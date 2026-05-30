@@ -299,7 +299,6 @@ priv.lib.Customers.common_bai.blfacadeintf-tests-1.0.0.jar
 pub.tool.Java_build.parent-1.4.0.jar
 ```
 
-XXXXX
 ### 2.10. Generated Documentation Location
 
 #### 2.10.1 Purpose
@@ -436,19 +435,11 @@ A documentation site MAY generate repository-level index pages listing all docum
 Such index pages SHOULD display human-readable module names and MAY omit redundant repository identity from visible labels, while still preserving full artifact coordinates in metadata.
 
 Example display label:
-
-```text
-lang.common.base
-```
-
+ `lang.common.base ` 
 with metadata:
-
-```text
-artifactId = pub.lib.Mps_lang.common.base
-groupId    = eu.algites.lib.mps
-```
-
-XXXXX
+ `artifactId = pub.lib.Mps_lang.common.base groupId    = <derived-groupId> `
+where:
+- `<derived-groupId>` is the groupId derived according to section 2.5 using the repository naming rules and the applicable domain prefix.
 
 ---
 
