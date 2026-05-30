@@ -299,9 +299,160 @@ priv.lib.Customers.common_bai.blfacadeintf-tests-1.0.0.jar
 pub.tool.Java_build.parent-1.4.0.jar
 ```
 
+XXXXX
+### 2.10. Generated Documentation Location
+
+#### 2.10.1 Purpose
+
+Generated documentation for repository artifacts SHOULD be placed under a dedicated documentation site root.
+
+This standard defines only the logical directory structure of generated documentation. It does not prescribe a concrete hosting mechanism. The same structure may be published using GitHub Pages, an internal web server, an artifact repository, or any other static documentation hosting solution.
+
+#### 2.10.2 Canonical Form
+
+Generated documentation for an artifact SHOULD use the following structure:
+
+```text
+<docs-site-root>/<module.path>/<documentation-channel>/
+```
+
+Where:
+
+- `<docs-site-root>` is the repository-local root directory for generated documentation site content,
+- `<module.path>` is the same module path used in the artifactId after the mandatory `_` repository separator,
+- `<documentation-channel>` identifies the published documentation view.
+
+Recommended documentation channels are:
+
+```text
+latest/
+snapshots/<snapshot-id>/
+releases/<version>/
+```
+
+#### 2.10.3 Examples
+
+For repository:
+
+```text
+pub.lib.Mps
+```
+
+and artifacts:
+
+```text
+pub.lib.Mps_lang.common.base
+pub.lib.Mps_sol.common.base
+```
+
+the generated documentation may be placed as:
+
+```text
+docs-site/
+  lang.common.base/
+    latest/
+    snapshots/main/
+    releases/0.1.0/
+
+  sol.common.base/
+    latest/
+    snapshots/main/
+    releases/0.1.0/
+```
+
+For repository:
+
+```text
+pub.tool.Java
+```
+
+and artifact:
+
+```text
+pub.tool.Java_build.parent
+```
+
+the generated documentation may be placed as:
+
+```text
+docs-site/
+  build.parent/
+    latest/
+    releases/1.4.0/
+```
+
+#### 2.10.4 Repository Prefix Rule
+
+The repository identity prefix MUST NOT be repeated in the documentation path when the documentation is stored or published within the scope of the same repository.
+
+Therefore, this is preferred:
+
+```text
+docs-site/lang.common.base/latest/
+```
+
+over:
+
+```text
+docs-site/pub.lib.Mps_lang.common.base/latest/
+```
+
+The full artifactId remains available as metadata inside the generated documentation.
+
+#### 2.10.5 Module Path Reuse
+
+The documentation path SHOULD reuse `<module.path>` rather than inventing a separate documentation identifier.
+
+This keeps the relationship between repository structure, artifact identity, and generated documentation deterministic:
+
+```text
+artifactId = <repository-id>_<module.path>
+docs path  = <docs-site-root>/<module.path>/
+```
+
+#### 2.10.6 Artifact Kind Disambiguation
+
+If multiple artifacts in the same repository would otherwise have the same logical module name, the module path SHOULD include a disambiguating folder segment.
+
+For example, MPS language and solution artifacts may use:
+
+```text
+lang.common.base
+sol.common.base
+```
+
+instead of both using:
+
+```text
+common.base
+```
+
+This is not a technology hierarchy in the documentation site. It is part of the artifact module path and therefore part of the artifact naming model.
+
+#### 2.10.7 Generated Indexes
+
+A documentation site MAY generate repository-level index pages listing all documented artifacts.
+
+Such index pages SHOULD display human-readable module names and MAY omit redundant repository identity from visible labels, while still preserving full artifact coordinates in metadata.
+
+Example display label:
+
+```text
+lang.common.base
+```
+
+with metadata:
+
+```text
+artifactId = pub.lib.Mps_lang.common.base
+groupId    = eu.algites.lib.mps
+```
+
+XXXXX
+
 ---
 
-### 2.10. Repository/Artifact Roles (Recommended Set)
+### 2.11. Repository/Artifact Roles (Recommended Set)
 
 Common roles include:
 
@@ -316,7 +467,7 @@ New roles MAY be introduced but MUST be lowercase and documented.
 
 ---
 
-### 2.11. CI/CD Governance
+### 2.12. CI/CD Governance
 
 CI pipelines MUST:
 
@@ -331,7 +482,7 @@ groupId MUST remain identical for public and private variants within the same do
 
 ---
 
-### 2.12. Migration Rule
+### 2.13. Migration Rule
 
 When migrating legacy projects:
 
@@ -342,7 +493,7 @@ When migrating legacy projects:
 
 ---
 
-### 2.13. Rationale
+### 2.14. Rationale
 
 This standard balances:
 
@@ -365,7 +516,7 @@ while extending them with explicit visibility and repository/module separation s
 
 ---
 
-### 2.14. Summary
+### 2.15. Summary
 
 - Repositories express **visibility + role + business identity**.
 - Artifacts express **visibility + role + business identity + module specialization**, separated by `_`.
@@ -382,7 +533,7 @@ This standard is normative for all Algites projects.
 ---
 [[/FINALLY-APPROVED]]
 
-[[UNVERIFIED]]
+[[PROPOSAL]]
 
 ## 3. Algites Artifact and Dependency Model
 
@@ -876,9 +1027,6 @@ Build integration:
 - CI: supplies publishing targets (download/upload endpoints) via environment/properties consistent with Algites conventions.
 
 ---
-[[/UNVERIFIED]]
-
-[[FINALLY-APPROVED]]
 
 ### 3.10. Artifact Roles
 
@@ -1469,5 +1617,5 @@ This section is intentionally placed at the end and is **temporary**.
     - parent edges define baseline dependency intents.
 
 
-[[/FINALLY-APPROVED]]
+[[/PROPOSAL]]
 
