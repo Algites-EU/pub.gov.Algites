@@ -42,6 +42,19 @@ data class AIcMpsArtifactCandidate(
 
 val locRepositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
 val locDiscoveryOutputFile = layout.buildDirectory.file("algites/discovered-mps-artifacts.tsv")
+
+fun AIcReadMpsDocsRepositoryId(): String {
+    val locFile = layout.projectDirectory.file("algites-source-repository.yml").asFile
+    require(locFile.isFile) {
+        "Missing repository configuration file: ${locFile.absolutePath}"
+    }
+
+    val locMatchResult = Regex("""(?m)^\s*id\s*:\s*([^\s#]+)\s*$""").find(locFile.readText(Charsets.UTF_8))
+    return requireNotNull(locMatchResult) {
+        "Cannot find sourceRepository.id in: ${locFile.absolutePath}"
+    }.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'")
+}
+
 val locGeneratedDocsRoot = layout.projectDirectory.dir(
     (findProperty("algites.docs.generatedRoot") as String?) ?: "docs-site/generated"
 )
@@ -143,7 +156,7 @@ fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
 }
 
 fun AIcReadRepositoryRole(): String {
-    val locRepositoryId = AIcReadRepositoryId()
+    val locRepositoryId = AIcReadMpsDocsRepositoryId()
     val locSegments = locRepositoryId.split(".")
     require(locSegments.size >= 3) {
         "Repository id must follow <vis>.<role>.<BusinessName>[.<reposubname>]: ${locRepositoryId}"
@@ -388,7 +401,7 @@ tasks.register("validateAlgitesConfiguration") {
             "Missing repository configuration file: ${locRepositoryFile.absolutePath}"
         }
 
-        val locRepositoryId = AIcReadRepositoryId()
+        val locRepositoryId = AIcReadMpsDocsRepositoryId()
         val locArtifactSetProjects = AIcReadArtifactSetProjects()
 
         logger.lifecycle("Algites repository id: ${locRepositoryId}")
@@ -418,7 +431,7 @@ tasks.register("discoverMpsArtifacts") {
     outputs.file(locDiscoveryOutputFile)
 
     doLast {
-        val locRepositoryId = AIcReadRepositoryId()
+        val locRepositoryId = AIcReadMpsDocsRepositoryId()
         val locArtifactSetProjects = AIcReadArtifactSetProjects()
         val locArtifacts = AIcDiscoverMpsArtifacts(locRepositoryId, locArtifactSetProjects)
         val locOutputFile = locDiscoveryOutputFile.get().asFile
@@ -473,6 +486,7 @@ tasks.register("generateDummyMpsDocs") {
     outputs.dir(locGeneratedDocsRoot)
 
     doLast {
+        val locRepositoryId = AIcReadMpsDocsRepositoryId()
         val locDiscoveryFile = locDiscoveryOutputFile.get().asFile
         require(locDiscoveryFile.isFile) {
             "Missing discovery output file: ${locDiscoveryFile.absolutePath}"
@@ -546,11 +560,11 @@ tasks.register("generateDummyMpsDocs") {
             <html lang="en">
             <head>
               <meta charset="utf-8">
-              <title>Generated ${AIcEscapeHtml(locRepositoryId)} MPS Documentation</title>
+              <title>Generated ${locRepositoryId} MPS Documentation</title>
             </head>
             <body>
               <main>
-                <h1>Generated ${AIcEscapeHtml(locRepositoryId)} MPS Documentation</h1>
+                <h1>Generated ${locRepositoryId} MPS Documentation</h1>
                 <ul>
             ${
                 locPublishableLines.joinToString("\n") { locLine ->
