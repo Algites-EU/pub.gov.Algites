@@ -546,11 +546,11 @@ tasks.register("generateDummyMpsDocs") {
             <html lang="en">
             <head>
               <meta charset="utf-8">
-              <title>Generated ${locRepositoryId} MPS Documentation</title>
+              <title>Generated ${AIcEscapeHtml(locRepositoryId)} MPS Documentation</title>
             </head>
             <body>
               <main>
-                <h1>Generated ${locRepositoryId} MPS Documentation</h1>
+                <h1>Generated ${AIcEscapeHtml(locRepositoryId)} MPS Documentation</h1>
                 <ul>
             ${
                 locPublishableLines.joinToString("\n") { locLine ->
