@@ -1,0 +1,92 @@
+name: Generate and publish Algites documentation site
+
+on:
+  workflow_call:
+    inputs:
+      gradle-task:
+        description: Gradle task that generates the documentation site.
+        required: false
+        type: string
+        default: generateDummyMpsDocs
+      docs-site-path:
+        description: Path to the generated static documentation site.
+        required: false
+        type: string
+        default: docs-site
+      java-version:
+        description: Java version used for Gradle execution.
+        required: false
+        type: string
+        default: "21"
+      gradle-arguments:
+        description: Additional Gradle arguments.
+        required: false
+        type: string
+        default: ""
+      publish-pages:
+        description: Whether to deploy the generated documentation to GitHub Pages.
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: algites-docs-pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  generate-docs:
+    name: Generate documentation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version }}
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Generate documentation site
+        shell: bash
+        run: ./gradlew --no-daemon ${{ inputs.gradle-task }} ${{ inputs.gradle-arguments }}
+
+      - name: Upload documentation site as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: algites-docs-site
+          path: ${{ inputs.docs-site-path }}
+          if-no-files-found: error
+
+      - name: Configure GitHub Pages
+        if: ${{ inputs.publish-pages }}
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: ${{ inputs.publish-pages }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ inputs.docs-site-path }}
+
+  deploy-pages:
+    name: Deploy GitHub Pages
+    if: ${{ inputs.publish-pages }}
+    needs: generate-docs
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
