@@ -312,12 +312,13 @@ This standard defines only the logical directory structure of generated document
 Generated documentation for an artifact SHOULD use the following structure:
 
 ```text
-<docs-site-root>/<module.path>/<documentation-channel>/
+<docs-site-root>/generated/<module.path>/<documentation-channel>/
 ```
 
 Where:
 
 - `<docs-site-root>` is the repository-local root directory for generated documentation site content,
+- `generated` is the root of generated documentation, which can be potentially removed and regenerated without impacting the manually created documentation. This folder should never contain manually created documentation.
 - `<module.path>` is the same module path used in the artifactId after the mandatory `_` repository separator,
 - `<documentation-channel>` identifies the published documentation view.
 
@@ -348,15 +349,16 @@ the generated documentation may be placed as:
 
 ```text
 docs-site/
-  lang.common.base/
-    latest/
-    snapshots/main/
-    releases/0.1.0/
+  generated/
+    lang.common.base/
+      latest/
+      snapshots/main/
+      releases/0.1.0/
 
-  sol.common.base/
-    latest/
-    snapshots/main/
-    releases/0.1.0/
+    sol.common.base/
+      latest/
+      snapshots/main/
+      releases/0.1.0/
 ```
 
 For repository:
@@ -375,9 +377,10 @@ the generated documentation may be placed as:
 
 ```text
 docs-site/
-  build.parent/
-    latest/
-    releases/1.4.0/
+  generated/
+    build.parent/
+      latest/
+      releases/1.4.0/
 ```
 
 #### 2.10.4 Repository Prefix Rule
@@ -387,13 +390,13 @@ The repository identity prefix MUST NOT be repeated in the documentation path wh
 Therefore, this is preferred:
 
 ```text
-docs-site/lang.common.base/latest/
+docs-site/generated/lang.common.base/latest/
 ```
 
 over:
 
 ```text
-docs-site/pub.lib.Mps_lang.common.base/latest/
+docs-site/generated/pub.lib.Mps_lang.common.base/latest/
 ```
 
 The full artifactId remains available as metadata inside the generated documentation.
