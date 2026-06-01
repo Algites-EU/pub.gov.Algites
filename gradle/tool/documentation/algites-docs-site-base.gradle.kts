@@ -8,9 +8,7 @@
  * index. Technology-specific scripts should apply this script automatically.
  */
 
-plugins {
-    base
-}
+apply(plugin = "base")
 
 val locDocsSiteRoot = layout.projectDirectory.dir(
     (findProperty("algites.docs.siteRoot") as String?) ?: "docs-site"
