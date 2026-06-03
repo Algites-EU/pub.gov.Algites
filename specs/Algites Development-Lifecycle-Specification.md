@@ -10,8 +10,7 @@ In the case of GitHub the GitHub Actions pipeline facility is used.
 
 The goal is to provide a predictable, low-friction workflow:
 
-- Keep **Gradle** as the primary, fast path.
-- Keep **Maven** compatible and up-to-date (typically when Maven config changes).
+- Keep **Gradle** as only build tool, no Maven support anymore.
 - Enable **safe test-only runs** on dedicated branches without publishing.
 - Enable **fast compile-only runs** on feature branches.
 - Support Algites-style **variant branches** (e.g. `jvm17/*`, `jvm21/*`, `and21/*`, `mps2025.1/*`) naturally.
@@ -34,7 +33,6 @@ Creation of the releases or nightly build deployments to the artifact repositori
 - **Central workflow**: the reusable workflow hosted centrally (e.g. in `pub.gov.Algites`) that contains the logic for:
   - deciding what to do based on branch name,
   - detecting config changes,
-  - resolving build tool (Gradle vs Maven),
   - resolving Java version,
   - generating tokens,
   - running compile/tests/publishing,
@@ -108,7 +106,7 @@ Feature branches are compiled without tests:
 Examples:
 
 - `feature/ci-experiment`
-- `jvm17/feature/ID.123_maven-compat`
+- `jvm17/feature/ID.123_new-compat`
 
 **Mode = compile**
 
@@ -120,106 +118,11 @@ All branches not matching the above patterns are treated as:
 
 **Mode = skip**
 
----
-[//]: # (Obsolete, no longer valid - to be removed)
-
-[//]: # (#### 2.1.4. Config-change detection &#40;Maven vs Gradle&#41;)
-
-[//]: # ()
-[//]: # (The central workflow detects changes between the pushed commits and classifies them as:)
-
-[//]: # ()
-[//]: # (- **POM change** &#40;Maven config changed&#41;: e.g. `**/pom.xml`, `**/*.pom`)
-
-[//]: # (- **Gradle config change**: e.g.)
-
-[//]: # (  - `**/build.gradle`, `**/build.gradle.kts`)
-
-[//]: # (  - `**/settings.gradle`, `**/settings.gradle.kts`)
-
-[//]: # (  - `**/gradle.properties`)
-
-[//]: # (  - `gradle/**` &#40;wrapper/config&#41;)
-
-[//]: # (  - `buildSrc/**`)
-
-[//]: # (  - `gradlew`, `gradlew.bat`)
-
-[//]: # ()
-[//]: # (This is used to decide which build tool&#40;s&#41; to run in **auto** mode.)
-
-[//]: # ()
-[//]: # (---)
-
-[//]: # ()
-[//]: # (#### 2.1.5. Build Tool Selection)
-
-[//]: # ()
-[//]: # (The pipeline can run **Gradle**, **Maven**, or **both** in a single CI run.)
-
-[//]: # ()
-[//]: # (##### 2.1.5.1 Repository configuration file &#40;optional&#41;)
-
-[//]: # ()
-[//]: # (Add an optional file at repository root:)
-
-[//]: # ()
-[//]: # (- `algites-source-repository.properties`)
-
-[//]: # ()
-[//]: # (Example:)
-
-[//]: # ()
-[//]: # (```properties)
-
-[//]: # (algites.build-tool=maven)
-
-[//]: # (```)
-
-[//]: # ()
-[//]: # (Supported values:)
-
-[//]: # ()
-[//]: # (- `algites.build-tool=gradle`)
-
-[//]: # (- `algites.build-tool=maven`)
-
-[//]: # (- `algites.build-tool=auto`)
-
-[//]: # ()
-[//]: # (If the file is missing &#40;or set to `auto`&#41;, optimized auto-selection is used.)
-
-[//]: # ()
-[//]: # (##### 2.1.5.2 Optimized auto-selection rules)
-
-[//]: # ()
-[//]: # (If `algites.build-tool` is not forced &#40;file missing or set to `auto`, and workflow input is `auto`&#41;:)
-
-[//]: # ()
-[//]: # (- If **POM changed** → run **Maven only**)
-
-[//]: # (- Else if **Gradle config changed** → run **Gradle**)
-
-[//]: # (- Else &#40;no POM/Gradle config change&#41; → run **Gradle**)
-
-[//]: # (- If **both POM and Gradle config changed** → run **both Maven and Gradle**)
-
-[//]: # ()
-[//]: # (If `algites.build-tool` is forced to `maven` or `gradle`, only that tool runs &#40;even if both configs changed&#41;.)
-
-[//]: # ()
-[//]: # (##### 2.1.5.3 Practical note &#40;double execution&#41;)
-
-[//]: # ()
-[//]: # (If both Maven and Gradle configurations are changed, CI will execute **both toolchains**.)
-
-[//]: # (To keep changes easier to review and to avoid multiple CI runs across separate pushes, it is usually best to)
-
-[//]: # (change Maven + Gradle config together **in one commit** &#40;or one push&#41;.)
+#### 2.1.4. (reserved)
 
 #### 2.1.5. Build Tool - Gradle
 
-The unified build is based uniquely on Grafdle in all repositories. But for every artifacts Gradle produces also the Maven artifacts to allow free usage of the generated products also from Maven buuilding system. Artifacts are published by gradle in the maven repositories.
+The unified build is based uniquely on Gradle in all repositories. But for every artifacts Gradle produces also the Maven artifacts to allow free usage of the generated products also from Maven buuilding system. Artifacts are published by gradle in the maven repositories.
 
 ##### 2.1.5.1 Gradle bootstrap handling
 
@@ -482,10 +385,7 @@ If Java version is not provided explicitly, the workflow auto-detects it in this
 
 1. `.java-version` (single integer per line, e.g. `17`)
 2. `gradle.properties` containing `javaVersion=<n>`
-3. root `pom.xml` containing either:
-   - `<maven.compiler.release>n</maven.compiler.release>`
-   - `<maven.compiler.source>n</maven.compiler.source>`
-4. fallback default (currently `17`)
+3. fallback default (currently `17`)
 
 ---
 
@@ -586,7 +486,7 @@ Lane meaning:
 
 #### 3.1.2. Repository metadata
 
-To use the lanes on the project, the repo MUST contain `algites-source-repository.properties` in repository root with the defined lane identification:
+To use the lanes on the project, the repo MUST contain `algites-source-repository.yml` in repository root with the defined lane identification:
 
 ```properties
 algites.repository.lane=1.1
@@ -627,22 +527,8 @@ This eliminates constant conflicts during upmerge (because `C` is not stored in 
 
 #### 3.1.4. CI: when/what runs
 
-The unified CI workflow computes the snapshot version and then runs either Gradle or Maven:
+The unified CI workflow computes the snapshot version and then runs Gradle
 
-##### 3.1.4.1 Build tool selection
-`algites-source-repository.properties` (optional):
-
-```properties
-algites.build-tool=auto     # default
-# algites.build-tool=gradle
-# algites.build-tool=maven
-```
-
-In `auto`, CI prefers Gradle if a Gradle wrapper / build files exist; otherwise Maven if a root `pom.xml` exists.
-
-See the detaiuls in the above chapter "Build Tool Selection"
-
----
 
 #### 3.1.5. Release process (manual action)
 
