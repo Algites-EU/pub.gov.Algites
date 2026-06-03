@@ -3,267 +3,231 @@
  *
  * Intended location in governance repository:
  *   gradle/tool/documentation/algites-docs-site-base.gradle.kts
- *
- * This script defines common documentation-site conventions, publication
- * parameters, and generated documentation indexes. Technology-specific scripts
- * must generate only artifact directories under the active publication root.
  */
 
-if ((extra.properties["algitesDocsBaseApplied"] as Boolean?) != true) {
-    extra["algitesDocsBaseApplied"] = true
+apply(plugin = "base")
 
-    apply(plugin = "base")
+val docsSiteRoot = file((findProperty("algites.docs.siteRoot") as String?) ?: "docs-site")
+val generatedDocsRoot = File(docsSiteRoot, "generated")
+val repositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml").asFile
 
-    val docsSiteRootDirectory = layout.projectDirectory.dir(
-        (findProperty("algites.docs.siteRoot") as String?) ?: "docs-site"
+val docsPublicationKind = ((findProperty("algites.docs.publicationKind") as String?) ?: "snapshot").trim().lowercase()
+require(docsPublicationKind in setOf("preview", "snapshot", "release")) {
+    "Invalid algites.docs.publicationKind='${docsPublicationKind}'. Allowed values are: preview, snapshot, release."
+}
+
+val docsPublicationIdRaw = ((findProperty("algites.docs.publicationId") as String?) ?: "local").trim().ifBlank { "local" }
+val docsPublicationId = docsPublicationIdRaw
+    .replace(Regex("[^A-Za-z0-9._-]+"), "-")
+    .trim('-', '.', '_')
+    .ifBlank { "local" }
+
+val docsPublicationRoot = File(generatedDocsRoot, "${docsPublicationKind}/${docsPublicationId}")
+
+extra["algitesDocsSiteRootPath"] = docsSiteRoot.path
+extra["algitesGeneratedDocsRootPath"] = generatedDocsRoot.path
+extra["algitesDocsPublicationKind"] = docsPublicationKind
+extra["algitesDocsPublicationId"] = docsPublicationId
+extra["algitesDocsPublicationRootPath"] = docsPublicationRoot.path
+
+fun String.AIcNormalizeYamlScalar(): String {
+    return trim().removeSurrounding("\"").removeSurrounding("'")
+}
+
+fun AIcReadYamlScalar(aYamlText: String, aKey: String): String? {
+    return Regex("""(?m)^\s*${Regex.escape(aKey)}\s*:\s*([^#\r\n]+)\s*(?:#.*)?$""")
+        .find(aYamlText)
+        ?.groupValues
+        ?.get(1)
+        ?.AIcNormalizeYamlScalar()
+        ?.takeIf { it.isNotBlank() }
+}
+
+data class AIcRepositoryDocumentationMetadata(
+    val id: String,
+    val name: String,
+    val description: String
+)
+
+fun AIcReadRepositoryDocumentationMetadata(): AIcRepositoryDocumentationMetadata {
+    if (!repositoryConfigFile.isFile) {
+        return AIcRepositoryDocumentationMetadata(
+            id = rootProject.name,
+            name = rootProject.name,
+            description = ""
+        )
+    }
+
+    val locYamlText = repositoryConfigFile.readText(Charsets.UTF_8)
+    val locRepositoryId = AIcReadYamlScalar(locYamlText, "id") ?: rootProject.name
+    val locRepositoryName = AIcReadYamlScalar(locYamlText, "name") ?: locRepositoryId
+    val locRepositoryDescription = AIcReadYamlScalar(locYamlText, "description") ?: ""
+
+    return AIcRepositoryDocumentationMetadata(
+        id = locRepositoryId,
+        name = locRepositoryName,
+        description = locRepositoryDescription
     )
+}
 
-    val generatedDocsRootDirectory = layout.projectDirectory.dir(
-        (findProperty("algites.docs.generatedRoot") as String?) ?: "docs-site/generated"
-    )
+fun String.AIcEscapeHtml(): String {
+    return replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;")
+}
 
-    val repositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
+fun File.AIcRelativeUrlFrom(aBaseDirectory: File): String {
+    return aBaseDirectory.toPath().relativize(toPath()).toString().replace(File.separatorChar, '/')
+}
 
-    val docsPublicationKind = ((findProperty("algites.docs.publicationKind") as String?) ?: "snapshot")
-        .trim()
-        .lowercase()
+tasks.register("generateAlgitesDocsRootIndex") {
+    group = "algites"
+    description = "Generates the stable root index page for the Algites documentation site."
 
-    require(docsPublicationKind in setOf("preview", "snapshot", "release")) {
-        "Invalid algites.docs.publicationKind='${docsPublicationKind}'. Allowed values are: preview, snapshot, release."
+    outputs.file(File(docsSiteRoot, "index.html"))
+
+    doLast {
+        val locMetadata = AIcReadRepositoryDocumentationMetadata()
+        val locIndexFile = File(docsSiteRoot, "index.html")
+        locIndexFile.parentFile.mkdirs()
+
+        locIndexFile.writeText(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>${locMetadata.name.AIcEscapeHtml()} Documentation</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.5; color: #1f2937; background: #f9fafb; }
+                header, main { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+                header { padding-top: 2rem; }
+                h1 { margin: 0 0 0.5rem 0; font-size: 2rem; }
+                .meta, .card { background: white; border: 1px solid #e5e7eb; border-radius: 0.75rem; padding: 1rem 1.25rem; margin: 1rem 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+                iframe { width: 100%; min-height: 70vh; border: 1px solid #e5e7eb; border-radius: 0.75rem; background: white; }
+                a { color: #2563eb; }
+                code { background: #f3f4f6; border-radius: 0.25rem; padding: 0.1rem 0.25rem; }
+              </style>
+            </head>
+            <body>
+              <header>
+                <h1>${locMetadata.name.AIcEscapeHtml()}</h1>
+                <div class="meta">
+                  <p><strong>Repository ID:</strong> <code>${locMetadata.id.AIcEscapeHtml()}</code></p>
+                  ${if (locMetadata.description.isNotBlank()) "<p>${locMetadata.description.AIcEscapeHtml()}</p>" else ""}
+                  <p><strong>Current publication:</strong> <code>${docsPublicationKind.AIcEscapeHtml()}/${docsPublicationId.AIcEscapeHtml()}</code></p>
+                </div>
+              </header>
+
+              <main>
+                <section class="card">
+                  <h2>Generated documentation</h2>
+                  <p>
+                    Open the generated documentation index directly:
+                    <a href="generated/">generated/index.html</a>.
+                  </p>
+                </section>
+                <iframe src="generated/" title="Generated documentation index"></iframe>
+              </main>
+            </body>
+            </html>
+            """.trimIndent(),
+            Charsets.UTF_8
+        )
     }
+}
 
-    fun String.AIcSanitizeDocumentationPathSegment(): String {
-        val locTrimmedValue = trim()
-        val locSanitizedValue = locTrimmedValue
-            .replace(Regex("""[^A-Za-z0-9._-]+"""), "-")
-            .trim('-', '.', '_')
-        return locSanitizedValue.ifBlank { "local" }
-    }
+tasks.register("generateAlgitesGeneratedDocsIndex") {
+    group = "algites"
+    description = "Generates generated/index.html and publication-level indexes from the staged documentation tree."
 
-    val docsPublicationId = ((findProperty("algites.docs.publicationId") as String?) ?: "local")
-        .AIcSanitizeDocumentationPathSegment()
+    outputs.file(File(generatedDocsRoot, "index.html"))
 
-    val publicationRootDirectory = generatedDocsRootDirectory.dir("${docsPublicationKind}/${docsPublicationId}")
+    doLast {
+        generatedDocsRoot.mkdirs()
+        docsPublicationRoot.mkdirs()
 
-    extra["algitesDocsSiteRootPath"] = docsSiteRootDirectory.asFile.path
-    extra["algitesGeneratedDocsRootPath"] = generatedDocsRootDirectory.asFile.path
-    extra["algitesDocsPublicationKind"] = docsPublicationKind
-    extra["algitesDocsPublicationId"] = docsPublicationId
-    extra["algitesDocsPublicationRootPath"] = publicationRootDirectory.asFile.path
+        val locPublicationDirectories = listOf("preview", "snapshot", "release")
+            .map { locKind -> locKind to File(generatedDocsRoot, locKind) }
+            .filter { (_, locDirectory) -> locDirectory.isDirectory }
 
-    fun String.AIcNormalizeYamlScalar(): String {
-        return trim().removeSurrounding("\"").removeSurrounding("'")
-    }
+        locPublicationDirectories.forEach { (locKind, locKindDirectory) ->
+            locKindDirectory.listFiles { locFile -> locFile.isDirectory }
+                ?.sortedBy { locFile -> locFile.name }
+                ?.forEach { locPublicationDirectory ->
+                    val locArtifactIndexes = locPublicationDirectory
+                        .walkTopDown()
+                        .filter { locFile -> locFile.isFile && locFile.name == "index.html" && locFile.parentFile != locPublicationDirectory }
+                        .map { locFile -> locFile.parentFile }
+                        .distinct()
+                        .sortedBy { locDirectory -> locDirectory.AIcRelativeUrlFrom(locPublicationDirectory) }
+                        .toList()
 
-    fun AIcReadRepositoryId(): String {
-        val locFile = repositoryConfigFile.asFile
-        if (!locFile.isFile) {
-            return rootProject.name
-        }
-
-        val locMatchResult = Regex("""(?m)^\s*id\s*:\s*([^\s#]+)\s*$""").find(locFile.readText(Charsets.UTF_8))
-        return locMatchResult?.groupValues?.get(1)?.AIcNormalizeYamlScalar() ?: rootProject.name
-    }
-
-    fun AIcReadGeneratedArtifactTitle(aArtifactDirectory: File): String {
-        val locMetadataFile = aArtifactDirectory.resolve(".algites-docs-artifact.properties")
-        if (locMetadataFile.isFile) {
-            val locMetadata = java.util.Properties()
-            locMetadataFile.inputStream().use { locInputStream -> locMetadata.load(locInputStream) }
-            val locTitle = locMetadata.getProperty("title")
-            if (!locTitle.isNullOrBlank()) {
-                return locTitle
-            }
-        }
-        return aArtifactDirectory.name
-    }
-
-    fun AIcReadGeneratedArtifactType(aArtifactDirectory: File): String? {
-        val locMetadataFile = aArtifactDirectory.resolve(".algites-docs-artifact.properties")
-        if (!locMetadataFile.isFile) {
-            return null
-        }
-        val locMetadata = java.util.Properties()
-        locMetadataFile.inputStream().use { locInputStream -> locMetadata.load(locInputStream) }
-        return locMetadata.getProperty("type")?.takeIf { locValue -> locValue.isNotBlank() }
-    }
-
-    fun AIcRelativeHref(aBaseDirectory: File, aTargetFile: File): String {
-        return aBaseDirectory.toPath()
-            .relativize(aTargetFile.toPath())
-            .toString()
-            .replace(File.separatorChar, '/')
-    }
-
-    tasks.register("generateAlgitesDocsRootIndex") {
-        group = "algites"
-        description = "Generates the stable root index page for the Algites documentation site."
-
-        outputs.file(docsSiteRootDirectory.file("index.html"))
-
-        doLast {
-            val locRepositoryId = AIcReadRepositoryId()
-            val locIndexFile = docsSiteRootDirectory.file("index.html").asFile
-            locIndexFile.parentFile.mkdirs()
-
-            if (!locIndexFile.exists() || (findProperty("algites.docs.overwriteRootIndex") == "true")) {
-                locIndexFile.writeText(
-                    """
-                    <!doctype html>
-                    <html lang="en">
-                    <head>
-                      <meta charset="utf-8">
-                      <title>${locRepositoryId} Documentation</title>
-                      <meta name="viewport" content="width=device-width, initial-scale=1">
-                    </head>
-                    <body>
-                      <main>
-                        <h1>${locRepositoryId} Documentation</h1>
-                        <p>This is the stable repository documentation entry point.</p>
-                        <p><a href="generated/">Open generated documentation</a></p>
-                      </main>
-                    </body>
-                    </html>
-                    """.trimIndent(),
-                    Charsets.UTF_8
-                )
-            } else {
-                logger.lifecycle("Keeping existing manual documentation root index: ${locIndexFile.absolutePath}")
-            }
-        }
-    }
-
-    tasks.register("generateAlgitesDocsPublicationIndex") {
-        group = "algites"
-        description = "Generates the index for the active Algites documentation publication."
-
-        outputs.file(publicationRootDirectory.file("index.html"))
-
-        doLast {
-            val locRepositoryId = AIcReadRepositoryId()
-            val locPublicationRoot = publicationRootDirectory.asFile
-            locPublicationRoot.mkdirs()
-
-            val locArtifactDirectories = locPublicationRoot
-                .walkTopDown()
-                .maxDepth(2)
-                .filter { locFile -> locFile.isDirectory }
-                .filter { locFile -> locFile != locPublicationRoot }
-                .filter { locFile -> locFile.resolve("index.html").isFile }
-                .sortedBy { locFile -> locFile.relativeTo(locPublicationRoot).path.replace(File.separatorChar, '/') }
-                .toList()
-
-            val locItemsHtml = if (locArtifactDirectories.isEmpty()) {
-                "      <li>No generated artifact documentation was found for this publication.</li>"
-            } else {
-                locArtifactDirectories.joinToString("\n") { locDirectory ->
-                    val locHref = AIcRelativeHref(locPublicationRoot, locDirectory.resolve("index.html"))
-                    val locTitle = AIcReadGeneratedArtifactTitle(locDirectory)
-                    val locType = AIcReadGeneratedArtifactType(locDirectory)?.let { locValue -> " <small>(${locValue})</small>" } ?: ""
-                    "      <li><a href=\"${locHref}\">${locTitle}</a>${locType}</li>"
+                    val locPublicationIndexFile = File(locPublicationDirectory, "index.html")
+                    locPublicationIndexFile.writeText(
+                        """
+                        <!doctype html>
+                        <html lang="en">
+                        <head>
+                          <meta charset="utf-8">
+                          <title>${locKind}/${locPublicationDirectory.name} Documentation</title>
+                          <meta name="viewport" content="width=device-width, initial-scale=1">
+                        </head>
+                        <body>
+                          <main>
+                            <h1>${locKind.AIcEscapeHtml()}/${locPublicationDirectory.name.AIcEscapeHtml()}</h1>
+                            <ul>
+                        ${locArtifactIndexes.joinToString("\n") { locArtifactDirectory ->
+                            val locUrl = locArtifactDirectory.AIcRelativeUrlFrom(locPublicationDirectory) + "/"
+                            "      <li><a href=\"${locUrl.AIcEscapeHtml()}\">${locArtifactDirectory.AIcRelativeUrlFrom(locPublicationDirectory).AIcEscapeHtml()}</a></li>"
+                        }}
+                            </ul>
+                          </main>
+                        </body>
+                        </html>
+                        """.trimIndent(),
+                        Charsets.UTF_8
+                    )
                 }
-            }
-
-            publicationRootDirectory.file("index.html").asFile.writeText(
-                """
-                <!doctype html>
-                <html lang="en">
-                <head>
-                  <meta charset="utf-8">
-                  <title>${locRepositoryId} ${docsPublicationKind} ${docsPublicationId} Documentation</title>
-                  <meta name="viewport" content="width=device-width, initial-scale=1">
-                </head>
-                <body>
-                  <main>
-                    <h1>${locRepositoryId} Documentation</h1>
-                    <dl>
-                      <dt>Publication kind</dt>
-                      <dd>${docsPublicationKind}</dd>
-                      <dt>Publication ID</dt>
-                      <dd>${docsPublicationId}</dd>
-                    </dl>
-                    <h2>Generated artifacts</h2>
-                    <ul>
-                ${locItemsHtml}
-                    </ul>
-                    <p><a href="../../index.html">All generated publications</a></p>
-                  </main>
-                </body>
-                </html>
-                """.trimIndent(),
-                Charsets.UTF_8
-            )
         }
+
+        val locGeneratedIndexFile = File(generatedDocsRoot, "index.html")
+        locGeneratedIndexFile.writeText(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>Generated Documentation</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+            </head>
+            <body>
+              <main>
+                <h1>Generated Documentation</h1>
+                <h2>Publication sections</h2>
+                <ul>
+            ${locPublicationDirectories.joinToString("\n") { (locKind, locDirectory) ->
+                "      <li><a href=\"${locKind}/\">${locKind.AIcEscapeHtml()}</a> (${locDirectory.listFiles { locFile -> locFile.isDirectory }?.size ?: 0})</li>"
+            }}
+                </ul>
+                <h2>Current publication</h2>
+                <p><a href="${docsPublicationKind}/${docsPublicationId}/">${docsPublicationKind.AIcEscapeHtml()}/${docsPublicationId.AIcEscapeHtml()}</a></p>
+              </main>
+            </body>
+            </html>
+            """.trimIndent(),
+            Charsets.UTF_8
+        )
     }
+}
 
-    tasks.register("generateAlgitesDocsGeneratedIndex") {
-        group = "algites"
-        description = "Generates the top-level generated documentation index."
+tasks.register("generateAlgitesDocsSite") {
+    group = "algites"
+    description = "Generic aggregate task for repository documentation site generation."
 
-        dependsOn("generateAlgitesDocsPublicationIndex")
-
-        outputs.file(generatedDocsRootDirectory.file("index.html"))
-
-        doLast {
-            val locRepositoryId = AIcReadRepositoryId()
-            val locGeneratedRoot = generatedDocsRootDirectory.asFile
-            locGeneratedRoot.mkdirs()
-
-            val locPublicationDirectories = locGeneratedRoot
-                .walkTopDown()
-                .maxDepth(3)
-                .filter { locFile -> locFile.isDirectory }
-                .filter { locFile -> locFile != locGeneratedRoot }
-                .filter { locFile -> locFile.resolve("index.html").isFile }
-                .filter { locFile -> locFile.parentFile.parentFile == locGeneratedRoot }
-                .sortedBy { locFile -> locFile.relativeTo(locGeneratedRoot).path.replace(File.separatorChar, '/') }
-                .toList()
-
-            val locItemsHtml = if (locPublicationDirectories.isEmpty()) {
-                "      <li>No generated documentation publications were found.</li>"
-            } else {
-                locPublicationDirectories.joinToString("\n") { locDirectory ->
-                    val locRelativePath = locDirectory.relativeTo(locGeneratedRoot).path.replace(File.separatorChar, '/')
-                    "      <li><a href=\"${locRelativePath}/\">${locRelativePath}</a></li>"
-                }
-            }
-
-            generatedDocsRootDirectory.file("index.html").asFile.writeText(
-                """
-                <!doctype html>
-                <html lang="en">
-                <head>
-                  <meta charset="utf-8">
-                  <title>Generated ${locRepositoryId} Documentation</title>
-                  <meta name="viewport" content="width=device-width, initial-scale=1">
-                </head>
-                <body>
-                  <main>
-                    <h1>Generated ${locRepositoryId} Documentation</h1>
-                    <ul>
-                ${locItemsHtml}
-                    </ul>
-                  </main>
-                </body>
-                </html>
-                """.trimIndent(),
-                Charsets.UTF_8
-            )
-        }
-    }
-
-    tasks.register("generateAlgitesDocsIndexes") {
-        group = "algites"
-        description = "Generates all common Algites documentation indexes."
-
-        dependsOn("generateAlgitesDocsRootIndex")
-        dependsOn("generateAlgitesDocsGeneratedIndex")
-    }
-
-    tasks.register("generateAlgitesDocsSite") {
-        group = "algites"
-        description = "Generic aggregate task for repository documentation site generation."
-
-        dependsOn("generateAlgitesDocsIndexes")
-    }
+    dependsOn("generateAlgitesDocsRootIndex")
+    dependsOn("generateAlgitesGeneratedDocsIndex")
 }

@@ -4,33 +4,34 @@
  * Intended location in governance repository:
  *   gradle/tool/documentation/algites-docs-site.gradle.kts
  *
- * This script is the public entry point for repository documentation generation.
- * It applies the common base script, detects artifact-set project documentation
- * type, and then applies the required technology-specific documentation scripts.
+ * This is the public entry point. It applies the shared base script and then
+ * applies technology-specific generators according to artifact/artifact-set type.
  */
 
-val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as String?)
+val algitesDocsBaseScript = (findProperty("algites.docs.baseScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-base.gradle.kts"
 
-val locAlgitesDocsJavaScript = (findProperty("algites.docs.javaScript") as String?)
+val algitesDocsJavaScript = (findProperty("algites.docs.javaScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-java.gradle.kts"
 
-val locAlgitesDocsMpsScript = (findProperty("algites.docs.mpsScript") as String?)
+val algitesDocsMpsScript = (findProperty("algites.docs.mpsScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-mps.gradle.kts"
 
-apply(from = uri(locAlgitesDocsBaseScript))
+apply(from = uri(algitesDocsBaseScript))
 
-data class AIcDocsArtifactSetProject(
-    val locRelativePath: String,
-    val locProjectDirectory: File,
-    val locDocumentationType: String,
-    val locDocumentationTypeReason: String
-)
-
-val locRepositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
+val repositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml").asFile
 
 fun String.AIcNormalizeYamlScalar(): String {
     return trim().removeSurrounding("\"").removeSurrounding("'")
+}
+
+fun AIcReadYamlScalar(aYamlText: String, aKey: String): String? {
+    return Regex("""(?m)^\s*${Regex.escape(aKey)}\s*:\s*([^#\r\n]+)\s*(?:#.*)?$""")
+        .find(aYamlText)
+        ?.groupValues
+        ?.get(1)
+        ?.AIcNormalizeYamlScalar()
+        ?.takeIf { it.isNotBlank() }
 }
 
 fun AIcReadYamlListAfterKey(aYamlText: String, aKey: String): List<String> {
@@ -44,13 +45,11 @@ fun AIcReadYamlListAfterKey(aYamlText: String, aKey: String): List<String> {
 
         for (locSubIndex in locIndex + 1 until locLines.size) {
             val locSubLine = locLines[locSubIndex]
-
             if (locSubLine.isBlank()) {
                 continue
             }
 
             val locIndent = locSubLine.takeWhile { it == ' ' }.length
-
             if (locIndent <= locBaseIndent) {
                 break
             }
@@ -69,22 +68,12 @@ fun AIcReadYamlListAfterKey(aYamlText: String, aKey: String): List<String> {
     return emptyList()
 }
 
-fun AIcReadYamlScalarByKey(aYamlText: String, aKey: String): String? {
-    return Regex("""(?m)^\s*${Regex.escape(aKey)}\s*:\s*([^#\r\n]+)\s*(?:#.*)?$""")
-        .find(aYamlText)
-        ?.groupValues
-        ?.get(1)
-        ?.AIcNormalizeYamlScalar()
-        ?.takeIf { it.isNotBlank() }
-}
-
 fun AIcReadArtifactSetProjectRelativePaths(): List<String> {
-    val locFile = locRepositoryConfigFile.asFile
-    require(locFile.isFile) {
-        "Missing repository configuration file: ${locFile.absolutePath}"
+    if (!repositoryConfigFile.isFile) {
+        return listOf(".")
     }
 
-    val locYamlText = locFile.readText(Charsets.UTF_8)
+    val locYamlText = repositoryConfigFile.readText(Charsets.UTF_8)
     val locCandidateKeys = listOf(
         "containedArtifactSetProjectRelativePaths",
         "containedArtifactSetRelativePaths",
@@ -92,110 +81,82 @@ fun AIcReadArtifactSetProjectRelativePaths(): List<String> {
         "containedArtifactRelativePaths"
     )
 
-    val locRelativePaths = locCandidateKeys
+    return locCandidateKeys
         .asSequence()
         .map { locKey -> AIcReadYamlListAfterKey(locYamlText, locKey) }
         .firstOrNull { locValues -> locValues.isNotEmpty() }
-        ?: emptyList()
-
-    return locRelativePaths.ifEmpty { listOf(".") }
+        ?.ifEmpty { listOf(".") }
+        ?: listOf(".")
 }
 
-fun AIcReadExplicitDocumentationType(aArtifactSetProjectDirectory: File): String? {
-    val locConfigurationFile = aArtifactSetProjectDirectory.resolve("algites-artifact-set.yml")
-    if (!locConfigurationFile.isFile) {
-        return null
+fun AIcReadExplicitArtifactType(aProjectDirectory: File): String? {
+    val locArtifactSetFile = aProjectDirectory.resolve("algites-artifact-set.yml")
+    if (locArtifactSetFile.isFile) {
+        return AIcReadYamlScalar(locArtifactSetFile.readText(Charsets.UTF_8), "type")?.lowercase()
     }
 
-    val locYamlText = locConfigurationFile.readText(Charsets.UTF_8)
-    return AIcReadYamlScalarByKey(locYamlText, "documentationType")
-        ?: AIcReadYamlScalarByKey(locYamlText, "artifactType")
-        ?: AIcReadYamlScalarByKey(locYamlText, "type")
+    val locArtifactFile = aProjectDirectory.resolve("algites-artifact.yml")
+    if (locArtifactFile.isFile) {
+        return AIcReadYamlScalar(locArtifactFile.readText(Charsets.UTF_8), "type")?.lowercase()
+    }
+
+    return null
 }
 
 fun AIcContainsFileWithExtension(aDirectory: File, aExtensions: Set<String>): Boolean {
     return aDirectory
         .walkTopDown()
-        .onEnter { locFile ->
-            locFile.name !in setOf("build", ".gradle", "classes_gen", "source_gen", "source_gen.caches", ".git")
-        }
+        .onEnter { locFile -> locFile.name !in setOf("build", ".gradle", "classes_gen", "source_gen", "source_gen.caches", ".git") }
         .any { locFile -> locFile.isFile && locFile.extension.lowercase() in aExtensions }
 }
 
-fun AIcContainsJavaSource(aDirectory: File): Boolean {
+fun AIcLooksLikeJavaProject(aDirectory: File): Boolean {
     return aDirectory.resolve("src/main/java").isDirectory ||
         aDirectory.resolve("src/main/kotlin").isDirectory ||
         AIcContainsFileWithExtension(aDirectory, setOf("java", "kt"))
 }
 
-fun AIcResolveDocumentationType(aArtifactSetProjectDirectory: File): Pair<String, String> {
-    val locExplicitType = AIcReadExplicitDocumentationType(aArtifactSetProjectDirectory)?.lowercase()
-
+fun AIcResolveArtifactType(aProjectDirectory: File): String {
+    val locExplicitType = AIcReadExplicitArtifactType(aProjectDirectory)
     if (locExplicitType != null) {
         return when (locExplicitType) {
-            "mps" -> "mps" to "explicit algites-artifact-set.yml type"
-            "java", "jvm" -> "java" to "explicit algites-artifact-set.yml type"
+            "mps" -> "mps"
+            "java", "jvm" -> "java"
             else -> {
-                logger.warn(
-                    "Unsupported documentation type '${locExplicitType}' in ${aArtifactSetProjectDirectory.resolve("algites-artifact-set.yml").absolutePath}; using Java documentation as default."
-                )
-                "java" to "unsupported explicit type, defaulted to java"
+                logger.warn("Unsupported artifact type '${locExplicitType}' in ${aProjectDirectory}; using Java documentation as default.")
+                "java"
             }
         }
     }
 
-    val locLooksLikeMps = AIcContainsFileWithExtension(aArtifactSetProjectDirectory, setOf("mpl", "msd"))
-    val locLooksLikeJava = AIcContainsJavaSource(aArtifactSetProjectDirectory)
+    val locLooksLikeMps = AIcContainsFileWithExtension(aProjectDirectory, setOf("mpl", "msd"))
+    val locLooksLikeJava = AIcLooksLikeJavaProject(aProjectDirectory)
 
     return when {
-        locLooksLikeMps && !locLooksLikeJava -> "mps" to "detected MPS descriptor files"
-        locLooksLikeJava && !locLooksLikeMps -> "java" to "detected Java/Kotlin source files"
+        locLooksLikeMps && !locLooksLikeJava -> "mps"
+        locLooksLikeJava && !locLooksLikeMps -> "java"
         locLooksLikeMps && locLooksLikeJava -> {
-            logger.warn(
-                "Artifact-set project '${aArtifactSetProjectDirectory.relativeTo(layout.projectDirectory.asFile)}' looks like both MPS and Java; using Java documentation as default. Add algites-artifact-set.yml with documentationType: mps or documentationType: java to make this explicit."
-            )
-            "java" to "ambiguous detection, defaulted to java"
+            logger.warn("Artifact project '${aProjectDirectory}' looks like both MPS and Java; using Java documentation as default. Add algites-artifact-set.yml or algites-artifact.yml with type: mps or type: java to make this explicit.")
+            "java"
         }
         else -> {
-            logger.warn(
-                "Cannot determine documentation type for artifact-set project '${aArtifactSetProjectDirectory.relativeTo(layout.projectDirectory.asFile)}'; using Java documentation as default. Add algites-artifact-set.yml with documentationType: mps or documentationType: java to make this explicit."
-            )
-            "java" to "undetermined, defaulted to java"
+            logger.warn("Cannot determine artifact type for '${aProjectDirectory}'; using Java documentation as default. Add algites-artifact-set.yml or algites-artifact.yml with type: mps or type: java to make this explicit.")
+            "java"
         }
     }
 }
 
-fun AIcResolveDocsArtifactSetProjects(): List<AIcDocsArtifactSetProject> {
-    return AIcReadArtifactSetProjectRelativePaths().map { locRelativePath ->
-        val locProjectDirectory = layout.projectDirectory.dir(locRelativePath).asFile
-        require(locProjectDirectory.isDirectory) {
-            "Configured artifact-set project directory does not exist: ${locProjectDirectory.absolutePath}"
-        }
+val resolvedArtifactTypes = AIcReadArtifactSetProjectRelativePaths()
+    .map { locRelativePath -> layout.projectDirectory.dir(locRelativePath).asFile }
+    .map { locProjectDirectory -> AIcResolveArtifactType(locProjectDirectory) }
+    .toSet()
 
-        val (locDocumentationType, locDocumentationTypeReason) = AIcResolveDocumentationType(locProjectDirectory)
-        AIcDocsArtifactSetProject(
-            locRelativePath = locRelativePath,
-            locProjectDirectory = locProjectDirectory,
-            locDocumentationType = locDocumentationType,
-            locDocumentationTypeReason = locDocumentationTypeReason
-        )
-    }
+logger.lifecycle("Algites documentation artifact type resolution: ${resolvedArtifactTypes.sorted().joinToString(", ")}")
+
+if ("java" in resolvedArtifactTypes) {
+    apply(from = uri(algitesDocsJavaScript))
 }
 
-val locResolvedArtifactSetProjects = AIcResolveDocsArtifactSetProjects()
-val locResolvedDocumentationTypes = locResolvedArtifactSetProjects.map { it.locDocumentationType }.toSet()
-
-logger.lifecycle("Algites documentation artifact-set project resolution:")
-locResolvedArtifactSetProjects.forEach { locArtifactSetProject ->
-    logger.lifecycle(
-        " - ${locArtifactSetProject.locRelativePath}: ${locArtifactSetProject.locDocumentationType} (${locArtifactSetProject.locDocumentationTypeReason})"
-    )
-}
-
-if ("java" in locResolvedDocumentationTypes) {
-    apply(from = uri(locAlgitesDocsJavaScript))
-}
-
-if ("mps" in locResolvedDocumentationTypes) {
-    apply(from = uri(locAlgitesDocsMpsScript))
+if ("mps" in resolvedArtifactTypes) {
+    apply(from = uri(algitesDocsMpsScript))
 }

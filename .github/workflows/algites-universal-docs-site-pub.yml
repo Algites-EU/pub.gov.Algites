@@ -13,18 +13,13 @@ name: Generate and publish Algites documentation site
         required: false
         type: string
         default: generateAlgitesDocsSite
-      docs-site-path:
-        description: Path to the generated static documentation site.
-        required: false
-        type: string
-        default: docs-site
       java-version:
         description: Java version used for Gradle execution.
         required: false
         type: string
         default: "21"
       publication-kind:
-        description: Documentation publication kind.
+        description: Documentation publication kind: preview, snapshot, or release.
         required: false
         type: string
         default: preview
@@ -33,28 +28,31 @@ name: Generate and publish Algites documentation site
         required: false
         type: string
         default: ""
+      pages-branch:
+        description: Branch that stores the persistent generated documentation site.
+        required: false
+        type: string
+        default: gh-pages
       gradle-arguments:
         description: Additional Gradle arguments.
         required: false
         type: string
         default: ""
       publish-pages:
-        description: Whether to deploy the generated documentation to GitHub Pages.
+        description: Whether to commit the generated documentation to the Pages branch.
         required: false
         type: boolean
         default: true
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 env:
   ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
 
 concurrency:
-  group: algites-docs-pages-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: algites-docs-pages-${{ github.repository }}-${{ inputs.pages-branch }}
+  cancel-in-progress: false
 
 jobs:
   generate-docs:
@@ -86,6 +84,33 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.publication.outputs.source-ref }}
+          path: source
+
+      - name: Prepare persistent Pages branch worktree
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          locPagesBranch="${{ inputs.pages-branch }}"
+          mkdir -p pages-worktree
+          cd pages-worktree
+
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+
+          if git ls-remote --exit-code --heads origin "${locPagesBranch}" >/dev/null 2>&1; then
+            git fetch --depth=1 origin "${locPagesBranch}"
+            git checkout "${locPagesBranch}"
+          else
+            git checkout --orphan "${locPagesBranch}"
+            git rm -rf . >/dev/null 2>&1 || true
+            printf '%s\n' '<!doctype html><html><head><meta charset="utf-8"><title>Documentation</title></head><body><p>Documentation site is being generated.</p></body></html>' > index.html
+            touch .nojekyll
+            git add index.html .nojekyll
+            git commit -m "Initialize documentation site"
+          fi
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -96,13 +121,15 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Generate documentation site
+      - name: Generate documentation site into persistent Pages worktree
+        working-directory: source
         shell: bash
         run: |
           set -euo pipefail
 
           ./gradlew --no-daemon \
             ${{ inputs.gradle-task }} \
+            -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/pages-worktree" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
             ${{ inputs.gradle-arguments }}
@@ -111,29 +138,23 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: algites-docs-site
-          path: ${{ inputs.docs-site-path }}
+          path: pages-worktree
           if-no-files-found: error
 
-      - name: Configure GitHub Pages
+      - name: Commit generated documentation to Pages branch
         if: ${{ inputs.publish-pages }}
-        uses: actions/configure-pages@v5
+        working-directory: pages-worktree
+        shell: bash
+        run: |
+          set -euo pipefail
 
-      - name: Upload GitHub Pages artifact
-        if: ${{ inputs.publish-pages }}
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ${{ inputs.docs-site-path }}
+          touch .nojekyll
+          git add -A
 
-  deploy-pages:
-    name: Deploy GitHub Pages
-    if: ${{ inputs.publish-pages }}
-    needs: generate-docs
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+          if git diff --cached --quiet; then
+            echo "No documentation changes to publish."
+            exit 0
+          fi
 
-    steps:
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          git commit -m "Publish documentation for ${{ steps.publication.outputs.publication-kind }}/${{ steps.publication.outputs.publication-id }}"
+          git push origin HEAD:${{ inputs.pages-branch }}
