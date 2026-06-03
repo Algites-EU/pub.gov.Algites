@@ -1,6 +1,6 @@
 name: Generate and publish Algites documentation site
 
-"on":
+on:
   workflow_call:
     inputs:
       source-ref:
@@ -39,13 +39,15 @@ name: Generate and publish Algites documentation site
         type: string
         default: ""
       publish-pages:
-        description: Whether to commit the generated documentation to the Pages branch.
+        description: Whether to persist and deploy the generated documentation to GitHub Pages.
         required: false
         type: boolean
         default: true
 
 permissions:
   contents: write
+  pages: write
+  id-token: write
 
 env:
   ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
@@ -55,9 +57,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  generate-docs:
-    name: Generate documentation
+  generate-and-publish-docs:
+    name: Generate and publish documentation
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy-pages.outputs.page_url }}
 
     steps:
       - name: Resolve documentation publication parameters
@@ -86,14 +91,15 @@ jobs:
           ref: ${{ steps.publication.outputs.source-ref }}
           path: source
 
-      - name: Prepare persistent Pages branch worktree
+      - name: Prepare persistent Pages branch workspace
         shell: bash
         run: |
           set -euo pipefail
 
           locPagesBranch="${{ inputs.pages-branch }}"
-          mkdir -p pages-worktree
-          cd pages-worktree
+
+          mkdir -p gh-pages
+          cd gh-pages
 
           git init
           git config user.name "github-actions[bot]"
@@ -121,7 +127,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Generate documentation site into persistent Pages worktree
+      - name: Generate documentation site into persistent Pages workspace
         working-directory: source
         shell: bash
         run: |
@@ -129,21 +135,14 @@ jobs:
 
           ./gradlew --no-daemon \
             ${{ inputs.gradle-task }} \
-            -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/pages-worktree" \
+            -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/gh-pages" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
             ${{ inputs.gradle-arguments }}
 
-      - name: Upload documentation site as workflow artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: algites-docs-site
-          path: pages-worktree
-          if-no-files-found: error
-
-      - name: Commit generated documentation to Pages branch
+      - name: Commit generated documentation to persistent Pages branch
         if: ${{ inputs.publish-pages }}
-        working-directory: pages-worktree
+        working-directory: gh-pages
         shell: bash
         run: |
           set -euo pipefail
@@ -152,9 +151,31 @@ jobs:
           git add -A
 
           if git diff --cached --quiet; then
-            echo "No documentation changes to publish."
+            echo "No documentation changes to persist."
             exit 0
           fi
 
           git commit -m "Publish documentation for ${{ steps.publication.outputs.publication-kind }}/${{ steps.publication.outputs.publication-id }}"
           git push origin HEAD:${{ inputs.pages-branch }}
+
+      - name: Upload documentation site as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: algites-docs-site
+          path: gh-pages
+          if-no-files-found: error
+
+      - name: Configure GitHub Pages
+        if: ${{ inputs.publish-pages }}
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: ${{ inputs.publish-pages }}
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: gh-pages
+
+      - name: Deploy GitHub Pages
+        if: ${{ inputs.publish-pages }}
+        id: deploy-pages
+        uses: actions/deploy-pages@v4
