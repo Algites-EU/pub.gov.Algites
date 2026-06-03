@@ -1,13 +1,18 @@
 name: Generate and publish Algites documentation site
 
-on:
+"on":
   workflow_call:
     inputs:
+      source-ref:
+        description: Branch, tag, or commit to check out. Defaults to the calling workflow ref.
+        required: false
+        type: string
+        default: ""
       gradle-task:
         description: Gradle task that generates the documentation site.
         required: false
         type: string
-        default: generateDummyMpsDocs
+        default: generateAlgitesDocsSite
       docs-site-path:
         description: Path to the generated static documentation site.
         required: false
@@ -18,6 +23,16 @@ on:
         required: false
         type: string
         default: "21"
+      publication-kind:
+        description: Documentation publication kind.
+        required: false
+        type: string
+        default: preview
+      publication-id:
+        description: Documentation publication identifier. Defaults to the checked out branch/tag name.
+        required: false
+        type: string
+        default: ""
       gradle-arguments:
         description: Additional Gradle arguments.
         required: false
@@ -34,8 +49,11 @@ permissions:
   pages: write
   id-token: write
 
+env:
+  ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
+
 concurrency:
-  group: algites-docs-pages-${{ github.ref }}
+  group: algites-docs-pages-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -44,8 +62,30 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Resolve documentation publication parameters
+        id: publication
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          locSourceRef="${{ inputs.source-ref }}"
+          if [[ -z "${locSourceRef}" ]]; then
+            locSourceRef="${ALGITES_DOCS_DEFAULT_REF}"
+          fi
+
+          locPublicationId="${{ inputs.publication-id }}"
+          if [[ -z "${locPublicationId}" ]]; then
+            locPublicationId="${locSourceRef}"
+          fi
+
+          echo "source-ref=${locSourceRef}" >> "${GITHUB_OUTPUT}"
+          echo "publication-kind=${{ inputs.publication-kind }}" >> "${GITHUB_OUTPUT}"
+          echo "publication-id=${locPublicationId}" >> "${GITHUB_OUTPUT}"
+
       - name: Checkout source repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.publication.outputs.source-ref }}
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -58,7 +98,14 @@ jobs:
 
       - name: Generate documentation site
         shell: bash
-        run: ./gradlew --no-daemon ${{ inputs.gradle-task }} ${{ inputs.gradle-arguments }}
+        run: |
+          set -euo pipefail
+
+          ./gradlew --no-daemon \
+            ${{ inputs.gradle-task }} \
+            -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
+            -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
+            ${{ inputs.gradle-arguments }}
 
       - name: Upload documentation site as workflow artifact
         uses: actions/upload-artifact@v4
