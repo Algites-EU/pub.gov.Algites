@@ -76,9 +76,9 @@ fun AIcDocsRelativeHref(aBaseDirectory: File, aTargetDirectory: File): String {
         .trim('/')
 
     return if (locRelativePath.isBlank()) {
-        "./"
+        "index.html"
     } else {
-        "${locRelativePath}/"
+        "${locRelativePath}/index.html"
     }
 }
 
@@ -171,13 +171,13 @@ fun AIcDocsWritePublicationGroupIndex(
                       "<p>No ${aPublicationKind.AIcDocsHtmlEscape()} documentation has been generated yet.</p>"
                   } else {
                       "<ul>\n" + locSortedEntries.joinToString("\n") { locDirectory ->
-                          "                <li><a href=\"${locDirectory.name.AIcDocsHtmlEscape()}/\">${locDirectory.name.AIcDocsHtmlEscape()}</a></li>"
+                          "                <li><a href=\"${locDirectory.name.AIcDocsHtmlEscape()}/index.html\">${locDirectory.name.AIcDocsHtmlEscape()}</a></li>"
                       } + "\n              </ul>"
                   }
               }
             </section>
 
-            <p><a href="../../">Back to documentation root</a></p>
+            <p><a href="../../index.html">Back to documentation root</a></p>
           </main>
         </body>
         </html>
@@ -311,9 +311,9 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
                     <section class="card">
                       <h2>Documentation sections</h2>
                       <ul class="nav-list">
-                        <li><a href="generated/preview/">Preview</a></li>
-                        <li><a href="generated/snapshot/">Snapshot</a></li>
-                        <li><a href="generated/release/">Release</a></li>
+                        <li><a href="generated/preview/index.html">Preview</a></li>
+                        <li><a href="generated/snapshot/index.html">Snapshot</a></li>
+                        <li><a href="generated/release/index.html">Release</a></li>
                       </ul>
                     </section>
 
