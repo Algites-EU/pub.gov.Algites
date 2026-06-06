@@ -15,8 +15,9 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 
 apply(from = uri(locAlgitesDocsBaseScript))
 
-val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (findProperty("algites.docs.generatedRoot") as String?) ?: "docs-site/generated"
+val locGeneratedDocsRoot = file(
+    (findProperty("algites.docs.publicationRoot") as String?)
+        ?: (extra["algitesPublicationDocsRootPath"] as String? ?: "docs-site/generated")
 )
 
 val locRepositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
@@ -68,7 +69,7 @@ tasks.register("generateJavaDocsSite") {
             }
 
             val locModulePath = locSubproject.AIcResolveJavaModulePath()
-            val locTargetDirectory = locGeneratedDocsRoot.dir("${locModulePath}/latest").asFile
+            val locTargetDirectory = locGeneratedDocsRoot.resolve("${locModulePath}/latest")
 
             locTargetDirectory.deleteRecursively()
             locTargetDirectory.mkdirs()
@@ -81,7 +82,7 @@ tasks.register("generateJavaDocsSite") {
             locModulePath
         }.sorted()
 
-        val locIndexFile = locGeneratedDocsRoot.file("index.html").asFile
+        val locIndexFile = locGeneratedDocsRoot.resolve("index.html")
         locIndexFile.parentFile.mkdirs()
         locIndexFile.writeText(
             """
@@ -108,7 +109,7 @@ tasks.register("generateJavaDocsSite") {
             Charsets.UTF_8
         )
 
-        logger.lifecycle("Java documentation generated at: ${locGeneratedDocsRoot.asFile.absolutePath}")
+        logger.lifecycle("Java documentation generated at: ${locGeneratedDocsRoot.absolutePath}")
         logger.lifecycle("Documented Java artifact(s): ${locDocumentedProjects.size}")
     }
 }

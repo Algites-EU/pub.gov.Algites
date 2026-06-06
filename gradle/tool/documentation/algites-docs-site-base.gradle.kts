@@ -15,18 +15,31 @@ val locDocsSiteRoot = layout.projectDirectory.dir(
 )
 
 /*
- * Kept for compatibility with the current Java/MPS documentation scripts.
- * Newer callers should normally pass only algites.docs.siteRoot and let
- * technology-specific scripts use their conventional generated output below it.
+ * Generated documentation is always placed below the documentation site root.
+ * Technology-specific scripts should generate into locPublicationDocsRoot, not
+ * directly into locGeneratedDocsRoot.
  */
-val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (findProperty("algites.docs.generatedRoot") as String?) ?: "docs-site/generated"
-)
+val locGeneratedDocsRoot = locDocsSiteRoot.dir("generated")
+
+val locPublicationKind = (findProperty("algites.docs.publicationKind") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+
+val locPublicationId = (findProperty("algites.docs.publicationId") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+
+val locPublicationDocsRoot = if (locPublicationKind != null && locPublicationId != null) {
+    locGeneratedDocsRoot.dir("${locPublicationKind}/${locPublicationId}")
+} else {
+    locGeneratedDocsRoot
+}
 
 val locRepositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
 
 extra["algitesDocsSiteRootPath"] = locDocsSiteRoot.asFile.path
 extra["algitesGeneratedDocsRootPath"] = locGeneratedDocsRoot.asFile.path
+extra["algitesPublicationDocsRootPath"] = locPublicationDocsRoot.asFile.path
 
 fun String.AIcDocsNormalizeYamlScalar(): String {
     return trim().removeSurrounding("\"").removeSurrounding("'")
@@ -88,11 +101,7 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
                 ?.trim()
                 ?.takeIf { it.isNotBlank() }
 
-            val locCurrentPublicationDirectory = if (locPublicationKind != null && locPublicationId != null) {
-                locDocsSiteRoot.dir("generated/${locPublicationKind}/${locPublicationId}").asFile
-            } else {
-                locGeneratedDocsRoot.asFile
-            }
+            val locCurrentPublicationDirectory = locPublicationDocsRoot.asFile
 
             val locCurrentPublicationHref = AIcDocsRelativeHref(
                 locDocsSiteRoot.asFile,
