@@ -82,6 +82,110 @@ fun AIcDocsRelativeHref(aBaseDirectory: File, aTargetDirectory: File): String {
     }
 }
 
+
+fun AIcDocsWritePublicationGroupIndex(
+    aGroupDirectory: File,
+    aPublicationKind: String,
+    aRepositoryName: String,
+    aDescending: Boolean
+) {
+    aGroupDirectory.mkdirs()
+
+    val locEntries = aGroupDirectory
+        .listFiles()
+        ?.filter { locFile -> locFile.isDirectory && locFile.resolve("index.html").isFile }
+        ?.sortedBy { locFile -> locFile.name.lowercase() }
+        ?: emptyList()
+
+    val locSortedEntries = if (aDescending) {
+        locEntries.asReversed()
+    } else {
+        locEntries
+    }
+
+    val locTitle = "${aRepositoryName} ${aPublicationKind} documentation"
+    val locIndexFile = aGroupDirectory.resolve("index.html")
+
+    locIndexFile.writeText(
+        """
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <title>${locTitle.AIcDocsHtmlEscape()}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body {
+              margin: 0;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+              line-height: 1.5;
+              color: #1f2937;
+              background: #f9fafb;
+            }
+
+            main {
+              max-width: 900px;
+              margin: 0 auto;
+              padding: 2rem 1.5rem;
+            }
+
+            .muted {
+              color: #6b7280;
+            }
+
+            .card {
+              background: white;
+              border: 1px solid #e5e7eb;
+              border-radius: 0.75rem;
+              padding: 1rem 1.25rem;
+              margin: 1rem 0;
+              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+            }
+
+            li {
+              margin: 0.35rem 0;
+            }
+
+            a {
+              color: #2563eb;
+            }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>${locTitle.AIcDocsHtmlEscape()}</h1>
+            <p class="muted">
+              ${
+                  if (aDescending) {
+                      "Entries are sorted descending so newer or higher version identifiers appear first."
+                  } else {
+                      "Entries are sorted ascending alphabetically."
+                  }
+              }
+            </p>
+
+            <section class="card">
+              <h2>Available ${aPublicationKind.AIcDocsHtmlEscape()} publications</h2>
+              ${
+                  if (locSortedEntries.isEmpty()) {
+                      "<p>No ${aPublicationKind.AIcDocsHtmlEscape()} documentation has been generated yet.</p>"
+                  } else {
+                      "<ul>\n" + locSortedEntries.joinToString("\n") { locDirectory ->
+                          "                <li><a href=\"${locDirectory.name.AIcDocsHtmlEscape()}/\">${locDirectory.name.AIcDocsHtmlEscape()}</a></li>"
+                      } + "\n              </ul>"
+                  }
+              }
+            </section>
+
+            <p><a href="../../">Back to documentation root</a></p>
+          </main>
+        </body>
+        </html>
+        """.trimIndent(),
+        Charsets.UTF_8
+    )
+}
+
 if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
     tasks.register("generateAlgitesDocsRootIndex") {
         group = "algites"
@@ -233,11 +337,50 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
     }
 }
 
+
+if (tasks.findByName("generateAlgitesDocsPublicationGroupIndexes") == null) {
+    tasks.register("generateAlgitesDocsPublicationGroupIndexes") {
+        group = "algites"
+        description = "Generates index pages for Algites preview, snapshot, and release documentation groups."
+
+        outputs.file(locGeneratedDocsRoot.file("preview/index.html"))
+        outputs.file(locGeneratedDocsRoot.file("snapshot/index.html"))
+        outputs.file(locGeneratedDocsRoot.file("release/index.html"))
+
+        doLast {
+            val locRepositoryId = AIcDocsReadRepositoryScalar("id") ?: rootProject.name
+            val locRepositoryName = AIcDocsReadRepositoryScalar("name") ?: locRepositoryId
+
+            AIcDocsWritePublicationGroupIndex(
+                locGeneratedDocsRoot.dir("preview").asFile,
+                "preview",
+                locRepositoryName,
+                false
+            )
+
+            AIcDocsWritePublicationGroupIndex(
+                locGeneratedDocsRoot.dir("snapshot").asFile,
+                "snapshot",
+                locRepositoryName,
+                true
+            )
+
+            AIcDocsWritePublicationGroupIndex(
+                locGeneratedDocsRoot.dir("release").asFile,
+                "release",
+                locRepositoryName,
+                true
+            )
+        }
+    }
+}
+
 if (tasks.findByName("generateAlgitesDocsSite") == null) {
     tasks.register("generateAlgitesDocsSite") {
         group = "algites"
         description = "Generic aggregate task for repository documentation site generation."
 
         dependsOn("generateAlgitesDocsRootIndex")
+        dependsOn("generateAlgitesDocsPublicationGroupIndexes")
     }
 }
