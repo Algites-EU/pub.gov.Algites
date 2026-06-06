@@ -197,6 +197,13 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
             val locRepositoryId = AIcDocsReadRepositoryScalar("id") ?: rootProject.name
             val locRepositoryName = AIcDocsReadRepositoryScalar("name") ?: locRepositoryId
             val locRepositoryDescription = AIcDocsReadRepositoryScalar("description")
+            val locRepositoryHomeUrl = (findProperty("algites.docs.repositoryHomeUrl") as String?)
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?: AIcDocsReadRepositoryScalar("homeUrl")
+                ?: AIcDocsReadRepositoryScalar("repositoryUrl")
+                ?: AIcDocsReadRepositoryScalar("url")
+                ?: "https://github.com/Algites-EU/${locRepositoryId}"
             val locIndexFile = locDocsSiteRoot.file("index.html").asFile
             locIndexFile.parentFile.mkdirs()
 
@@ -211,15 +218,80 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
                 <html lang="en">
                 <head>
                   <meta charset="utf-8">
-                  <title>${locRepositoryName.AIcDocsHtmlEscape()} Documentation</title>
+                  <title>Algites ${locRepositoryId.AIcDocsHtmlEscape()} Repository Documentation</title>
                   <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <style>
+                    body {
+                      margin: 0;
+                      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                      line-height: 1.5;
+                      color: #1f2937;
+                      background: #f9fafb;
+                    }
+
+                    header, main {
+                      max-width: 1100px;
+                      margin: 0 auto;
+                      padding: 1.5rem;
+                    }
+
+                    header {
+                      padding-top: 2rem;
+                    }
+
+                    h1 {
+                      margin: 0 0 0.5rem 0;
+                      font-size: 2rem;
+                    }
+
+                    .card {
+                      background: white;
+                      border: 1px solid #e5e7eb;
+                      border-radius: 0.75rem;
+                      padding: 1rem 1.25rem;
+                      margin: 1rem 0;
+                      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+                    }
+
+                    iframe {
+                      width: 100%;
+                      min-height: 70vh;
+                      border: 1px solid #e5e7eb;
+                      border-radius: 0.75rem;
+                      background: white;
+                    }
+
+                    a {
+                      color: #2563eb;
+                    }
+                  </style>
                 </head>
                 <body>
+                  <header>
+                    <h1>Algites <strong>${locRepositoryId.AIcDocsHtmlEscape()}</strong> Repository Documentation</h1>
+                    <p>
+                      This page is the stable repository documentation entry point.
+                      Generated artifact documentation is published under
+                      <a href="generated/">generated/</a>.
+                    </p>
+                    <p>
+                      ${locRepositoryId.AIcDocsHtmlEscape()} repository home is <a href="${locRepositoryHomeUrl.AIcDocsHtmlEscape()}">
+                here
+                </a>.
+                    </p>
+                  </header>
+
                   <main>
-                    <h1>${locRepositoryName.AIcDocsHtmlEscape()} Documentation</h1>
-                    <p>Repository ID: ${locRepositoryId.AIcDocsHtmlEscape()}</p>
-                    ${locRepositoryDescription?.let { "<p>${it.AIcDocsHtmlEscape()}</p>" } ?: ""}
-                    <p><a href="generated/index.html">Open generated documentation</a></p>
+                    <section class="card">
+                      <h2>Generated Artifact Documentation</h2>
+                      <p>
+                        The content below is generated automatically. If the embedded view is not available,
+                        open the generated documentation index directly:
+                        <a href="generated/">generated/index.html</a>.
+                      </p>
+                    </section>
+
+                    <iframe src="generated/" title="Generated artifact documentation"></iframe>
                   </main>
                 </body>
                 </html>
