@@ -71,6 +71,63 @@ fun readAlgitesYamlScalar(aYamlText: String, aParentKey: String, aKey: String): 
     return null
 }
 
+fun readAlgitesYamlScalarFromFile(aFile: java.io.File, aParentKey: String, aKey: String): String? =
+    if (aFile.isFile) {
+        readAlgitesYamlScalar(aFile.readText(), aParentKey, aKey)
+    } else {
+        null
+    }
+
+fun algitesDirectorySequenceFromProjectToRoot(aStartDirectory: java.io.File): Sequence<java.io.File> =
+    generateSequence(aStartDirectory.canonicalFile) { locDirectory ->
+        if (locDirectory == rootProject.projectDir.canonicalFile) {
+            null
+        } else {
+            locDirectory.parentFile
+        }
+    }
+
+fun findNearestAlgitesMetadataFile(aStartDirectory: java.io.File, aFileName: String): java.io.File? =
+    algitesDirectorySequenceFromProjectToRoot(aStartDirectory)
+        .map { locDirectory -> java.io.File(locDirectory, aFileName) }
+        .firstOrNull { locFile -> locFile.isFile }
+
+fun resolveAlgitesGroupForProject(aProjectDirectory: java.io.File): String? {
+    val locArtifactGroup = findNearestAlgitesMetadataFile(aProjectDirectory, "algites-artifact.yml")
+        ?.let { locArtifactFile -> readAlgitesYamlScalarFromFile(locArtifactFile, "artifact", "groupId") }
+
+    if (!locArtifactGroup.isNullOrBlank()) {
+        return locArtifactGroup
+    }
+
+    val locArtifactSetGroup = findNearestAlgitesMetadataFile(aProjectDirectory, "algites-artifact-set.yml")
+        ?.let { locArtifactSetFile -> readAlgitesYamlScalarFromFile(locArtifactSetFile, "artifactSet", "groupId") }
+
+    if (!locArtifactSetGroup.isNullOrBlank()) {
+        return locArtifactSetGroup
+    }
+
+    val locSourceRepositoryGroup = readAlgitesSourceRepositoryYamlText()
+        ?.let { locYamlText -> readAlgitesYamlScalar(locYamlText, "sourceRepository", "groupId") }
+
+    if (!locSourceRepositoryGroup.isNullOrBlank()) {
+        return locSourceRepositoryGroup
+    }
+
+    return null
+}
+
+fun requireAlgitesGroupForPublish(aProjectPath: String, aProjectGroup: Any?) {
+    val locGroupText = aProjectGroup?.toString()?.trim()
+
+    if (locGroupText.isNullOrBlank() || locGroupText == "unspecified") {
+        throw GradleException(
+            "Project '$aProjectPath' is being published, but no Maven group could be resolved. " +
+                "Define groupId in algites-artifact.yml, algites-artifact-set.yml, or algites-source-repository.yml."
+        )
+    }
+}
+
 fun resolveAlgitesVersionFromSourceRepository(): String {
     val locYamlText = readAlgitesSourceRepositoryYamlText()
 
@@ -148,7 +205,11 @@ allprojects {
         rootProject.layout.projectDirectory.dir("run/bld/gradle/${project.path.removePrefix(":").replace(':', '/')}")
     )
 
-    group = "eu.algites.lib"
+    val algitesResolvedProjectGroup = resolveAlgitesGroupForProject(project.projectDir)
+
+    if (!algitesResolvedProjectGroup.isNullOrBlank()) {
+        group = algitesResolvedProjectGroup
+    }
 
     version = resolveAlgitesVersionFromSourceRepository()
 
@@ -175,6 +236,10 @@ subprojects {
     }
 
     plugins.withId("maven-publish") {
+        if (algitesIsPublishRequested) {
+            requireAlgitesGroupForPublish(project.path, project.group)
+        }
+
         plugins.withId("java") {
             extensions.configure<PublishingExtension>("publishing") {
                 publications {
