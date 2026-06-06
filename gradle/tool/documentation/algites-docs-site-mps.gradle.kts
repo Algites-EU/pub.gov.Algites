@@ -56,7 +56,9 @@ fun AIcReadMpsDocsRepositoryId(): String {
 }
 
 val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (findProperty("algites.docs.generatedRoot") as String?) ?: "docs-site/generated"
+    (extra.properties["algitesPublicationDocsRootPath"] as String?)
+        ?: (findProperty("algites.docs.generatedRoot") as String?)
+        ?: "docs-site/generated"
 )
 
 fun String.AIcToSha256Text(): String {
@@ -571,7 +573,7 @@ tasks.register("generateDummyMpsDocs") {
                     val locColumns = locLine.split("\t")
                     val locModulePath = locColumns[3]
                     val locDocumentationPath = locColumns[5]
-                    "      <li><a href=\"${locDocumentationPath}/latest/\">${locModulePath}</a></li>"
+                    "      <li><a href=\"${locDocumentationPath}/latest/index.html\">${locModulePath}</a></li>"
                 }
             }
                 </ul>

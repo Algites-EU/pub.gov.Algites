@@ -16,7 +16,9 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 apply(from = uri(locAlgitesDocsBaseScript))
 
 val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (findProperty("algites.docs.generatedRoot") as String?) ?: "docs-site/generated"
+    (extra.properties["algitesPublicationDocsRootPath"] as String?)
+        ?: (findProperty("algites.docs.generatedRoot") as String?)
+        ?: "docs-site/generated"
 )
 
 val locRepositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
@@ -97,7 +99,7 @@ tasks.register("generateJavaDocsSite") {
                 <ul>
             ${
                 locDocumentedProjects.joinToString("\n") { locModulePath ->
-                    "      <li><a href=\"${locModulePath}/latest/\">${locModulePath}</a></li>"
+                    "      <li><a href=\"${locModulePath}/latest/index.html\">${locModulePath}</a></li>"
                 }
             }
                 </ul>
