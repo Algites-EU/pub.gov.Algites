@@ -12,6 +12,7 @@
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
 import org.gradle.api.tasks.testing.Test
 
 apply(plugin = "base")
@@ -27,67 +28,104 @@ fun String.capitalizedForAlgitesName(): String =
         }
     }
 
-fun algitesExtraString(aName: String): String? =
-    if (rootProject.extra.has(aName)) {
-        rootProject.extra[aName]?.toString()
+fun algitesGradleOrEnvironmentValue(aName: String): String? =
+    providers.gradleProperty(aName).orNull
+        ?: providers.environmentVariable(aName).orNull
+
+fun readAlgitesSourceRepositoryYamlText(): String? {
+    val locRepositoryFile = rootProject.layout.projectDirectory.file("algites-source-repository.yml").asFile
+
+    return if (locRepositoryFile.isFile) {
+        locRepositoryFile.readText()
     } else {
         null
     }
+}
 
-fun algitesSetting(aPropertyName: String, aExtraDefaultName: String, aHardDefaultValue: String? = null): String? =
-    providers.gradleProperty(aPropertyName).orNull
-        ?: providers.environmentVariable(aPropertyName.replace('.', '_').uppercase()).orNull
-        ?: algitesExtraString(aExtraDefaultName)
-        ?: aHardDefaultValue
+fun readAlgitesYamlScalar(aYamlText: String, aParentKey: String, aKey: String): String? {
+    var locInsideParent = false
+    val locParentPrefix = "$aParentKey:"
+    val locKeyPrefix = "$aKey:"
 
-val algitesRepositoryVisibility = algitesSetting(
-    aPropertyName = "algites.repository.visibility",
-    aExtraDefaultName = "algites.repository.visibility.default",
-    aHardDefaultValue = "public"
-)!!.lowercase()
+    aYamlText.lineSequence().forEach { locRawLine ->
+        val locLine = locRawLine.trim()
 
-val algitesDeploymentVisibility = algitesSetting(
-    aPropertyName = "algites.deployment.visibility",
-    aExtraDefaultName = "algites.deployment.visibility.default",
-    aHardDefaultValue = algitesRepositoryVisibility
-)!!.lowercase()
+        if (locLine.isBlank() || locLine.startsWith("#")) {
+            return@forEach
+        }
 
-val algitesDeploymentProfile = algitesSetting(
-    aPropertyName = "algites.deployment.profile",
-    aExtraDefaultName = "algites.deployment.profile.default",
-    aHardDefaultValue = if (algitesDeploymentVisibility == "private") "private" else "public"
-)!!.lowercase()
+        if (!locRawLine.startsWith(" ") && !locRawLine.startsWith("\t")) {
+            locInsideParent = locLine == locParentPrefix
+            return@forEach
+        }
 
-val algitesReleaseRepositoryUrl = algitesSetting(
-    aPropertyName = "algites.deployment.maven.releases.url",
-    aExtraDefaultName = "algites.deployment.maven.releases.url.default",
-    aHardDefaultValue = if (algitesDeploymentProfile == "private") null else "https://maven.pkg.github.com/Algites-EU/pub.lib.Java"
-)
+        if (locInsideParent && locLine.startsWith(locKeyPrefix)) {
+            return locLine
+                .removePrefix(locKeyPrefix)
+                .trim()
+                .removeSurrounding("\"")
+                .removeSurrounding("'")
+        }
+    }
 
-val algitesSnapshotRepositoryUrl = algitesSetting(
-    aPropertyName = "algites.deployment.maven.snapshots.url",
-    aExtraDefaultName = "algites.deployment.maven.snapshots.url.default",
-    aHardDefaultValue = if (algitesDeploymentProfile == "private") null else "https://maven.pkg.github.com/Algites-EU/pub.lib.Java"
-)
+    return null
+}
 
-val algitesRepositoryUser = algitesSetting(
-    aPropertyName = "algites.deployment.maven.username",
-    aExtraDefaultName = "algites.deployment.maven.username.default",
-    aHardDefaultValue = providers.environmentVariable("GITHUB_ACTOR").orNull
-)
+fun resolveAlgitesVersionFromSourceRepository(): String {
+    val locYamlText = readAlgitesSourceRepositoryYamlText()
 
-val algitesRepositoryPassword = algitesSetting(
-    aPropertyName = "algites.deployment.maven.password",
-    aExtraDefaultName = "algites.deployment.maven.password.default",
-    aHardDefaultValue = providers.environmentVariable("GITHUB_TOKEN").orNull
-        ?: providers.environmentVariable("ALGITES_MAVEN_TOKEN").orNull
-)
+    if (locYamlText == null) {
+        return "0.0.1-SNAPSHOT"
+    }
 
-val algitesDocsPagesBranch = algitesSetting(
-    aPropertyName = "algites.deployment.docs.pagesBranch",
-    aExtraDefaultName = "algites.deployment.docs.pagesBranch.default",
-    aHardDefaultValue = "gh-pages"
-)
+    val locReleaseLine = readAlgitesYamlScalar(locYamlText, "versionContext", "releaseLine")
+        ?: return "0.0.1-SNAPSHOT"
+
+    val locRevision = readAlgitesYamlScalar(locYamlText, "versionContext", "revision")
+        ?: "0"
+
+    val locQualifierKind = readAlgitesYamlScalar(locYamlText, "versionContext", "qualifierKind")
+    val locQualifierLabel = readAlgitesYamlScalar(locYamlText, "versionContext", "qualifierLabel")
+
+    val locBaseVersion = "$locReleaseLine.$locRevision"
+    val locEffectiveQualifier = locQualifierLabel
+        ?: locQualifierKind
+
+    return if (locEffectiveQualifier.isNullOrBlank() || locEffectiveQualifier.equals("RELEASE", ignoreCase = true)) {
+        locBaseVersion
+    } else {
+        "$locBaseVersion-${locEffectiveQualifier.uppercase()}"
+    }
+}
+
+val algitesRepositoryVisibility = (algitesGradleOrEnvironmentValue("ALGITES_VISIBILITY") ?: "pub").lowercase()
+val algitesDeploymentDirection = (algitesGradleOrEnvironmentValue("ALGITES_DIRECTION") ?: "upload").lowercase()
+
+val algitesReleaseRepositoryUrl = algitesGradleOrEnvironmentValue("ALGITES_MAVEN_RELEASES_URL")
+    ?: algitesGradleOrEnvironmentValue("ALGITES_REPO_URL")
+
+val algitesSnapshotRepositoryUrl = algitesGradleOrEnvironmentValue("ALGITES_MAVEN_SNAPSHOTS_URL")
+    ?: algitesGradleOrEnvironmentValue("ALGITES_REPO_URL")
+
+val algitesRepositoryUser = algitesGradleOrEnvironmentValue("ALGITES_REPO_USER")
+    ?: providers.environmentVariable("GITHUB_ACTOR").orNull
+
+val algitesRepositoryPassword = algitesGradleOrEnvironmentValue("ALGITES_REPO_PASS")
+    ?: providers.environmentVariable("GITHUB_TOKEN").orNull
+    ?: providers.environmentVariable("ALGITES_MAVEN_TOKEN").orNull
+
+val algitesDocsPagesBranch = algitesGradleOrEnvironmentValue("ALGITES_DOCS_PAGES_BRANCH") ?: "gh-pages"
+
+val algitesRemoteRepositoryName = buildString {
+    append("algites")
+    append(algitesRepositoryVisibility.capitalizedForAlgitesName())
+    append(algitesDeploymentDirection.capitalizedForAlgitesName())
+}
+
+val algitesHasRemoteRepository = !algitesReleaseRepositoryUrl.isNullOrBlank() &&
+    !algitesSnapshotRepositoryUrl.isNullOrBlank() &&
+    !algitesRepositoryUser.isNullOrBlank() &&
+    !algitesRepositoryPassword.isNullOrBlank()
 
 val algitesIsCi = providers.environmentVariable("CI")
     .map { locValue -> locValue.equals("true", ignoreCase = true) }
@@ -101,8 +139,8 @@ val algitesIsPublishRequested = algitesRequestedTasks.any { locTaskName ->
         locTaskName.contains("publish", ignoreCase = true)
 }
 
-if (algitesIsCi && algitesIsPublishRequested && algitesRepositoryPassword.isNullOrBlank()) {
-    throw GradleException("CI publish build requires deployment credentials. Provide GITHUB_TOKEN or ALGITES_MAVEN_TOKEN.")
+if (algitesIsCi && algitesIsPublishRequested && !algitesHasRemoteRepository) {
+    throw GradleException("CI publish build requires ALGITES_REPO_* credentials and repository URLs.")
 }
 
 allprojects {
@@ -110,44 +148,48 @@ allprojects {
         rootProject.layout.projectDirectory.dir("run/bld/gradle/${project.path.removePrefix(":").replace(':', '/')}")
     )
 
-    group = providers.gradleProperty("algites.group")
-        .orElse("eu.algites.lib")
-        .get()
+    group = "eu.algites.lib"
 
-    version = providers.gradleProperty("algites.version")
-        .orElse("0.0.1-SNAPSHOT")
-        .get()
+    version = resolveAlgitesVersionFromSourceRepository()
+
+    tasks.withType<Test>().configureEach {
+        useTestNG()
+    }
 }
 
 subprojects {
-    plugins.withId("java") {
-        tasks.withType<Test>().configureEach {
-            useTestNG()
-        }
+    val algitesSubprojectPathDots = project.path
+        .removePrefix(":")
+        .replace(':', '.')
+
+    val algitesCanonicalArtifactId = if (algitesSubprojectPathDots.isBlank()) {
+        rootProject.name
+    } else {
+        "${rootProject.name}_${algitesSubprojectPathDots}"
     }
 
     plugins.withId("base") {
-        val locPathDots = project.path.removePrefix(":").replace(':', '.')
-        val locCanonicalArtifactId = if (locPathDots.isBlank()) {
-            rootProject.name
-        } else {
-            "${rootProject.name}_${locPathDots}"
-        }
-
         extensions.configure<BasePluginExtension>("base") {
-            archivesName.set(locCanonicalArtifactId)
+            archivesName.set(algitesCanonicalArtifactId)
         }
     }
 
     plugins.withId("maven-publish") {
+        plugins.withId("java") {
+            extensions.configure<PublishingExtension>("publishing") {
+                publications {
+                    if (findByName("mavenJava") == null && components.findByName("java") != null) {
+                        create<MavenPublication>("mavenJava") {
+                            from(components["java"])
+                        }
+                    }
+                }
+            }
+        }
+
         extensions.configure<PublishingExtension>("publishing") {
             publications.withType(MavenPublication::class.java).configureEach {
-                val locPathDots = project.path.removePrefix(":").replace(':', '.')
-                artifactId = if (locPathDots.isBlank()) {
-                    rootProject.name
-                } else {
-                    "${rootProject.name}_${locPathDots}"
-                }
+                artifactId = algitesCanonicalArtifactId
             }
 
             repositories {
@@ -159,7 +201,7 @@ subprojects {
 
                 if (!locRepositoryUrl.isNullOrBlank() && !algitesRepositoryUser.isNullOrBlank() && !algitesRepositoryPassword.isNullOrBlank()) {
                     maven {
-                        name = "algites" + algitesDeploymentProfile.capitalizedForAlgitesName()
+                        name = algitesRemoteRepositoryName
                         url = uri(locRepositoryUrl)
                         credentials {
                             username = algitesRepositoryUser
@@ -170,6 +212,20 @@ subprojects {
             }
         }
     }
+
+    tasks.matching { locTask -> locTask.name == "publish" }.configureEach {
+        if (!algitesIsCi && !algitesHasRemoteRepository) {
+            dependsOn("publishToMavenLocal")
+        }
+    }
+}
+
+tasks.withType<PublishToMavenRepository>().configureEach {
+    enabled = false
+}
+
+tasks.matching { locTask -> locTask.name == "publish" || locTask.name == "publishToMavenLocal" }.configureEach {
+    enabled = false
 }
 
 tasks.register("printAlgitesDeploymentPlan") {
@@ -182,10 +238,11 @@ tasks.register("printAlgitesDeploymentPlan") {
 
         println("Algites deployment plan for ${rootProject.name}:")
         println(" - repository visibility: $algitesRepositoryVisibility")
-        println(" - deployment visibility: $algitesDeploymentVisibility")
-        println(" - deployment profile: $algitesDeploymentProfile")
+        println(" - deployment direction: $algitesDeploymentDirection")
+        println(" - Maven repository name: $algitesRemoteRepositoryName")
         println(" - Maven releases URL: $locReleaseRepositoryDisplay")
         println(" - Maven snapshots URL: $locSnapshotRepositoryDisplay")
+        println(" - Maven remote repository configured: $algitesHasRemoteRepository")
         println(" - docs pages branch: $algitesDocsPagesBranch")
     }
 }
