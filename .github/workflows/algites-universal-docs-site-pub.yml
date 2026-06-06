@@ -116,7 +116,7 @@ jobs:
             locRepositoryName="${locRepositoryFullName##*/}"
             locRepositoryHtmlUrl="https://github.com/${locRepositoryFullName}"
 
-            cat > index.html <<EOF
+          cat > index.html <<EOF
             <!doctype html>
             <html lang="en">
             <head>
@@ -196,7 +196,7 @@ jobs:
               </main>
             </body>
             </html>
-            EOF
+          EOF
 
             touch .nojekyll
             git add index.html .nojekyll
