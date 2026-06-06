@@ -177,12 +177,15 @@ tasks.register("printAlgitesDeploymentPlan") {
     description = "Prints the effective Algites deployment configuration."
 
     doLast {
+        val locReleaseRepositoryDisplay = algitesReleaseRepositoryUrl ?: "not configured"
+        val locSnapshotRepositoryDisplay = algitesSnapshotRepositoryUrl ?: "not configured"
+
         println("Algites deployment plan for ${rootProject.name}:")
         println(" - repository visibility: $algitesRepositoryVisibility")
         println(" - deployment visibility: $algitesDeploymentVisibility")
         println(" - deployment profile: $algitesDeploymentProfile")
-        println(" - Maven releases URL: ${algitesReleaseRepositoryUrl ?: \"not configured\"}")
-        println(" - Maven snapshots URL: ${algitesSnapshotRepositoryUrl ?: \"not configured\"}")
+        println(" - Maven releases URL: $locReleaseRepositoryDisplay")
+        println(" - Maven snapshots URL: $locSnapshotRepositoryDisplay")
         println(" - docs pages branch: $algitesDocsPagesBranch")
     }
 }
