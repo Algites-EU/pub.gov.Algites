@@ -177,7 +177,7 @@ fun AIcDocsWritePublicationGroupIndex(
               }
             </section>
 
-            <p><a href="../../index.html">Back to documentation root</a></p>
+            <p><a href="../index.html">Back to generated documentation index</a></p>
           </main>
         </body>
         </html>
@@ -189,9 +189,53 @@ fun AIcDocsWritePublicationGroupIndex(
 if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
     tasks.register("generateAlgitesDocsRootIndex") {
         group = "algites"
-        description = "Generates the stable root index page for the Algites documentation site."
+        description = "Generates the stable root index page for the Algites documentation site only if it does not already exist."
 
         outputs.file(locDocsSiteRoot.file("index.html"))
+
+        doLast {
+            val locRepositoryId = AIcDocsReadRepositoryScalar("id") ?: rootProject.name
+            val locRepositoryName = AIcDocsReadRepositoryScalar("name") ?: locRepositoryId
+            val locRepositoryDescription = AIcDocsReadRepositoryScalar("description")
+            val locIndexFile = locDocsSiteRoot.file("index.html").asFile
+            locIndexFile.parentFile.mkdirs()
+
+            if (locIndexFile.exists()) {
+                logger.lifecycle("Keeping existing documentation root index: ${locIndexFile.absolutePath}")
+                return@doLast
+            }
+
+            locIndexFile.writeText(
+                """
+                <!doctype html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8">
+                  <title>${locRepositoryName.AIcDocsHtmlEscape()} Documentation</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                </head>
+                <body>
+                  <main>
+                    <h1>${locRepositoryName.AIcDocsHtmlEscape()} Documentation</h1>
+                    <p>Repository ID: ${locRepositoryId.AIcDocsHtmlEscape()}</p>
+                    ${locRepositoryDescription?.let { "<p>${it.AIcDocsHtmlEscape()}</p>" } ?: ""}
+                    <p><a href="generated/index.html">Open generated documentation</a></p>
+                  </main>
+                </body>
+                </html>
+                """.trimIndent(),
+                Charsets.UTF_8
+            )
+        }
+    }
+}
+
+if (tasks.findByName("generateAlgitesDocsGeneratedIndex") == null) {
+    tasks.register("generateAlgitesDocsGeneratedIndex") {
+        group = "algites"
+        description = "Generates the generated documentation landing page."
+
+        outputs.file(locGeneratedDocsRoot.file("index.html"))
 
         doLast {
             val locRepositoryId = AIcDocsReadRepositoryScalar("id") ?: rootProject.name
@@ -208,17 +252,9 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
             val locCurrentPublicationDirectory = locPublicationDocsRoot.asFile
 
             val locCurrentPublicationHref = AIcDocsRelativeHref(
-                locDocsSiteRoot.asFile,
+                locGeneratedDocsRoot.asFile,
                 locCurrentPublicationDirectory
             )
-
-            val locIndexFile = locDocsSiteRoot.file("index.html").asFile
-            locIndexFile.parentFile.mkdirs()
-
-            if (findProperty("algites.docs.keepManualRootIndex") == "true" && locIndexFile.exists()) {
-                logger.lifecycle("Keeping existing manual documentation root index: ${locIndexFile.absolutePath}")
-                return@doLast
-            }
 
             val locPublicationLabel = if (locPublicationKind != null && locPublicationId != null) {
                 "${locPublicationKind}/${locPublicationId}"
@@ -226,13 +262,16 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
                 "generated"
             }
 
+            val locIndexFile = locGeneratedDocsRoot.file("index.html").asFile
+            locIndexFile.parentFile.mkdirs()
+
             locIndexFile.writeText(
                 """
                 <!doctype html>
                 <html lang="en">
                 <head>
                   <meta charset="utf-8">
-                  <title>${locRepositoryName.AIcDocsHtmlEscape()} Documentation</title>
+                  <title>${locRepositoryName.AIcDocsHtmlEscape()} Generated Documentation</title>
                   <meta name="viewport" content="width=device-width, initial-scale=1">
                   <style>
                     body {
@@ -302,7 +341,7 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
                 </head>
                 <body>
                   <header>
-                    <h1>${locRepositoryName.AIcDocsHtmlEscape()} Documentation</h1>
+                    <h1>${locRepositoryName.AIcDocsHtmlEscape()} Generated Documentation</h1>
                     <p class="muted">Repository ID: ${locRepositoryId.AIcDocsHtmlEscape()}</p>
                     ${locRepositoryDescription?.let { "<p>${it.AIcDocsHtmlEscape()}</p>" } ?: ""}
                   </header>
@@ -311,9 +350,9 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
                     <section class="card">
                       <h2>Documentation sections</h2>
                       <ul class="nav-list">
-                        <li><a href="generated/preview/index.html">Preview</a></li>
-                        <li><a href="generated/snapshot/index.html">Snapshot</a></li>
-                        <li><a href="generated/release/index.html">Release</a></li>
+                        <li><a href="preview/index.html">Preview</a></li>
+                        <li><a href="snapshot/index.html">Snapshot</a></li>
+                        <li><a href="release/index.html">Release</a></li>
                       </ul>
                     </section>
 
@@ -327,6 +366,8 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
                     </section>
 
                     <iframe src="${locCurrentPublicationHref.AIcDocsHtmlEscape()}" title="Current generated artifact documentation"></iframe>
+
+                    <p><a href="../index.html">Repository documentation root</a></p>
                   </main>
                 </body>
                 </html>
@@ -382,5 +423,19 @@ if (tasks.findByName("generateAlgitesDocsSite") == null) {
 
         dependsOn("generateAlgitesDocsRootIndex")
         dependsOn("generateAlgitesDocsPublicationGroupIndexes")
+        dependsOn("generateAlgitesDocsGeneratedIndex")
     }
+}
+
+
+afterEvaluate {
+    val locGeneratedIndexTask = tasks.findByName("generateAlgitesDocsGeneratedIndex")
+    val locPublicationGroupIndexesTask = tasks.findByName("generateAlgitesDocsPublicationGroupIndexes")
+
+    listOf("generateJavaDocsSite", "generateDummyMpsDocs")
+        .mapNotNull { locTaskName -> tasks.findByName(locTaskName) }
+        .forEach { locDocumentationTask ->
+            locGeneratedIndexTask?.mustRunAfter(locDocumentationTask)
+            locPublicationGroupIndexesTask?.mustRunAfter(locDocumentationTask)
+        }
 }

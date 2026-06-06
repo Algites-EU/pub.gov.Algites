@@ -55,9 +55,8 @@ fun AIcReadMpsDocsRepositoryId(): String {
     }.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'")
 }
 
-val locGeneratedDocsRoot = file(
-    (findProperty("algites.docs.publicationRoot") as String?)
-        ?: (extra["algitesPublicationDocsRootPath"] as String? ?: "docs-site/generated")
+val locGeneratedDocsRoot = layout.projectDirectory.dir(
+    (findProperty("algites.docs.generatedRoot") as String?) ?: "docs-site/generated"
 )
 
 fun String.AIcToSha256Text(): String {
@@ -514,7 +513,7 @@ tasks.register("generateDummyMpsDocs") {
             val locModuleName = locColumns[7]
             val locContentHash = locLine.AIcToSha256Text()
 
-            val locTargetDirectory = locGeneratedDocsRoot.resolve("${locDocumentationPath}/latest")
+            val locTargetDirectory = locGeneratedDocsRoot.dir("${locDocumentationPath}/latest").asFile
             locTargetDirectory.deleteRecursively()
             locTargetDirectory.mkdirs()
 
@@ -553,7 +552,7 @@ tasks.register("generateDummyMpsDocs") {
             )
         }
 
-        val locIndexFile = locGeneratedDocsRoot.resolve("index.html")
+        val locIndexFile = locGeneratedDocsRoot.asFile.resolve("index.html")
         locIndexFile.parentFile.mkdirs()
         locIndexFile.writeText(
             """
@@ -583,7 +582,7 @@ tasks.register("generateDummyMpsDocs") {
             Charsets.UTF_8
         )
 
-        logger.lifecycle("Dummy documentation generated at: ${locGeneratedDocsRoot.absolutePath}")
+        logger.lifecycle("Dummy documentation generated at: ${locGeneratedDocsRoot.asFile.absolutePath}")
         logger.lifecycle("Publishable MPS artifact(s): ${locPublishableLines.size}")
         logger.lifecycle("Skipped non-publishable MPS artifact(s): ${locLines.size - locPublishableLines.size}")
     }
