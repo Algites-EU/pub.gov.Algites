@@ -1,6 +1,16 @@
 pluginManagement {
     repositories {
+        val locIsCi =
+                providers.gradleProperty("CI")
+                .orElse(providers.environmentVariable("CI"))
+                .map { it.equals("true", ignoreCase = true) }
+                .orElse(false)
+                .get()
+
         gradlePluginPortal()
+        if (!locIsCi) {
+            mavenLocal()
+        }
         mavenCentral()
         maven {
             name = "algites-public-releases"
@@ -20,7 +30,18 @@ pluginManagement {
 }
 
 dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        val locIsCi =
+                providers.gradleProperty("CI")
+                .orElse(providers.environmentVariable("CI"))
+                .map { it.equals("true", ignoreCase = true) }
+                .orElse(false)
+                .get()
+
+        if (!locIsCi) {
+            mavenLocal()
+        }
         mavenCentral()
         maven {
             name = "algites-public-releases"
@@ -39,5 +60,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "pub.gov.Algites"
-include(":devops:build:policy:base")
+apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-root-settings-discovery.gradle.kts"))

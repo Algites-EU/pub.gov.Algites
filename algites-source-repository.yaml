@@ -1,8 +1,7 @@
 sourceRepository:
   id: pub.gov.Algites
+¨ groupId: eu.algites.gov
   name: Algites public governance repository
-  containedArtifactRelativePaths:
-    - devops/build/model/common
 
 versionContext:
   releaseLine: "1"
