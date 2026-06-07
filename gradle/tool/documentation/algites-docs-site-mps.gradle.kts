@@ -393,6 +393,7 @@ fun AIcDiscoverMpsArtifacts(
 tasks.register("validateAlgitesConfiguration") {
     group = "algites"
     description = "Validates minimal Algites source repository configuration."
+    notCompatibleWithConfigurationCache("This legacy MPS discovery task still uses script helper functions at execution time.")
 
     inputs.file(locRepositoryConfigFile)
 
@@ -417,6 +418,7 @@ tasks.register("validateAlgitesConfiguration") {
 tasks.register("discoverMpsArtifacts") {
     group = "algites"
     description = "Discovers MPS language/solution descriptors in configured artifact-set projects and derives Algites artifact identities."
+    notCompatibleWithConfigurationCache("This legacy MPS discovery task still uses script helper functions at execution time.")
 
     dependsOn("validateAlgitesConfiguration")
 
@@ -468,6 +470,7 @@ tasks.register("discoverMpsArtifacts") {
 tasks.register("printDiscoveredMpsArtifacts") {
     group = "algites"
     description = "Prints discovered MPS artifacts to the Gradle log."
+    notCompatibleWithConfigurationCache("This legacy MPS reporting task still uses script helper functions at execution time.")
 
     dependsOn("discoverMpsArtifacts")
 
@@ -480,6 +483,7 @@ tasks.register("printDiscoveredMpsArtifacts") {
 tasks.register("generateDummyMpsDocs") {
     group = "algites"
     description = "Generates dummy static documentation pages for discovered MPS artifacts."
+    notCompatibleWithConfigurationCache("This legacy MPS documentation task still uses script helper functions at execution time.")
 
     dependsOn("discoverMpsArtifacts")
     dependsOn("generateAlgitesDocsRootIndex")

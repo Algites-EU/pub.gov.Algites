@@ -113,8 +113,6 @@ val locGeneratedDocsRoot = layout.projectDirectory.dir(
 
 val locRepositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
 val locFallbackRepositoryId = rootProject.name
-val locDocumentedJavaModulePaths = mutableListOf<String>()
-
 fun Project.AIcResolveJavaModulePath(): String {
     return path.removePrefix(":").replace(":", ".")
 }
@@ -146,7 +144,7 @@ val locGenerateJavaDocsSiteTaskProvider = tasks.register<AIcGenerateJavaDocsSite
     repositoryConfigFile.set(locRepositoryConfigFile)
     fallbackRepositoryId.set(locFallbackRepositoryId)
     generatedDocsRootDirectory.set(locGeneratedDocsRoot)
-    documentedJavaModulePaths.set(provider { locDocumentedJavaModulePaths.sorted() })
+    documentedJavaModulePaths.set(emptyList())
 }
 
 subprojects.forEach { locSubproject ->
@@ -155,8 +153,8 @@ subprojects.forEach { locSubproject ->
         val locStageTaskName = "stageJavaDocsSiteFor${locSubproject.AIcResolveDocsTaskNameSuffix()}"
         val locJavadocDestinationDirectory = locSubproject.layout.buildDirectory.dir("docs/javadoc")
 
-        if (!locDocumentedJavaModulePaths.contains(locModulePath)) {
-            locDocumentedJavaModulePaths.add(locModulePath)
+        locGenerateJavaDocsSiteTaskProvider.configure {
+            documentedJavaModulePaths.add(locModulePath)
         }
 
         val locJavadocTaskProvider = locSubproject.tasks.named<Javadoc>("javadoc") {
