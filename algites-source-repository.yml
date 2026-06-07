@@ -1,6 +1,6 @@
 sourceRepository:
   id: pub.gov.Algites
-¨ groupId: eu.algites.gov
+¨ groupId: eu.algites.gov.pub
   name: Algites public governance repository
 
 versionContext:

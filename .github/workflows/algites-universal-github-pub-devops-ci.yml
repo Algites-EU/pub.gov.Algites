@@ -126,25 +126,35 @@ jobs:
           VARIANT="$PREFIX"
           echo "variant=$VARIANT" >> "$GITHUB_OUTPUT"
 
-          if [[ ! -f "algites-source-repository.properties" ]]; then
-            echo "::error::algites-source-repository.properties not found in repo root (required for lane branches)."
+          if [[ ! -f "algites-source-repository.yml" ]]; then
+            echo "::error::algites-source-repository.yml not found in repo root (required for lane branches)."
             exit 1
           fi
 
-          REPO_LANE="$(grep -E '^[[:space:]]*repo\.lane[[:space:]]*=' algites-source-repository.properties | head -n1 | cut -d'=' -f2- | tr -d '[:space:] || true)"
+          REPO_LANE="$(python3 - <<'PY'
+          import re
+          from pathlib import Path
+          locText = Path('algites-source-repository.yml').read_text(encoding='utf-8')
+          locMatch = re.search(r'(?ms)^versionContext:\s*$(.*?)(?=^[A-Za-z0-9_-]+:\s*$|\Z)', locText)
+          if locMatch:
+              locReleaseLine = re.search(r"(?m)^\s+releaseLine:\s*['\"]?([^'\"\n#]+)", locMatch.group(1))
+              if locReleaseLine:
+                  print(locReleaseLine.group(1).strip())
+          PY
+          )"
           if [[ -z "$REPO_LANE" ]]; then
-            echo "::error::repo.lane missing/empty in algites-source-repository.properties"
+            echo "::error::versionContext.releaseLine missing/empty in algites-source-repository.yml"
             exit 1
           fi
 
-          # Branch lane must match repo.lane
+          # Branch lane must match versionContext.releaseLine.
           if [[ "$BRANCH_LANE" != "$REPO_LANE" ]]; then
-            echo "::error::Lane mismatch. Branch lane='$BRANCH_LANE' but repo.lane='$REPO_LANE'."
+            echo "::error::Lane mismatch. Branch lane='$BRANCH_LANE' but versionContext.releaseLine='$REPO_LANE'."
             exit 1
           fi
 
           if [[ ! "$REPO_LANE" =~ ^([0-9]+)\.([0-9]+)\.x$ ]]; then
-            echo "::error::repo.lane must be <A>.<B>.x (e.g. 1.1). Got: '$REPO_LANE'."
+            echo "::error::versionContext.releaseLine must be <A>.<B>.x (e.g. 1.1.x). Got: '$REPO_LANE'."
             exit 1
           fi
 
@@ -252,177 +262,177 @@ jobs:
           export REF ORG REPO MSGS
 
           python3 - <<'PY'
-          import os, re
-
-          ref = os.environ.get("REF","")
-          org = os.environ.get("ORG","Algites-EU")
-          repo = os.environ.get("REPO","")
-          msgs = os.environ.get("MSGS","")
-
-          # Branch conventions (recommended, strict):
-          #   .../feature/ID.123_some-text
-          #   .../feature/ID.pub.tool.Java-123_some-text
-          #
-          # Commit conventions (supported):
-          #   #123
-          #   #ID.123
-          #   #pub.tool.Java-123
-          #   #ID.pub.tool.Java-123
-          #
-          # Notes:
-          # - branch parsing is intentionally strict (requires "ID." + "_" delimiter)
-          # - cross-repo shorthand assumes the Algites-EU organization
-
-          refs = set()  # (repo_full, issue_number)
-
-          # --- Branch parsing (strict, forcing: "ID.<...>" followed by underscore) ---
-          for m in re.finditer(r'(?:^|/)ID\.(\d{1,9})_', ref):
-            refs.add((repo, m.group(1)))
-
-          for m in re.finditer(r'(?:^|/)ID\.([A-Za-z0-9.]+)-(\d{1,9})_', ref):
-            alias, num = m.group(1), m.group(2)
-            refs.add((f"{org}/{alias}", num))
-
-          # --- Commit parsing (#token) ---
-          for token in re.findall(r'#[A-Za-z0-9.\-]{1,120}', msgs):
-            t = token[1:]  # strip '#'
-            if t.startswith("ID."):
-              t = t[3:]
-
-            if re.fullmatch(r'\d{1,9}', t):
-              refs.add((repo, t))
-              continue
-
-            m = re.fullmatch(r'([A-Za-z0-9.]+)-(\d{1,9})', t)
-            if m:
-              alias, num = m.group(1), m.group(2)
-              refs.add((f"{org}/{alias}", num))
-
-          out_path = os.environ.get("GITHUB_OUTPUT")
-          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
-
-          if not refs:
-            if out_path:
-              with open(out_path, "a", encoding="utf-8") as f:
-                f.write("found=false\n")
-                f.write("issues=\n")
-            raise SystemExit(0)
-
-          refs_sorted = sorted(refs, key=lambda x: (x[0], int(x[1])))
-
-          if out_path:
-            with open(out_path, "a", encoding="utf-8") as f:
-              f.write("found=true\n")
-              f.write("issues=" + " ".join([f"{r}#{n}" for r,n in refs_sorted]) + "\n")
-
-          if summary_path:
-            with open(summary_path, "a", encoding="utf-8") as s:
-              s.write("## Related Issues\n\n")
-              for r, n in refs_sorted:
-                s.write(f"- [{r}#{n}](https://github.com/{r}/issues/{n})\n")
-              s.write("\n")
-              s.write("> Detected from branch name (e.g. `feature/ID.123_...`) and/or commit subjects containing `#123`, `#pub.tool.Java-123`, etc.\n")
-          PY
-
-      - name: Emit related-issue notices
-        if: ${{ steps.issues.outputs.found == 'true' }}
-        shell: bash
-        run: |
-          for item in ${{ steps.issues.outputs.issues }}; do
-            echo "::notice title=Related Issue::$item"
-          done
-
-      - name: Detect Java version
-        id: detect-java
-        if: ${{ inputs.java-version == '' && steps.mode.outputs.mode != 'skip' }}
-        shell: bash
-        run: |
-          # Preferred: .java-version (one integer line)
-          if [ -f .java-version ]; then
-            v="$(tr -d '\r\n' < .java-version)"
-            if [[ "$v" =~ ^[0-9]+$ ]]; then
-              echo "version=$v" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          fi
+                    import os, re
           
-          # Gradle: gradle.properties with javaVersion=17
-          if [ -f gradle.properties ] && grep -q '^javaVersion=' gradle.properties; then
-            v="$(grep '^javaVersion=' gradle.properties | head -n1 | cut -d= -f2 | tr -d ' \r\n')"
-            if [[ "$v" =~ ^[0-9]+$ ]]; then
-              echo "version=$v" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-          fi
+                    ref = os.environ.get("REF","")
+                    org = os.environ.get("ORG","Algites-EU")
+                    repo = os.environ.get("REPO","")
+                    msgs = os.environ.get("MSGS","")
           
-          echo "version=17" >> "$GITHUB_OUTPUT"
-
-      - name: Set up JDK
-        if: ${{ steps.mode.outputs.mode != 'skip' }}
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: ${{ inputs.java-version != '' && inputs.java-version || steps.detect-java.outputs.version }}
-
-      - name: Generate GitHub App token
-        id: app-token
-        if: ${{ steps.mode.outputs.mode != 'skip' }}
-        uses: actions/github-app-token@v1
-        with:
-          app-id: ${{ secrets.GITHUB_APP_ID }}
-          private-key: ${{ secrets.GITHUB_APP_PEM }}
-
-      # -------------------------
-      # Construction mode
-      # -------------------------
-      - name: Gradle construction only
-        if: ${{ steps.mode.outputs.mode == 'compile' }}
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
-        run: |
-          set -euo pipefail
-          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
-          EXTRA=""
-          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-
-          echo "=== Gradle construction: compile (including test sources, without test execution) ==="
-          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
-
-      # -------------------------
-      # Verification mode
-      # -------------------------
-      - name: Gradle verification
-        if: ${{ steps.mode.outputs.mode == 'test' }}
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
-        run: |
-          set -euo pipefail
-          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
-          EXTRA=""
-          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-
-          echo "=== Gradle verification: test+integration test, no packaging ==="
-          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
-
-      # -------------------------
-      # Approval mode
-      # -------------------------
-      - name: Gradle approval
-        if: ${{ steps.mode.outputs.mode == 'verify' }}
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
-        run: |
-          set -euo pipefail
-          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
-          EXTRA=""
-          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-          echo "=== Gradle approval (test+integration test, with packaging) ==="
-          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
-
-      - name: Skip (non-matching branch)
-        if: ${{ steps.mode.outputs.mode == 'skip' }}
-        run: |
-          echo "Mode=skip → no construction/verification/approval for this branch."
+                    # Branch conventions (recommended, strict):
+                    #   .../feature/ID.123_some-text
+                    #   .../feature/ID.pub.tool.Java-123_some-text
+                    #
+                    # Commit conventions (supported):
+                    #   #123
+                    #   #ID.123
+                    #   #pub.tool.Java-123
+                    #   #ID.pub.tool.Java-123
+                    #
+                    # Notes:
+                    # - branch parsing is intentionally strict (requires "ID." + "_" delimiter)
+                    # - cross-repo shorthand assumes the Algites-EU organization
+          
+                    refs = set()  # (repo_full, issue_number)
+          
+                    # --- Branch parsing (strict, forcing: "ID.<...>" followed by underscore) ---
+                    for m in re.finditer(r'(?:^|/)ID\.(\d{1,9})_', ref):
+                      refs.add((repo, m.group(1)))
+          
+                    for m in re.finditer(r'(?:^|/)ID\.([A-Za-z0-9.]+)-(\d{1,9})_', ref):
+                      alias, num = m.group(1), m.group(2)
+                      refs.add((f"{org}/{alias}", num))
+          
+                    # --- Commit parsing (#token) ---
+                    for token in re.findall(r'#[A-Za-z0-9.\-]{1,120}', msgs):
+                      t = token[1:]  # strip '#'
+                      if t.startswith("ID."):
+                        t = t[3:]
+          
+                      if re.fullmatch(r'\d{1,9}', t):
+                        refs.add((repo, t))
+                        continue
+          
+                      m = re.fullmatch(r'([A-Za-z0-9.]+)-(\d{1,9})', t)
+                      if m:
+                        alias, num = m.group(1), m.group(2)
+                        refs.add((f"{org}/{alias}", num))
+          
+                    out_path = os.environ.get("GITHUB_OUTPUT")
+                    summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          
+                    if not refs:
+                      if out_path:
+                        with open(out_path, "a", encoding="utf-8") as f:
+                          f.write("found=false\n")
+                          f.write("issues=\n")
+                      raise SystemExit(0)
+          
+                    refs_sorted = sorted(refs, key=lambda x: (x[0], int(x[1])))
+          
+                    if out_path:
+                      with open(out_path, "a", encoding="utf-8") as f:
+                        f.write("found=true\n")
+                        f.write("issues=" + " ".join([f"{r}#{n}" for r,n in refs_sorted]) + "\n")
+          
+                    if summary_path:
+                      with open(summary_path, "a", encoding="utf-8") as s:
+                        s.write("## Related Issues\n\n")
+                        for r, n in refs_sorted:
+                          s.write(f"- [{r}#{n}](https://github.com/{r}/issues/{n})\n")
+                        s.write("\n")
+                        s.write("> Detected from branch name (e.g. `feature/ID.123_...`) and/or commit subjects containing `#123`, `#pub.tool.Java-123`, etc.\n")
+                    PY
+          
+                - name: Emit related-issue notices
+                  if: ${{ steps.issues.outputs.found == 'true' }}
+                  shell: bash
+                  run: |
+                    for item in ${{ steps.issues.outputs.issues }}; do
+                      echo "::notice title=Related Issue::$item"
+                    done
+          
+                - name: Detect Java version
+                  id: detect-java
+                  if: ${{ inputs.java-version == '' && steps.mode.outputs.mode != 'skip' }}
+                  shell: bash
+                  run: |
+                    # Preferred: .java-version (one integer line)
+                    if [ -f .java-version ]; then
+                      v="$(tr -d '\r\n' < .java-version)"
+                      if [[ "$v" =~ ^[0-9]+$ ]]; then
+                        echo "version=$v" >> "$GITHUB_OUTPUT"
+                        exit 0
+                      fi
+                    fi
+                    
+                    # Gradle: gradle.properties with javaVersion=17
+                    if [ -f gradle.properties ] && grep -q '^javaVersion=' gradle.properties; then
+                      v="$(grep '^javaVersion=' gradle.properties | head -n1 | cut -d= -f2 | tr -d ' \r\n')"
+                      if [[ "$v" =~ ^[0-9]+$ ]]; then
+                        echo "version=$v" >> "$GITHUB_OUTPUT"
+                        exit 0
+                      fi
+                    fi
+                    
+                    echo "version=17" >> "$GITHUB_OUTPUT"
+          
+                - name: Set up JDK
+                  if: ${{ steps.mode.outputs.mode != 'skip' }}
+                  uses: actions/setup-java@v4
+                  with:
+                    distribution: temurin
+                    java-version: ${{ inputs.java-version != '' && inputs.java-version || steps.detect-java.outputs.version }}
+          
+                - name: Generate GitHub App token
+                  id: app-token
+                  if: ${{ inputs.github-app-enabled && steps.mode.outputs.mode != 'skip' }}
+                  uses: actions/github-app-token@v1
+                  with:
+                    app-id: ${{ secrets.GITHUB_APP_ID }}
+                    private-key: ${{ secrets.GITHUB_APP_PEM }}
+          
+                # -------------------------
+                # Construction mode
+                # -------------------------
+                - name: Gradle construction only
+                  if: ${{ steps.mode.outputs.mode == 'compile' }}
+                  env:
+                    GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
+                  run: |
+                    set -euo pipefail
+                    chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+                    ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+                    EXTRA=""
+                    if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+          
+                    echo "=== Gradle construction: compile (including test sources, without test execution) ==="
+                    "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
+          
+                # -------------------------
+                # Verification mode
+                # -------------------------
+                - name: Gradle verification
+                  if: ${{ steps.mode.outputs.mode == 'test' }}
+                  env:
+                    GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
+                  run: |
+                    set -euo pipefail
+                    chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+                    ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+                    EXTRA=""
+                    if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+          
+                    echo "=== Gradle verification: test+integration test, no packaging ==="
+                    "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
+          
+                # -------------------------
+                # Approval mode
+                # -------------------------
+                - name: Gradle approval
+                  if: ${{ steps.mode.outputs.mode == 'verify' }}
+                  env:
+                    GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
+                  run: |
+                    set -euo pipefail
+                    chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+                    ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+                    EXTRA=""
+                    if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+                    echo "=== Gradle approval (test+integration test, with packaging) ==="
+                    "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
+          
+                - name: Skip (non-matching branch)
+                  if: ${{ steps.mode.outputs.mode == 'skip' }}
+                  run: |
+                    echo "Mode=skip → no construction/verification/approval for this branch."

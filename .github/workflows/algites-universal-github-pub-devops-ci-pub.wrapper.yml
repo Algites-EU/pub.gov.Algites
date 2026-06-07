@@ -3,11 +3,6 @@ name: Algites Universal Pub DevOps CI (Public Wrapper)
 on:
   workflow_call:
     inputs:
-      build-tool:
-        description: "Optional override: auto | gradle | maven"
-        required: false
-        type: string
-        default: "auto"
       java-version:
         description: "Optional override: Java version (e.g. 17, 21). Empty = auto-detect."
         required: false
@@ -27,6 +22,7 @@ jobs:
     uses: ./.github/workflows/algites-universal-github-pub-devops-ci.yml
     with:
       java-version: ${{ inputs.java-version }}
+      github-app-enabled: true
     secrets:
       GITHUB_APP_ID: ${{ secrets.PUB_GITHUB_APP_ID }}
       GITHUB_APP_INSTALLATION_ID: ${{ secrets.PUB_GITHUB_APP_INSTALLATION_ID }}

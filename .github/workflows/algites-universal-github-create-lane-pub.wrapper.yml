@@ -37,12 +37,13 @@ on:
 
 jobs:
   create-lane:
-    uses: Algites-EU/pub.dov.Algites/.github/workflows/algites-universal-github-create-lane.yml@main
+    uses: Algites-EU/pub.gov.Algites/.github/workflows/algites-universal-github-create-lane.yml@main
     with:
       source_lane: ${{ inputs.source_lane }}
       new_lane: ${{ inputs.new_lane }}
       variants: ${{ inputs.variants }}
       variants_explicit: ${{ inputs.variants_explicit }}
+      github-app-enabled: true
     secrets:
       GITHUB_APP_ID: ${{ secrets.PUB_GITHUB_APP_ID }}
       GITHUB_APP_INSTALLATION_ID: ${{ secrets.PUB_GITHUB_APP_INSTALLATION_ID }}

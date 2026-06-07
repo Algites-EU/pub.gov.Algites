@@ -23,6 +23,39 @@ on:
         required: false
         default: false
 
+  workflow_call:
+    inputs:
+      source_lane:
+        description: "Source lane (e.g. 1.1.x)"
+        required: true
+        type: string
+      new_lane:
+        description: "New lane (e.g. 1.2.x)"
+        required: true
+        type: string
+      variants:
+        description: "auto (discover) or explicit list"
+        required: false
+        type: string
+        default: "auto"
+      variants_explicit:
+        description: "Comma-separated variants when variants=explicit (e.g. jvm17,and21)"
+        required: false
+        type: string
+        default: ""
+      github-app-enabled:
+        type: boolean
+        description: "Indication the Github Application for the task is enabled"
+        required: false
+        default: false
+    secrets:
+      GITHUB_APP_ID:
+        required: false
+      GITHUB_APP_INSTALLATION_ID:
+        required: false
+      GITHUB_APP_PEM:
+        required: false
+
 permissions:
   contents: write
 
@@ -127,18 +160,44 @@ jobs:
             TMP="create-lane/${TO}-$(date +%Y%m%d%H%M%S)"
             git switch -c "$TMP" "refs/remotes/origin/${FROM}"
 
-            if [[ ! -f "algites-source-repository.properties" ]]; then
-              echo "ERROR: algites-source-repository.properties not found in repo root on ${FROM}." >&2
+            if [[ ! -f "algites-source-repository.yml" ]]; then
+              echo "ERROR: algites-source-repository.yml not found in repo root on ${FROM}." >&2
               exit 1
             fi
 
-            if grep -qE '^repo\.lane=' algites-source-repository.properties; then
-              sed -i "s/^repo\.lane=.*/repo.lane=${NEW}/" algites-source-repository.properties
-            else
-              echo "repo.lane=${NEW}" >> algites-source-repository.properties
-            fi
+            python3 - "$NEW" <<'PY'
+          import re
+          import sys
+          from pathlib import Path
+          
+          locNewLane = sys.argv[1]
+          locPath = Path("algites-source-repository.yml")
+          locText = locPath.read_text(encoding="utf-8")
+          
+          locMatch = re.search(r"(?m)^versionContext:\s*$", locText)
+          if not locMatch:
+              locText = locText.rstrip() + "\n\nversionContext:\n  releaseLine: \"%s\"\n  revision: 0\n  qualifierKind: SNAPSHOT\n  qualifierLabel: SNAPSHOT\n" % locNewLane
+          else:
+              locStart = locMatch.end()
+              locNext = re.search(r"(?m)^[A-Za-z0-9_-]+:\s*$", locText[locStart:])
+              locEnd = locStart + locNext.start() if locNext else len(locText)
+              locBlock = locText[locStart:locEnd]
+              if re.search(r"(?m)^\s+releaseLine:\s*", locBlock):
+                  locBlock = re.sub(r"(?m)^(\s+releaseLine:\s*).*$", r"\1\"%s\"" % locNewLane, locBlock, count=1)
+              else:
+                  locBlock = "\n  releaseLine: \"%s\"" % locNewLane + locBlock
+              if not re.search(r"(?m)^\s+revision:\s*", locBlock):
+                  locBlock += "  revision: 0\n"
+              if not re.search(r"(?m)^\s+qualifierKind:\s*", locBlock):
+                  locBlock += "  qualifierKind: SNAPSHOT\n"
+              if not re.search(r"(?m)^\s+qualifierLabel:\s*", locBlock):
+                  locBlock += "  qualifierLabel: SNAPSHOT\n"
+              locText = locText[:locStart] + locBlock + locText[locEnd:]
+          
+          locPath.write_text(locText, encoding="utf-8")
+          PY
 
-            git add algites-source-repository.properties
+            git add algites-source-repository.yml
             git commit -m "Create lane ${TO} (from ${FROM})"
             git push origin "HEAD:${TO}"
 
