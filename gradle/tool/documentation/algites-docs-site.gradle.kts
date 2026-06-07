@@ -152,13 +152,13 @@ fun AIcResolveDocumentationType(aArtifactSetProjectDirectory: File): Pair<String
         locLooksLikeJava && !locLooksLikeMps -> "java" to "detected Java/Kotlin source files"
         locLooksLikeMps && locLooksLikeJava -> {
             logger.warn(
-                "Artifact-set project '${aArtifactSetProjectDirectory.relativeTo(layout.projectDirectory.asFile)}' looks like both MPS and Java; using Java documentation as default. Add algites-artifact-set.yml with documentationType: mps or documentationType: java to make this explicit."
+                "Artifact-set project '${aArtifactSetProjectDirectory.relativeTo(layout.projectDirectory.asFile)}' looks like both MPS and Java; using Java documentation as default. Add algites-artifact-set.yml with type: mps or algites-artifact.yml with type: java to make this explicit."
             )
             "java" to "ambiguous detection, defaulted to java"
         }
         else -> {
             logger.warn(
-                "Cannot determine documentation type for artifact-set project '${aArtifactSetProjectDirectory.relativeTo(layout.projectDirectory.asFile)}'; using Java documentation as default. Add algites-artifact-set.yml with documentationType: mps or documentationType: java to make this explicit."
+                "Cannot determine documentation type for artifact-set project '${aArtifactSetProjectDirectory.relativeTo(layout.projectDirectory.asFile)}'; using Java documentation as default. Add algites-artifact-set.yml with type: mps or algites-artifact.yml with type: java to make this explicit."
             )
             "java" to "undetermined, defaulted to java"
         }
