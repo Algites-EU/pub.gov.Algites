@@ -347,105 +347,105 @@ jobs:
               s.write("> Detected from branch name (e.g. `feature/ID.123_...`) and/or commit subjects containing `#123`, `#pub.tool.Java-123`, etc.\n")
           PY
           
-                - name: Emit related-issue notices
-                  if: ${{ steps.issues.outputs.found == 'true' }}
-                  shell: bash
-                  run: |
-                    for item in ${{ steps.issues.outputs.issues }}; do
-                      echo "::notice title=Related Issue::$item"
-                    done
+      - name: Emit related-issue notices
+        if: ${{ steps.issues.outputs.found == 'true' }}
+        shell: bash
+        run: |
+          for item in ${{ steps.issues.outputs.issues }}; do
+            echo "::notice title=Related Issue::$item"
+          done
+
+      - name: Detect Java version
+        id: detect-java
+        if: ${{ inputs.java-version == '' && steps.mode.outputs.mode != 'skip' }}
+        shell: bash
+        run: |
+          # Preferred: .java-version (one integer line)
+          if [ -f .java-version ]; then
+            v="$(tr -d '\r\n' < .java-version)"
+            if [[ "$v" =~ ^[0-9]+$ ]]; then
+              echo "version=$v" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
           
-                - name: Detect Java version
-                  id: detect-java
-                  if: ${{ inputs.java-version == '' && steps.mode.outputs.mode != 'skip' }}
-                  shell: bash
-                  run: |
-                    # Preferred: .java-version (one integer line)
-                    if [ -f .java-version ]; then
-                      v="$(tr -d '\r\n' < .java-version)"
-                      if [[ "$v" =~ ^[0-9]+$ ]]; then
-                        echo "version=$v" >> "$GITHUB_OUTPUT"
-                        exit 0
-                      fi
-                    fi
-                    
-                    # Gradle: gradle.properties with javaVersion=17
-                    if [ -f gradle.properties ] && grep -q '^javaVersion=' gradle.properties; then
-                      v="$(grep '^javaVersion=' gradle.properties | head -n1 | cut -d= -f2 | tr -d ' \r\n')"
-                      if [[ "$v" =~ ^[0-9]+$ ]]; then
-                        echo "version=$v" >> "$GITHUB_OUTPUT"
-                        exit 0
-                      fi
-                    fi
-                    
-                    echo "version=17" >> "$GITHUB_OUTPUT"
+          # Gradle: gradle.properties with javaVersion=17
+          if [ -f gradle.properties ] && grep -q '^javaVersion=' gradle.properties; then
+            v="$(grep '^javaVersion=' gradle.properties | head -n1 | cut -d= -f2 | tr -d ' \r\n')"
+            if [[ "$v" =~ ^[0-9]+$ ]]; then
+              echo "version=$v" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
           
-                - name: Set up JDK
-                  if: ${{ steps.mode.outputs.mode != 'skip' }}
-                  uses: actions/setup-java@v4
-                  with:
-                    distribution: temurin
-                    java-version: ${{ inputs.java-version != '' && inputs.java-version || steps.detect-java.outputs.version }}
-          
-                - name: Generate GitHub App token
-                  id: app-token
-                  if: ${{ inputs.github-app-enabled && steps.mode.outputs.mode != 'skip' }}
-                  uses: actions/github-app-token@v1
-                  with:
-                    app-id: ${{ secrets.GITHUB_APP_ID }}
-                    private-key: ${{ secrets.GITHUB_APP_PEM }}
-          
-                # -------------------------
-                # Construction mode
-                # -------------------------
-                - name: Gradle construction only
-                  if: ${{ steps.mode.outputs.mode == 'compile' }}
-                  env:
-                    GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
-                  run: |
-                    set -euo pipefail
-                    chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-                    ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
-                    EXTRA=""
-                    if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-          
-                    echo "=== Gradle construction: compile (including test sources, without test execution) ==="
-                    "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
-          
-                # -------------------------
-                # Verification mode
-                # -------------------------
-                - name: Gradle verification
-                  if: ${{ steps.mode.outputs.mode == 'test' }}
-                  env:
-                    GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
-                  run: |
-                    set -euo pipefail
-                    chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-                    ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
-                    EXTRA=""
-                    if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-          
-                    echo "=== Gradle verification: test+integration test, no packaging ==="
-                    "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
-          
-                # -------------------------
-                # Approval mode
-                # -------------------------
-                - name: Gradle approval
-                  if: ${{ steps.mode.outputs.mode == 'verify' }}
-                  env:
-                    GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
-                  run: |
-                    set -euo pipefail
-                    chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-                    ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
-                    EXTRA=""
-                    if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-                    echo "=== Gradle approval (test+integration test, with packaging) ==="
-                    "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
-          
-                - name: Skip (non-matching branch)
-                  if: ${{ steps.mode.outputs.mode == 'skip' }}
-                  run: |
-                    echo "Mode=skip → no construction/verification/approval for this branch."
+          echo "version=17" >> "$GITHUB_OUTPUT"
+
+      - name: Set up JDK
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ inputs.java-version != '' && inputs.java-version || steps.detect-java.outputs.version }}
+
+      - name: Generate GitHub App token
+        id: app-token
+        if: ${{ inputs.github-app-enabled && steps.mode.outputs.mode != 'skip' }}
+        uses: actions/github-app-token@v1
+        with:
+          app-id: ${{ secrets.GITHUB_APP_ID }}
+          private-key: ${{ secrets.GITHUB_APP_PEM }}
+
+      # -------------------------
+      # Construction mode
+      # -------------------------
+      - name: Gradle construction only
+        if: ${{ steps.mode.outputs.mode == 'compile' }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+          EXTRA=""
+          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+
+          echo "=== Gradle construction: compile (including test sources, without test execution) ==="
+          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
+
+      # -------------------------
+      # Verification mode
+      # -------------------------
+      - name: Gradle verification
+        if: ${{ steps.mode.outputs.mode == 'test' }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+          EXTRA=""
+          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+
+          echo "=== Gradle verification: test+integration test, no packaging ==="
+          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
+
+      # -------------------------
+      # Approval mode
+      # -------------------------
+      - name: Gradle approval
+        if: ${{ steps.mode.outputs.mode == 'verify' }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token != '' && steps.app-token.outputs.token || github.token }}
+        run: |
+          set -euo pipefail
+          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+          EXTRA=""
+          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+          echo "=== Gradle approval (test+integration test, with packaging) ==="
+          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
+
+      - name: Skip (non-matching branch)
+        if: ${{ steps.mode.outputs.mode == 'skip' }}
+        run: |
+          echo "Mode=skip → no construction/verification/approval for this branch."
