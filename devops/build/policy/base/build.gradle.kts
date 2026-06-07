@@ -33,12 +33,6 @@ gradlePlugin {
 }
 
 
-plugins {
-    `maven-publish`
-    `kotlin-dsl`
-    `java-gradle-plugin`
-}
-
 publishing {
 
     publications {
