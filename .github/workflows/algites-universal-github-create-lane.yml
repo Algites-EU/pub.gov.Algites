@@ -195,7 +195,7 @@ jobs:
               locText = locText[:locStart] + locBlock + locText[locEnd:]
           
           locPath.write_text(locText, encoding="utf-8")
-          PY
+            PY
 
             git add algites-source-repository.yml
             git commit -m "Create lane ${TO} (from ${FROM})"
