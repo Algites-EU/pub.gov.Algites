@@ -119,7 +119,7 @@ jobs:
           PREFIX="${BRANCH%%/*}"
           case "$PREFIX" in
             lane|feature|main|master|develop|hotfix)
-              echo "::error::Lane branches must be variant-prefixed, e.g. 'jvm17/lane/1.1.x' (got '$BRANCH')."
+              echo "::error::Lane branches must be variant-prefixed, e.g. 'jvm17/lane/1.1' (got '$BRANCH')."
               exit 1
               ;;
           esac
@@ -131,19 +131,40 @@ jobs:
             exit 1
           fi
 
-          REPO_LANE="$(python3 - <<'PY'
+          VERSION_CONTEXT="$(python3 - <<'PY'
           import re
           from pathlib import Path
+
           locText = Path('algites-source-repository.yml').read_text(encoding='utf-8')
           locMatch = re.search(r'(?ms)^versionContext:\s*$(.*?)(?=^[A-Za-z0-9_-]+:\s*$|\Z)', locText)
-          if locMatch:
-              locReleaseLine = re.search(r"(?m)^\s+releaseLine:\s*['\"]?([^'\"\n#]+)", locMatch.group(1))
-              if locReleaseLine:
-                  print(locReleaseLine.group(1).strip())
+          locBlock = locMatch.group(1) if locMatch else ''
+
+          def read_value(aName):
+              locValueMatch = re.search(r"(?m)^\s+" + re.escape(aName) + r":\s*['\"]?([^'\"\n#]+)", locBlock)
+              return locValueMatch.group(1).strip() if locValueMatch else ''
+
+          print("releaseLine=" + read_value("releaseLine"))
+          print("revision=" + read_value("revision"))
+          print("qualifierKind=" + read_value("qualifierKind"))
+          print("qualifierLabel=" + read_value("qualifierLabel"))
           PY
           )"
+
+          REPO_LANE="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^releaseLine=//p')"
+          REPO_REVISION="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^revision=//p')"
+          REPO_QUALIFIER_KIND="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^qualifierKind=//p')"
+          REPO_QUALIFIER_LABEL="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^qualifierLabel=//p')"
+
           if [[ -z "$REPO_LANE" ]]; then
             echo "::error::versionContext.releaseLine missing/empty in algites-source-repository.yml"
+            exit 1
+          fi
+          if [[ -z "$REPO_REVISION" ]]; then
+            echo "::error::versionContext.revision missing/empty in algites-source-repository.yml"
+            exit 1
+          fi
+          if [[ ! "$REPO_REVISION" =~ ^[0-9]+$ ]]; then
+            echo "::error::versionContext.revision must be a non-negative integer. Got: '$REPO_REVISION'."
             exit 1
           fi
 
@@ -153,30 +174,21 @@ jobs:
             exit 1
           fi
 
-          if [[ ! "$REPO_LANE" =~ ^([0-9]+)\.([0-9]+)\.x$ ]]; then
-            echo "::error::versionContext.releaseLine must be <A>.<B>.x (e.g. 1.1.x). Got: '$REPO_LANE'."
+          if [[ ! "$REPO_LANE" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error::versionContext.releaseLine must be a numeric dot-separated identifier, e.g. 1 or 1.1. Got: '$REPO_LANE'."
             exit 1
           fi
 
-          A="${BASH_REMATCH[1]}"
-          B="${BASH_REMATCH[2]}"
-
           echo "lane=$REPO_LANE" >> "$GITHUB_OUTPUT"
 
-          # Compute next C from tags: vA.B.C-VARIANT
-          PATTERN="v${A}.${B}.*-${VARIANT}"
-          MAX_C="-1"
-          while IFS= read -r tag; do
-            if [[ "$tag" =~ ^v${A}\.${B}\.([0-9]+)-${VARIANT}$ ]]; then
-              c="${BASH_REMATCH[1]}"
-              if (( c > MAX_C )); then MAX_C="$c"; fi
-            fi
-          done < <(git tag --list "$PATTERN" || true)
-
-          NEXT_C=$((MAX_C + 1))
-          if (( NEXT_C < 0 )); then NEXT_C=0; fi
-
-          SNAPSHOT_VERSION="${A}.${B}.${NEXT_C}-${VARIANT}-SNAPSHOT"
+          VERSION_BASE="${REPO_LANE}.${REPO_REVISION}"
+          REPO_QUALIFIER_KIND_UPPER="$(echo "${REPO_QUALIFIER_KIND:-}" | tr '[:lower:]' '[:upper:]')"
+          if [[ "$REPO_QUALIFIER_KIND_UPPER" == "SNAPSHOT" ]]; then
+            SNAPSHOT_LABEL="${REPO_QUALIFIER_LABEL:-SNAPSHOT}"
+            SNAPSHOT_VERSION="${VERSION_BASE}-${SNAPSHOT_LABEL}"
+          else
+            SNAPSHOT_VERSION="${VERSION_BASE}"
+          fi
           echo "snapshot_version=$SNAPSHOT_VERSION" >> "$GITHUB_OUTPUT"
 
           {
@@ -185,9 +197,10 @@ jobs:
             echo "- Branch: \`${BRANCH}\`"
             echo "- Variant: \`${VARIANT}\`"
             echo "- Lane: \`${REPO_LANE}\`"
-            echo "- Computed Snapshot: \`${SNAPSHOT_VERSION}\`"
-            echo ""
-            echo "> Tags scanned: \`${PATTERN}\` (format: `vA.B.C-VARIANT`)"
+            echo "- Revision: \`${REPO_REVISION}\`"
+            echo "- Qualifier kind: \`${REPO_QUALIFIER_KIND:-}\`"
+            echo "- Qualifier label: \`${REPO_QUALIFIER_LABEL:-}\`"
+            echo "- Computed Version: \`${SNAPSHOT_VERSION}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Detect config changes (pom/gradle)
