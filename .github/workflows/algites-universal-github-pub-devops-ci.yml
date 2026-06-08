@@ -278,25 +278,67 @@ jobs:
           set -euo pipefail
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
 
-          LOC_RESOLVER_INIT_SCRIPT="${GITHUB_WORKSPACE}/.algites-ci-resolve.init.gradle.kts"
-          trap 'rm -f "${LOC_RESOLVER_INIT_SCRIPT}"' EXIT
+          LOC_RESOLVER_PROJECT_DIR="${RUNNER_TEMP}/algites-ci-resolve-project"
+          rm -rf "${LOC_RESOLVER_PROJECT_DIR}"
+          mkdir -p "${LOC_RESOLVER_PROJECT_DIR}"
 
-          cat > "${LOC_RESOLVER_INIT_SCRIPT}" <<'KTS'
-          gradle.rootProject {
-              val locAlgitesResolverWrapperScript = file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
-              if (locAlgitesResolverWrapperScript.isFile) {
-                  apply(from = locAlgitesResolverWrapperScript)
-              } else {
-                  apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
+          cat > "${LOC_RESOLVER_PROJECT_DIR}/settings.gradle.kts" <<'KTS'
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+                  mavenCentral()
+                  google()
               }
+          }
 
-              tasks.register("algitesCiResolveMetadata") {
-                  group = "algites"
-                  description = "Resolves Algites artifact metadata for GitHub Actions."
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  mavenCentral()
+                  google()
+              }
+          }
 
-                  doLast {
+          rootProject.name = "algites-ci-resolve"
+          KTS
+
+          cat > "${LOC_RESOLVER_PROJECT_DIR}/build.gradle.kts" <<'KTS'
+          import java.io.File
+
+          val locRepositoryDirectory = File(System.getenv("ALGITES_METADATA_REPOSITORY_DIR"))
+          val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
+
+          if (locResolverCoreScript.isFile) {
+              apply(from = locResolverCoreScript)
+          } else {
+              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts"))
+          }
+
+          tasks.register("algitesCiResolveMetadata") {
+              group = "algites"
+              description = "Resolves Algites artifact metadata for GitHub Actions."
+
+              doLast {
                   @Suppress("UNCHECKED_CAST")
-                  val locProperties = rootProject.extra["algitesResolvedArtifactDirectoryMetadataProperties"] as Map<String, String>
+                  val locResolveMetadataMap = rootProject.extra["algitesResolveArtifactDirectoryMetadataMap"] as (
+                      File,
+                      String?,
+                      String?,
+                      String?,
+                      String?
+                  ) -> Map<String, Any?>
+
+                  @Suppress("UNCHECKED_CAST")
+                  val locFlattenMetadata = rootProject.extra["algitesFlattenArtifactDirectoryMetadata"] as (Map<String, Any?>) -> Map<String, String>
+
+                  val locMetadata = locResolveMetadataMap(
+                      locRepositoryDirectory,
+                      "",
+                      "current-with-subdirs",
+                      providers.gradleProperty("repository.name").orNull,
+                      providers.gradleProperty("repository.visibility").orNull
+                  )
+                  val locProperties = locFlattenMetadata(locMetadata)
                   val locArtifactDirectoryCount = locProperties["artifactDirectories.count"]?.toIntOrNull() ?: 0
 
                   fun AIcNormalize(aValue: String?): String {
@@ -330,12 +372,11 @@ jobs:
                   println("ALGITES_CI_VERSION_QUALIFIER_KIND=${AIcRootProperty("version.qualifierKind")}")
                   println("ALGITES_CI_VERSION_QUALIFIER_LABEL=${AIcRootProperty("version.qualifierLabel")}")
                   println("ALGITES_CI_VERSION_RESOLVED_VALUE=${AIcRootProperty("version.resolvedValue")}")
-                  }
               }
           }
           KTS
 
-          RESOLVED_METADATA="$("${GITHUB_WORKSPACE}/gradlew" --no-daemon -q --init-script "${LOC_RESOLVER_INIT_SCRIPT}" algitesCiResolveMetadata)"
+          RESOLVED_METADATA="$(ALGITES_METADATA_REPOSITORY_DIR="${GITHUB_WORKSPACE}" "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q --project-dir "${LOC_RESOLVER_PROJECT_DIR}" algitesCiResolveMetadata)"
           printf '%s\n' "$RESOLVED_METADATA"
 
           algites_ci_get_value() {

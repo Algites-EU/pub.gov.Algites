@@ -214,42 +214,85 @@ jobs:
           locPath.write_text(locText, encoding="utf-8")
           PY
 
-            LOC_RESOLVER_INIT_SCRIPT="${RUNNER_TEMP}/algites-resolve-artifact-metadata-${V}.init.gradle.kts"
-            LOC_RESOLVED_PROPERTIES_FILE="${RUNNER_TEMP}/algites-resolved-artifact-metadata-${V}.properties"
+            LOC_RESOLVER_PROJECT_DIR="${RUNNER_TEMP}/algites-resolve-artifact-metadata-${V//\//-}-project"
+            LOC_RESOLVED_PROPERTIES_FILE="${RUNNER_TEMP}/algites-resolved-artifact-metadata-${V//\//-}.properties"
 
-            cat > "${LOC_RESOLVER_INIT_SCRIPT}" <<'KTS'
-          gradle.rootProject {
-              val locWrapperScript = file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
-              if (locWrapperScript.isFile) {
-                  apply(from = locWrapperScript)
-              } else {
-                  apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
+            rm -rf "${LOC_RESOLVER_PROJECT_DIR}"
+            mkdir -p "${LOC_RESOLVER_PROJECT_DIR}"
+
+            cat > "${LOC_RESOLVER_PROJECT_DIR}/settings.gradle.kts" <<'KTS'
+          pluginManagement {
+              repositories {
+                  gradlePluginPortal()
+                  mavenCentral()
+                  google()
               }
+          }
 
-              tasks.register("writeAlgitesResolvedArtifactMetadataProperties") {
-                  group = "algites"
-                  description = "Writes resolved Algites artifact metadata properties for GitHub Actions."
+          dependencyResolutionManagement {
+              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+              repositories {
+                  mavenCentral()
+                  google()
+              }
+          }
 
-                  doLast {
-                      @Suppress("UNCHECKED_CAST")
-                      val locProperties = rootProject.extra["algitesResolvedArtifactDirectoryMetadataProperties"] as Map<String, String>
-                      val locOutputFile = file(System.getenv("ALGITES_RESOLVED_PROPERTIES_FILE"))
+          rootProject.name = "algites-resolve-artifact-metadata"
+          KTS
 
-                      locOutputFile.parentFile.mkdirs()
-                      locOutputFile.writeText(
-                locProperties.entries
-                    .sortedBy { it.key }
-                    .joinToString(System.lineSeparator()) { locEntry ->
-                        "${locEntry.key}=${locEntry.value}"
-                    } + System.lineSeparator(),
-                Charsets.UTF_8
-                      )
-                  }
+            cat > "${LOC_RESOLVER_PROJECT_DIR}/build.gradle.kts" <<'KTS'
+          import java.io.File
+
+          val locRepositoryDirectory = File(System.getenv("ALGITES_METADATA_REPOSITORY_DIR"))
+          val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
+
+          if (locResolverCoreScript.isFile) {
+              apply(from = locResolverCoreScript)
+          } else {
+              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts"))
+          }
+
+          tasks.register("writeAlgitesResolvedArtifactMetadataProperties") {
+              group = "algites"
+              description = "Writes resolved Algites artifact metadata properties for GitHub Actions."
+
+              doLast {
+                  @Suppress("UNCHECKED_CAST")
+                  val locResolveMetadataMap = rootProject.extra["algitesResolveArtifactDirectoryMetadataMap"] as (
+                      File,
+                      String?,
+                      String?,
+                      String?,
+                      String?
+                  ) -> Map<String, Any?>
+
+                  @Suppress("UNCHECKED_CAST")
+                  val locFlattenMetadata = rootProject.extra["algitesFlattenArtifactDirectoryMetadata"] as (Map<String, Any?>) -> Map<String, String>
+
+                  val locMetadata = locResolveMetadataMap(
+                      locRepositoryDirectory,
+                      "",
+                      "current-with-subdirs",
+                      providers.gradleProperty("repository.name").orNull,
+                      providers.gradleProperty("repository.visibility").orNull
+                  )
+                  val locProperties = locFlattenMetadata(locMetadata)
+                  val locOutputFile = File(System.getenv("ALGITES_RESOLVED_PROPERTIES_FILE"))
+
+                  locOutputFile.parentFile.mkdirs()
+                  locOutputFile.writeText(
+                      locProperties.entries
+                          .sortedBy { it.key }
+                          .joinToString(System.lineSeparator()) { locEntry ->
+                              "${locEntry.key}=${locEntry.value}"
+                          } + System.lineSeparator(),
+                      Charsets.UTF_8
+                  )
               }
           }
           KTS
 
-            ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" ./gradlew --no-daemon --quiet --init-script "${LOC_RESOLVER_INIT_SCRIPT}" writeAlgitesResolvedArtifactMetadataProperties
+            ALGITES_METADATA_REPOSITORY_DIR="${PWD}" ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" ./gradlew --no-daemon --quiet --project-dir "${LOC_RESOLVER_PROJECT_DIR}" writeAlgitesResolvedArtifactMetadataProperties
 
             LOC_RESOLVED_LANE="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
             LOC_RESOLVED_QUALIFIER_KIND="$(grep -m 1 '^artifactDirectories\.0\.version\.qualifierKind=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
