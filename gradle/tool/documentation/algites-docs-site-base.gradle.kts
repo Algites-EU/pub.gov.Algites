@@ -91,11 +91,13 @@ fun AIcDocsReadArtifactDirectories(aProperties: Map<String, String?>): List<Map<
 val locAlgitesDocsResolvedMetadataProperties = locAlgitesDocsResolvedMetadataPropertiesRaw
     .mapValues { locEntry -> locEntry.value.takeIf { it != "null" } }
 val locAlgitesDocsResolvedArtifactDirectories = AIcDocsReadArtifactDirectories(locAlgitesDocsResolvedMetadataProperties)
-val locAlgitesDocsResolvedRepositoryName = locAlgitesDocsResolvedMetadataProperties["repository.name"] ?: rootProject.name
+val locAlgitesDocsResolvedRepositoryId = locAlgitesDocsResolvedMetadataProperties["repository.id"] ?: rootProject.name
+val locAlgitesDocsResolvedRepositoryName = locAlgitesDocsResolvedMetadataProperties["repository.name"] ?: locAlgitesDocsResolvedRepositoryId
 val locAlgitesDocsResolvedRepositoryVisibility = locAlgitesDocsResolvedMetadataProperties["repository.visibility"] ?: ""
 
 extra["algitesDocsResolvedMetadataProperties"] = locAlgitesDocsResolvedMetadataProperties
 extra["algitesDocsResolvedArtifactDirectories"] = locAlgitesDocsResolvedArtifactDirectories
+extra["algitesDocsResolvedRepositoryId"] = locAlgitesDocsResolvedRepositoryId
 extra["algitesDocsResolvedRepositoryName"] = locAlgitesDocsResolvedRepositoryName
 extra["algitesDocsResolvedRepositoryVisibility"] = locAlgitesDocsResolvedRepositoryVisibility
 
@@ -144,7 +146,8 @@ fun String.AIcDocsHtmlEscape(): String {
 
 fun AIcDocsReadRepositoryScalar(aKey: String): String? {
     return when (aKey) {
-        "id", "name" -> locAlgitesDocsResolvedRepositoryName
+        "id" -> locAlgitesDocsResolvedRepositoryId
+        "name" -> locAlgitesDocsResolvedRepositoryName
         "visibility" -> locAlgitesDocsResolvedRepositoryVisibility.takeIf { it.isNotBlank() }
         else -> null
     }
