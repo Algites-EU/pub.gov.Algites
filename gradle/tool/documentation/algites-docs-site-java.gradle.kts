@@ -8,47 +8,22 @@
  * documentation-site script.
  */
 
+import org.gradle.api.Action
+import org.gradle.api.Task
 import org.gradle.api.tasks.javadoc.Javadoc
 
 data class AIcJavaDocsSiteEntry(
     val locModulePath: String,
     val locJavadocOutputDirectory: File
-)
+) : java.io.Serializable
 
-val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as String?)
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-base.gradle.kts"
+class AIcGenerateJavaDocsSiteAction(
+    private val locRepositoryId: String,
+    private val locGeneratedDocsRootFile: File,
+    private val locJavaDocsSiteEntries: List<AIcJavaDocsSiteEntry>
+) : Action<Task>, java.io.Serializable {
 
-apply(from = uri(locAlgitesDocsBaseScript))
-
-val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (extra.properties["algitesPublicationDocsRootPath"] as String?)
-        ?: (findProperty("algites.docs.generatedRoot") as String?)
-        ?: "docs-site/generated"
-)
-val locGeneratedDocsRootFile = locGeneratedDocsRoot.asFile
-val locJavaDocsRepositoryId = (extra.properties["algitesDocsResolvedRepositoryName"] as String?) ?: rootProject.name
-
-fun AIcReadRepositoryId(): String {
-    return locJavaDocsRepositoryId
-}
-
-fun Project.AIcResolveJavaModulePath(): String {
-    return path.removePrefix(":").replace(":", ".")
-}
-
-val locJavaDocsSiteEntries = mutableListOf<AIcJavaDocsSiteEntry>()
-
-val locGenerateJavaDocsSite = tasks.register("generateJavaDocsSite") {
-    group = "algites"
-    description = "Generates and stages Java Javadoc into the Algites documentation site."
-
-    dependsOn("generateAlgitesDocsRootIndex")
-
-    outputs.dir(locGeneratedDocsRootFile)
-
-    doLast {
-        val locRepositoryId = AIcReadRepositoryId()
-
+    override fun execute(aTask: Task) {
         val locDocumentedProjects = locJavaDocsSiteEntries.mapNotNull { locEntry ->
             val locJavadocOutputDirectory = locEntry.locJavadocOutputDirectory
 
@@ -91,9 +66,49 @@ val locGenerateJavaDocsSite = tasks.register("generateJavaDocsSite") {
             Charsets.UTF_8
         )
 
-        logger.lifecycle("Java documentation generated at: ${locGeneratedDocsRootFile.absolutePath}")
-        logger.lifecycle("Documented Java artifact(s): ${locDocumentedProjects.size}")
+        aTask.logger.lifecycle("Java documentation generated at: ${locGeneratedDocsRootFile.absolutePath}")
+        aTask.logger.lifecycle("Documented Java artifact(s): ${locDocumentedProjects.size}")
     }
+}
+
+val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as String?)
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-base.gradle.kts"
+
+apply(from = uri(locAlgitesDocsBaseScript))
+
+val locGeneratedDocsRoot = layout.projectDirectory.dir(
+    (extra.properties["algitesPublicationDocsRootPath"] as String?)
+        ?: (findProperty("algites.docs.generatedRoot") as String?)
+        ?: "docs-site/generated"
+)
+val locGeneratedDocsRootFile = locGeneratedDocsRoot.asFile
+val locJavaDocsRepositoryId = (extra.properties["algitesDocsResolvedRepositoryName"] as String?) ?: rootProject.name
+
+fun AIcReadRepositoryId(): String {
+    return locJavaDocsRepositoryId
+}
+
+fun Project.AIcResolveJavaModulePath(): String {
+    return path.removePrefix(":").replace(":", ".")
+}
+
+val locJavaDocsSiteEntries = mutableListOf<AIcJavaDocsSiteEntry>()
+
+val locGenerateJavaDocsSite = tasks.register("generateJavaDocsSite") {
+    group = "algites"
+    description = "Generates and stages Java Javadoc into the Algites documentation site."
+
+    dependsOn("generateAlgitesDocsRootIndex")
+
+    outputs.dir(locGeneratedDocsRootFile)
+
+    doLast(
+        AIcGenerateJavaDocsSiteAction(
+            locJavaDocsRepositoryId,
+            locGeneratedDocsRootFile,
+            locJavaDocsSiteEntries
+        )
+    )
 }
 
 subprojects.forEach { locSubproject ->
