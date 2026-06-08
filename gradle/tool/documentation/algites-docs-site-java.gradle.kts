@@ -11,6 +11,7 @@
 import org.gradle.api.Action
 import org.gradle.api.Task
 import org.gradle.api.tasks.javadoc.Javadoc
+import org.gradle.external.javadoc.StandardJavadocDocletOptions
 
 data class AIcJavaDocsSiteEntry(
     val locModulePath: String,
@@ -120,6 +121,14 @@ subprojects.forEach { locSubproject ->
         }
 
         locJavadocTaskProvider.configure {
+            (options as? StandardJavadocDocletOptions)?.apply {
+                /* Accept the legacy Algites @date block tag used in source Javadocs. */
+                tags("date:a:Date:")
+
+                /* Keep generated documentation tolerant of existing source comments. */
+                addBooleanOption("Xdoclint:none", true)
+            }
+
             val locJavadocOutputDirectory = destinationDir ?: return@configure
             locJavaDocsSiteEntries.add(
                 AIcJavaDocsSiteEntry(
