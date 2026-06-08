@@ -28,23 +28,18 @@ on:
         required: false
         type: string
         default: ""
-      documentation-branch:
+      pages-branch:
         description: Branch that stores the persistent generated documentation site.
         required: false
         type: string
-        default: documentation
-      publication-target:
-        description: "Optional publication target list. Empty means: pub.* repositories publish to github-pages; priv.* repositories only update documentation-branch. Currently supported value: github-pages."
-        required: false
-        type: string
-        default: ""
+        default: gh-pages
       gradle-arguments:
         description: Additional Gradle arguments.
         required: false
         type: string
         default: ""
       publish-pages:
-        description: Deprecated compatibility switch. If false, GitHub Pages publication is disabled even when publication-target resolves to github-pages.
+        description: Whether to persist and deploy the generated documentation to GitHub Pages.
         required: false
         type: boolean
         default: true
@@ -58,7 +53,7 @@ env:
   ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
 
 concurrency:
-  group: algites-docs-pages-${{ github.repository }}-${{ inputs.documentation-branch }}
+  group: algites-docs-pages-${{ github.repository }}-${{ inputs.pages-branch }}
   cancel-in-progress: false
 
 jobs:
@@ -86,38 +81,9 @@ jobs:
             locPublicationId="${locSourceRef}"
           fi
 
-          locDocumentationBranch="${{ inputs.documentation-branch }}"
-          if [[ -z "${locDocumentationBranch}" ]]; then
-            locDocumentationBranch="documentation"
-          fi
-
-          locPublicationTarget="${{ inputs.publication-target }}"
-          if [[ -z "${locPublicationTarget}" ]]; then
-            locRepositoryName="${GITHUB_REPOSITORY#*/}"
-            if [[ "${locRepositoryName}" == pub.* ]]; then
-              locPublicationTarget="github-pages"
-            else
-              locPublicationTarget=""
-            fi
-          fi
-
-          locPublishGitHubPages="false"
-          if [[ "${{ inputs.publish-pages }}" == "true" ]]; then
-            IFS=',' read -ra locPublicationTargets <<< "${locPublicationTarget}"
-            for locSinglePublicationTarget in "${locPublicationTargets[@]}"; do
-              locSinglePublicationTarget="$(echo "${locSinglePublicationTarget}" | xargs)"
-              if [[ "${locSinglePublicationTarget}" == "github-pages" ]]; then
-                locPublishGitHubPages="true"
-              fi
-            done
-          fi
-
           echo "source-ref=${locSourceRef}" >> "${GITHUB_OUTPUT}"
           echo "publication-kind=${{ inputs.publication-kind }}" >> "${GITHUB_OUTPUT}"
           echo "publication-id=${locPublicationId}" >> "${GITHUB_OUTPUT}"
-          echo "documentation-branch=${locDocumentationBranch}" >> "${GITHUB_OUTPUT}"
-          echo "publication-target=${locPublicationTarget}" >> "${GITHUB_OUTPUT}"
-          echo "publish-github-pages=${locPublishGitHubPages}" >> "${GITHUB_OUTPUT}"
 
       - name: Checkout source repository
         uses: actions/checkout@v4
@@ -125,26 +91,26 @@ jobs:
           ref: ${{ steps.publication.outputs.source-ref }}
           path: source
 
-      - name: Prepare persistent documentation branch workspace
+      - name: Prepare persistent Pages branch workspace
         shell: bash
         run: |
           set -euo pipefail
 
-          locDocumentationBranch="${{ steps.publication.outputs.documentation-branch }}"
+          locPagesBranch="${{ inputs.pages-branch }}"
 
-          mkdir -p documentation-branch
-          cd documentation-branch
+          mkdir -p gh-pages
+          cd gh-pages
 
           git init
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
 
-          if git ls-remote --exit-code --heads origin "${locDocumentationBranch}" >/dev/null 2>&1; then
-            git fetch --depth=1 origin "${locDocumentationBranch}"
-            git checkout "${locDocumentationBranch}"
+          if git ls-remote --exit-code --heads origin "${locPagesBranch}" >/dev/null 2>&1; then
+            git fetch --depth=1 origin "${locPagesBranch}"
+            git checkout "${locPagesBranch}"
           else
-            git checkout --orphan "${locDocumentationBranch}"
+            git checkout --orphan "${locPagesBranch}"
             git rm -rf . >/dev/null 2>&1 || true
             touch .nojekyll
             git add .nojekyll
@@ -160,6 +126,18 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Restore existing documentation site into source workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mkdir -p source/docs-site
+
+          rsync -a --delete \
+            --exclude '.git/' \
+            gh-pages/ \
+            source/docs-site/
+
       - name: Generate documentation site
         working-directory: source
         shell: bash
@@ -172,7 +150,7 @@ jobs:
             -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
             ${{ inputs.gradle-arguments }}
 
-      - name: Copy generated documentation to documentation branch workspace
+      - name: Copy generated documentation to persistent Pages workspace
         shell: bash
         run: |
           set -euo pipefail
@@ -185,15 +163,14 @@ jobs:
           rsync -a --delete \
             --exclude '.git/' \
             source/docs-site/ \
-            documentation-branch/
+            gh-pages/
 
-      - name: Commit generated documentation to documentation branch
-        working-directory: documentation-branch
+      - name: Commit generated documentation to persistent Pages branch
+        if: ${{ inputs.publish-pages }}
+        working-directory: gh-pages
         shell: bash
         run: |
           set -euo pipefail
-
-          locDocumentationBranch="${{ steps.publication.outputs.documentation-branch }}"
 
           touch .nojekyll
           git add -A
@@ -204,26 +181,26 @@ jobs:
           fi
 
           git commit -m "Publish documentation for ${{ steps.publication.outputs.publication-kind }}/${{ steps.publication.outputs.publication-id }}"
-          git push origin HEAD:"${locDocumentationBranch}"
+          git push origin HEAD:${{ inputs.pages-branch }}
 
       - name: Upload documentation site as workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: algites-docs-site
-          path: documentation-branch
+          path: gh-pages
           if-no-files-found: error
 
       - name: Configure GitHub Pages
-        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
+        if: ${{ inputs.publish-pages }}
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages artifact
-        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
+        if: ${{ inputs.publish-pages }}
         uses: actions/upload-pages-artifact@v3
         with:
-          path: documentation-branch
+          path: gh-pages
 
       - name: Deploy GitHub Pages
-        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
+        if: ${{ inputs.publish-pages }}
         id: deploy-pages
         uses: actions/deploy-pages@v4
