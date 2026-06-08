@@ -40,19 +40,16 @@ data class AIcMpsArtifactCandidate(
     val locPublishable: Boolean
 )
 
-val locRepositoryConfigFile = layout.projectDirectory.file("algites-source-repository.yml")
 val locDiscoveryOutputFile = layout.buildDirectory.file("algites/discovered-mps-artifacts.tsv")
+val locAlgitesDocsResolvedRepositoryName = (extra.properties["algitesDocsResolvedRepositoryName"] as String?) ?: rootProject.name
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsResolvedArtifactDirectories = extra.properties["algitesDocsResolvedArtifactDirectories"] as? List<Map<String, String?>>
+    ?: emptyList()
+
 
 fun AIcReadMpsDocsRepositoryId(): String {
-    val locFile = layout.projectDirectory.file("algites-source-repository.yml").asFile
-    require(locFile.isFile) {
-        "Missing repository configuration file: ${locFile.absolutePath}"
-    }
-
-    val locMatchResult = Regex("""(?m)^\s*id\s*:\s*([^\s#]+)\s*$""").find(locFile.readText(Charsets.UTF_8))
-    return requireNotNull(locMatchResult) {
-        "Cannot find sourceRepository.id in: ${locFile.absolutePath}"
-    }.groupValues[1].trim().removeSurrounding("\"").removeSurrounding("'")
+    return locAlgitesDocsResolvedRepositoryName
 }
 
 val locGeneratedDocsRoot = layout.projectDirectory.dir(
@@ -67,88 +64,29 @@ fun String.AIcToSha256Text(): String {
     return locHashBytes.joinToString("") { locByte -> "%02x".format(locByte) }
 }
 
-fun String.AIcNormalizeYamlScalar(): String {
-    return trim().removeSurrounding("\"").removeSurrounding("'")
-}
-
 fun AIcReadXmlAttribute(aXmlText: String, aAttributeName: String): String? {
     val locRegex = Regex("""\b${Regex.escape(aAttributeName)}\s*=\s*["']([^"']+)["']""")
     return locRegex.find(aXmlText)?.groupValues?.get(1)
 }
 
 fun AIcReadRepositoryId(): String {
-    val locFile = locRepositoryConfigFile.asFile
-    require(locFile.isFile) {
-        "Missing repository configuration file: ${locFile.absolutePath}"
-    }
-
-    val locMatchResult = Regex("""(?m)^\s*id\s*:\s*([^\s#]+)\s*$""").find(locFile.readText(Charsets.UTF_8))
-    return requireNotNull(locMatchResult) {
-        "Cannot find sourceRepository.id in: ${locFile.absolutePath}"
-    }.groupValues[1].AIcNormalizeYamlScalar()
-}
-
-fun AIcReadYamlListAfterKey(aYamlText: String, aKey: String): List<String> {
-    val locLines = aYamlText.lines()
-    val locResult = mutableListOf<String>()
-
-    for (locIndex in locLines.indices) {
-        val locLine = locLines[locIndex]
-        val locMatch = Regex("""^(\s*)${Regex.escape(aKey)}\s*:\s*$""").find(locLine) ?: continue
-        val locBaseIndent = locMatch.groupValues[1].length
-
-        for (locSubIndex in locIndex + 1 until locLines.size) {
-            val locSubLine = locLines[locSubIndex]
-
-            if (locSubLine.isBlank()) {
-                continue
-            }
-
-            val locIndent = locSubLine.takeWhile { it == ' ' }.length
-
-            if (locIndent <= locBaseIndent) {
-                break
-            }
-
-            val locItemMatch = Regex("""^\s*-\s*(.+?)\s*(?:#.*)?$""").find(locSubLine)
-            if (locItemMatch != null) {
-                locResult.add(locItemMatch.groupValues[1].AIcNormalizeYamlScalar())
-            }
-        }
-
-        if (locResult.isNotEmpty()) {
-            return locResult
-        }
-    }
-
-    return emptyList()
+    return locAlgitesDocsResolvedRepositoryName
 }
 
 fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
-    val locFile = locRepositoryConfigFile.asFile
-    val locYamlText = locFile.readText(Charsets.UTF_8)
-
-    val locCandidateKeys = listOf(
-        "containedArtifactSetProjectRelativePaths",
-        "containedArtifactSetRelativePaths",
-        "containedProjectRelativePaths",
-        "containedArtifactRelativePaths"
-    )
-
-    val locRelativePaths = locCandidateKeys
-        .asSequence()
-        .map { locKey -> AIcReadYamlListAfterKey(locYamlText, locKey) }
-        .firstOrNull { locValues -> locValues.isNotEmpty() }
-        ?: emptyList()
-
-    require(locRelativePaths.isNotEmpty()) {
-        "Cannot find any contained artifact-set project paths in ${locFile.absolutePath}. Tried keys: ${locCandidateKeys.joinToString(", ")}"
+    val locMpsArtifactDirectories = locAlgitesDocsResolvedArtifactDirectories.filter { locArtifactDirectory ->
+        locArtifactDirectory["type"] == "mps" && locArtifactDirectory["contentsModel"] == "self-contained"
     }
 
-    return locRelativePaths.map { locRelativePath ->
+    require(locMpsArtifactDirectories.isNotEmpty()) {
+        "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with type=mps and contentsModel=self-contained."
+    }
+
+    return locMpsArtifactDirectories.map { locArtifactDirectory ->
+        val locRelativePath = locArtifactDirectory["path"] ?: "."
         val locProjectDirectory = layout.projectDirectory.dir(locRelativePath).asFile
         require(locProjectDirectory.isDirectory) {
-            "Configured artifact-set project directory does not exist: ${locProjectDirectory.absolutePath}"
+            "Resolved MPS artifact directory does not exist: ${locProjectDirectory.absolutePath}"
         }
         AIcArtifactSetProject(
             locRelativePath = locRelativePath,
@@ -393,17 +331,11 @@ fun AIcDiscoverMpsArtifacts(
 tasks.register("validateAlgitesConfiguration") {
     group = "algites"
     description = "Validates minimal Algites source repository configuration."
-    notCompatibleWithConfigurationCache("This legacy MPS discovery task still uses script helper functions at execution time.")
 
-    inputs.file(locRepositoryConfigFile)
+    inputs.property("algitesDocsResolvedRepositoryName", locAlgitesDocsResolvedRepositoryName)
+    inputs.property("algitesDocsResolvedArtifactDirectories", locAlgitesDocsResolvedArtifactDirectories.toString())
 
     doLast {
-        val locRepositoryFile = locRepositoryConfigFile.asFile
-
-        require(locRepositoryFile.isFile) {
-            "Missing repository configuration file: ${locRepositoryFile.absolutePath}"
-        }
-
         val locRepositoryId = AIcReadMpsDocsRepositoryId()
         val locArtifactSetProjects = AIcReadArtifactSetProjects()
 
@@ -418,11 +350,11 @@ tasks.register("validateAlgitesConfiguration") {
 tasks.register("discoverMpsArtifacts") {
     group = "algites"
     description = "Discovers MPS language/solution descriptors in configured artifact-set projects and derives Algites artifact identities."
-    notCompatibleWithConfigurationCache("This legacy MPS discovery task still uses script helper functions at execution time.")
 
     dependsOn("validateAlgitesConfiguration")
 
-    inputs.file(locRepositoryConfigFile)
+    inputs.property("algitesDocsResolvedRepositoryName", locAlgitesDocsResolvedRepositoryName)
+    inputs.property("algitesDocsResolvedArtifactDirectories", locAlgitesDocsResolvedArtifactDirectories.toString())
     inputs.files(fileTree(layout.projectDirectory.asFile) {
         include("**/*.mpl")
         include("**/*.msd")
@@ -470,7 +402,6 @@ tasks.register("discoverMpsArtifacts") {
 tasks.register("printDiscoveredMpsArtifacts") {
     group = "algites"
     description = "Prints discovered MPS artifacts to the Gradle log."
-    notCompatibleWithConfigurationCache("This legacy MPS reporting task still uses script helper functions at execution time.")
 
     dependsOn("discoverMpsArtifacts")
 
@@ -483,7 +414,6 @@ tasks.register("printDiscoveredMpsArtifacts") {
 tasks.register("generateDummyMpsDocs") {
     group = "algites"
     description = "Generates dummy static documentation pages for discovered MPS artifacts."
-    notCompatibleWithConfigurationCache("This legacy MPS documentation task still uses script helper functions at execution time.")
 
     dependsOn("discoverMpsArtifacts")
     dependsOn("generateAlgitesDocsRootIndex")

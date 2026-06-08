@@ -90,119 +90,6 @@ jobs:
           # 5) Everything else: skip
           echo "mode=skip" >> "$GITHUB_OUTPUT"
 
-      - name: Lane consistency + snapshot version (lane branches)
-        id: lanever
-        if: ${{ steps.mode.outputs.mode != 'skip' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          BRANCH="${GITHUB_REF#refs/heads/}"
-
-          # Defaults (for non-lane branches)
-          {
-            echo "is_lane=false"
-            echo "lane="
-            echo "variant="
-            echo "snapshot_version="
-          } >> "$GITHUB_OUTPUT"
-
-          # Only apply versioning to lane branches.
-          if [[ ! "$BRANCH" =~ (^|/)lane/([^/]+) ]]; then
-            exit 0
-          fi
-
-          BRANCH_LANE="${BASH_REMATCH[2]}"
-          echo "is_lane=true" >> "$GITHUB_OUTPUT"
-
-          # Determine variant as the first segment (must not be 'lane' itself).
-          PREFIX="${BRANCH%%/*}"
-          case "$PREFIX" in
-            lane|feature|main|master|develop|hotfix)
-              echo "::error::Lane branches must be variant-prefixed, e.g. 'jvm17/lane/1.1' (got '$BRANCH')."
-              exit 1
-              ;;
-          esac
-          VARIANT="$PREFIX"
-          echo "variant=$VARIANT" >> "$GITHUB_OUTPUT"
-
-          if [[ ! -f "algites-source-repository.yml" ]]; then
-            echo "::error::algites-source-repository.yml not found in repo root (required for lane branches)."
-            exit 1
-          fi
-
-          VERSION_CONTEXT="$(python3 - <<'PY'
-          import re
-          from pathlib import Path
-
-          locText = Path('algites-source-repository.yml').read_text(encoding='utf-8')
-          locMatch = re.search(r'(?ms)^versionContext:\s*$(.*?)(?=^[A-Za-z0-9_-]+:\s*$|\Z)', locText)
-          locBlock = locMatch.group(1) if locMatch else ''
-
-          def read_value(aName):
-              locValueMatch = re.search(r"(?m)^\s+" + re.escape(aName) + r":\s*['\"]?([^'\"\n#]+)", locBlock)
-              return locValueMatch.group(1).strip() if locValueMatch else ''
-
-          print("releaseLine=" + read_value("releaseLine"))
-          print("revision=" + read_value("revision"))
-          print("qualifierKind=" + read_value("qualifierKind"))
-          print("qualifierLabel=" + read_value("qualifierLabel"))
-          PY
-          )"
-
-          REPO_LANE="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^releaseLine=//p')"
-          REPO_REVISION="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^revision=//p')"
-          REPO_QUALIFIER_KIND="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^qualifierKind=//p')"
-          REPO_QUALIFIER_LABEL="$(printf '%s\n' "$VERSION_CONTEXT" | sed -n 's/^qualifierLabel=//p')"
-
-          if [[ -z "$REPO_LANE" ]]; then
-            echo "::error::versionContext.releaseLine missing/empty in algites-source-repository.yml"
-            exit 1
-          fi
-          if [[ -z "$REPO_REVISION" ]]; then
-            echo "::error::versionContext.revision missing/empty in algites-source-repository.yml"
-            exit 1
-          fi
-          if [[ ! "$REPO_REVISION" =~ ^[0-9]+$ ]]; then
-            echo "::error::versionContext.revision must be a non-negative integer. Got: '$REPO_REVISION'."
-            exit 1
-          fi
-
-          # Branch lane must match versionContext.releaseLine.
-          if [[ "$BRANCH_LANE" != "$REPO_LANE" ]]; then
-            echo "::error::Lane mismatch. Branch lane='$BRANCH_LANE' but versionContext.releaseLine='$REPO_LANE'."
-            exit 1
-          fi
-
-          if [[ ! "$REPO_LANE" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
-            echo "::error::versionContext.releaseLine must be a numeric dot-separated identifier, e.g. 1 or 1.1. Got: '$REPO_LANE'."
-            exit 1
-          fi
-
-          echo "lane=$REPO_LANE" >> "$GITHUB_OUTPUT"
-
-          VERSION_BASE="${REPO_LANE}.${REPO_REVISION}"
-          REPO_QUALIFIER_KIND_UPPER="$(echo "${REPO_QUALIFIER_KIND:-}" | tr '[:lower:]' '[:upper:]')"
-          if [[ "$REPO_QUALIFIER_KIND_UPPER" == "SNAPSHOT" ]]; then
-            SNAPSHOT_LABEL="${REPO_QUALIFIER_LABEL:-SNAPSHOT}"
-            SNAPSHOT_VERSION="${VERSION_BASE}-${SNAPSHOT_LABEL}"
-          else
-            SNAPSHOT_VERSION="${VERSION_BASE}"
-          fi
-          echo "snapshot_version=$SNAPSHOT_VERSION" >> "$GITHUB_OUTPUT"
-
-          {
-            echo "### B1 Version (lane branches)"
-            echo ""
-            echo "- Branch: \`${BRANCH}\`"
-            echo "- Variant: \`${VARIANT}\`"
-            echo "- Lane: \`${REPO_LANE}\`"
-            echo "- Revision: \`${REPO_REVISION}\`"
-            echo "- Qualifier kind: \`${REPO_QUALIFIER_KIND:-}\`"
-            echo "- Qualifier label: \`${REPO_QUALIFIER_LABEL:-}\`"
-            echo "- Computed Version: \`${SNAPSHOT_VERSION}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-
       - name: Detect config changes (pom/gradle)
         id: changes
         if: ${{ steps.mode.outputs.mode != 'skip' }}
@@ -244,7 +131,6 @@ jobs:
 
           echo "pom_changed=$pom_changed"
           echo "gradle_changed=$gradle_changed"
-
           echo "pom_changed=$pom_changed" >> "$GITHUB_OUTPUT"
           echo "gradle_changed=$gradle_changed" >> "$GITHUB_OUTPUT"
 
@@ -254,7 +140,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           REF="${GITHUB_REF#refs/heads/}"
           ORG="Algites-EU"
           REPO="${GITHUB_REPOSITORY}"
@@ -273,80 +158,78 @@ jobs:
           fi
 
           export REF ORG REPO MSGS
-
           python3 - <<'PY'
           import os, re
 
-          ref = os.environ.get("REF","")
-          org = os.environ.get("ORG","Algites-EU")
-          repo = os.environ.get("REPO","")
-          msgs = os.environ.get("MSGS","")
+          ref = os.environ.get("REF", "")
+          org = os.environ.get("ORG", "Algites-EU")
+          repo = os.environ.get("REPO", "")
+          msgs = os.environ.get("MSGS", "")
 
           # Branch conventions (recommended, strict):
-          #   .../feature/ID.123_some-text
-          #   .../feature/ID.pub.tool.Java-123_some-text
+          # .../feature/ID.123_some-text
+          # .../feature/ID.pub.tool.Java-123_some-text
           #
           # Commit conventions (supported):
-          #   #123
-          #   #ID.123
-          #   #pub.tool.Java-123
-          #   #ID.pub.tool.Java-123
+          # #123
+          # #ID.123
+          # #pub.tool.Java-123
+          # #ID.pub.tool.Java-123
           #
           # Notes:
           # - branch parsing is intentionally strict (requires "ID." + "_" delimiter)
           # - cross-repo shorthand assumes the Algites-EU organization
-
-          refs = set()  # (repo_full, issue_number)
+          refs = set() # (repo_full, issue_number)
 
           # --- Branch parsing (strict, forcing: "ID.<...>" followed by underscore) ---
           for m in re.finditer(r'(?:^|/)ID\.(\d{1,9})_', ref):
-            refs.add((repo, m.group(1)))
+              refs.add((repo, m.group(1)))
 
           for m in re.finditer(r'(?:^|/)ID\.([A-Za-z0-9.]+)-(\d{1,9})_', ref):
-            alias, num = m.group(1), m.group(2)
-            refs.add((f"{org}/{alias}", num))
+              alias, num = m.group(1), m.group(2)
+              refs.add((f"{org}/{alias}", num))
 
           # --- Commit parsing (#token) ---
           for token in re.findall(r'#[A-Za-z0-9.\-]{1,120}', msgs):
-            t = token[1:]  # strip '#'
-            if t.startswith("ID."):
-              t = t[3:]
+              t = token[1:] # strip '#'
+              if t.startswith("ID."):
+                  t = t[3:]
 
-            if re.fullmatch(r'\d{1,9}', t):
-              refs.add((repo, t))
-              continue
+              if re.fullmatch(r'\d{1,9}', t):
+                  refs.add((repo, t))
+                  continue
 
-            m = re.fullmatch(r'([A-Za-z0-9.]+)-(\d{1,9})', t)
-            if m:
-              alias, num = m.group(1), m.group(2)
-              refs.add((f"{org}/{alias}", num))
+              m = re.fullmatch(r'([A-Za-z0-9.]+)-(\d{1,9})', t)
+              if m:
+                  alias, num = m.group(1), m.group(2)
+                  refs.add((f"{org}/{alias}", num))
 
           out_path = os.environ.get("GITHUB_OUTPUT")
           summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
 
           if not refs:
-            if out_path:
-              with open(out_path, "a", encoding="utf-8") as f:
-                f.write("found=false\n")
-                f.write("issues=\n")
-            raise SystemExit(0)
+              if out_path:
+                  with open(out_path, "a", encoding="utf-8") as f:
+                      f.write("found=false\n")
+                      f.write("issues=\n")
+              raise SystemExit(0)
 
           refs_sorted = sorted(refs, key=lambda x: (x[0], int(x[1])))
 
           if out_path:
-            with open(out_path, "a", encoding="utf-8") as f:
-              f.write("found=true\n")
-              f.write("issues=" + " ".join([f"{r}#{n}" for r,n in refs_sorted]) + "\n")
+              with open(out_path, "a", encoding="utf-8") as f:
+                  f.write("found=true\n")
+                  f.write("issues=" + " ".join([f"{r}#{n}" for r,n in refs_sorted]) + "\n")
 
           if summary_path:
-            with open(summary_path, "a", encoding="utf-8") as s:
-              s.write("## Related Issues\n\n")
-              for r, n in refs_sorted:
-                s.write(f"- [{r}#{n}](https://github.com/{r}/issues/{n})\n")
-              s.write("\n")
-              s.write("> Detected from branch name (e.g. `feature/ID.123_...`) and/or commit subjects containing `#123`, `#pub.tool.Java-123`, etc.\n")
+              with open(summary_path, "a", encoding="utf-8") as s:
+                  s.write("## Related Issues\n\n")
+                  for r, n in refs_sorted:
+                      s.write(f"- [{r}#{n}](https://github.com/{r}/issues/{n})\n")
+                  s.write("\n")
+                  s.write("> Detected from branch name (e.g. `feature/ID.123_...`) and/or commit subjects containing `#123`, `#pub.tool.Java-123`, etc.\n")
           PY
-          
+
       - name: Emit related-issue notices
         if: ${{ steps.issues.outputs.found == 'true' }}
         shell: bash
@@ -368,7 +251,7 @@ jobs:
               exit 0
             fi
           fi
-          
+
           # Gradle: gradle.properties with javaVersion=17
           if [ -f gradle.properties ] && grep -q '^javaVersion=' gradle.properties; then
             v="$(grep '^javaVersion=' gradle.properties | head -n1 | cut -d= -f2 | tr -d ' \r\n')"
@@ -377,7 +260,7 @@ jobs:
               exit 0
             fi
           fi
-          
+
           echo "version=17" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK
@@ -386,6 +269,182 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ inputs.java-version != '' && inputs.java-version || steps.detect-java.outputs.version }}
+
+      - name: Resolve Algites artifact metadata
+        id: algites-metadata
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+
+          LOC_RESOLVER_BUILD_FILE="${GITHUB_WORKSPACE}/.algites-ci-resolve.gradle.kts"
+          trap 'rm -f "${LOC_RESOLVER_BUILD_FILE}"' EXIT
+
+          cat > "${LOC_RESOLVER_BUILD_FILE}" <<'KTS'
+          val locAlgitesResolverWrapperScript = file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
+          if (locAlgitesResolverWrapperScript.isFile) {
+              apply(from = locAlgitesResolverWrapperScript)
+          } else {
+              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
+          }
+
+          tasks.register("algitesCiResolveMetadata") {
+              group = "algites"
+              description = "Resolves Algites artifact metadata for GitHub Actions."
+
+              doLast {
+                  @Suppress("UNCHECKED_CAST")
+                  val locProperties = rootProject.extra["algitesResolvedArtifactDirectoryMetadataProperties"] as Map<String, String>
+                  val locArtifactDirectoryCount = locProperties["artifactDirectories.count"]?.toIntOrNull() ?: 0
+
+                  fun AIcNormalize(aValue: String?): String {
+                      return aValue?.takeUnless { it == "null" } ?: ""
+                  }
+
+                  var locRootArtifactDirectoryIndex = -1
+                  for (locIndex in 0 until locArtifactDirectoryCount) {
+                      val locGradleProjectPath = AIcNormalize(locProperties["artifactDirectories.${locIndex}.gradleProjectPath"])
+                      val locPath = AIcNormalize(locProperties["artifactDirectories.${locIndex}.path"])
+                      if (locGradleProjectPath == ":" || locPath == "." || locPath == "") {
+                          locRootArtifactDirectoryIndex = locIndex
+                          break
+                      }
+                  }
+                  if (locRootArtifactDirectoryIndex < 0 && locArtifactDirectoryCount > 0) {
+                      locRootArtifactDirectoryIndex = 0
+                  }
+
+                  fun AIcRootProperty(aSuffix: String): String {
+                      return if (locRootArtifactDirectoryIndex >= 0) {
+                          AIcNormalize(locProperties["artifactDirectories.${locRootArtifactDirectoryIndex}.${aSuffix}"])
+                      } else {
+                          ""
+                      }
+                  }
+
+                  println("ALGITES_CI_ARTIFACT_INDEX=${locRootArtifactDirectoryIndex}")
+                  println("ALGITES_CI_VERSION_LANE=${AIcRootProperty("version.lane")}")
+                  println("ALGITES_CI_VERSION_REVISION=${AIcRootProperty("version.revision")}")
+                  println("ALGITES_CI_VERSION_QUALIFIER_KIND=${AIcRootProperty("version.qualifierKind")}")
+                  println("ALGITES_CI_VERSION_QUALIFIER_LABEL=${AIcRootProperty("version.qualifierLabel")}")
+                  println("ALGITES_CI_VERSION_RESOLVED_VALUE=${AIcRootProperty("version.resolvedValue")}")
+              }
+          }
+          KTS
+
+          RESOLVED_METADATA="$("${GITHUB_WORKSPACE}/gradlew" --no-daemon -q -b "${LOC_RESOLVER_BUILD_FILE}" algitesCiResolveMetadata)"
+          printf '%s\n' "$RESOLVED_METADATA"
+
+          algites_ci_get_value() {
+            printf '%s\n' "$RESOLVED_METADATA" | sed -n "s/^ALGITES_CI_$1=//p" | tail -n 1
+          }
+
+          {
+            echo "artifact_index=$(algites_ci_get_value ARTIFACT_INDEX)"
+            echo "version_lane=$(algites_ci_get_value VERSION_LANE)"
+            echo "version_revision=$(algites_ci_get_value VERSION_REVISION)"
+            echo "version_qualifier_kind=$(algites_ci_get_value VERSION_QUALIFIER_KIND)"
+            echo "version_qualifier_label=$(algites_ci_get_value VERSION_QUALIFIER_LABEL)"
+            echo "version_resolved_value=$(algites_ci_get_value VERSION_RESOLVED_VALUE)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Lane consistency + snapshot version (lane branches)
+        id: lanever
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          BRANCH="${GITHUB_REF#refs/heads/}"
+
+          # Defaults (for non-lane branches)
+          {
+            echo "is_lane=false"
+            echo "lane="
+            echo "variant="
+            echo "snapshot_version="
+          } >> "$GITHUB_OUTPUT"
+
+          # Only apply versioning to lane branches.
+          if [[ ! "$BRANCH" =~ (^|/)lane/([^/]+) ]]; then
+            exit 0
+          fi
+
+          BRANCH_LANE="${BASH_REMATCH[2]}"
+          echo "is_lane=true" >> "$GITHUB_OUTPUT"
+
+          # Determine variant as the first segment (must not be 'lane' itself).
+          PREFIX="${BRANCH%%/*}"
+          case "$PREFIX" in
+            lane|feature|main|master|develop|hotfix)
+              echo "::error::Lane branches must be variant-prefixed, e.g. 'jvm17/lane/1.1' (got '$BRANCH')."
+              exit 1
+              ;;
+          esac
+
+          VARIANT="$PREFIX"
+          echo "variant=$VARIANT" >> "$GITHUB_OUTPUT"
+
+          REPO_LANE="${{ steps.algites-metadata.outputs.version_lane }}"
+          REPO_REVISION="${{ steps.algites-metadata.outputs.version_revision }}"
+          REPO_QUALIFIER_KIND="${{ steps.algites-metadata.outputs.version_qualifier_kind }}"
+          REPO_QUALIFIER_LABEL="${{ steps.algites-metadata.outputs.version_qualifier_label }}"
+          RESOLVED_VERSION="${{ steps.algites-metadata.outputs.version_resolved_value }}"
+
+          if [[ -z "$REPO_LANE" ]]; then
+            echo "::error::Resolved root artifact version.lane is missing/empty."
+            exit 1
+          fi
+
+          if [[ -z "$REPO_REVISION" ]]; then
+            echo "::error::Resolved root artifact version.revision is missing/empty."
+            exit 1
+          fi
+
+          if [[ ! "$REPO_REVISION" =~ ^[0-9]+$ ]]; then
+            echo "::error::Resolved root artifact version.revision must be a non-negative integer. Got: '$REPO_REVISION'."
+            exit 1
+          fi
+
+          # Branch lane must match the resolved root artifact version lane.
+          if [[ "$BRANCH_LANE" != "$REPO_LANE" ]]; then
+            echo "::error::Lane mismatch. Branch lane='$BRANCH_LANE' but resolved root artifact version.lane='$REPO_LANE'."
+            exit 1
+          fi
+
+          if [[ ! "$REPO_LANE" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error::Resolved root artifact version.lane must be a numeric dot-separated identifier, e.g. 1 or 1.1. Got: '$REPO_LANE'."
+            exit 1
+          fi
+
+          echo "lane=$REPO_LANE" >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$RESOLVED_VERSION" ]]; then
+            SNAPSHOT_VERSION="$RESOLVED_VERSION"
+          else
+            VERSION_BASE="${REPO_LANE}.${REPO_REVISION}"
+            REPO_QUALIFIER_KIND_UPPER="$(echo "${REPO_QUALIFIER_KIND:-}" | tr '[:lower:]' '[:upper:]')"
+            if [[ "$REPO_QUALIFIER_KIND_UPPER" == "SNAPSHOT" ]]; then
+              SNAPSHOT_LABEL="${REPO_QUALIFIER_LABEL:-SNAPSHOT}"
+              SNAPSHOT_VERSION="${VERSION_BASE}-${SNAPSHOT_LABEL}"
+            else
+              SNAPSHOT_VERSION="${VERSION_BASE}"
+            fi
+          fi
+
+          echo "snapshot_version=$SNAPSHOT_VERSION" >> "$GITHUB_OUTPUT"
+
+          {
+            echo "### B1 Version (lane branches)"
+            echo ""
+            echo "- Branch: \`${BRANCH}\`"
+            echo "- Variant: \`${VARIANT}\`"
+            echo "- Lane: \`${REPO_LANE}\`"
+            echo "- Revision: \`${REPO_REVISION}\`"
+            echo "- Qualifier kind: \`${REPO_QUALIFIER_KIND:-}\`"
+            echo "- Qualifier label: \`${REPO_QUALIFIER_LABEL:-}\`"
+            echo "- Computed Version: \`${SNAPSHOT_VERSION}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Generate GitHub App token
         id: app-token
@@ -408,7 +467,6 @@ jobs:
           ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
           EXTRA=""
           if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-
           echo "=== Gradle construction: compile (including test sources, without test execution) ==="
           "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
 
@@ -425,7 +483,6 @@ jobs:
           ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
           EXTRA=""
           if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
-
           echo "=== Gradle verification: test+integration test, no packaging ==="
           "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
 

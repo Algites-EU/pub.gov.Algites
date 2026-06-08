@@ -1,106 +1,57 @@
 /*
  * Algites repository settings discovery.
  *
- * Intended location in governance repository:
- *   gradle/tool/repository/algites-root-settings-discovery.gradle.kts
- *
- * This script is meant to be applied from settings.gradle.kts after the
- * repository-specific pluginManagement and dependencyResolutionManagement
- * blocks have been declared.
+ * This script is a thin Settings adapter over the shared artifact directory
+ * metadata resolver. The resolver itself contains the repository scanning and
+ * metadata inheritance logic.
  */
 
-fun readAlgitesRepositoryId(aRootDirectory: File): String {
-    val locRepositoryConfigurationFile = listOf(
-        File(aRootDirectory, "algites-source-repository.yml"),
-        File(aRootDirectory, "algites-source-repository.yaml")
-    ).firstOrNull { locFile -> locFile.isFile }
+import java.io.File
 
-    if (locRepositoryConfigurationFile != null) {
-        val locYamlText = locRepositoryConfigurationFile.readText(Charsets.UTF_8)
-        val locRepositoryBlockText = Regex(
-            pattern = "(?ms)^\\s*(?:sourceRepository|repository)\\s*:\\s*(.*?)(?=^\\S|\\z)"
-        ).find(locYamlText)?.groupValues?.get(1) ?: locYamlText
-
-        val locRepositoryId = Regex("(?m)^\\s*id\\s*:\\s*([^#\\r\\n]+)")
-            .find(locRepositoryBlockText)
-            ?.groupValues
-            ?.get(1)
-            ?.trim()
-            ?.removeSurrounding("\"")
-            ?.removeSurrounding("'")
-
-        if (!locRepositoryId.isNullOrBlank()) {
-            return locRepositoryId
-        }
-    }
-
-    return aRootDirectory.name
+val locAlgitesResolverCoreScript = File(rootDir, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
+if (locAlgitesResolverCoreScript.isFile) {
+    apply(from = locAlgitesResolverCoreScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts"))
 }
 
-fun isIgnoredAlgitesDiscoveryPath(aFile: File): Boolean {
-    val locRelativePath = aFile.relativeTo(rootDir).invariantSeparatorsPath
-    val locIgnoredPathElements = setOf(
-        ".git",
-        ".gradle",
-        ".idea",
-        "build",
-        "run",
-        "docs-site",
-        "source_gen",
-        "source_gen.caches",
-        "classes_gen",
-        "out",
-        "target"
-    )
+@Suppress("UNCHECKED_CAST")
+val locAlgitesResolveMetadataMap = extra["algitesResolveArtifactDirectoryMetadataMap"] as (
+    File,
+    String?,
+    String?,
+    String?,
+    String?
+) -> Map<String, Any?>
 
-    return locRelativePath
-        .split('/')
-        .any { locPathElement -> locPathElement in locIgnoredPathElements }
-}
+val locAlgitesResolvedMetadata = locAlgitesResolveMetadataMap(
+    rootDir,
+    "",
+    "current-with-subdirs",
+    null,
+    null
+)
 
-fun isAlgitesArtifactConfigurationFile(aFile: File): Boolean =
-    aFile.isFile &&
-        (
-            aFile.name == "algites-artifact.yml" ||
-                aFile.name == "algites-artifact.yaml" ||
-                aFile.name == "algites-artifact-set.yml" ||
-                aFile.name == "algites-artifact-set.yaml"
-            )
+@Suppress("UNCHECKED_CAST")
+val locAlgitesRepositoryMetadata = locAlgitesResolvedMetadata["repository"] as Map<String, Any?>
+@Suppress("UNCHECKED_CAST")
+val locAlgitesArtifactDirectories = locAlgitesResolvedMetadata["artifactDirectories"] as List<Map<String, Any?>>
 
-fun toAlgitesGradleProjectPath(aDirectory: File): String =
-    ":" + aDirectory
-        .relativeTo(rootDir)
-        .invariantSeparatorsPath
-        .split('/')
-        .filter { locPathElement -> locPathElement.isNotBlank() }
-        .joinToString(":")
-
-rootProject.name = readAlgitesRepositoryId(rootDir)
-
-val locArtifactConfigurationFiles = rootDir
-    .walkTopDown()
-    .filter { locFile -> isAlgitesArtifactConfigurationFile(locFile) }
-    .filterNot { locFile -> isIgnoredAlgitesDiscoveryPath(locFile) }
-    .sortedBy { locFile -> locFile.relativeTo(rootDir).invariantSeparatorsPath }
-    .toList()
+rootProject.name = locAlgitesRepositoryMetadata["name"]?.toString()?.takeIf { it.isNotBlank() } ?: rootDir.name
 
 val locIncludedProjectPaths = linkedSetOf<String>()
 
-locArtifactConfigurationFiles.forEach { locArtifactConfigurationFile ->
-    val locArtifactRootDirectory = locArtifactConfigurationFile.parentFile
-    val locBuildFile = listOf(
-        File(locArtifactRootDirectory, "build.gradle.kts"),
-        File(locArtifactRootDirectory, "build.gradle")
-    ).firstOrNull { locFile -> locFile.isFile }
+locAlgitesArtifactDirectories
+    .filter { locArtifactDirectory -> locArtifactDirectory["hasGradleBuild"] == true }
+    .forEach { locArtifactDirectory ->
+        val locArtifactDirectoryPath = locArtifactDirectory["path"]?.toString() ?: return@forEach
+        val locGradleProjectPath = locArtifactDirectory["gradleProjectPath"]?.toString() ?: return@forEach
 
-    if (locArtifactRootDirectory != rootDir && locBuildFile != null) {
-        val locProjectPath = toAlgitesGradleProjectPath(locArtifactRootDirectory)
-        if (locIncludedProjectPaths.add(locProjectPath)) {
-            include(locProjectPath)
-            project(locProjectPath).projectDir = locArtifactRootDirectory
+        if (locGradleProjectPath != ":" && locIncludedProjectPaths.add(locGradleProjectPath)) {
+            include(locGradleProjectPath)
+            project(locGradleProjectPath).projectDir = File(rootDir, locArtifactDirectoryPath)
         }
     }
-}
 
 println(
     "Algites settings discovery included " +

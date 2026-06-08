@@ -16,7 +16,14 @@ import org.gradle.api.publish.maven.tasks.PublishToMavenRepository
 import org.gradle.api.tasks.testing.Test
 
 apply(plugin = "base")
-apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-model.gradle.kts"))
+
+val locAlgitesResolverWrapperScript = rootProject.file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
+if (locAlgitesResolverWrapperScript.isFile) {
+    apply(from = locAlgitesResolverWrapperScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
+}
+
 apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site.gradle.kts"))
 
 fun String.capitalizedForAlgitesName(): String =
@@ -32,89 +39,21 @@ fun algitesGradleOrEnvironmentValue(aName: String): String? =
     providers.gradleProperty(aName).orNull
         ?: providers.environmentVariable(aName).orNull
 
-fun readAlgitesSourceRepositoryYamlText(): String? {
-    val locRepositoryFile = rootProject.layout.projectDirectory.file("algites-source-repository.yml").asFile
+@Suppress("UNCHECKED_CAST")
+val algitesResolvedRepositoryMetadata = rootProject.extra["algitesResolvedRepositoryMetadata"] as Map<String, Any?>
 
-    return if (locRepositoryFile.isFile) {
-        locRepositoryFile.readText()
-    } else {
-        null
-    }
+@Suppress("UNCHECKED_CAST")
+val algitesResolvedArtifactDirectoriesByGradleProjectPath =
+    rootProject.extra["algitesResolvedArtifactDirectoriesByGradleProjectPath"] as Map<String, Map<String, Any?>>
+
+fun algitesResolvedArtifactDirectoryForProject(aProjectPath: String): Map<String, Any?>? {
+    return algitesResolvedArtifactDirectoriesByGradleProjectPath[aProjectPath]
 }
 
-fun readAlgitesYamlScalar(aYamlText: String, aParentKey: String, aKey: String): String? {
-    var locInsideParent = false
-    val locParentPrefix = "$aParentKey:"
-    val locKeyPrefix = "$aKey:"
-
-    aYamlText.lineSequence().forEach { locRawLine ->
-        val locLine = locRawLine.trim()
-
-        if (locLine.isBlank() || locLine.startsWith("#")) {
-            return@forEach
-        }
-
-        if (!locRawLine.startsWith(" ") && !locRawLine.startsWith("\t")) {
-            locInsideParent = locLine == locParentPrefix
-            return@forEach
-        }
-
-        if (locInsideParent && locLine.startsWith(locKeyPrefix)) {
-            return locLine
-                .removePrefix(locKeyPrefix)
-                .trim()
-                .removeSurrounding("\"")
-                .removeSurrounding("'")
-        }
-    }
-
-    return null
-}
-
-fun readAlgitesYamlScalarFromFile(aFile: java.io.File, aParentKey: String, aKey: String): String? =
-    if (aFile.isFile) {
-        readAlgitesYamlScalar(aFile.readText(), aParentKey, aKey)
-    } else {
-        null
-    }
-
-fun algitesDirectorySequenceFromProjectToRoot(aStartDirectory: java.io.File): Sequence<java.io.File> =
-    generateSequence(aStartDirectory.canonicalFile) { locDirectory ->
-        if (locDirectory == rootProject.projectDir.canonicalFile) {
-            null
-        } else {
-            locDirectory.parentFile
-        }
-    }
-
-fun findNearestAlgitesMetadataFile(aStartDirectory: java.io.File, aFileName: String): java.io.File? =
-    algitesDirectorySequenceFromProjectToRoot(aStartDirectory)
-        .map { locDirectory -> java.io.File(locDirectory, aFileName) }
-        .firstOrNull { locFile -> locFile.isFile }
-
-fun resolveAlgitesGroupForProject(aProjectDirectory: java.io.File): String? {
-    val locArtifactGroup = findNearestAlgitesMetadataFile(aProjectDirectory, "algites-artifact.yml")
-        ?.let { locArtifactFile -> readAlgitesYamlScalarFromFile(locArtifactFile, "artifact", "groupId") }
-
-    if (!locArtifactGroup.isNullOrBlank()) {
-        return locArtifactGroup
-    }
-
-    val locArtifactSetGroup = findNearestAlgitesMetadataFile(aProjectDirectory, "algites-artifact-set.yml")
-        ?.let { locArtifactSetFile -> readAlgitesYamlScalarFromFile(locArtifactSetFile, "artifactSet", "groupId") }
-
-    if (!locArtifactSetGroup.isNullOrBlank()) {
-        return locArtifactSetGroup
-    }
-
-    val locSourceRepositoryGroup = readAlgitesSourceRepositoryYamlText()
-        ?.let { locYamlText -> readAlgitesYamlScalar(locYamlText, "sourceRepository", "groupId") }
-
-    if (!locSourceRepositoryGroup.isNullOrBlank()) {
-        return locSourceRepositoryGroup
-    }
-
-    return null
+@Suppress("UNCHECKED_CAST")
+fun algitesResolvedVersionValue(aArtifactDirectory: Map<String, Any?>?): String? {
+    val locVersion = aArtifactDirectory?.get("version") as? Map<String, Any?>
+    return locVersion?.get("resolvedValue")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
 }
 
 fun requireAlgitesGroupForPublish(aProjectPath: String, aProjectGroup: Any?) {
@@ -128,34 +67,11 @@ fun requireAlgitesGroupForPublish(aProjectPath: String, aProjectGroup: Any?) {
     }
 }
 
-fun resolveAlgitesVersionFromSourceRepository(): String {
-    val locYamlText = readAlgitesSourceRepositoryYamlText()
-
-    if (locYamlText == null) {
-        return "0.0.1-SNAPSHOT"
-    }
-
-    val locReleaseLine = readAlgitesYamlScalar(locYamlText, "versionContext", "releaseLine")
-        ?: return "0.0.1-SNAPSHOT"
-
-    val locRevision = readAlgitesYamlScalar(locYamlText, "versionContext", "revision")
-        ?: "0"
-
-    val locQualifierKind = readAlgitesYamlScalar(locYamlText, "versionContext", "qualifierKind")
-    val locQualifierLabel = readAlgitesYamlScalar(locYamlText, "versionContext", "qualifierLabel")
-
-    val locBaseVersion = "$locReleaseLine.$locRevision"
-    val locEffectiveQualifier = locQualifierLabel
-        ?: locQualifierKind
-
-    return if (locEffectiveQualifier.isNullOrBlank() || locEffectiveQualifier.equals("RELEASE", ignoreCase = true)) {
-        locBaseVersion
-    } else {
-        "$locBaseVersion-${locEffectiveQualifier.uppercase()}"
-    }
-}
-
-val algitesRepositoryVisibility = (algitesGradleOrEnvironmentValue("ALGITES_VISIBILITY") ?: "pub").lowercase()
+val algitesRepositoryVisibility = (
+    algitesGradleOrEnvironmentValue("ALGITES_VISIBILITY")
+        ?: algitesResolvedRepositoryMetadata["visibility"]?.toString()
+        ?: "pub"
+).lowercase()
 val algitesDeploymentDirection = (algitesGradleOrEnvironmentValue("ALGITES_DIRECTION") ?: "upload").lowercase()
 
 val algitesReleaseRepositoryUrl = algitesGradleOrEnvironmentValue("ALGITES_MAVEN_RELEASES_URL")
@@ -205,13 +121,17 @@ allprojects {
         rootProject.layout.projectDirectory.dir("run/bld/gradle/${project.path.removePrefix(":").replace(':', '/')}")
     )
 
-    val algitesResolvedProjectGroup = resolveAlgitesGroupForProject(project.projectDir)
+    val algitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
+    val algitesResolvedProjectGroup = algitesArtifactDirectory?.get("groupId")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+        ?: algitesResolvedRepositoryMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
 
     if (!algitesResolvedProjectGroup.isNullOrBlank()) {
         group = algitesResolvedProjectGroup
     }
 
-    version = resolveAlgitesVersionFromSourceRepository()
+    version = algitesResolvedVersionValue(algitesArtifactDirectory)
+        ?: algitesResolvedVersionValue(algitesResolvedArtifactDirectoryForProject(":"))
+        ?: "0.0.1-SNAPSHOT"
 
     tasks.withType<Test>().configureEach {
         useTestNG()

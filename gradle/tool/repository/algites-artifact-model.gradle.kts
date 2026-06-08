@@ -1,147 +1,61 @@
 /*
- * Algites artifact metadata model.
+ * Deprecated compatibility adapter for the old Algites artifact metadata model.
  *
- * Intended location in governance repository:
- *   gradle/tool/repository/algites-artifact-model.gradle.kts
+ * New code should apply:
+ *   algites-artifact-directory-metadata-resolver-wrapper.gradle.kts
  *
- * This script scans algites-artifact.yml and algites-artifact-set.yml files and
- * exposes the resulting metadata through rootProject.extra.
+ * This file intentionally contains no repository scanning or YAML parsing.
  */
 
-fun readAlgitesYamlScalar(aYamlText: String, aBlockName: String?, aKey: String): String? {
-    val locSearchText = if (aBlockName == null) {
-        aYamlText
-    } else {
-        Regex("(?ms)^\\s*" + Regex.escape(aBlockName) + "\\s*:\\s*(.*?)(?=^\\S|\\z)")
-            .find(aYamlText)
-            ?.groupValues
-            ?.get(1)
-            ?: return null
-    }
-
-    return Regex("(?m)^\\s*" + Regex.escape(aKey) + "\\s*:\\s*([^#\\r\\n]+)")
-        .find(locSearchText)
-        ?.groupValues
-        ?.get(1)
-        ?.trim()
-        ?.removeSurrounding("\"")
-        ?.removeSurrounding("'")
+val locAlgitesResolverWrapperScript = rootProject.file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
+if (locAlgitesResolverWrapperScript.isFile) {
+    apply(from = locAlgitesResolverWrapperScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
 }
 
-fun isIgnoredAlgitesArtifactModelPath(aFile: File): Boolean {
-    val locRelativePath = aFile.relativeTo(rootProject.projectDir).invariantSeparatorsPath
-    val locIgnoredPathElements = setOf(
-        ".git",
-        ".gradle",
-        ".idea",
-        "build",
-        "run",
-        "docs-site",
-        "source_gen",
-        "source_gen.caches",
-        "classes_gen",
-        "out",
-        "target"
+@Suppress("UNCHECKED_CAST")
+val locAlgitesResolvedArtifactDirectories = rootProject.extra["algitesResolvedArtifactDirectories"] as List<Map<String, Any?>>
+
+val locAlgitesArtifactMetadata = locAlgitesResolvedArtifactDirectories.map { locArtifactDirectory ->
+    linkedMapOf<String, Any?>(
+        "kind" to locArtifactDirectory["kind"],
+        "type" to locArtifactDirectory["type"],
+        "name" to locArtifactDirectory["name"],
+        "description" to locArtifactDirectory["description"],
+        "relativePath" to locArtifactDirectory["path"],
+        "hasGradleBuild" to locArtifactDirectory["hasGradleBuild"],
+        "projectPath" to locArtifactDirectory["gradleProjectPath"]
     )
-
-    return locRelativePath
-        .split('/')
-        .any { locPathElement -> locPathElement in locIgnoredPathElements }
 }
 
-fun isAlgitesArtifactModelConfigurationFile(aFile: File): Boolean =
-    aFile.isFile &&
-        (
-            aFile.name == "algites-artifact.yml" ||
-                aFile.name == "algites-artifact.yaml" ||
-                aFile.name == "algites-artifact-set.yml" ||
-                aFile.name == "algites-artifact-set.yaml"
-            )
-
-fun toAlgitesArtifactProjectPath(aDirectory: File): String =
-    ":" + aDirectory
-        .relativeTo(rootProject.projectDir)
-        .invariantSeparatorsPath
-        .split('/')
-        .filter { locPathElement -> locPathElement.isNotBlank() }
-        .joinToString(":")
-
-val locArtifactMetadata = rootProject.projectDir
-    .walkTopDown()
-    .filter { locFile -> isAlgitesArtifactModelConfigurationFile(locFile) }
-    .filterNot { locFile -> isIgnoredAlgitesArtifactModelPath(locFile) }
-    .sortedBy { locFile -> locFile.relativeTo(rootProject.projectDir).invariantSeparatorsPath }
-    .map { locConfigurationFile ->
-        val locRootDirectory = locConfigurationFile.parentFile
-        val locYamlText = locConfigurationFile.readText(Charsets.UTF_8)
-        val locKind = if (locConfigurationFile.name.contains("artifact-set")) {
-            "artifactSet"
-        } else {
-            "artifact"
-        }
-        val locType = readAlgitesYamlScalar(locYamlText, locKind, "type")
-            ?: readAlgitesYamlScalar(locYamlText, null, "type")
-            ?: "unknown"
-        val locName = readAlgitesYamlScalar(locYamlText, locKind, "name")
-            ?: readAlgitesYamlScalar(locYamlText, null, "name")
-            ?: locRootDirectory.name
-        val locDescription = readAlgitesYamlScalar(locYamlText, locKind, "description")
-            ?: readAlgitesYamlScalar(locYamlText, null, "description")
-            ?: ""
-        val locHasGradleBuild = listOf(
-            File(locRootDirectory, "build.gradle.kts"),
-            File(locRootDirectory, "build.gradle")
-        ).any { locFile -> locFile.isFile }
-        val locRelativePath = locRootDirectory
-            .relativeTo(rootProject.projectDir)
-            .invariantSeparatorsPath
-            .ifBlank { "." }
-
-        linkedMapOf<String, Any>(
-            "kind" to locKind,
-            "type" to locType,
-            "name" to locName,
-            "description" to locDescription,
-            "configurationFile" to locConfigurationFile.absolutePath,
-            "rootDirectory" to locRootDirectory.absolutePath,
-            "relativePath" to locRelativePath,
-            "hasGradleBuild" to locHasGradleBuild,
-            "projectPath" to if (locRootDirectory == rootProject.projectDir) ":" else toAlgitesArtifactProjectPath(locRootDirectory)
-        )
-    }
-    .toList()
-
-rootProject.extra["algitesArtifactMetadata"] = locArtifactMetadata
-
-val locArtifactMetadataByProjectPath = locArtifactMetadata
+rootProject.extra["algitesArtifactMetadata"] = locAlgitesArtifactMetadata
+rootProject.extra["algitesArtifactMetadataByProjectPath"] = locAlgitesArtifactMetadata
     .groupBy { locMetadata -> locMetadata["projectPath"] as String }
-
-rootProject.extra["algitesArtifactMetadataByProjectPath"] = locArtifactMetadataByProjectPath
-
-val locArtifactTypes = locArtifactMetadata
-    .map { locMetadata -> locMetadata["type"] as String }
+rootProject.extra["algitesArtifactTypes"] = locAlgitesArtifactMetadata
+    .mapNotNull { locMetadata -> locMetadata["type"]?.toString() }
     .distinct()
     .sorted()
 
-rootProject.extra["algitesArtifactTypes"] = locArtifactTypes
+if (tasks.findByName("printAlgitesArtifactModel") == null) {
+    tasks.register("printAlgitesArtifactModel") {
+        group = "algites"
+        description = "Prints Algites artifact metadata discovered in this repository."
 
-tasks.register("printAlgitesArtifactModel") {
-    group = "algites"
-    description = "Prints Algites artifact metadata discovered in this repository."
-
-    doLast {
-        println("Algites artifact metadata for ${rootProject.name}:")
-        locArtifactMetadata.forEach { locMetadata ->
-            println(
-                " - " +
-                    locMetadata["kind"] +
-                    " type=" +
-                    locMetadata["type"] +
-                    " path=" +
-                    locMetadata["relativePath"] +
-                    " gradle=" +
-                    locMetadata["hasGradleBuild"]
-            )
+        doLast {
+            println("Algites artifact metadata for ${rootProject.name}:")
+            locAlgitesArtifactMetadata.forEach { locMetadata ->
+                println(
+                    " - " +
+                        locMetadata["kind"] +
+                        " type=" +
+                        locMetadata["type"] +
+                        " path=" +
+                        locMetadata["relativePath"] +
+                        " gradle=" +
+                        locMetadata["hasGradleBuild"]
+                )
+            }
         }
     }
 }
