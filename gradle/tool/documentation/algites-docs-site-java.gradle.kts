@@ -104,8 +104,8 @@ subprojects.forEach { locSubproject ->
             dependsOn(locJavadocTaskProvider)
         }
 
-        locJavadocTaskProvider.configure { locJavadocTask ->
-            val locJavadocOutputDirectory = locJavadocTask.destinationDir ?: return@configure
+        locJavadocTaskProvider.configure {
+            val locJavadocOutputDirectory = destinationDir ?: return@configure
             locJavaDocsSiteEntries.add(
                 AIcJavaDocsSiteEntry(
                     locModulePath = locSubproject.AIcResolveJavaModulePath(),
