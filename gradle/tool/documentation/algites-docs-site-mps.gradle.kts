@@ -45,15 +45,35 @@ data class AIcMpsArtifactCandidate(
 ) : java.io.Serializable
 
 val locDiscoveryOutputFile = layout.buildDirectory.file("algites/discovered-mps-artifacts.tsv")
-val locAlgitesDocsResolvedRepositoryName = (extra.properties["algitesDocsResolvedRepositoryName"] as String?) ?: rootProject.name
+val locAlgitesDocsResolvedRepositoryId =
+    (extra.properties["algitesDocsResolvedRepositoryId"] as String?)
+        ?: (rootProject.extra.properties["algitesDocsResolvedRepositoryId"] as String?)
+        ?: (rootProject.extra.properties["algitesResolvedRepositoryMetadata"] as? Map<*, *>)
+            ?.get("name")
+            ?.toString()
+        ?: rootProject.name
+val locAlgitesDocsResolvedRepositoryName =
+    (extra.properties["algitesDocsResolvedRepositoryName"] as String?)
+        ?: (rootProject.extra.properties["algitesDocsResolvedRepositoryName"] as String?)
+        ?: locAlgitesDocsResolvedRepositoryId
 
-@Suppress("UNCHECKED_CAST")
-val locAlgitesDocsResolvedArtifactDirectories = extra.properties["algitesDocsResolvedArtifactDirectories"] as? List<Map<String, String?>>
-    ?: emptyList()
+fun AIcNormalizeResolvedArtifactDirectories(aValue: Any?): List<Map<String, String?>> {
+    return (aValue as? List<*>)
+        ?.mapNotNull { locEntry ->
+            (locEntry as? Map<*, *>)?.mapKeys { locMapEntry -> locMapEntry.key.toString() }
+                ?.mapValues { locMapEntry -> locMapEntry.value?.toString()?.takeIf { it != "null" } }
+        }
+        ?: emptyList()
+}
+
+val locAlgitesDocsResolvedArtifactDirectories =
+    AIcNormalizeResolvedArtifactDirectories(extra.properties["algitesDocsResolvedArtifactDirectories"])
+        .ifEmpty { AIcNormalizeResolvedArtifactDirectories(rootProject.extra.properties["algitesDocsResolvedArtifactDirectories"]) }
+        .ifEmpty { AIcNormalizeResolvedArtifactDirectories(rootProject.extra.properties["algitesResolvedArtifactDirectories"]) }
 
 
 fun AIcReadMpsDocsRepositoryId(): String {
-    return locAlgitesDocsResolvedRepositoryName
+    return locAlgitesDocsResolvedRepositoryId
 }
 
 val locGeneratedDocsRoot = layout.projectDirectory.dir(
@@ -74,16 +94,31 @@ fun AIcReadXmlAttribute(aXmlText: String, aAttributeName: String): String? {
 }
 
 fun AIcReadRepositoryId(): String {
-    return locAlgitesDocsResolvedRepositoryName
+    return locAlgitesDocsResolvedRepositoryId
 }
 
 fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
     val locMpsArtifactDirectories = locAlgitesDocsResolvedArtifactDirectories.filter { locArtifactDirectory ->
-        locArtifactDirectory["type"] == "mps" && locArtifactDirectory["contentsModel"] == "self-contained"
+        locArtifactDirectory["type"] == "mps" &&
+            (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
     }
 
-    require(locMpsArtifactDirectories.isNotEmpty()) {
-        "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with type=mps and contentsModel=self-contained."
+    if (locMpsArtifactDirectories.isEmpty()) {
+        val locHasMpsDescriptors = locProjectRootDirectory
+            .walkTopDown()
+            .filter { locFile -> locFile.isFile }
+            .any { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
+
+        require(locHasMpsDescriptors) {
+            "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with type=mps and contentsModel=self-contained."
+        }
+
+        return listOf(
+            AIcArtifactSetProject(
+                locRelativePath = ".",
+                locProjectDirectory = locProjectRootDirectory
+            )
+        )
     }
 
     return locMpsArtifactDirectories.map { locArtifactDirectory ->
@@ -341,11 +376,26 @@ class AIcMpsSupport(
 
     fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
         val locMpsArtifactDirectories = locResolvedArtifactDirectories.filter { locArtifactDirectory ->
-            locArtifactDirectory["type"] == "mps" && locArtifactDirectory["contentsModel"] == "self-contained"
+            locArtifactDirectory["type"] == "mps" &&
+            (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
         }
 
-        require(locMpsArtifactDirectories.isNotEmpty()) {
-            "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with type=mps and contentsModel=self-contained."
+        if (locMpsArtifactDirectories.isEmpty()) {
+            val locHasMpsDescriptors = locProjectRootDirectory
+                .walkTopDown()
+                .filter { locFile -> locFile.isFile }
+                .any { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
+
+            require(locHasMpsDescriptors) {
+                "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with type=mps and contentsModel=self-contained."
+            }
+
+            return listOf(
+                AIcArtifactSetProject(
+                    locRelativePath = ".",
+                    locProjectDirectory = locProjectRootDirectory
+                )
+            )
         }
 
         return locMpsArtifactDirectories.map { locArtifactDirectory ->
@@ -753,12 +803,12 @@ tasks.register("validateAlgitesConfiguration") {
     group = "algites"
     description = "Validates minimal Algites source repository configuration."
 
-    inputs.property("algitesDocsResolvedRepositoryName", locAlgitesDocsResolvedRepositoryName)
+    inputs.property("algitesDocsResolvedRepositoryId", locAlgitesDocsResolvedRepositoryId)
     inputs.property("algitesDocsResolvedArtifactDirectories", locAlgitesDocsResolvedArtifactDirectories.toString())
 
     doLast(
         AIcValidateAlgitesConfigurationAction(
-            locAlgitesDocsResolvedRepositoryName,
+            locAlgitesDocsResolvedRepositoryId,
             locProjectRootDirectory,
             locAlgitesDocsResolvedArtifactDirectories
         )
@@ -771,7 +821,7 @@ tasks.register("discoverMpsArtifacts") {
 
     dependsOn("validateAlgitesConfiguration")
 
-    inputs.property("algitesDocsResolvedRepositoryName", locAlgitesDocsResolvedRepositoryName)
+    inputs.property("algitesDocsResolvedRepositoryId", locAlgitesDocsResolvedRepositoryId)
     inputs.property("algitesDocsResolvedArtifactDirectories", locAlgitesDocsResolvedArtifactDirectories.toString())
     inputs.files(fileTree(locProjectRootDirectory) {
         include("**/*.mpl")
@@ -786,7 +836,7 @@ tasks.register("discoverMpsArtifacts") {
 
     doLast(
         AIcDiscoverMpsArtifactsAction(
-            locAlgitesDocsResolvedRepositoryName,
+            locAlgitesDocsResolvedRepositoryId,
             locProjectRootDirectory,
             locAlgitesDocsResolvedArtifactDirectories,
             locDiscoveryOutputFile.get().asFile
@@ -819,7 +869,7 @@ tasks.register("generateDummyMpsDocs") {
 
     doLast(
         AIcGenerateDummyMpsDocsAction(
-            locAlgitesDocsResolvedRepositoryName,
+            locAlgitesDocsResolvedRepositoryId,
             locDiscoveryOutputFile.get().asFile,
             locGeneratedDocsRoot.asFile
         )
