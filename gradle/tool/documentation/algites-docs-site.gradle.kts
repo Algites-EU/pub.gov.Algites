@@ -109,6 +109,32 @@ fun AIcReadYamlScalarByPath(aYamlText: String, vararg aPath: String): String? {
     return null
 }
 
+fun AIcFindArtifactSetConfigurationDirectories(): List<String> {
+    val locRootDirectory = layout.projectDirectory.asFile
+    val locConfigurationFileNames = setOf(
+        "algites-artifact-set.yml",
+        "algites-artifact-set.yaml"
+    )
+
+    return locRootDirectory
+        .walkTopDown()
+        .onEnter { locFile ->
+            locFile.name !in setOf("build", ".gradle", "classes_gen", "source_gen", "source_gen.caches", ".git", "docs-site")
+        }
+        .filter { locFile -> locFile.isFile && locFile.name in locConfigurationFileNames }
+        .map { locFile ->
+            val locParentDirectory = locFile.parentFile
+            if (locParentDirectory == locRootDirectory) {
+                "."
+            } else {
+                locParentDirectory.relativeTo(locRootDirectory).invariantSeparatorsPath
+            }
+        }
+        .distinct()
+        .sorted()
+        .toList()
+}
+
 fun AIcReadArtifactSetProjectRelativePaths(): List<String> {
     val locFile = locRepositoryConfigFile.asFile
     require(locFile.isFile) {
@@ -129,23 +155,49 @@ fun AIcReadArtifactSetProjectRelativePaths(): List<String> {
         .firstOrNull { locValues -> locValues.isNotEmpty() }
         ?: emptyList()
 
-    return locRelativePaths.ifEmpty { listOf(".") }
+    if (locRelativePaths.isNotEmpty()) {
+        return locRelativePaths
+    }
+
+    val locDiscoveredArtifactSetProjectRelativePaths = AIcFindArtifactSetConfigurationDirectories()
+    if (locDiscoveredArtifactSetProjectRelativePaths.isNotEmpty()) {
+        logger.lifecycle(
+            "Algites documentation discovered artifact-set project(s) from algites-artifact-set.yml: ${locDiscoveredArtifactSetProjectRelativePaths.joinToString(", ")}"
+        )
+        return locDiscoveredArtifactSetProjectRelativePaths
+    }
+
+    return listOf(".")
 }
 
 fun AIcReadExplicitDocumentationType(aArtifactSetProjectDirectory: File): String? {
-    val locConfigurationFile = listOf(
+    val locConfigurationFileCandidates = listOf(
         aArtifactSetProjectDirectory.resolve("algites-artifact-set.yml"),
         aArtifactSetProjectDirectory.resolve("algites-artifact-set.yaml"),
         aArtifactSetProjectDirectory.resolve("algites-artifact.yml"),
         aArtifactSetProjectDirectory.resolve("algites-artifact.yaml")
-    ).firstOrNull { it.isFile } ?: return null
+    )
+
+    val locConfigurationFile = locConfigurationFileCandidates.firstOrNull { it.isFile }
+    if (locConfigurationFile == null) {
+        logger.lifecycle(
+            "No explicit Algites documentation type configuration found in ${aArtifactSetProjectDirectory.absolutePath}. Checked: ${locConfigurationFileCandidates.joinToString(", ") { it.name }}"
+        )
+        return null
+    }
 
     val locYamlText = locConfigurationFile.readText(Charsets.UTF_8)
-    return AIcReadYamlScalarByPath(locYamlText, "artifactSet", "type")
+    val locExplicitType = AIcReadYamlScalarByPath(locYamlText, "artifactSet", "type")
         ?: AIcReadYamlScalarByPath(locYamlText, "artifact", "type")
         ?: AIcReadYamlScalarByKey(locYamlText, "documentationType")
         ?: AIcReadYamlScalarByKey(locYamlText, "artifactType")
         ?: AIcReadYamlScalarByKey(locYamlText, "type")
+
+    logger.lifecycle(
+        "Algites documentation type configuration ${locConfigurationFile.absolutePath} resolved type: ${locExplicitType ?: "<none>"}"
+    )
+
+    return locExplicitType
 }
 
 fun AIcContainsFileWithExtension(aDirectory: File, aExtensions: Set<String>): Boolean {
