@@ -168,7 +168,7 @@ jobs:
 
           ./gradlew --no-daemon \
             ${{ inputs.gradle-task }} \
-            -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
+            -Palgites.docs.siteRoot="../documentation-branch" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
             ${{ inputs.gradle-arguments }}
