@@ -180,40 +180,42 @@ jobs:
         run: |
           set -euo pipefail
 
-          locResolverBuildFile="${RUNNER_TEMP}/algites-resolve-artifact-metadata.gradle.kts"
+          locResolverInitScript="${RUNNER_TEMP}/algites-resolve-artifact-metadata.init.gradle.kts"
           locResolvedPropertiesFile="${RUNNER_TEMP}/algites-resolved-artifact-metadata.properties"
 
-          cat > "${locResolverBuildFile}" <<'KTS'
-          val locWrapperScript = file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
-          if (locWrapperScript.isFile) {
-              apply(from = locWrapperScript)
-          } else {
-              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
-          }
+          cat > "${locResolverInitScript}" <<'KTS'
+          gradle.rootProject {
+              val locWrapperScript = file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
+              if (locWrapperScript.isFile) {
+                  apply(from = locWrapperScript)
+              } else {
+                  apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
+              }
 
-          tasks.register("writeAlgitesResolvedArtifactMetadataProperties") {
-              group = "algites"
-              description = "Writes resolved Algites artifact metadata properties for GitHub Actions."
+              tasks.register("writeAlgitesResolvedArtifactMetadataProperties") {
+                  group = "algites"
+                  description = "Writes resolved Algites artifact metadata properties for GitHub Actions."
 
-              doLast {
-                  @Suppress("UNCHECKED_CAST")
-                  val locProperties = rootProject.extra["algitesResolvedArtifactDirectoryMetadataProperties"] as Map<String, String>
-                  val locOutputFile = file(System.getenv("ALGITES_RESOLVED_PROPERTIES_FILE"))
+                  doLast {
+                      @Suppress("UNCHECKED_CAST")
+                      val locProperties = rootProject.extra["algitesResolvedArtifactDirectoryMetadataProperties"] as Map<String, String>
+                      val locOutputFile = file(System.getenv("ALGITES_RESOLVED_PROPERTIES_FILE"))
 
-                  locOutputFile.parentFile.mkdirs()
-                  locOutputFile.writeText(
-                      locProperties.entries
-                          .sortedBy { it.key }
-                          .joinToString(System.lineSeparator()) { locEntry ->
-                              "${locEntry.key}=${locEntry.value}"
-                          } + System.lineSeparator(),
-                      Charsets.UTF_8
-                  )
+                      locOutputFile.parentFile.mkdirs()
+                      locOutputFile.writeText(
+                          locProperties.entries
+                              .sortedBy { it.key }
+                              .joinToString(System.lineSeparator()) { locEntry ->
+                                  "${locEntry.key}=${locEntry.value}"
+                              } + System.lineSeparator(),
+                          Charsets.UTF_8
+                      )
+                  }
               }
           }
           KTS
 
-          ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" ./gradlew --no-daemon --quiet --build-file "${locResolverBuildFile}" writeAlgitesResolvedArtifactMetadataProperties
+          ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" ./gradlew --no-daemon --quiet --init-script "${locResolverInitScript}" writeAlgitesResolvedArtifactMetadataProperties
 
           locResolvedVersion="$(grep -m 1 '^artifactDirectories\.0\.version\.resolvedValue=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
           locResolvedLane="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
