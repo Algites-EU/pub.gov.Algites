@@ -278,62 +278,66 @@ jobs:
           set -euo pipefail
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
 
-          LOC_RESOLVER_BUILD_FILE="${GITHUB_WORKSPACE}/.algites-ci-resolve.gradle.kts"
-          trap 'rm -f "${LOC_RESOLVER_BUILD_FILE}"' EXIT
+          LOC_RESOLVER_INIT_SCRIPT="${RUNNER_TEMP}/algites-ci-resolve.init.gradle.kts"
+          trap 'rm -f "${LOC_RESOLVER_INIT_SCRIPT}"' EXIT
 
-          cat > "${LOC_RESOLVER_BUILD_FILE}" <<'KTS'
-          val locAlgitesResolverWrapperScript = file("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
-          if (locAlgitesResolverWrapperScript.isFile) {
-              apply(from = locAlgitesResolverWrapperScript)
-          } else {
-              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
-          }
+          cat > "${LOC_RESOLVER_INIT_SCRIPT}" <<'KTS'
+          val locWorkspaceDirectory = file(System.getenv("GITHUB_WORKSPACE") ?: ".")
 
-          tasks.register("algitesCiResolveMetadata") {
-              group = "algites"
-              description = "Resolves Algites artifact metadata for GitHub Actions."
+          gradle.rootProject {
+              val locAlgitesResolverWrapperScript = locWorkspaceDirectory.resolve("gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts")
+              if (locAlgitesResolverWrapperScript.isFile) {
+                  apply(from = locAlgitesResolverWrapperScript)
+              } else {
+                  apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
+              }
 
-              doLast {
-                  @Suppress("UNCHECKED_CAST")
-                  val locProperties = rootProject.extra["algitesResolvedArtifactDirectoryMetadataProperties"] as Map<String, String>
-                  val locArtifactDirectoryCount = locProperties["artifactDirectories.count"]?.toIntOrNull() ?: 0
+              tasks.register("algitesCiResolveMetadata") {
+                  group = "algites"
+                  description = "Resolves Algites artifact metadata for GitHub Actions."
 
-                  fun AIcNormalize(aValue: String?): String {
-                      return aValue?.takeUnless { it == "null" } ?: ""
-                  }
+                  doLast {
+                      @Suppress("UNCHECKED_CAST")
+                      val locProperties = rootProject.extra["algitesResolvedArtifactDirectoryMetadataProperties"] as Map<String, String>
+                      val locArtifactDirectoryCount = locProperties["artifactDirectories.count"]?.toIntOrNull() ?: 0
 
-                  var locRootArtifactDirectoryIndex = -1
-                  for (locIndex in 0 until locArtifactDirectoryCount) {
-                      val locGradleProjectPath = AIcNormalize(locProperties["artifactDirectories.${locIndex}.gradleProjectPath"])
-                      val locPath = AIcNormalize(locProperties["artifactDirectories.${locIndex}.path"])
-                      if (locGradleProjectPath == ":" || locPath == "." || locPath == "") {
-                          locRootArtifactDirectoryIndex = locIndex
-                          break
+                      fun AIcNormalize(aValue: String?): String {
+                          return aValue?.takeUnless { it == "null" } ?: ""
                       }
-                  }
-                  if (locRootArtifactDirectoryIndex < 0 && locArtifactDirectoryCount > 0) {
-                      locRootArtifactDirectoryIndex = 0
-                  }
 
-                  fun AIcRootProperty(aSuffix: String): String {
-                      return if (locRootArtifactDirectoryIndex >= 0) {
-                          AIcNormalize(locProperties["artifactDirectories.${locRootArtifactDirectoryIndex}.${aSuffix}"])
-                      } else {
-                          ""
+                      var locRootArtifactDirectoryIndex = -1
+                      for (locIndex in 0 until locArtifactDirectoryCount) {
+                          val locGradleProjectPath = AIcNormalize(locProperties["artifactDirectories.${locIndex}.gradleProjectPath"])
+                          val locPath = AIcNormalize(locProperties["artifactDirectories.${locIndex}.path"])
+                          if (locGradleProjectPath == ":" || locPath == "." || locPath == "") {
+                              locRootArtifactDirectoryIndex = locIndex
+                              break
+                          }
                       }
-                  }
+                      if (locRootArtifactDirectoryIndex < 0 && locArtifactDirectoryCount > 0) {
+                          locRootArtifactDirectoryIndex = 0
+                      }
 
-                  println("ALGITES_CI_ARTIFACT_INDEX=${locRootArtifactDirectoryIndex}")
-                  println("ALGITES_CI_VERSION_LANE=${AIcRootProperty("version.lane")}")
-                  println("ALGITES_CI_VERSION_REVISION=${AIcRootProperty("version.revision")}")
-                  println("ALGITES_CI_VERSION_QUALIFIER_KIND=${AIcRootProperty("version.qualifierKind")}")
-                  println("ALGITES_CI_VERSION_QUALIFIER_LABEL=${AIcRootProperty("version.qualifierLabel")}")
-                  println("ALGITES_CI_VERSION_RESOLVED_VALUE=${AIcRootProperty("version.resolvedValue")}")
+                      fun AIcRootProperty(aSuffix: String): String {
+                          return if (locRootArtifactDirectoryIndex >= 0) {
+                              AIcNormalize(locProperties["artifactDirectories.${locRootArtifactDirectoryIndex}.${aSuffix}"])
+                          } else {
+                              ""
+                          }
+                      }
+
+                      println("ALGITES_CI_ARTIFACT_INDEX=${locRootArtifactDirectoryIndex}")
+                      println("ALGITES_CI_VERSION_LANE=${AIcRootProperty("version.lane")}")
+                      println("ALGITES_CI_VERSION_REVISION=${AIcRootProperty("version.revision")}")
+                      println("ALGITES_CI_VERSION_QUALIFIER_KIND=${AIcRootProperty("version.qualifierKind")}")
+                      println("ALGITES_CI_VERSION_QUALIFIER_LABEL=${AIcRootProperty("version.qualifierLabel")}")
+                      println("ALGITES_CI_VERSION_RESOLVED_VALUE=${AIcRootProperty("version.resolvedValue")}")
+                  }
               }
           }
           KTS
 
-          RESOLVED_METADATA="$("${GITHUB_WORKSPACE}/gradlew" --no-daemon -q -b "${LOC_RESOLVER_BUILD_FILE}" algitesCiResolveMetadata)"
+          RESOLVED_METADATA="$("${GITHUB_WORKSPACE}/gradlew" --no-daemon -q --project-dir "${GITHUB_WORKSPACE}" --init-script "${LOC_RESOLVER_INIT_SCRIPT}" algitesCiResolveMetadata)"
           printf '%s\n' "$RESOLVED_METADATA"
 
           algites_ci_get_value() {

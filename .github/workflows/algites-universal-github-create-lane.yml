@@ -247,10 +247,7 @@ jobs:
           }
           KTS
 
-            ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" \
-              ./gradlew --no-daemon --quiet \
-              -b "${LOC_RESOLVER_BUILD_FILE}" \
-              writeAlgitesResolvedArtifactMetadataProperties
+            ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" ./gradlew --no-daemon --quiet --build-file "${LOC_RESOLVER_BUILD_FILE}" writeAlgitesResolvedArtifactMetadataProperties
 
             LOC_RESOLVED_LANE="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
             LOC_RESOLVED_QUALIFIER_KIND="$(grep -m 1 '^artifactDirectories\.0\.version\.qualifierKind=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
