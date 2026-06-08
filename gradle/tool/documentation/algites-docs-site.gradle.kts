@@ -78,6 +78,37 @@ fun AIcReadYamlScalarByKey(aYamlText: String, aKey: String): String? {
         ?.takeIf { it.isNotBlank() }
 }
 
+fun AIcReadYamlScalarByPath(aYamlText: String, vararg aPath: String): String? {
+    val locStack = mutableListOf<Pair<Int, String>>()
+
+    aYamlText.lines().forEach { locRawLine ->
+        val locLineWithoutComment = locRawLine.substringBefore("#")
+        if (locLineWithoutComment.isBlank()) {
+            return@forEach
+        }
+
+        val locIndent = locLineWithoutComment.takeWhile { it == ' ' }.length
+        val locMatch = Regex("""^\s*([A-Za-z0-9_.-]+)\s*:\s*(.*?)\s*$""").find(locLineWithoutComment)
+            ?: return@forEach
+
+        val locKey = locMatch.groupValues[1]
+        val locValue = locMatch.groupValues[2].AIcNormalizeYamlScalar()
+
+        while (locStack.isNotEmpty() && locStack.last().first >= locIndent) {
+            locStack.removeAt(locStack.size - 1)
+        }
+
+        val locCurrentPath = (locStack.map { it.second } + locKey)
+        if (locCurrentPath == aPath.toList() && locValue.isNotBlank()) {
+            return locValue
+        }
+
+        locStack.add(locIndent to locKey)
+    }
+
+    return null
+}
+
 fun AIcReadArtifactSetProjectRelativePaths(): List<String> {
     val locFile = locRepositoryConfigFile.asFile
     require(locFile.isFile) {
@@ -102,15 +133,33 @@ fun AIcReadArtifactSetProjectRelativePaths(): List<String> {
 }
 
 fun AIcReadExplicitDocumentationType(aArtifactSetProjectDirectory: File): String? {
-    val locConfigurationFile = aArtifactSetProjectDirectory.resolve("algites-artifact-set.yml")
-    if (!locConfigurationFile.isFile) {
-        return null
-    }
+    val locConfigurationFiles = listOf(
+        aArtifactSetProjectDirectory.resolve("algites-artifact-set.yml"),
+        aArtifactSetProjectDirectory.resolve("algites-artifact-set.yaml"),
+        aArtifactSetProjectDirectory.resolve("algites-artifact.yml"),
+        aArtifactSetProjectDirectory.resolve("algites-artifact.yaml")
+    )
 
-    val locYamlText = locConfigurationFile.readText(Charsets.UTF_8)
-    return AIcReadYamlScalarByKey(locYamlText, "documentationType")
-        ?: AIcReadYamlScalarByKey(locYamlText, "artifactType")
-        ?: AIcReadYamlScalarByKey(locYamlText, "type")
+    locConfigurationFiles
+        .filter { locConfigurationFile -> locConfigurationFile.isFile }
+        .forEach { locConfigurationFile ->
+            val locYamlText = locConfigurationFile.readText(Charsets.UTF_8)
+            val locDocumentationType =
+                AIcReadYamlScalarByPath(locYamlText, "artifactSet", "type")
+                    ?: AIcReadYamlScalarByPath(locYamlText, "artifact", "type")
+                    ?: AIcReadYamlScalarByPath(locYamlText, "documentation", "type")
+                    ?: AIcReadYamlScalarByPath(locYamlText, "artifactSet", "documentationType")
+                    ?: AIcReadYamlScalarByPath(locYamlText, "artifact", "documentationType")
+                    ?: AIcReadYamlScalarByKey(locYamlText, "documentationType")
+                    ?: AIcReadYamlScalarByKey(locYamlText, "artifactType")
+                    ?: AIcReadYamlScalarByKey(locYamlText, "type")
+
+            if (locDocumentationType != null) {
+                return locDocumentationType
+            }
+        }
+
+    return null
 }
 
 fun AIcContainsFileWithExtension(aDirectory: File, aExtensions: Set<String>): Boolean {

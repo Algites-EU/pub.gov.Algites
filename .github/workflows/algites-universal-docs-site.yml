@@ -172,29 +172,6 @@ jobs:
             -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
             ${{ inputs.gradle-arguments }}
 
-      - name: Diagnose generated publication content before documentation branch sync
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          locPublicationPath="generated/${{ steps.publication.outputs.publication-kind }}/${{ steps.publication.outputs.publication-id }}"
-          locSourcePublicationDirectory="source/docs-site/${locPublicationPath}"
-
-          echo "Expected generated source publication directory: ${locSourcePublicationDirectory}"
-
-          if [[ -d "${locSourcePublicationDirectory}" ]]; then
-            echo "Directory exists. Listing content:"
-            find "${locSourcePublicationDirectory}" -maxdepth 4 -print | sort
-          else
-            echo "Directory does not exist."
-            echo "Existing generated directory overview:"
-            if [[ -d "source/docs-site/generated" ]]; then
-              find "source/docs-site/generated" -maxdepth 4 -print | sort
-            else
-              echo "source/docs-site/generated does not exist."
-            fi
-          fi
-
       - name: Copy generated documentation to documentation branch workspace
         shell: bash
         run: |
@@ -209,30 +186,6 @@ jobs:
             --exclude '.git/' \
             source/docs-site/ \
             documentation-branch/
-
-      - name: Diagnose persisted publication content after documentation branch sync
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          locPublicationPath="generated/${{ steps.publication.outputs.publication-kind }}/${{ steps.publication.outputs.publication-id }}"
-          locPersistedPublicationDirectory="documentation-branch/${locPublicationPath}"
-
-          echo "Expected persisted publication directory: ${locPersistedPublicationDirectory}"
-
-          if [[ -d "${locPersistedPublicationDirectory}" ]]; then
-            echo "Directory exists. Listing content:"
-            find "${locPersistedPublicationDirectory}" -maxdepth 4 -print | sort
-          else
-            echo "Directory does not exist."
-            echo "Existing persisted generated directory overview:"
-            if [[ -d "documentation-branch/generated" ]]; then
-              find "documentation-branch/generated" -maxdepth 4 -print | sort
-            else
-              echo "documentation-branch/generated does not exist."
-            fi
-          fi
-
 
       - name: Commit generated documentation to documentation branch
         working-directory: documentation-branch
