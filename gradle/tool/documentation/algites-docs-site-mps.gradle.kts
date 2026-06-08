@@ -15,6 +15,8 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 
 apply(from = uri(locAlgitesDocsBaseScript))
 
+val locProjectRootDirectory = layout.projectDirectory.asFile
+
 data class AIcArtifactSetProject(
     val locRelativePath: String,
     val locProjectDirectory: File
@@ -84,7 +86,7 @@ fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
 
     return locMpsArtifactDirectories.map { locArtifactDirectory ->
         val locRelativePath = locArtifactDirectory["path"] ?: "."
-        val locProjectDirectory = layout.projectDirectory.dir(locRelativePath).asFile
+        val locProjectDirectory = File(locProjectRootDirectory, locRelativePath)
         require(locProjectDirectory.isDirectory) {
             "Resolved MPS artifact directory does not exist: ${locProjectDirectory.absolutePath}"
         }
@@ -285,7 +287,7 @@ fun AIcDiscoverMpsArtifacts(
             val locModuleKind = AIcDeriveModuleKind(locDescriptorFile) ?: return@mapNotNull null
             val locModuleName = AIcReadMpsModuleName(locDescriptorFile) ?: return@mapNotNull null
             val locBaseModulePath = AIcDeriveBaseModulePath(locModuleName, locModuleKind, locRepositoryRole)
-            val locDescriptorPath = layout.projectDirectory.asFile.toPath()
+            val locDescriptorPath = locProjectRootDirectory.toPath()
                 .relativize(locDescriptorFile.toPath())
                 .toString()
                 .replace(File.separatorChar, '/')
@@ -355,7 +357,7 @@ tasks.register("discoverMpsArtifacts") {
 
     inputs.property("algitesDocsResolvedRepositoryName", locAlgitesDocsResolvedRepositoryName)
     inputs.property("algitesDocsResolvedArtifactDirectories", locAlgitesDocsResolvedArtifactDirectories.toString())
-    inputs.files(fileTree(layout.projectDirectory.asFile) {
+    inputs.files(fileTree(locProjectRootDirectory) {
         include("**/*.mpl")
         include("**/*.msd")
         exclude("**/build/**")

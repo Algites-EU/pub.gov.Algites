@@ -146,6 +146,22 @@ fun AIcDocsReadRepositoryScalar(aKey: String): String? {
     }
 }
 
+val locAlgitesDocsRepositoryId = AIcDocsReadRepositoryScalar("id") ?: locAlgitesDocsResolvedRepositoryName
+val locAlgitesDocsRepositoryNameForSite = AIcDocsReadRepositoryScalar("name") ?: locAlgitesDocsRepositoryId
+val locAlgitesDocsRepositoryDescription = AIcDocsReadRepositoryScalar("description")
+val locAlgitesDocsRepositoryHomeUrl = (findProperty("algites.docs.repositoryHomeUrl") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+    ?: AIcDocsReadRepositoryScalar("homeUrl")
+    ?: AIcDocsReadRepositoryScalar("repositoryUrl")
+    ?: AIcDocsReadRepositoryScalar("url")
+    ?: "https://github.com/Algites-EU/${locAlgitesDocsRepositoryId}"
+val locAlgitesDocsPublicationLabel = if (locPublicationKind != null && locPublicationId != null) {
+    "${locPublicationKind}/${locPublicationId}"
+} else {
+    "generated"
+}
+
 fun AIcDocsRelativeHref(aBaseDirectory: File, aTargetDirectory: File): String {
     val locRelativePath = aBaseDirectory.toPath()
         .relativize(aTargetDirectory.toPath())
@@ -272,16 +288,10 @@ if (tasks.findByName("generateAlgitesDocsRootIndex") == null) {
         outputs.file(locDocsSiteRoot.file("index.html"))
 
         doLast {
-            val locRepositoryId = AIcDocsReadRepositoryScalar("id") ?: rootProject.name
-            val locRepositoryName = AIcDocsReadRepositoryScalar("name") ?: locRepositoryId
-            val locRepositoryDescription = AIcDocsReadRepositoryScalar("description")
-            val locRepositoryHomeUrl = (findProperty("algites.docs.repositoryHomeUrl") as String?)
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?: AIcDocsReadRepositoryScalar("homeUrl")
-                ?: AIcDocsReadRepositoryScalar("repositoryUrl")
-                ?: AIcDocsReadRepositoryScalar("url")
-                ?: "https://github.com/Algites-EU/${locRepositoryId}"
+            val locRepositoryId = locAlgitesDocsRepositoryId
+            val locRepositoryName = locAlgitesDocsRepositoryNameForSite
+            val locRepositoryDescription = locAlgitesDocsRepositoryDescription
+            val locRepositoryHomeUrl = locAlgitesDocsRepositoryHomeUrl
             val locIndexFile = locDocsSiteRoot.file("index.html").asFile
             locIndexFile.parentFile.mkdirs()
 
@@ -388,16 +398,9 @@ if (tasks.findByName("generateAlgitesDocsGeneratedIndex") == null) {
         outputs.file(locGeneratedDocsRoot.file("index.html"))
 
         doLast {
-            val locRepositoryId = AIcDocsReadRepositoryScalar("id") ?: rootProject.name
-            val locRepositoryName = AIcDocsReadRepositoryScalar("name") ?: locRepositoryId
-            val locRepositoryDescription = AIcDocsReadRepositoryScalar("description")
-
-            val locPublicationKind = (findProperty("algites.docs.publicationKind") as String?)
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-            val locPublicationId = (findProperty("algites.docs.publicationId") as String?)
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
+            val locRepositoryId = locAlgitesDocsRepositoryId
+            val locRepositoryName = locAlgitesDocsRepositoryNameForSite
+            val locRepositoryDescription = locAlgitesDocsRepositoryDescription
 
             val locCurrentPublicationDirectory = locPublicationDocsRoot.asFile
 
@@ -406,11 +409,7 @@ if (tasks.findByName("generateAlgitesDocsGeneratedIndex") == null) {
                 locCurrentPublicationDirectory
             )
 
-            val locPublicationLabel = if (locPublicationKind != null && locPublicationId != null) {
-                "${locPublicationKind}/${locPublicationId}"
-            } else {
-                "generated"
-            }
+            val locPublicationLabel = locAlgitesDocsPublicationLabel
 
             val locIndexFile = locGeneratedDocsRoot.file("index.html").asFile
             locIndexFile.parentFile.mkdirs()
@@ -539,8 +538,8 @@ if (tasks.findByName("generateAlgitesDocsPublicationGroupIndexes") == null) {
         outputs.file(locGeneratedDocsRoot.file("release/index.html"))
 
         doLast {
-            val locRepositoryId = AIcDocsReadRepositoryScalar("id") ?: rootProject.name
-            val locRepositoryName = AIcDocsReadRepositoryScalar("name") ?: locRepositoryId
+            val locRepositoryId = locAlgitesDocsRepositoryId
+            val locRepositoryName = locAlgitesDocsRepositoryNameForSite
 
             AIcDocsWritePublicationGroupIndex(
                 locGeneratedDocsRoot.dir("preview").asFile,
