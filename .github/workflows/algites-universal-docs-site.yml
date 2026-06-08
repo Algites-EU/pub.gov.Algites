@@ -122,8 +122,20 @@ jobs:
       - name: Checkout source repository
         uses: actions/checkout@v4
         with:
+          repository: ${{ github.repository }}
           ref: ${{ steps.publication.outputs.source-ref }}
           path: source
+          fetch-depth: 0
+
+      - name: Show checked out source revision
+        working-directory: source
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "Requested source ref: ${{ steps.publication.outputs.source-ref }}"
+          echo "Checked out HEAD: $(git rev-parse HEAD)"
+          echo "Checked out branch: $(git branch --show-current || true)"
 
       - name: Prepare persistent documentation branch workspace
         shell: bash
@@ -160,7 +172,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Generate documentation site
+      - name: Generate documentation site into persistent documentation branch workspace
         working-directory: source
         shell: bash
         run: |
@@ -168,24 +180,10 @@ jobs:
 
           ./gradlew --no-daemon \
             ${{ inputs.gradle-task }} \
+            -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
             ${{ inputs.gradle-arguments }}
-
-      - name: Copy generated documentation to documentation branch workspace
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if [[ ! -d "source/docs-site" ]]; then
-            echo "Generated documentation directory source/docs-site was not found."
-            exit 1
-          fi
-
-          rsync -a --delete \
-            --exclude '.git/' \
-            source/docs-site/ \
-            documentation-branch/
 
       - name: Commit generated documentation to documentation branch
         working-directory: documentation-branch
