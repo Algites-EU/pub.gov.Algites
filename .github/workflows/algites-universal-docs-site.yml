@@ -160,7 +160,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Generate documentation site into persistent documentation branch workspace
+      - name: Generate documentation site
         working-directory: source
         shell: bash
         run: |
@@ -168,10 +168,24 @@ jobs:
 
           ./gradlew --no-daemon \
             ${{ inputs.gradle-task }} \
-            -Palgites.docs.siteRoot="../documentation-branch" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Palgites.docs.publicationId="${{ steps.publication.outputs.publication-id }}" \
             ${{ inputs.gradle-arguments }}
+
+      - name: Copy generated documentation to documentation branch workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -d "source/docs-site" ]]; then
+            echo "Generated documentation directory source/docs-site was not found."
+            exit 1
+          fi
+
+          rsync -a --delete \
+            --exclude '.git/' \
+            source/docs-site/ \
+            documentation-branch/
 
       - name: Commit generated documentation to documentation branch
         working-directory: documentation-branch
