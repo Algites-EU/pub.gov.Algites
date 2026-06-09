@@ -81,6 +81,7 @@ data class AIcAlgitesArtifactDirectoryMetadata(
 )
 
 data class AIcAlgitesRepositoryMetadata(
+    val id: String,
     val name: String,
     val visibility: String,
     val groupId: String?
@@ -162,6 +163,16 @@ fun AIcResolveRepositoryMetadata(
     val locRootConfig = AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)
         ?.takeIf { it.kind == "repository" }
 
+    val locRepositoryId = locRootConfig?.values?.let {
+        AIcFirstValue(
+            it,
+            "repository.id",
+            "sourceRepository.id",
+            "id"
+        )
+    }?.takeIf { it.isNotBlank() }
+        ?: aRepositoryRoot.name
+
     val locRepositoryName = aRepositoryNameOverride
         ?.takeIf { it.isNotBlank() }
         ?: locRootConfig?.values?.let {
@@ -169,13 +180,10 @@ fun AIcResolveRepositoryMetadata(
                 it,
                 "repository.name",
                 "sourceRepository.name",
-                "repository.id",
-                "sourceRepository.id",
-                "name",
-                "id"
+                "name"
             )
         }?.takeIf { it.isNotBlank() }
-        ?: aRepositoryRoot.name
+        ?: locRepositoryId
 
     val locVisibility = aRepositoryVisibilityOverride
         ?.takeIf { it.isNotBlank() }
@@ -187,7 +195,7 @@ fun AIcResolveRepositoryMetadata(
                 "visibility"
             )
         }?.takeIf { it.isNotBlank() }
-        ?: AIcInferVisibilityFromRepositoryName(locRepositoryName)
+        ?: AIcInferVisibilityFromRepositoryName(locRepositoryId)
 
     val locGroupId = locRootConfig?.values?.let {
         AIcFirstValue(
@@ -199,6 +207,7 @@ fun AIcResolveRepositoryMetadata(
     }?.takeIf { it.isNotBlank() }
 
     return AIcAlgitesRepositoryMetadata(
+        id = locRepositoryId,
         name = locRepositoryName,
         visibility = locVisibility,
         groupId = locGroupId
@@ -660,6 +669,7 @@ fun AIcPropertiesScalar(aValue: String?): String {
 fun AIcToYaml(aResult: AIcAlgitesResolutionResult): String {
     return buildString {
         appendLine("repository:")
+        appendLine("  id: ${AIcYamlScalar(aResult.repository.id)}")
         appendLine("  name: ${AIcYamlScalar(aResult.repository.name)}")
         appendLine("  visibility: ${AIcYamlScalar(aResult.repository.visibility)}")
         appendLine("  groupId: ${AIcYamlScalar(aResult.repository.groupId)}")
@@ -690,6 +700,7 @@ fun AIcToYaml(aResult: AIcAlgitesResolutionResult): String {
 
 fun AIcToDottedProperties(aResult: AIcAlgitesResolutionResult): String {
     return buildString {
+        appendLine("repository.id=${AIcPropertiesScalar(aResult.repository.id)}")
         appendLine("repository.name=${AIcPropertiesScalar(aResult.repository.name)}")
         appendLine("repository.visibility=${AIcPropertiesScalar(aResult.repository.visibility)}")
         appendLine("repository.groupId=${AIcPropertiesScalar(aResult.repository.groupId)}")
@@ -731,6 +742,7 @@ fun AIcFormatOutput(
 fun AIcToMap(aResult: AIcAlgitesResolutionResult): Map<String, Any?> {
     return linkedMapOf(
         "repository" to linkedMapOf(
+            "id" to aResult.repository.id,
             "name" to aResult.repository.name,
             "visibility" to aResult.repository.visibility,
             "groupId" to aResult.repository.groupId
@@ -764,6 +776,7 @@ fun AIcFlattenDottedProperties(aResultMap: Map<String, Any?>): Map<String, Strin
     val locRepository = aResultMap["repository"] as Map<String, Any?>
     val locArtifactDirectories = aResultMap["artifactDirectories"] as List<Map<String, Any?>>
 
+    locProperties["repository.id"] = locRepository["id"]?.toString() ?: "null"
     locProperties["repository.name"] = locRepository["name"]?.toString() ?: "null"
     locProperties["repository.visibility"] = locRepository["visibility"]?.toString() ?: "null"
     locProperties["repository.groupId"] = locRepository["groupId"]?.toString() ?: "null"
