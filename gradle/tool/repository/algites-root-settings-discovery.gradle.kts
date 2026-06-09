@@ -37,7 +37,10 @@ val locAlgitesRepositoryMetadata = locAlgitesResolvedMetadata["repository"] as M
 @Suppress("UNCHECKED_CAST")
 val locAlgitesArtifactDirectories = locAlgitesResolvedMetadata["artifactDirectories"] as List<Map<String, Any?>>
 
-rootProject.name = locAlgitesRepositoryMetadata["name"]?.toString()?.takeIf { it.isNotBlank() } ?: rootDir.name
+rootProject.name =
+    locAlgitesRepositoryMetadata["id"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: locAlgitesRepositoryMetadata["name"]?.toString()?.takeIf { it.isNotBlank() }
+        ?: rootDir.name
 
 val locIncludedProjectPaths = linkedSetOf<String>()
 
