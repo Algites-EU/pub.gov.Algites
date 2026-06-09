@@ -45,11 +45,18 @@ data class AIcMpsArtifactCandidate(
 ) : java.io.Serializable
 
 val locDiscoveryOutputFile = layout.buildDirectory.file("algites/discovered-mps-artifacts.tsv")
+val locAlgitesDocsResolvedRepositoryMetadata =
+    (extra.properties["algitesResolvedRepositoryMetadata"] as? Map<*, *>)
+        ?: (rootProject.extra.properties["algitesResolvedRepositoryMetadata"] as? Map<*, *>)
+
 val locAlgitesDocsResolvedRepositoryId =
     (extra.properties["algitesDocsResolvedRepositoryId"] as String?)
         ?: (rootProject.extra.properties["algitesDocsResolvedRepositoryId"] as String?)
-        ?: (rootProject.extra.properties["algitesResolvedRepositoryMetadata"] as? Map<*, *>)
-            ?.get("name")
+        ?: locAlgitesDocsResolvedRepositoryMetadata
+            ?.get("id")
+            ?.toString()
+        ?: locAlgitesDocsResolvedRepositoryMetadata
+            ?.get("repositoryId")
             ?.toString()
         ?: rootProject.name
 val locAlgitesDocsResolvedRepositoryName =
