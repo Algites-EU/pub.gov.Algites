@@ -17,17 +17,6 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 
 apply(from = uri(locAlgitesDocsBaseScript))
 
-val locAlgitesMpsManagerWrapperScript = (findProperty("algites.mps.managerWrapperScript") as String?)
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/mps/algites-mps-manager-wrapper.gradle.kts"
-
-apply(from = uri(locAlgitesMpsManagerWrapperScript))
-
-val locAlgitesMpsDocumentationGeneratorId =
-    (findProperty("algites.mps.documentation.generator.id") as String?)
-        ?: (extra.properties["algitesMpsDocumentationGeneratorId"] as String?)
-        ?: (rootProject.extra.properties["algitesMpsDocumentationGeneratorId"] as String?)
-
-
 val locProjectRootDirectory = layout.projectDirectory.asFile
 
 data class AIcArtifactSetProject(
@@ -56,18 +45,11 @@ data class AIcMpsArtifactCandidate(
 ) : java.io.Serializable
 
 val locDiscoveryOutputFile = layout.buildDirectory.file("algites/discovered-mps-artifacts.tsv")
-val locAlgitesDocsResolvedRepositoryMetadata =
-    (extra.properties["algitesResolvedRepositoryMetadata"] as? Map<*, *>)
-        ?: (rootProject.extra.properties["algitesResolvedRepositoryMetadata"] as? Map<*, *>)
-
 val locAlgitesDocsResolvedRepositoryId =
     (extra.properties["algitesDocsResolvedRepositoryId"] as String?)
         ?: (rootProject.extra.properties["algitesDocsResolvedRepositoryId"] as String?)
-        ?: locAlgitesDocsResolvedRepositoryMetadata
-            ?.get("id")
-            ?.toString()
-        ?: locAlgitesDocsResolvedRepositoryMetadata
-            ?.get("repositoryId")
+        ?: (rootProject.extra.properties["algitesResolvedRepositoryMetadata"] as? Map<*, *>)
+            ?.get("name")
             ?.toString()
         ?: rootProject.name
 val locAlgitesDocsResolvedRepositoryName =
@@ -95,10 +77,12 @@ fun AIcReadMpsDocsRepositoryId(): String {
 }
 
 val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (extra.properties["algitesPublicationDocsRootPath"] as String?)
+    (extra.properties["algitesGeneratedDocsRootPath"] as String?)
         ?: (findProperty("algites.docs.generatedRoot") as String?)
         ?: "docs-site/generated"
 )
+val locMpsDocsPublicationKind = (extra.properties["algitesDocsPublicationKind"] as String?) ?: "preview"
+val locMpsDocsPublicationId = (extra.properties["algitesDocsPublicationId"] as String?) ?: "main"
 
 fun String.AIcToSha256Text(): String {
     val locDigest = MessageDigest.getInstance("SHA-256")
@@ -708,7 +692,9 @@ class AIcPrintDiscoveredMpsArtifactsAction(
 class AIcGenerateDummyMpsDocsAction(
     private val locRepositoryId: String,
     private val locDiscoveryFile: File,
-    private val locGeneratedDocsRootFile: File
+    private val locGeneratedDocsRootFile: File,
+    private val locPublicationKind: String,
+    private val locPublicationId: String
 ) : Action<Task>, java.io.Serializable {
     override fun execute(aTask: Task) {
         require(locDiscoveryFile.isFile) {
@@ -736,7 +722,7 @@ class AIcGenerateDummyMpsDocsAction(
             val locModuleName = locColumns[7]
             val locContentHash = AIcToSha256Text(locLine)
 
-            val locTargetDirectory = File(locGeneratedDocsRootFile, "${locDocumentationPath}/latest")
+            val locTargetDirectory = File(locGeneratedDocsRootFile, "artifacts/${locDocumentationPath}/${locPublicationKind}/${locPublicationId}/mpsdoc")
             locTargetDirectory.deleteRecursively()
             locTargetDirectory.mkdirs()
 
@@ -817,58 +803,6 @@ class AIcGenerateDummyMpsDocsAction(
     }
 }
 
-fun AIcToGradleTaskNameSuffix(aText: String): String {
-    val locParts = aText
-        .replace(Regex("[^A-Za-z0-9]+"), " ")
-        .trim()
-        .split(Regex("\\s+"))
-        .filter { locPart -> locPart.isNotBlank() }
-
-    val locSuffix = locParts.joinToString("") { locPart ->
-        locPart.replaceFirstChar { locChar ->
-            if (locChar.isLowerCase()) {
-                locChar.titlecase()
-            } else {
-                locChar.toString()
-            }
-        }
-    }
-
-    return locSuffix.ifBlank { "Root" }
-}
-
-@Suppress("UNCHECKED_CAST")
-val locRegisterMpsProjectMetadataValidationTask =
-    extra.properties["algitesRegisterMpsProjectMetadataValidationTask"] as? ((String, String) -> Any)
-        ?: rootProject.extra.properties["algitesRegisterMpsProjectMetadataValidationTask"] as? ((String, String) -> Any)
-        ?: error("Algites MPS manager wrapper did not export algitesRegisterMpsProjectMetadataValidationTask.")
-
-@Suppress("UNCHECKED_CAST")
-val locRegisterMpsDocumentationGeneratorTask =
-    extra.properties["algitesRegisterMpsDocumentationGeneratorTask"] as? ((String, String) -> Any)
-        ?: rootProject.extra.properties["algitesRegisterMpsDocumentationGeneratorTask"] as? ((String, String) -> Any)
-        ?: error("Algites MPS manager wrapper did not export algitesRegisterMpsDocumentationGeneratorTask.")
-
-val locMpsArtifactSetProjectsForDocs = AIcReadArtifactSetProjects()
-
-val locMpsProjectMetadataValidationTasks = locMpsArtifactSetProjectsForDocs.map { locArtifactSetProject ->
-    locRegisterMpsProjectMetadataValidationTask(
-        "validateAlgitesMpsProjectMetadata${AIcToGradleTaskNameSuffix(locArtifactSetProject.locRelativePath)}",
-        locArtifactSetProject.locProjectDirectory.absolutePath
-    )
-}
-
-val locMpsDocumentationGeneratorTasks = if (locAlgitesMpsDocumentationGeneratorId.isNullOrBlank()) {
-    emptyList()
-} else {
-    locMpsArtifactSetProjectsForDocs.map { locArtifactSetProject ->
-        locRegisterMpsDocumentationGeneratorTask(
-            "runAlgitesMpsDocumentationGenerator${AIcToGradleTaskNameSuffix(locArtifactSetProject.locRelativePath)}",
-            locArtifactSetProject.locProjectDirectory.absolutePath
-        )
-    }
-}
-
 tasks.register("validateAlgitesConfiguration") {
     group = "algites"
     description = "Validates minimal Algites source repository configuration."
@@ -931,7 +865,6 @@ tasks.register("generateDummyMpsDocs") {
     group = "algites"
     description = "Generates dummy static documentation pages for discovered MPS artifacts."
 
-    dependsOn(locMpsProjectMetadataValidationTasks)
     dependsOn("discoverMpsArtifacts")
     dependsOn("generateAlgitesDocsRootIndex")
 
@@ -942,22 +875,13 @@ tasks.register("generateDummyMpsDocs") {
         AIcGenerateDummyMpsDocsAction(
             locAlgitesDocsResolvedRepositoryId,
             locDiscoveryOutputFile.get().asFile,
-            locGeneratedDocsRoot.asFile
+            locGeneratedDocsRoot.asFile,
+            locMpsDocsPublicationKind,
+            locMpsDocsPublicationId
         )
     )
 }
 
-tasks.register("generateMpsDocs") {
-    group = "algites"
-    description = "Generates MPS documentation using the configured generator, or dummy documentation when no generator is configured."
-
-    if (locAlgitesMpsDocumentationGeneratorId.isNullOrBlank()) {
-        dependsOn("generateDummyMpsDocs")
-    } else {
-        dependsOn(locMpsDocumentationGeneratorTasks)
-    }
-}
-
 tasks.named("generateAlgitesDocsSite") {
-    dependsOn("generateMpsDocs")
+    dependsOn("generateDummyMpsDocs")
 }

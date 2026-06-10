@@ -21,6 +21,8 @@ data class AIcJavaDocsSiteEntry(
 class AIcGenerateJavaDocsSiteAction(
     private val locRepositoryId: String,
     private val locGeneratedDocsRootFile: File,
+    private val locPublicationKind: String,
+    private val locPublicationId: String,
     private val locJavaDocsSiteEntries: List<AIcJavaDocsSiteEntry>
 ) : Action<Task>, java.io.Serializable {
 
@@ -32,7 +34,7 @@ class AIcGenerateJavaDocsSiteAction(
                 return@mapNotNull null
             }
 
-            val locTargetDirectory = File(locGeneratedDocsRootFile, "${locEntry.locModulePath}/latest")
+            val locTargetDirectory = File(locGeneratedDocsRootFile, "artifacts/${locEntry.locModulePath}/${locPublicationKind}/${locPublicationId}/javadoc")
 
             locTargetDirectory.deleteRecursively()
             locJavadocOutputDirectory.copyRecursively(locTargetDirectory, overwrite = true)
@@ -56,7 +58,7 @@ class AIcGenerateJavaDocsSiteAction(
                 <ul>
             ${
                 locDocumentedProjects.joinToString("\n") { locModulePath ->
-                    "      <li><a href=\"${locModulePath}/latest/index.html\">${locModulePath}</a></li>"
+                    "      <li><a href=\"artifacts/${locModulePath}/${locPublicationKind}/${locPublicationId}/index.html\">${locModulePath}</a></li>"
                 }
             }
                 </ul>
@@ -78,11 +80,13 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 apply(from = uri(locAlgitesDocsBaseScript))
 
 val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (extra.properties["algitesPublicationDocsRootPath"] as String?)
+    (extra.properties["algitesGeneratedDocsRootPath"] as String?)
         ?: (findProperty("algites.docs.generatedRoot") as String?)
         ?: "docs-site/generated"
 )
 val locGeneratedDocsRootFile = locGeneratedDocsRoot.asFile
+val locJavaDocsPublicationKind = (extra.properties["algitesDocsPublicationKind"] as String?) ?: "preview"
+val locJavaDocsPublicationId = (extra.properties["algitesDocsPublicationId"] as String?) ?: "main"
 val locJavaDocsRepositoryId = (extra.properties["algitesDocsResolvedRepositoryName"] as String?) ?: rootProject.name
 
 fun AIcReadRepositoryId(): String {
@@ -107,6 +111,8 @@ val locGenerateJavaDocsSite = tasks.register("generateJavaDocsSite") {
         AIcGenerateJavaDocsSiteAction(
             locJavaDocsRepositoryId,
             locGeneratedDocsRootFile,
+            locJavaDocsPublicationKind,
+            locJavaDocsPublicationId,
             locJavaDocsSiteEntries
         )
     )
