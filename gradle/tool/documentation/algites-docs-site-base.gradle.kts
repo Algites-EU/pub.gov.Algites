@@ -330,7 +330,7 @@ class AIcGenerateAlgitesDocsRootIndexAction(
                 body {
                   margin: 0;
                   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-                  line-height: 1.5;
+                  line-height: 1.35;
                   color: #1f2937;
                   background: #f9fafb;
                 }
@@ -346,7 +346,7 @@ class AIcGenerateAlgitesDocsRootIndexAction(
                 }
 
                 h1 {
-                  margin: 0 0 0.5rem 0;
+                  margin: 0 0 0.35rem 0;
                   font-size: 2rem;
                 }
 
@@ -354,8 +354,8 @@ class AIcGenerateAlgitesDocsRootIndexAction(
                   background: white;
                   border: 1px solid #e5e7eb;
                   border-radius: 0.75rem;
-                  padding: 1rem 1.25rem;
-                  margin: 1rem 0;
+                  padding: 0.75rem 0.9rem;
+                  margin: 0.65rem 0;
                   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
                 }
 
@@ -367,8 +367,67 @@ class AIcGenerateAlgitesDocsRootIndexAction(
                   background: white;
                 }
 
+                h2 {
+                  margin: 0 0 0.55rem 0;
+                  font-size: 1.1rem;
+                }
+
+                ul {
+                  margin: 0.35rem 0 0 0;
+                  padding-left: 1.25rem;
+                }
+
+                li {
+                  margin: 0.15rem 0;
+                }
+
                 a {
                   color: #2563eb;
+                }
+
+                .compact-lead {
+                  margin-top: 0;
+                  margin-bottom: 0.7rem;
+                }
+
+                .artifact-publication-grid {
+                  display: grid;
+                  grid-template-columns: minmax(22rem, 1.05fr) minmax(26rem, 1.35fr);
+                  gap: 0.75rem;
+                  align-items: start;
+                }
+
+                .artifact-publication-grid .card:nth-child(3) {
+                  grid-column: 1;
+                }
+
+                .card-strong {
+                  border-color: #d1d5db;
+                }
+
+                .coordinates {
+                  grid-template-columns: minmax(7rem, 9rem) 1fr;
+                }
+
+                .compact-dl {
+                  grid-template-columns: minmax(9rem, 13rem) 1fr;
+                }
+
+                .back-links {
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 0.75rem;
+                  margin-top: 0.75rem;
+                }
+
+                @media (max-width: 820px) {
+                  .artifact-publication-grid {
+                    grid-template-columns: 1fr;
+                  }
+
+                  .artifact-publication-grid .card:nth-child(3) {
+                    grid-column: auto;
+                  }
                 }
               </style>
             </head>
@@ -617,7 +676,7 @@ class AIcGenerateAlgitesDocsPublicationGroupIndexesAction(
                 main {
                   max-width: 900px;
                   margin: 0 auto;
-                  padding: 2rem 1.5rem;
+                  padding: 1.25rem 1rem;
                 }
 
                 h1 {
@@ -750,7 +809,7 @@ loc_index_file.write_text(f'''<!doctype html>
     body {{
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.5;
+      line-height: 1.35;
       color: #1f2937;
       background: #f9fafb;
     }}
@@ -758,16 +817,16 @@ loc_index_file.write_text(f'''<!doctype html>
     header, main {{
       max-width: 1100px;
       margin: 0 auto;
-      padding: 1.5rem;
+      padding: 1rem;
     }}
 
     header {{
-      padding-top: 2rem;
+      padding-top: 1.25rem;
     }}
 
     h1 {{
       margin: 0 0 0.5rem 0;
-      font-size: 2rem;
+      font-size: 1.65rem;
     }}
 
     .muted {{
@@ -778,18 +837,18 @@ loc_index_file.write_text(f'''<!doctype html>
       background: white;
       border: 1px solid #e5e7eb;
       border-radius: 0.75rem;
-      padding: 1rem 1.25rem;
-      margin: 1rem 0;
+      padding: 0.75rem 0.9rem;
+      margin: 0.65rem 0;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }}
 
     iframe {{
       width: 100%;
-      min-height: 45vh;
+      min-height: 34vh;
       border: 1px solid #e5e7eb;
       border-radius: 0.75rem;
       background: white;
-      margin-bottom: 1.5rem;
+      margin-bottom: 0.85rem;
     }}
 
     a {{
@@ -895,7 +954,7 @@ def loc_write_publication_group_index(group_directory, publication_kind, reposit
     body {{
       margin: 0;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      line-height: 1.5;
+      line-height: 1.35;
       color: #1f2937;
       background: #f9fafb;
     }}
@@ -918,8 +977,8 @@ def loc_write_publication_group_index(group_directory, publication_kind, reposit
       background: white;
       border: 1px solid #e5e7eb;
       border-radius: 0.75rem;
-      padding: 1rem 1.25rem;
-      margin: 1rem 0;
+      padding: 0.75rem 0.9rem;
+      margin: 0.65rem 0;
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }}
 
@@ -1078,7 +1137,9 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                 "Gradle project path" to locArtifactPublication.locMetadata["gradleProjectPath"],
                 "Resolved version" to locArtifactPublication.locMetadata["version.resolvedValue"],
                 "Version lane" to locArtifactPublication.locMetadata["version.lane"],
-                "Version revision" to locArtifactPublication.locMetadata["version.revision"]
+                "Version revision" to locArtifactPublication.locMetadata["version.revision"],
+                "Qualifier kind" to locArtifactPublication.locMetadata["version.qualifierKind"],
+                "Qualifier label" to locArtifactPublication.locMetadata["version.qualifierLabel"]
             )
 
             val locMetadataHtml = locMetadataRows.joinToString("\n") { (locLabel, locValue) ->
@@ -1103,30 +1164,34 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                 "${locArtifactPublication.locLocalArtifactId} ${locArtifactPublication.locPublicationKind}/${locArtifactPublication.locPublicationId}",
                 """
                 <h1>${locEscape(locArtifactPublication.locLocalArtifactId)}</h1>
-                <p class="muted">Artifact publication: <code>${locEscape(locArtifactPublication.locPublicationKind)}/${locEscape(locArtifactPublication.locPublicationId)}</code></p>
+                <p class="muted compact-lead">Artifact publication: <code>${locEscape(locArtifactPublication.locPublicationKind)}/${locEscape(locArtifactPublication.locPublicationId)}</code></p>
 
-                <section class="card">
-                  <h2>Artifact coordinates</h2>
-                  <dl>
-                    <dt>Group ID</dt><dd><strong><code>${locEscape(locArtifactGroupId ?: "not specified")}</code></strong></dd>
-                    <dt>Artifact ID</dt><dd><strong><code>${locEscape(locFullArtifactId)}</code></strong></dd>
-                  </dl>
-                </section>
+                <div class="artifact-publication-grid">
+                  <section class="card card-strong">
+                    <h2>Artifact coordinates</h2>
+                    <dl class="coordinates">
+                      <dt>Group ID</dt><dd><strong><code>${locEscape(locArtifactGroupId ?: "not specified")}</code></strong></dd>
+                      <dt>Artifact ID</dt><dd><strong><code>${locEscape(locFullArtifactId)}</code></strong></dd>
+                    </dl>
+                  </section>
 
-                <section class="card">
-                  <h2>Artifact metadata</h2>
-                  <dl>
-                    ${locMetadataHtml}
-                  </dl>
-                </section>
+                  <section class="card">
+                    <h2>Artifact metadata</h2>
+                    <dl class="compact-dl">
+                      ${locMetadataHtml}
+                    </dl>
+                  </section>
 
-                <section class="card">
-                  <h2>Generated documentation</h2>
-                  ${locDocsLinksHtml}
-                </section>
+                  <section class="card">
+                    <h2>Generated documentation</h2>
+                    ${locDocsLinksHtml}
+                  </section>
+                </div>
 
-                <p><a href="${locRelativeHref(locArtifactPublication.locArtifactPublicationDirectory, File(locPublicationsRootFile, "${locArtifactPublication.locPublicationKind}/${locArtifactPublication.locPublicationId}"))}">Back to publication index</a></p>
-                <p><a href="${locRelativeHref(locArtifactPublication.locArtifactPublicationDirectory, locArtifactsRootFile)}">Back to artifact index</a></p>
+                <nav class="back-links">
+                  <a href="${locRelativeHref(locArtifactPublication.locArtifactPublicationDirectory, File(locPublicationsRootFile, "${locArtifactPublication.locPublicationKind}/${locArtifactPublication.locPublicationId}"))}">Back to publication index</a>
+                  <a href="${locRelativeHref(locArtifactPublication.locArtifactPublicationDirectory, locArtifactsRootFile)}">Back to artifact index</a>
+                </nav>
                 """.trimIndent()
             )
         }
@@ -1363,7 +1428,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                 dl {
                   display: grid;
                   grid-template-columns: minmax(10rem, 18rem) 1fr;
-                  gap: 0.35rem 1rem;
+                  gap: 0.22rem 0.75rem;
                 }
 
                 dt {
