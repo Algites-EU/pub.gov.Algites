@@ -17,6 +17,17 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 
 apply(from = uri(locAlgitesDocsBaseScript))
 
+val locAlgitesMpsManagerWrapperScript = (findProperty("algites.mps.managerWrapperScript") as String?)
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/mps/algites-mps-manager-wrapper.gradle.kts"
+
+apply(from = uri(locAlgitesMpsManagerWrapperScript))
+
+val locAlgitesMpsDocumentationGeneratorId =
+    (findProperty("algites.mps.documentation.generator.id") as String?)
+        ?: (extra.properties["algitesMpsDocumentationGeneratorId"] as String?)
+        ?: (rootProject.extra.properties["algitesMpsDocumentationGeneratorId"] as String?)
+
+
 val locProjectRootDirectory = layout.projectDirectory.asFile
 
 data class AIcArtifactSetProject(
@@ -868,6 +879,7 @@ tasks.register("generateDummyMpsDocs") {
     group = "algites"
     description = "Generates dummy static documentation pages for discovered MPS artifacts."
 
+    dependsOn("validateAlgitesMpsProjectMetadata")
     dependsOn("discoverMpsArtifacts")
     dependsOn("generateAlgitesDocsRootIndex")
 
@@ -883,6 +895,17 @@ tasks.register("generateDummyMpsDocs") {
     )
 }
 
+tasks.register("generateMpsDocs") {
+    group = "algites"
+    description = "Generates MPS documentation using the configured generator, or dummy documentation when no generator is configured."
+
+    if (locAlgitesMpsDocumentationGeneratorId.isNullOrBlank()) {
+        dependsOn("generateDummyMpsDocs")
+    } else {
+        dependsOn("runAlgitesMpsDocumentationGenerator")
+    }
+}
+
 tasks.named("generateAlgitesDocsSite") {
-    dependsOn("generateDummyMpsDocs")
+    dependsOn("generateMpsDocs")
 }
