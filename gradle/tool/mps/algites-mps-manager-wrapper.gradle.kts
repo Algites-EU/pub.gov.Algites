@@ -18,6 +18,12 @@ val locAlgitesMpsManagerScript = (findProperty("algites.mps.managerScript") as S
 
 apply(from = uri(locAlgitesMpsManagerScript))
 
+@Suppress("UNCHECKED_CAST")
+val locAlgitesResolveMpsProjectMetadataMap =
+    extra.properties["algitesResolveMpsProjectMetadataMap"] as? ((String) -> Map<String, String>)
+        ?: rootProject.extra.properties["algitesResolveMpsProjectMetadataMap"] as? ((String) -> Map<String, String>)
+        ?: throw GradleException("Algites MPS manager did not export algitesResolveMpsProjectMetadataMap.")
+
 fun AIcReadAlgitesMpsWrapperExtra(aName: String): String {
     return extra.properties[aName]?.toString()?.takeIf { locValue -> locValue.isNotBlank() }
         ?: rootProject.extra.properties[aName]?.toString()?.takeIf { locValue -> locValue.isNotBlank() }
@@ -50,6 +56,94 @@ fun AIcFindAlgitesMpsHomeInInstallation(aRootDirectory: File): File? {
         }
 }
 
+fun AIcLogAlgitesMpsMetadata(aMetadata: Map<String, String>) {
+    logger.lifecycle("Algites MPS project metadata:")
+    logger.lifecycle(" - project directory: ${aMetadata["algitesMpsProjectDirectory"].orEmpty()}")
+    logger.lifecycle(" - migration file: ${aMetadata["algitesMpsMigrationFile"].orEmpty()}")
+    logger.lifecycle(" - project.baseline.version value(s): ${aMetadata["algitesMpsBaselineVersionValues"].orEmpty().ifBlank { "<none>" }}")
+    logger.lifecycle(" - project.migrated.version value(s): ${aMetadata["algitesMpsMigratedVersionValues"].orEmpty().ifBlank { "<none>" }}")
+    logger.lifecycle(" - effective baseline code: ${aMetadata["algitesMpsEffectiveBaselineCode"].orEmpty().ifBlank { "<none>" }}")
+    logger.lifecycle(" - effective MPS version: ${aMetadata["algitesMpsEffectiveVersion"].orEmpty().ifBlank { "<none>" }}")
+    logger.lifecycle(" - effective version source: ${aMetadata["algitesMpsEffectiveVersionSource"].orEmpty().ifBlank { "<none>" }}")
+}
+
+fun AIcValidateAlgitesMpsMetadata(aMetadata: Map<String, String>) {
+    val locMetadataError = aMetadata["algitesMpsMetadataError"].orEmpty()
+    if (locMetadataError.isNotBlank()) {
+        throw GradleException(locMetadataError)
+    }
+}
+
+fun AIcPrepareAlgitesMpsRuntime(aMetadata: Map<String, String>) {
+    AIcValidateAlgitesMpsMetadata(aMetadata)
+
+    val locMpsVersion = aMetadata["algitesMpsEffectiveVersion"].orEmpty()
+    val locManagedRootDirectory = File(aMetadata["algitesMpsManagedRootDirectory"].orEmpty())
+    val locDownloadUrl = aMetadata["algitesMpsDownloadUrl"].orEmpty()
+    val locHomeMarkerFile = File(locManagedRootDirectory, ".algites-mps-home")
+    val locCompleteMarkerFile = File(locManagedRootDirectory, ".algites-mps-installation-complete")
+
+    if (locCompleteMarkerFile.isFile && locHomeMarkerFile.isFile) {
+        val locMpsHome = File(locHomeMarkerFile.readText(Charsets.UTF_8).trim())
+        if (locMpsHome.isDirectory) {
+            logger.lifecycle("Managed MPS ${locMpsVersion} already available at: ${locMpsHome.absolutePath}")
+            return
+        }
+    }
+
+    require(locDownloadUrl.isNotBlank()) {
+        "Cannot download MPS runtime because algitesMpsDownloadUrl is empty."
+    }
+
+    val locArchiveDirectory = File(locManagedRootDirectory, "archive")
+    val locExtractDirectory = File(locManagedRootDirectory, "install")
+    val locArchiveFile = File(locArchiveDirectory, "MPS-${locMpsVersion}.tar.gz")
+
+    locArchiveDirectory.mkdirs()
+    locExtractDirectory.mkdirs()
+
+    if (!locArchiveFile.isFile) {
+        logger.lifecycle("Downloading MPS ${locMpsVersion} from: ${locDownloadUrl}")
+        URI(locDownloadUrl).toURL().openStream().use { locInputStream ->
+            locArchiveFile.outputStream().use { locOutputStream ->
+                locInputStream.copyTo(locOutputStream)
+            }
+        }
+    } else {
+        logger.lifecycle("Using cached MPS archive: ${locArchiveFile.absolutePath}")
+    }
+
+    logger.lifecycle("Extracting MPS ${locMpsVersion} to: ${locExtractDirectory.absolutePath}")
+    locExtractDirectory.deleteRecursively()
+    locExtractDirectory.mkdirs()
+
+    project.copy {
+        from(project.tarTree(project.resources.gzip(locArchiveFile)))
+        into(locExtractDirectory)
+    }
+
+    val locMpsHome = AIcFindAlgitesMpsHomeInInstallation(locExtractDirectory)
+        ?: throw GradleException("Cannot locate MPS home after extraction under: ${locExtractDirectory.absolutePath}")
+
+    locHomeMarkerFile.writeText(locMpsHome.absolutePath, Charsets.UTF_8)
+    locCompleteMarkerFile.writeText("MPS ${locMpsVersion}\n", Charsets.UTF_8)
+    logger.lifecycle("Managed MPS ${locMpsVersion} prepared at: ${locMpsHome.absolutePath}")
+}
+
+fun AIcReadAlgitesMpsHome(aMetadata: Map<String, String>): File {
+    val locManagedRootDirectory = File(aMetadata["algitesMpsManagedRootDirectory"].orEmpty())
+    val locHomeMarkerFile = File(locManagedRootDirectory, ".algites-mps-home")
+    require(locHomeMarkerFile.isFile) {
+        "Managed MPS home marker not found: ${locHomeMarkerFile.absolutePath}"
+    }
+
+    val locMpsHome = File(locHomeMarkerFile.readText(Charsets.UTF_8).trim())
+    require(locMpsHome.isDirectory) {
+        "Managed MPS home does not exist: ${locMpsHome.absolutePath}"
+    }
+    return locMpsHome
+}
+
 tasks.register("validateAlgitesMpsProjectMetadata") {
     group = "algites"
     description = "Validates MPS project migration metadata and resolves the effective MPS version."
@@ -60,27 +154,9 @@ tasks.register("validateAlgitesMpsProjectMetadata") {
     inputs.property("algitesMpsMetadataError", AIcReadAlgitesMpsWrapperExtra("algitesMpsMetadataError"))
 
     doLast {
-        val locMetadataError = AIcReadAlgitesMpsWrapperExtra("algitesMpsMetadataError")
-        val locProjectDirectory = AIcReadAlgitesMpsWrapperExtra("algitesMpsProjectDirectory")
-        val locMigrationFile = AIcReadAlgitesMpsWrapperExtra("algitesMpsMigrationFile")
-        val locBaselineValues = AIcReadAlgitesMpsWrapperExtra("algitesMpsBaselineVersionValues")
-        val locMigratedValues = AIcReadAlgitesMpsWrapperExtra("algitesMpsMigratedVersionValues")
-        val locEffectiveBaselineCode = AIcReadAlgitesMpsWrapperExtra("algitesMpsEffectiveBaselineCode")
-        val locEffectiveVersion = AIcReadAlgitesMpsWrapperExtra("algitesMpsEffectiveVersion")
-        val locEffectiveVersionSource = AIcReadAlgitesMpsWrapperExtra("algitesMpsEffectiveVersionSource")
-
-        logger.lifecycle("Algites MPS project metadata:")
-        logger.lifecycle(" - project directory: ${locProjectDirectory}")
-        logger.lifecycle(" - migration file: ${locMigrationFile}")
-        logger.lifecycle(" - project.baseline.version value(s): ${locBaselineValues.ifBlank { "<none>" }}")
-        logger.lifecycle(" - project.migrated.version value(s): ${locMigratedValues.ifBlank { "<none>" }}")
-        logger.lifecycle(" - effective baseline code: ${locEffectiveBaselineCode.ifBlank { "<none>" }}")
-        logger.lifecycle(" - effective MPS version: ${locEffectiveVersion.ifBlank { "<none>" }}")
-        logger.lifecycle(" - effective version source: ${locEffectiveVersionSource.ifBlank { "<none>" }}")
-
-        if (locMetadataError.isNotBlank()) {
-            throw GradleException(locMetadataError)
-        }
+        val locMetadata = locAlgitesResolveMpsProjectMetadataMap(AIcReadAlgitesMpsWrapperExtra("algitesMpsProjectDirectory"))
+        AIcLogAlgitesMpsMetadata(locMetadata)
+        AIcValidateAlgitesMpsMetadata(locMetadata)
     }
 }
 
@@ -91,11 +167,12 @@ tasks.register("printAlgitesMpsConfiguration") {
     dependsOn("validateAlgitesMpsProjectMetadata")
 
     doLast {
+        val locMetadata = locAlgitesResolveMpsProjectMetadataMap(AIcReadAlgitesMpsWrapperExtra("algitesMpsProjectDirectory"))
         logger.lifecycle("Algites MPS runtime configuration:")
-        logger.lifecycle(" - MPS version: ${AIcReadAlgitesMpsWrapperExtra("algitesMpsEffectiveVersion")}")
-        logger.lifecycle(" - cache directory: ${AIcReadAlgitesMpsWrapperExtra("algitesMpsCacheDirectory")}")
-        logger.lifecycle(" - managed root directory: ${AIcReadAlgitesMpsWrapperExtra("algitesMpsManagedRootDirectory")}")
-        logger.lifecycle(" - download URL: ${AIcReadAlgitesMpsWrapperExtra("algitesMpsDownloadUrl")}")
+        logger.lifecycle(" - MPS version: ${locMetadata["algitesMpsEffectiveVersion"].orEmpty()}")
+        logger.lifecycle(" - cache directory: ${locMetadata["algitesMpsCacheDirectory"].orEmpty()}")
+        logger.lifecycle(" - managed root directory: ${locMetadata["algitesMpsManagedRootDirectory"].orEmpty()}")
+        logger.lifecycle(" - download URL: ${locMetadata["algitesMpsDownloadUrl"].orEmpty()}")
     }
 }
 
@@ -106,57 +183,8 @@ tasks.register("downloadAlgitesMpsRuntime") {
     dependsOn("validateAlgitesMpsProjectMetadata")
 
     doLast {
-        val locMpsVersion = AIcReadAlgitesMpsWrapperExtra("algitesMpsEffectiveVersion")
-        val locManagedRootDirectory = File(AIcReadAlgitesMpsWrapperExtra("algitesMpsManagedRootDirectory"))
-        val locDownloadUrl = AIcReadAlgitesMpsWrapperExtra("algitesMpsDownloadUrl")
-        val locHomeMarkerFile = File(locManagedRootDirectory, ".algites-mps-home")
-        val locCompleteMarkerFile = File(locManagedRootDirectory, ".algites-mps-installation-complete")
-
-        if (locCompleteMarkerFile.isFile && locHomeMarkerFile.isFile) {
-            val locMpsHome = File(locHomeMarkerFile.readText(Charsets.UTF_8).trim())
-            if (locMpsHome.isDirectory) {
-                logger.lifecycle("Managed MPS ${locMpsVersion} already available at: ${locMpsHome.absolutePath}")
-                return@doLast
-            }
-        }
-
-        require(locDownloadUrl.isNotBlank()) {
-            "Cannot download MPS runtime because algitesMpsDownloadUrl is empty."
-        }
-
-        val locArchiveDirectory = File(locManagedRootDirectory, "archive")
-        val locExtractDirectory = File(locManagedRootDirectory, "install")
-        val locArchiveFile = File(locArchiveDirectory, "MPS-${locMpsVersion}.tar.gz")
-
-        locArchiveDirectory.mkdirs()
-        locExtractDirectory.mkdirs()
-
-        if (!locArchiveFile.isFile) {
-            logger.lifecycle("Downloading MPS ${locMpsVersion} from: ${locDownloadUrl}")
-            URI(locDownloadUrl).toURL().openStream().use { locInputStream ->
-                locArchiveFile.outputStream().use { locOutputStream ->
-                    locInputStream.copyTo(locOutputStream)
-                }
-            }
-        } else {
-            logger.lifecycle("Using cached MPS archive: ${locArchiveFile.absolutePath}")
-        }
-
-        logger.lifecycle("Extracting MPS ${locMpsVersion} to: ${locExtractDirectory.absolutePath}")
-        locExtractDirectory.deleteRecursively()
-        locExtractDirectory.mkdirs()
-
-        project.copy {
-            from(project.tarTree(project.resources.gzip(locArchiveFile)))
-            into(locExtractDirectory)
-        }
-
-        val locMpsHome = AIcFindAlgitesMpsHomeInInstallation(locExtractDirectory)
-            ?: throw GradleException("Cannot locate MPS home after extraction under: ${locExtractDirectory.absolutePath}")
-
-        locHomeMarkerFile.writeText(locMpsHome.absolutePath, Charsets.UTF_8)
-        locCompleteMarkerFile.writeText("MPS ${locMpsVersion}\n", Charsets.UTF_8)
-        logger.lifecycle("Managed MPS ${locMpsVersion} prepared at: ${locMpsHome.absolutePath}")
+        val locMetadata = locAlgitesResolveMpsProjectMetadataMap(AIcReadAlgitesMpsWrapperExtra("algitesMpsProjectDirectory"))
+        AIcPrepareAlgitesMpsRuntime(locMetadata)
     }
 }
 
@@ -167,77 +195,110 @@ tasks.register("prepareAlgitesMpsRuntime") {
     dependsOn("downloadAlgitesMpsRuntime")
 
     doLast {
-        val locManagedRootDirectory = File(AIcReadAlgitesMpsWrapperExtra("algitesMpsManagedRootDirectory"))
-        val locHomeMarkerFile = File(locManagedRootDirectory, ".algites-mps-home")
-        require(locHomeMarkerFile.isFile) {
-            "Managed MPS home marker not found: ${locHomeMarkerFile.absolutePath}"
-        }
-
-        val locMpsHome = File(locHomeMarkerFile.readText(Charsets.UTF_8).trim())
-        require(locMpsHome.isDirectory) {
-            "Managed MPS home does not exist: ${locMpsHome.absolutePath}"
-        }
-
+        val locMetadata = locAlgitesResolveMpsProjectMetadataMap(AIcReadAlgitesMpsWrapperExtra("algitesMpsProjectDirectory"))
+        val locMpsHome = AIcReadAlgitesMpsHome(locMetadata)
         logger.lifecycle("Prepared managed MPS home: ${locMpsHome.absolutePath}")
+    }
+}
+
+fun AIcRegisterAlgitesMpsProjectMetadataValidationTask(aTaskName: String, aProjectDirectoryPath: String): Any {
+    return tasks.register(aTaskName) {
+        group = "algites"
+        description = "Validates MPS project migration metadata for ${aProjectDirectoryPath}."
+
+        inputs.property("algitesMpsProjectDirectory", aProjectDirectoryPath)
+
+        doLast {
+            val locMetadata = locAlgitesResolveMpsProjectMetadataMap(aProjectDirectoryPath)
+            AIcLogAlgitesMpsMetadata(locMetadata)
+            AIcValidateAlgitesMpsMetadata(locMetadata)
+        }
+    }
+}
+
+fun AIcRegisterAlgitesMpsDocumentationGeneratorTask(aTaskName: String, aProjectDirectoryPath: String): Any {
+    return tasks.register(aTaskName) {
+        group = "algites"
+        description = "Runs a configured MPS documentation generator for ${aProjectDirectoryPath}."
+
+        inputs.property("algitesMpsProjectDirectory", aProjectDirectoryPath)
+
+        doLast {
+            val locGeneratorId = AIcReadAlgitesMpsDocumentationGeneratorValue(
+                "algites.mps.documentation.generator.id",
+                "algitesMpsDocumentationGeneratorId"
+            )
+            val locGeneratorVersion = AIcReadAlgitesMpsDocumentationGeneratorValue(
+                "algites.mps.documentation.generator.version",
+                "algitesMpsDocumentationGeneratorVersion"
+            )
+            val locGeneratorCommand = AIcReadAlgitesMpsDocumentationGeneratorValue(
+                "algites.mps.documentation.generator.command",
+                "algitesMpsDocumentationGeneratorCommand"
+            )
+
+            if (locGeneratorId.isNullOrBlank()) {
+                logger.lifecycle("No MPS documentation generator configured; skipping headless generator execution for ${aProjectDirectoryPath}.")
+                return@doLast
+            }
+
+            require(!locGeneratorCommand.isNullOrBlank()) {
+                "MPS documentation generator '${locGeneratorId}' is configured, but algites.mps.documentation.generator.command is not set yet."
+            }
+
+            val locMetadata = locAlgitesResolveMpsProjectMetadataMap(aProjectDirectoryPath)
+            AIcLogAlgitesMpsMetadata(locMetadata)
+            AIcPrepareAlgitesMpsRuntime(locMetadata)
+            val locMpsHome = AIcReadAlgitesMpsHome(locMetadata)
+            val locProjectDirectory = File(aProjectDirectoryPath).canonicalFile
+
+            logger.lifecycle("Running MPS documentation generator:")
+            logger.lifecycle(" - generator id: ${locGeneratorId}")
+            logger.lifecycle(" - generator version: ${locGeneratorVersion ?: "<unspecified>"}")
+            logger.lifecycle(" - MPS home: ${locMpsHome.absolutePath}")
+            logger.lifecycle(" - project directory: ${locProjectDirectory.absolutePath}")
+            logger.lifecycle(" - command: ${locGeneratorCommand}")
+
+            val locGeneratorCommandParts = locGeneratorCommand
+                .split(Regex("\\s+"))
+                .filter { it.isNotBlank() }
+
+            require(locGeneratorCommandParts.isNotEmpty()) {
+                "MPS documentation generator '${locGeneratorId}' has an empty command."
+            }
+
+            val locProcessBuilder = ProcessBuilder(locGeneratorCommandParts)
+            locProcessBuilder.directory(locProjectDirectory)
+            locProcessBuilder.environment()["MPS_HOME"] = locMpsHome.absolutePath
+            locProcessBuilder.environment()["ALGITES_MPS_PROJECT_DIR"] = locProjectDirectory.absolutePath
+            locProcessBuilder.inheritIO()
+
+            val locProcess = locProcessBuilder.start()
+            val locExitCode = locProcess.waitFor()
+
+            require(locExitCode == 0) {
+                "MPS documentation generator '${locGeneratorId}' failed with exit code ${locExitCode}."
+            }
+        }
     }
 }
 
 tasks.register("runAlgitesMpsDocumentationGenerator") {
     group = "algites"
-    description = "Runs a configured MPS documentation generator in headless mode."
+    description = "Runs a configured MPS documentation generator in headless mode for the default MPS project directory."
 
-    dependsOn("prepareAlgitesMpsRuntime")
-
-    doLast {
-        val locGeneratorId = AIcReadAlgitesMpsDocumentationGeneratorValue(
-            "algites.mps.documentation.generator.id",
-            "algitesMpsDocumentationGeneratorId"
+    dependsOn(
+        AIcRegisterAlgitesMpsDocumentationGeneratorTask(
+            "runAlgitesMpsDocumentationGeneratorDefault",
+            AIcReadAlgitesMpsWrapperExtra("algitesMpsProjectDirectory")
         )
-        val locGeneratorVersion = AIcReadAlgitesMpsDocumentationGeneratorValue(
-            "algites.mps.documentation.generator.version",
-            "algitesMpsDocumentationGeneratorVersion"
-        )
-        val locGeneratorCommand = AIcReadAlgitesMpsDocumentationGeneratorValue(
-            "algites.mps.documentation.generator.command",
-            "algitesMpsDocumentationGeneratorCommand"
-        )
+    )
+}
 
-        if (locGeneratorId.isNullOrBlank()) {
-            logger.lifecycle("No MPS documentation generator configured; skipping headless generator execution.")
-            return@doLast
-        }
+extra["algitesRegisterMpsProjectMetadataValidationTask"] = fun(aTaskName: String, aProjectDirectoryPath: String): Any {
+    return AIcRegisterAlgitesMpsProjectMetadataValidationTask(aTaskName, aProjectDirectoryPath)
+}
 
-        require(!locGeneratorCommand.isNullOrBlank()) {
-            "MPS documentation generator '${locGeneratorId}' is configured, but algites.mps.documentation.generator.command is not set yet."
-        }
-
-        val locManagedRootDirectory = File(AIcReadAlgitesMpsWrapperExtra("algitesMpsManagedRootDirectory"))
-        val locMpsHome = File(File(locManagedRootDirectory, ".algites-mps-home").readText(Charsets.UTF_8).trim())
-
-        logger.lifecycle("Running MPS documentation generator:")
-        logger.lifecycle(" - generator id: ${locGeneratorId}")
-        logger.lifecycle(" - generator version: ${locGeneratorVersion ?: "<unspecified>"}")
-        logger.lifecycle(" - MPS home: ${locMpsHome.absolutePath}")
-        logger.lifecycle(" - command: ${locGeneratorCommand}")
-
-        val locGeneratorCommandParts = locGeneratorCommand
-            .split(Regex("\\s+"))
-            .filter { it.isNotBlank() }
-
-        require(locGeneratorCommandParts.isNotEmpty()) {
-            "MPS documentation generator '${locGeneratorId}' has an empty command."
-        }
-
-        val locProcessBuilder = ProcessBuilder(locGeneratorCommandParts)
-        locProcessBuilder.directory(rootProject.projectDir)
-        locProcessBuilder.environment()["MPS_HOME"] = locMpsHome.absolutePath
-        locProcessBuilder.inheritIO()
-
-        val locProcess = locProcessBuilder.start()
-        val locExitCode = locProcess.waitFor()
-
-        require(locExitCode == 0) {
-            "MPS documentation generator '${locGeneratorId}' failed with exit code ${locExitCode}."
-        }
-    }
+extra["algitesRegisterMpsDocumentationGeneratorTask"] = fun(aTaskName: String, aProjectDirectoryPath: String): Any {
+    return AIcRegisterAlgitesMpsDocumentationGeneratorTask(aTaskName, aProjectDirectoryPath)
 }

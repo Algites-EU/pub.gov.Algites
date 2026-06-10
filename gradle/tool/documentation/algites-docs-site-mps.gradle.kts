@@ -817,6 +817,58 @@ class AIcGenerateDummyMpsDocsAction(
     }
 }
 
+fun AIcToGradleTaskNameSuffix(aText: String): String {
+    val locParts = aText
+        .replace(Regex("[^A-Za-z0-9]+"), " ")
+        .trim()
+        .split(Regex("\\s+"))
+        .filter { locPart -> locPart.isNotBlank() }
+
+    val locSuffix = locParts.joinToString("") { locPart ->
+        locPart.replaceFirstChar { locChar ->
+            if (locChar.isLowerCase()) {
+                locChar.titlecase()
+            } else {
+                locChar.toString()
+            }
+        }
+    }
+
+    return locSuffix.ifBlank { "Root" }
+}
+
+@Suppress("UNCHECKED_CAST")
+val locRegisterMpsProjectMetadataValidationTask =
+    extra.properties["algitesRegisterMpsProjectMetadataValidationTask"] as? ((String, String) -> Any)
+        ?: rootProject.extra.properties["algitesRegisterMpsProjectMetadataValidationTask"] as? ((String, String) -> Any)
+        ?: error("Algites MPS manager wrapper did not export algitesRegisterMpsProjectMetadataValidationTask.")
+
+@Suppress("UNCHECKED_CAST")
+val locRegisterMpsDocumentationGeneratorTask =
+    extra.properties["algitesRegisterMpsDocumentationGeneratorTask"] as? ((String, String) -> Any)
+        ?: rootProject.extra.properties["algitesRegisterMpsDocumentationGeneratorTask"] as? ((String, String) -> Any)
+        ?: error("Algites MPS manager wrapper did not export algitesRegisterMpsDocumentationGeneratorTask.")
+
+val locMpsArtifactSetProjectsForDocs = AIcReadArtifactSetProjects()
+
+val locMpsProjectMetadataValidationTasks = locMpsArtifactSetProjectsForDocs.map { locArtifactSetProject ->
+    locRegisterMpsProjectMetadataValidationTask(
+        "validateAlgitesMpsProjectMetadata${AIcToGradleTaskNameSuffix(locArtifactSetProject.locRelativePath)}",
+        locArtifactSetProject.locProjectDirectory.absolutePath
+    )
+}
+
+val locMpsDocumentationGeneratorTasks = if (locAlgitesMpsDocumentationGeneratorId.isNullOrBlank()) {
+    emptyList()
+} else {
+    locMpsArtifactSetProjectsForDocs.map { locArtifactSetProject ->
+        locRegisterMpsDocumentationGeneratorTask(
+            "runAlgitesMpsDocumentationGenerator${AIcToGradleTaskNameSuffix(locArtifactSetProject.locRelativePath)}",
+            locArtifactSetProject.locProjectDirectory.absolutePath
+        )
+    }
+}
+
 tasks.register("validateAlgitesConfiguration") {
     group = "algites"
     description = "Validates minimal Algites source repository configuration."
@@ -879,7 +931,7 @@ tasks.register("generateDummyMpsDocs") {
     group = "algites"
     description = "Generates dummy static documentation pages for discovered MPS artifacts."
 
-    dependsOn("validateAlgitesMpsProjectMetadata")
+    dependsOn(locMpsProjectMetadataValidationTasks)
     dependsOn("discoverMpsArtifacts")
     dependsOn("generateAlgitesDocsRootIndex")
 
@@ -902,7 +954,7 @@ tasks.register("generateMpsDocs") {
     if (locAlgitesMpsDocumentationGeneratorId.isNullOrBlank()) {
         dependsOn("generateDummyMpsDocs")
     } else {
-        dependsOn("runAlgitesMpsDocumentationGenerator")
+        dependsOn(locMpsDocumentationGeneratorTasks)
     }
 }
 

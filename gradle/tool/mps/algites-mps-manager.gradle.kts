@@ -26,6 +26,8 @@ fun AIcReadAlgitesMpsEnvironmentVariableName(aPropertyName: String): String {
 
 fun AIcReadAlgitesMpsProperty(aName: String): String? {
     return AIcReadAlgitesMpsStartParameterProperty(aName)
+        ?: extra.properties[aName]?.toString()?.takeIf { locValue -> locValue.isNotBlank() }
+        ?: rootProject.extra.properties[aName]?.toString()?.takeIf { locValue -> locValue.isNotBlank() }
         ?: System.getenv(AIcReadAlgitesMpsEnvironmentVariableName(aName))?.takeIf { locValue -> locValue.isNotBlank() }
 }
 
@@ -64,7 +66,7 @@ fun AIcConvertAlgitesMpsBaselineCodeToVersion(aBaselineCode: String): Pair<Strin
     return "${2000 + locYearPart}.${locReleasePart}" to null
 }
 
-fun AIcResolveAlgitesMpsProjectDirectory(): File {
+fun AIcResolveAlgitesMpsDefaultProjectDirectory(): File {
     val locConfiguredProjectDirectory = AIcReadAlgitesMpsProperty("algites.mps.project.dir")
     return if (locConfiguredProjectDirectory.isNullOrBlank()) {
         gradle.startParameter.currentDir.canonicalFile
@@ -95,76 +97,96 @@ fun AIcResolveAlgitesMpsDownloadUrl(aMpsVersion: String?): String? {
     return locTemplate.replace("{version}", aMpsVersion)
 }
 
-val locAlgitesMpsProjectDirectory = AIcResolveAlgitesMpsProjectDirectory()
-val locAlgitesMpsMigrationFile = File(locAlgitesMpsProjectDirectory, ".mps/migration.xml")
-val locAlgitesMpsCacheDirectory = AIcResolveAlgitesMpsCacheDirectory()
+fun AIcResolveAlgitesMpsProjectMetadataMap(aProjectDirectoryPath: String): Map<String, String> {
+    val locAlgitesMpsProjectDirectory = File(aProjectDirectoryPath).canonicalFile
+    val locAlgitesMpsMigrationFile = File(locAlgitesMpsProjectDirectory, ".mps/migration.xml")
+    val locAlgitesMpsCacheDirectory = AIcResolveAlgitesMpsCacheDirectory()
 
-var locAlgitesMpsBaselineCode: String? = null
-var locAlgitesMpsMigratedCode: String? = null
-var locAlgitesMpsEffectiveBaselineCode: String? = null
-var locAlgitesMpsEffectiveVersion: String? = null
-var locAlgitesMpsEffectiveVersionSource: String? = null
-var locAlgitesMpsMetadataError: String? = null
-var locAlgitesMpsBaselineValues = emptyList<String>()
-var locAlgitesMpsMigratedValues = emptyList<String>()
+    var locAlgitesMpsBaselineCode: String? = null
+    var locAlgitesMpsMigratedCode: String? = null
+    var locAlgitesMpsEffectiveBaselineCode: String? = null
+    var locAlgitesMpsEffectiveVersion: String? = null
+    var locAlgitesMpsEffectiveVersionSource: String? = null
+    var locAlgitesMpsMetadataError: String? = null
+    var locAlgitesMpsBaselineValues = emptyList<String>()
+    var locAlgitesMpsMigratedValues = emptyList<String>()
 
-if (!locAlgitesMpsMigrationFile.isFile) {
-    locAlgitesMpsMetadataError = "MPS migration metadata file not found: ${locAlgitesMpsMigrationFile.absolutePath}"
-} else {
-    val locMigrationXmlText = locAlgitesMpsMigrationFile.readText(Charsets.UTF_8)
-    locAlgitesMpsBaselineValues = AIcReadAlgitesMpsXmlEntryValues(locMigrationXmlText, "project.baseline.version")
-    locAlgitesMpsMigratedValues = AIcReadAlgitesMpsXmlEntryValues(locMigrationXmlText, "project.migrated.version")
+    if (!locAlgitesMpsMigrationFile.isFile) {
+        locAlgitesMpsMetadataError = "MPS migration metadata file not found: ${locAlgitesMpsMigrationFile.absolutePath}"
+    } else {
+        val locMigrationXmlText = locAlgitesMpsMigrationFile.readText(Charsets.UTF_8)
+        locAlgitesMpsBaselineValues = AIcReadAlgitesMpsXmlEntryValues(locMigrationXmlText, "project.baseline.version")
+        locAlgitesMpsMigratedValues = AIcReadAlgitesMpsXmlEntryValues(locMigrationXmlText, "project.migrated.version")
 
-    val (locResolvedMigratedCode, locMigratedError) = AIcReadAlgitesMpsUniqueVersionCode(
-        locAlgitesMpsMigratedValues,
-        "project.migrated.version"
-    )
-    val (locResolvedBaselineCode, locBaselineError) = AIcReadAlgitesMpsUniqueVersionCode(
-        locAlgitesMpsBaselineValues,
-        "project.baseline.version"
-    )
-
-    locAlgitesMpsMigratedCode = locResolvedMigratedCode
-    locAlgitesMpsBaselineCode = locResolvedBaselineCode
-    locAlgitesMpsMetadataError = locMigratedError ?: locBaselineError
-
-    if (locAlgitesMpsMetadataError == null) {
-        locAlgitesMpsEffectiveBaselineCode = locResolvedMigratedCode ?: locResolvedBaselineCode
-        locAlgitesMpsEffectiveVersionSource = if (locResolvedMigratedCode != null) {
+        val (locResolvedMigratedCode, locMigratedError) = AIcReadAlgitesMpsUniqueVersionCode(
+            locAlgitesMpsMigratedValues,
             "project.migrated.version"
-        } else if (locResolvedBaselineCode != null) {
+        )
+        val (locResolvedBaselineCode, locBaselineError) = AIcReadAlgitesMpsUniqueVersionCode(
+            locAlgitesMpsBaselineValues,
             "project.baseline.version"
-        } else {
-            null
-        }
+        )
 
-        if (locAlgitesMpsEffectiveBaselineCode == null) {
-            locAlgitesMpsMetadataError = "Neither project.migrated.version nor project.baseline.version found in ${locAlgitesMpsMigrationFile.absolutePath}"
-        } else {
-            val (locConvertedMpsVersion, locConversionError) = AIcConvertAlgitesMpsBaselineCodeToVersion(
-                locAlgitesMpsEffectiveBaselineCode!!
-            )
-            locAlgitesMpsEffectiveVersion = locConvertedMpsVersion
-            locAlgitesMpsMetadataError = locConversionError
+        locAlgitesMpsMigratedCode = locResolvedMigratedCode
+        locAlgitesMpsBaselineCode = locResolvedBaselineCode
+        locAlgitesMpsMetadataError = locMigratedError ?: locBaselineError
+
+        if (locAlgitesMpsMetadataError == null) {
+            locAlgitesMpsEffectiveBaselineCode = locResolvedMigratedCode ?: locResolvedBaselineCode
+            locAlgitesMpsEffectiveVersionSource = if (locResolvedMigratedCode != null) {
+                "project.migrated.version"
+            } else if (locResolvedBaselineCode != null) {
+                "project.baseline.version"
+            } else {
+                null
+            }
+
+            if (locAlgitesMpsEffectiveBaselineCode == null) {
+                locAlgitesMpsMetadataError = "Neither project.migrated.version nor project.baseline.version found in ${locAlgitesMpsMigrationFile.absolutePath}"
+            } else {
+                val (locConvertedMpsVersion, locConversionError) = AIcConvertAlgitesMpsBaselineCodeToVersion(
+                    locAlgitesMpsEffectiveBaselineCode!!
+                )
+                locAlgitesMpsEffectiveVersion = locConvertedMpsVersion
+                locAlgitesMpsMetadataError = locConversionError
+            }
         }
     }
+
+    val locAlgitesMpsManagedRootDirectory = locAlgitesMpsEffectiveVersion
+        ?.let { locMpsVersion -> File(locAlgitesMpsCacheDirectory, locMpsVersion).canonicalFile }
+    val locAlgitesMpsDownloadUrl = AIcResolveAlgitesMpsDownloadUrl(locAlgitesMpsEffectiveVersion)
+
+    return linkedMapOf(
+        "algitesMpsProjectDirectory" to locAlgitesMpsProjectDirectory.absolutePath,
+        "algitesMpsMigrationFile" to locAlgitesMpsMigrationFile.absolutePath,
+        "algitesMpsMigrationFilePresent" to locAlgitesMpsMigrationFile.isFile.toString(),
+        "algitesMpsBaselineVersionValues" to locAlgitesMpsBaselineValues.joinToString(","),
+        "algitesMpsMigratedVersionValues" to locAlgitesMpsMigratedValues.joinToString(","),
+        "algitesMpsBaselineVersionCode" to (locAlgitesMpsBaselineCode ?: ""),
+        "algitesMpsMigratedVersionCode" to (locAlgitesMpsMigratedCode ?: ""),
+        "algitesMpsEffectiveBaselineCode" to (locAlgitesMpsEffectiveBaselineCode ?: ""),
+        "algitesMpsEffectiveVersion" to (locAlgitesMpsEffectiveVersion ?: ""),
+        "algitesMpsEffectiveVersionSource" to (locAlgitesMpsEffectiveVersionSource ?: ""),
+        "algitesMpsMetadataError" to (locAlgitesMpsMetadataError ?: ""),
+        "algitesMpsCacheDirectory" to locAlgitesMpsCacheDirectory.absolutePath,
+        "algitesMpsManagedRootDirectory" to (locAlgitesMpsManagedRootDirectory?.absolutePath ?: ""),
+        "algitesMpsDownloadUrl" to (locAlgitesMpsDownloadUrl ?: "")
+    )
 }
 
-val locAlgitesMpsManagedRootDirectory = locAlgitesMpsEffectiveVersion
-    ?.let { locMpsVersion -> File(locAlgitesMpsCacheDirectory, locMpsVersion).canonicalFile }
-val locAlgitesMpsDownloadUrl = AIcResolveAlgitesMpsDownloadUrl(locAlgitesMpsEffectiveVersion)
+val locAlgitesMpsDefaultProjectMetadata = AIcResolveAlgitesMpsProjectMetadataMap(
+    AIcResolveAlgitesMpsDefaultProjectDirectory().absolutePath
+)
 
-extra["algitesMpsProjectDirectory"] = locAlgitesMpsProjectDirectory.absolutePath
-extra["algitesMpsMigrationFile"] = locAlgitesMpsMigrationFile.absolutePath
-extra["algitesMpsMigrationFilePresent"] = locAlgitesMpsMigrationFile.isFile.toString()
-extra["algitesMpsBaselineVersionValues"] = locAlgitesMpsBaselineValues.joinToString(",")
-extra["algitesMpsMigratedVersionValues"] = locAlgitesMpsMigratedValues.joinToString(",")
-extra["algitesMpsBaselineVersionCode"] = locAlgitesMpsBaselineCode ?: ""
-extra["algitesMpsMigratedVersionCode"] = locAlgitesMpsMigratedCode ?: ""
-extra["algitesMpsEffectiveBaselineCode"] = locAlgitesMpsEffectiveBaselineCode ?: ""
-extra["algitesMpsEffectiveVersion"] = locAlgitesMpsEffectiveVersion ?: ""
-extra["algitesMpsEffectiveVersionSource"] = locAlgitesMpsEffectiveVersionSource ?: ""
-extra["algitesMpsMetadataError"] = locAlgitesMpsMetadataError ?: ""
-extra["algitesMpsCacheDirectory"] = locAlgitesMpsCacheDirectory.absolutePath
-extra["algitesMpsManagedRootDirectory"] = locAlgitesMpsManagedRootDirectory?.absolutePath ?: ""
-extra["algitesMpsDownloadUrl"] = locAlgitesMpsDownloadUrl ?: ""
+locAlgitesMpsDefaultProjectMetadata.forEach { (locKey, locValue) ->
+    extra[locKey] = locValue
+    rootProject.extra[locKey] = locValue
+}
+
+val locAlgitesResolveMpsProjectMetadataMapFunction = fun(aProjectDirectoryPath: String): Map<String, String> {
+    return AIcResolveAlgitesMpsProjectMetadataMap(aProjectDirectoryPath)
+}
+
+extra["algitesResolveMpsProjectMetadataMap"] = locAlgitesResolveMpsProjectMetadataMapFunction
+rootProject.extra["algitesResolveMpsProjectMetadataMap"] = locAlgitesResolveMpsProjectMetadataMapFunction
