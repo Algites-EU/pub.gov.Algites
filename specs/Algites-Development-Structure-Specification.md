@@ -309,25 +309,35 @@ This standard defines only the logical directory structure of generated document
 
 #### 2.10.2 Canonical Form
 
-Generated documentation for an artifact SHOULD use the following structure:
+Generated documentation for an artifact SHOULD use the following canonical structure:
 
 ```text
-<docs-site-root>/generated/<module.path>/<documentation-channel>/
+<docs-site-root>/generated/artifacts/<module.local.id>/<documentation-channel>/
+```
+which contains the index.html generated specifically for every given artifact 
+and the documentations like javadoc or mpsdoc are placed into the given folder, what allows
+to integrate multiple documentation informations for every given version of the given artifact.
+
+Also there is generated an additonal index with following publication agnostic generated path structure:
+
+```text
+<docs-site-root>/generated/publications/<documentation-channel>/index.html
 ```
 
-Where:
+Meaning of the fields is:
 
 - `<docs-site-root>` is the repository-local root directory for generated documentation site content,
 - `generated` is the root of generated documentation, which can be potentially removed and regenerated without impacting the manually created documentation. This folder should never contain manually created documentation.
-- `<module.path>` is the same module path used in the artifactId after the mandatory `_` repository separator,
-- `<documentation-channel>` identifies the published documentation view.
+- `<module.local.id>` is the same module id used in the artifactId or artifactSetId after the mandatory `_` repository separator,
+- `<documentation-channel>` identifies the published documentation view. it consists from <publication-kind>/<publication-id>
+- `<docs-site-root>/generated/publications/<documentation-channel>/index.html` - contains the index generated dynamically to point the unique page in the canonical structure
 
 Recommended documentation channels are:
 
 ```text
-latest/
-snapshots/<snapshot-id>/
-releases/<version>/
+preview/<branch-name>/
+snapshots/<snapshot-version>/
+releases/<release-version>/
 ```
 
 #### 2.10.3 Examples
@@ -341,8 +351,8 @@ pub.lib.Mps
 and artifacts:
 
 ```text
-pub.lib.Mps_lang.common.base
-pub.lib.Mps_sol.common.base
+pub.lib.Mps_common.base.mpslang
+pub.lib.Mps_common.base.mpssol
 ```
 
 the generated documentation may be placed as:
@@ -350,27 +360,35 @@ the generated documentation may be placed as:
 ```text
 docs-site/
   generated/
-    lang.common.base/
-      latest/
-      snapshots/main/
-      releases/0.1.0/
+    artifacts/
+      lang.common.base/
+        preview/main/
+        snapshots/0.2.0-SNAPSHOT
+        releases/0.1.0/
 
-    sol.common.base/
-      latest/
-      snapshots/main/
-      releases/0.1.0/
+      sol.common.base/
+        preview/main/
+        snapshots/0.2.0-SNAPSHOT/
+        releases/0.1.0/
+    publications/
+      preview/
+        main/index.html
+      snapshots/
+        0.2.0-SNAPSHOT/index.html
+      releases/
+        0.1.0/index.html
 ```
 
 For repository:
 
 ```text
-pub.tool.Java
+pub.lib.Java
 ```
 
 and artifact:
 
 ```text
-pub.tool.Java_build.parent
+pub.lib.Java_build.parent
 ```
 
 the generated documentation may be placed as:
@@ -378,9 +396,15 @@ the generated documentation may be placed as:
 ```text
 docs-site/
   generated/
-    build.parent/
-      latest/
-      releases/1.4.0/
+    artifacts/
+      build.parent/
+        preview/branch_name/
+        snapshots/1.5.0-SNAPSHOT/
+        releases/1.4.0/
+    publications/
+      preview/branch_name/index.html
+      snapshots/1.5.0-SNAPSHOT/index.html
+      releases/1.4.0/index.html
 ```
 
 #### 2.10.4 Repository Prefix Rule
@@ -390,26 +414,26 @@ The repository identity prefix MUST NOT be repeated in the documentation path wh
 Therefore, this is preferred:
 
 ```text
-docs-site/generated/lang.common.base/latest/
+docs-site/generated/artifacts/common.base.mpslang/
 ```
 
 over:
 
 ```text
-docs-site/generated/pub.lib.Mps_lang.common.base/latest/
+docs-site/generated/artifacts/pub.lib.Mps_common.base.mpslang/
 ```
 
 The full artifactId remains available as metadata inside the generated documentation.
 
 #### 2.10.5 Module Path Reuse
 
-The documentation path SHOULD reuse `<module.path>` rather than inventing a separate documentation identifier.
+The documentation path SHOULD reuse `<module.local.id>` whcih is derived from the local artifact path in the repository rather than inventing a separate documentation identifier.
 
 This keeps the relationship between repository structure, artifact identity, and generated documentation deterministic:
 
 ```text
-artifactId = <repository-id>_<module.path>
-docs path  = <docs-site-root>/<module.path>/
+artifactId = <repository-id>_<module.local.id>
+docs path  = <docs-site-root>/<module.local.id>/
 ```
 
 #### 2.10.6 Artifact Kind Disambiguation
@@ -419,8 +443,8 @@ If multiple artifacts in the same repository would otherwise have the same logic
 For example, MPS language and solution artifacts may use:
 
 ```text
-lang.common.base
-sol.common.base
+common.base.mpslang
+common.base.mpssol
 ```
 
 instead of both using:
@@ -438,9 +462,10 @@ A documentation site MAY generate repository-level index pages listing all docum
 Such index pages SHOULD display human-readable module names and MAY omit redundant repository identity from visible labels, while still preserving full artifact coordinates in metadata.
 
 Example display label:
- `lang.common.base ` 
+ `common.base.mpslang ` 
 with metadata:
- `artifactId = pub.lib.Mps_lang.common.base groupId    = <derived-groupId> `
+ `artifactId = pub.lib.Mps_common.base.mpslang 
+ groupId    = <derived-groupId> `
 where:
 - `<derived-groupId>` is the groupId derived according to section 2.5 using the repository naming rules and the applicable domain prefix.
 
