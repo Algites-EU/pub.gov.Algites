@@ -733,7 +733,8 @@ def loc_relative_href(base_directory, target_directory):
         return 'index.html'
     return loc_relative_path + '/index.html'
 
-loc_current_publication_href = loc_relative_href(loc_generated_docs_root, loc_current_publication_directory)
+loc_artifacts_href = 'artifacts/index.html'
+loc_publications_href = 'publications/index.html'
 loc_description_html = ''
 if loc_repository_description:
     loc_description_html = '<p>' + html.escape(loc_repository_description, quote=True) + '</p>'
@@ -782,28 +783,13 @@ loc_index_file.write_text(f'''<!doctype html>
       box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
     }}
 
-    .nav-list {{
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.75rem;
-      padding: 0;
-      list-style: none;
-    }}
-
-    .nav-list a {{
-      display: inline-block;
-      padding: 0.5rem 0.75rem;
-      border: 1px solid #d1d5db;
-      border-radius: 0.5rem;
-      background: #f9fafb;
-    }}
-
     iframe {{
       width: 100%;
-      min-height: 70vh;
+      min-height: 45vh;
       border: 1px solid #e5e7eb;
       border-radius: 0.75rem;
       background: white;
+      margin-bottom: 1.5rem;
     }}
 
     a {{
@@ -820,24 +806,27 @@ loc_index_file.write_text(f'''<!doctype html>
 
   <main>
     <section class="card">
-      <h2>Documentation sections</h2>
-      <ul class="nav-list">
-        <li><a href="publications/preview/index.html">Preview</a></li>
-        <li><a href="publications/snapshot/index.html">Snapshot</a></li>
-        <li><a href="publications/release/index.html">Release</a></li>
-      </ul>
-    </section>
-
-    <section class="card">
-      <h2>Current generated documentation</h2>
+      <h2>Artifacts</h2>
       <p>
-        Current publication: <strong>{html.escape(loc_publication_label, quote=True)}</strong>.
-        Open it directly here:
-        <a href="{html.escape(loc_current_publication_href, quote=True)}">{html.escape(loc_current_publication_href, quote=True)}</a>.
+        Canonical documentation pages are organized by artifact.
+        Open the artifact index directly here:
+        <a href="{html.escape(loc_artifacts_href, quote=True)}">{html.escape(loc_artifacts_href, quote=True)}</a>.
       </p>
     </section>
 
-    <iframe src="{html.escape(loc_current_publication_href, quote=True)}" title="Current generated artifact documentation"></iframe>
+    <iframe src="{html.escape(loc_artifacts_href, quote=True)}" title="Generated artifact documentation"></iframe>
+
+    <section class="card">
+      <h2>Publications / versions</h2>
+      <p>
+        Publication indexes group artifacts by publication context, such as preview branch, snapshot, or release version.
+        Open the publication index directly here:
+        <a href="{html.escape(loc_publications_href, quote=True)}">{html.escape(loc_publications_href, quote=True)}</a>.
+      </p>
+      <p class="muted">Current publication: <strong>{html.escape(loc_publication_label, quote=True)}</strong>.</p>
+    </section>
+
+    <iframe src="{html.escape(loc_publications_href, quote=True)}" title="Generated publication documentation"></iframe>
 
     <p><a href="../index.html">Repository documentation root</a></p>
   </main>
@@ -1072,16 +1061,17 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
             ?: emptyList()
 
         locArtifactPublications.forEach { locArtifactPublication ->
+            val locArtifactGroupId = locArtifactPublication.locMetadata["groupId"]
+            val locFullArtifactId = locArtifactPublication.locMetadata["artifactId"]
+                ?: "${locRepositoryId}_${locArtifactPublication.locLocalArtifactId}"
+
             val locMetadataRows = listOf(
-                "Repository ID" to locRepositoryId,
-                "Repository name" to locRepositoryName,
                 "Local artifact ID" to locArtifactPublication.locLocalArtifactId,
                 "Publication kind" to locArtifactPublication.locPublicationKind,
                 "Publication ID" to locArtifactPublication.locPublicationId,
                 "Artifact path" to locArtifactPublication.locMetadata["path"],
                 "Artifact name" to locArtifactPublication.locMetadata["name"],
                 "Description" to locArtifactPublication.locMetadata["description"],
-                "Group ID" to locArtifactPublication.locMetadata["groupId"],
                 "Kind" to locArtifactPublication.locMetadata["kind"],
                 "Type" to locArtifactPublication.locMetadata["type"],
                 "Contents model" to locArtifactPublication.locMetadata["contentsModel"],
@@ -1114,6 +1104,14 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                 """
                 <h1>${locEscape(locArtifactPublication.locLocalArtifactId)}</h1>
                 <p class="muted">Artifact publication: <code>${locEscape(locArtifactPublication.locPublicationKind)}/${locEscape(locArtifactPublication.locPublicationId)}</code></p>
+
+                <section class="card">
+                  <h2>Artifact coordinates</h2>
+                  <dl>
+                    <dt>Group ID</dt><dd><strong><code>${locEscape(locArtifactGroupId ?: "not specified")}</code></strong></dd>
+                    <dt>Artifact ID</dt><dd><strong><code>${locEscape(locFullArtifactId)}</code></strong></dd>
+                  </dl>
+                </section>
 
                 <section class="card">
                   <h2>Artifact metadata</h2>
