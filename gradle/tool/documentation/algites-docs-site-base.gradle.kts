@@ -960,6 +960,16 @@ loc_write_publication_group_index(loc_generated_docs_root / 'release', 'release'
 }
 
 
+class AIcAlgitesDocsArtifactPublicationEntry(
+    val locLocalArtifactId: String,
+    val locPublicationKind: String,
+    val locPublicationId: String,
+    val locArtifactPublicationDirectory: File,
+    val locDocumentationDirectories: List<File>,
+    val locMetadata: Map<String, String?>
+) : java.io.Serializable
+
+
 if (tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes") == null) {
     tasks.register("generateAlgitesDocsArtifactPublicationIndexes") {
         group = "algites"
@@ -1083,14 +1093,6 @@ if (tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes") == null) {
                 } ?: emptyMap()
             }
 
-            data class LocalArtifactPublication(
-                val locLocalArtifactId: String,
-                val locPublicationKind: String,
-                val locPublicationId: String,
-                val locArtifactPublicationDirectory: File,
-                val locDocumentationDirectories: List<File>,
-                val locMetadata: Map<String, String?>
-            )
 
             val locArtifactPublications = locArtifactsRootFile
                 .listFiles()
@@ -1107,7 +1109,7 @@ if (tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes") == null) {
                                 ?.filter { locFile -> locFile.isDirectory }
                                 ?.map { locPublicationIdDirectory ->
                                     val locPublicationId = locPublicationIdDirectory.name
-                                    LocalArtifactPublication(
+                                    AIcAlgitesDocsArtifactPublicationEntry(
                                         locLocalArtifactId = locLocalArtifactId,
                                         locPublicationKind = locPublicationKind,
                                         locPublicationId = locPublicationId,
@@ -1125,7 +1127,7 @@ if (tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes") == null) {
                         ?: emptyList()
                 }
                 ?.sortedWith(
-                    compareBy<LocalArtifactPublication> { it.locLocalArtifactId.lowercase() }
+                    compareBy<AIcAlgitesDocsArtifactPublicationEntry> { it.locLocalArtifactId.lowercase() }
                         .thenBy { it.locPublicationKind.lowercase() }
                         .thenBy { it.locPublicationId.lowercase() }
                 )
@@ -1223,7 +1225,7 @@ if (tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes") == null) {
             locArtifactIds.forEach { locArtifactId ->
                 val locEntries = locArtifactPublications
                     .filter { locArtifactPublication -> locArtifactPublication.locLocalArtifactId == locArtifactId }
-                    .sortedWith(compareBy<LocalArtifactPublication> { it.locPublicationKind.lowercase() }.thenBy { it.locPublicationId.lowercase() })
+                    .sortedWith(compareBy<AIcAlgitesDocsArtifactPublicationEntry> { it.locPublicationKind.lowercase() }.thenBy { it.locPublicationId.lowercase() })
 
                 val locEntriesHtml = "<ul>\n" + locEntries.joinToString("\n") { locArtifactPublication ->
                     """<li><a href="${locEscape(locArtifactPublication.locPublicationKind)}/${locEscape(locArtifactPublication.locPublicationId)}/index.html">${locEscape(locArtifactPublication.locPublicationKind)}/${locEscape(locArtifactPublication.locPublicationId)}</a></li>"""
