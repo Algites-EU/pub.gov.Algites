@@ -220,10 +220,24 @@ tasks.register("runAlgitesMpsDocumentationGenerator") {
         logger.lifecycle(" - MPS home: ${locMpsHome.absolutePath}")
         logger.lifecycle(" - command: ${locGeneratorCommand}")
 
-        project.exec {
-            workingDir = rootProject.projectDir
-            environment("MPS_HOME", locMpsHome.absolutePath)
-            commandLine(locGeneratorCommand.split(Regex("\\s+")))
+        val locGeneratorCommandParts = locGeneratorCommand
+            .split(Regex("\\s+"))
+            .filter { it.isNotBlank() }
+
+        require(locGeneratorCommandParts.isNotEmpty()) {
+            "MPS documentation generator '${locGeneratorId}' has an empty command."
+        }
+
+        val locProcessBuilder = ProcessBuilder(locGeneratorCommandParts)
+        locProcessBuilder.directory(rootProject.projectDir)
+        locProcessBuilder.environment()["MPS_HOME"] = locMpsHome.absolutePath
+        locProcessBuilder.inheritIO()
+
+        val locProcess = locProcessBuilder.start()
+        val locExitCode = locProcess.waitFor()
+
+        require(locExitCode == 0) {
+            "MPS documentation generator '${locGeneratorId}' failed with exit code ${locExitCode}."
         }
     }
 }
