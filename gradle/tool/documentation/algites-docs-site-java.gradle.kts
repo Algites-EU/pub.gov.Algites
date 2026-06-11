@@ -9,20 +9,21 @@
  */
 
 import org.gradle.api.Action
+import org.gradle.api.Project
 import org.gradle.api.Task
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 
 data class AIcJavaDocsSiteEntry(
     val locModulePath: String,
-    val locJavadocOutputDirectory: File
+    val locJavadocOutputDirectory: File,
+    val locArtifactPublicationDirectory: File,
+    val locArtifactMetadata: Map<String, String>
 ) : java.io.Serializable
 
 class AIcGenerateJavaDocsSiteAction(
     private val locRepositoryId: String,
-    private val locGeneratedDocsRootFile: File,
-    private val locPublicationKind: String,
-    private val locPublicationId: String,
+    private val locArtifactDocsRootFile: File,
     private val locJavaDocsSiteEntries: List<AIcJavaDocsSiteEntry>
 ) : Action<Task>, java.io.Serializable {
 
@@ -34,43 +35,37 @@ class AIcGenerateJavaDocsSiteAction(
                 return@mapNotNull null
             }
 
-            val locTargetDirectory = File(locGeneratedDocsRootFile, "artifacts/${locEntry.locModulePath}/${locPublicationKind}/${locPublicationId}/javadoc")
+            val locArtifactPublicationDirectory = locEntry.locArtifactPublicationDirectory
+            val locTargetDirectory = File(locArtifactPublicationDirectory, "javadoc")
 
             locTargetDirectory.deleteRecursively()
             locJavadocOutputDirectory.copyRecursively(locTargetDirectory, overwrite = true)
 
+            AIcWriteArtifactMetadataSidecar(locArtifactPublicationDirectory, locEntry.locArtifactMetadata)
+
             locEntry.locModulePath
         }.sorted()
 
-        val locIndexFile = File(locGeneratedDocsRootFile, "index.html")
-        locIndexFile.parentFile.mkdirs()
-        locIndexFile.writeText(
-            """
-            <!doctype html>
-            <html lang="en">
-            <head>
-              <meta charset="utf-8">
-              <title>Generated ${locRepositoryId} Java Documentation</title>
-            </head>
-            <body>
-              <main>
-                <h1>Generated ${locRepositoryId} Java Documentation</h1>
-                <ul>
-            ${
-                locDocumentedProjects.joinToString("\n") { locModulePath ->
-                    "      <li><a href=\"artifacts/${locModulePath}/${locPublicationKind}/${locPublicationId}/index.html\">${locModulePath}</a></li>"
-                }
-            }
-                </ul>
-              </main>
-            </body>
-            </html>
-            """.trimIndent(),
-            Charsets.UTF_8
-        )
-
-        aTask.logger.lifecycle("Java documentation generated at: ${locGeneratedDocsRootFile.absolutePath}")
+        aTask.logger.lifecycle("Java documentation generated at: ${locArtifactDocsRootFile.absolutePath}")
         aTask.logger.lifecycle("Documented Java artifact(s): ${locDocumentedProjects.size}")
+    }
+
+    private fun AIcWriteArtifactMetadataSidecar(
+        aArtifactPublicationDirectory: File,
+        aArtifactMetadata: Map<String, String>
+    ) {
+        aArtifactPublicationDirectory.mkdirs()
+
+        aArtifactPublicationDirectory
+            .resolve(".algites-artifact-docs.properties")
+            .writeText(
+                aArtifactMetadata.entries
+                    .sortedBy { it.key }
+                    .joinToString(System.lineSeparator()) { locEntry ->
+                        "${locEntry.key}=${locEntry.value.replace(System.lineSeparator(), " ")}"
+                    } + System.lineSeparator(),
+                Charsets.UTF_8
+            )
     }
 }
 
@@ -79,22 +74,68 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 
 apply(from = uri(locAlgitesDocsBaseScript))
 
-val locGeneratedDocsRoot = layout.projectDirectory.dir(
-    (extra.properties["algitesGeneratedDocsRootPath"] as String?)
-        ?: (findProperty("algites.docs.generatedRoot") as String?)
-        ?: "docs-site/generated"
+val locArtifactDocsRoot = layout.projectDirectory.dir(
+    (extra.properties["algitesArtifactDocsRootPath"] as String?)
+        ?: (findProperty("algites.docs.artifactRoot") as String?)
+        ?: "docs-site/generated/artifacts"
 )
-val locGeneratedDocsRootFile = locGeneratedDocsRoot.asFile
-val locJavaDocsPublicationKind = (extra.properties["algitesDocsPublicationKind"] as String?) ?: "preview"
-val locJavaDocsPublicationId = (extra.properties["algitesDocsPublicationId"] as String?) ?: "main"
-val locJavaDocsRepositoryId = (extra.properties["algitesDocsResolvedRepositoryName"] as String?) ?: rootProject.name
+val locArtifactDocsRootFile = locArtifactDocsRoot.asFile
+val locPublicationKind = (extra.properties["algitesDocsPublicationKind"] as String?) ?: "generated"
+val locPublicationId = (extra.properties["algitesDocsPublicationId"] as String?) ?: "current"
+val locJavaDocsRepositoryId = (extra.properties["algitesDocsResolvedRepositoryId"] as String?) ?: rootProject.name
 
-fun AIcReadRepositoryId(): String {
-    return locJavaDocsRepositoryId
-}
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsResolvedArtifactDirectories =
+    (extra.properties["algitesDocsResolvedArtifactDirectories"] as? List<Map<String, String?>>)
+        ?: (rootProject.extra.properties["algitesDocsResolvedArtifactDirectories"] as? List<Map<String, String?>>)
+        ?: emptyList()
 
 fun Project.AIcResolveJavaModulePath(): String {
     return path.removePrefix(":").replace(":", ".")
+}
+
+fun Project.AIcResolveSourceRelativePath(): String {
+    return rootProject.projectDir.toPath()
+        .relativize(projectDir.toPath())
+        .toString()
+        .replace(File.separatorChar, '/')
+}
+
+fun AIcFindJavaArtifactMetadata(aSubproject: Project, aModulePath: String): Map<String, String?> {
+    val locProjectPath = aSubproject.path
+    val locSourceRelativePath = aSubproject.AIcResolveSourceRelativePath()
+
+    return locAlgitesDocsResolvedArtifactDirectories.firstOrNull { locArtifactDirectory ->
+        locArtifactDirectory["gradleProjectPath"] == locProjectPath ||
+            locArtifactDirectory["path"] == locSourceRelativePath ||
+            locArtifactDirectory["path"]?.replace('/', '.') == aModulePath
+    } ?: emptyMap()
+}
+
+fun AIcBuildJavaArtifactMetadata(
+    aSubproject: Project,
+    aModulePath: String
+): Map<String, String> {
+    val locResolvedMetadata = AIcFindJavaArtifactMetadata(aSubproject, aModulePath)
+    val locArtifactId = "${locJavaDocsRepositoryId}_${aModulePath}"
+
+    return mapOf(
+        "localArtifactId" to aModulePath,
+        "artifactId" to locArtifactId,
+        "groupId" to (locResolvedMetadata["groupId"] ?: ""),
+        "path" to (locResolvedMetadata["path"] ?: aSubproject.AIcResolveSourceRelativePath()),
+        "name" to (locResolvedMetadata["name"] ?: aModulePath),
+        "description" to (locResolvedMetadata["description"] ?: ""),
+        "kind" to (locResolvedMetadata["kind"] ?: "artifact"),
+        "type" to (locResolvedMetadata["type"] ?: "java"),
+        "contentsModel" to (locResolvedMetadata["contentsModel"] ?: ""),
+        "gradleProjectPath" to (locResolvedMetadata["gradleProjectPath"] ?: aSubproject.path),
+        "version.resolvedValue" to (locResolvedMetadata["version.resolvedValue"] ?: ""),
+        "version.lane" to (locResolvedMetadata["version.lane"] ?: ""),
+        "version.revision" to (locResolvedMetadata["version.revision"] ?: ""),
+        "version.qualifierKind" to (locResolvedMetadata["version.qualifierKind"] ?: ""),
+        "version.qualifierLabel" to (locResolvedMetadata["version.qualifierLabel"] ?: "")
+    )
 }
 
 val locJavaDocsSiteEntries = mutableListOf<AIcJavaDocsSiteEntry>()
@@ -105,14 +146,12 @@ val locGenerateJavaDocsSite = tasks.register("generateJavaDocsSite") {
 
     dependsOn("generateAlgitesDocsRootIndex")
 
-    outputs.dir(locGeneratedDocsRootFile)
+    outputs.dir(locArtifactDocsRootFile)
 
     doLast(
         AIcGenerateJavaDocsSiteAction(
             locJavaDocsRepositoryId,
-            locGeneratedDocsRootFile,
-            locJavaDocsPublicationKind,
-            locJavaDocsPublicationId,
+            locArtifactDocsRootFile,
             locJavaDocsSiteEntries
         )
     )
@@ -136,10 +175,18 @@ subprojects.forEach { locSubproject ->
             }
 
             val locJavadocOutputDirectory = destinationDir ?: return@configure
+            val locModulePath = locSubproject.AIcResolveJavaModulePath()
+            val locArtifactPublicationDirectory = File(
+                locArtifactDocsRootFile,
+                "${locModulePath}/${locPublicationKind}/${locPublicationId}"
+            )
+
             locJavaDocsSiteEntries.add(
                 AIcJavaDocsSiteEntry(
-                    locModulePath = locSubproject.AIcResolveJavaModulePath(),
-                    locJavadocOutputDirectory = locJavadocOutputDirectory
+                    locModulePath = locModulePath,
+                    locJavadocOutputDirectory = locJavadocOutputDirectory,
+                    locArtifactPublicationDirectory = locArtifactPublicationDirectory,
+                    locArtifactMetadata = AIcBuildJavaArtifactMetadata(locSubproject, locModulePath)
                 )
             )
         }
@@ -149,4 +196,3 @@ subprojects.forEach { locSubproject ->
 tasks.named("generateAlgitesDocsSite") {
     dependsOn(locGenerateJavaDocsSite)
 }
-
