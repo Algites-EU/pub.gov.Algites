@@ -392,13 +392,21 @@ class AIcGenerateAlgitesDocsRootIndexAction(
 
                 .artifact-publication-grid {
                   display: grid;
-                  grid-template-columns: minmax(22rem, 1.05fr) minmax(26rem, 1.35fr);
+                  grid-template-columns: minmax(26rem, 1.6fr) minmax(18rem, 0.9fr);
                   gap: 0.75rem;
                   align-items: start;
                 }
 
-                .artifact-publication-grid .card:nth-child(3) {
-                  grid-column: 1;
+                .artifact-primary-column,
+                .artifact-metadata-column {
+                  display: flex;
+                  flex-direction: column;
+                  gap: 0.65rem;
+                }
+
+                .artifact-primary-column .card,
+                .artifact-metadata-column .card {
+                  margin: 0;
                 }
 
                 .card-strong {
@@ -410,7 +418,7 @@ class AIcGenerateAlgitesDocsRootIndexAction(
                 }
 
                 .compact-dl {
-                  grid-template-columns: minmax(9rem, 13rem) 1fr;
+                  grid-template-columns: minmax(8rem, 11rem) 1fr;
                 }
 
                 .back-links {
@@ -423,10 +431,6 @@ class AIcGenerateAlgitesDocsRootIndexAction(
                 @media (max-width: 820px) {
                   .artifact-publication-grid {
                     grid-template-columns: 1fr;
-                  }
-
-                  .artifact-publication-grid .card:nth-child(3) {
-                    grid-column: auto;
                   }
                 }
               </style>
@@ -1123,6 +1127,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
             val locArtifactGroupId = locArtifactPublication.locMetadata["groupId"]
             val locFullArtifactId = locArtifactPublication.locMetadata["artifactId"]
                 ?: "${locRepositoryId}_${locArtifactPublication.locLocalArtifactId}"
+            val locResolvedArtifactVersion = locArtifactPublication.locMetadata["version.resolvedValue"]
 
             val locMetadataRows = listOf(
                 "Local artifact ID" to locArtifactPublication.locLocalArtifactId,
@@ -1167,25 +1172,30 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                 <p class="muted compact-lead">Artifact publication: <code>${locEscape(locArtifactPublication.locPublicationKind)}/${locEscape(locArtifactPublication.locPublicationId)}</code></p>
 
                 <div class="artifact-publication-grid">
-                  <section class="card card-strong">
-                    <h2>Artifact coordinates</h2>
-                    <dl class="coordinates">
-                      <dt>Group ID</dt><dd><strong><code>${locEscape(locArtifactGroupId ?: "not specified")}</code></strong></dd>
-                      <dt>Artifact ID</dt><dd><strong><code>${locEscape(locFullArtifactId)}</code></strong></dd>
-                    </dl>
-                  </section>
+                  <div class="artifact-primary-column">
+                    <section class="card card-strong">
+                      <h2>Artifact coordinates</h2>
+                      <dl class="coordinates">
+                        <dt>Group ID</dt><dd><strong><code>${locEscape(locArtifactGroupId ?: "not specified")}</code></strong></dd>
+                        <dt>Artifact ID</dt><dd><strong><code>${locEscape(locFullArtifactId)}</code></strong></dd>
+                        <dt>Version</dt><dd><strong><code>${locEscape(locResolvedArtifactVersion ?: "not specified")}</code></strong></dd>
+                      </dl>
+                    </section>
 
-                  <section class="card">
-                    <h2>Artifact metadata</h2>
-                    <dl class="compact-dl">
-                      ${locMetadataHtml}
-                    </dl>
-                  </section>
+                    <section class="card">
+                      <h2>Generated documentation</h2>
+                      ${locDocsLinksHtml}
+                    </section>
+                  </div>
 
-                  <section class="card">
-                    <h2>Generated documentation</h2>
-                    ${locDocsLinksHtml}
-                  </section>
+                  <aside class="artifact-metadata-column">
+                    <section class="card">
+                      <h2>Artifact metadata</h2>
+                      <dl class="compact-dl">
+                        ${locMetadataHtml}
+                      </dl>
+                    </section>
+                  </aside>
                 </div>
 
                 <nav class="back-links">
