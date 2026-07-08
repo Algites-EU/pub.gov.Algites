@@ -102,7 +102,6 @@ val AIcAlgitesIgnoredDirectoryNames = setOf(
     "out",
     "output",
     "docs-site",
-    "documentation",
     "documentation-branch",
     "gh-pages",
     "source_gen",
