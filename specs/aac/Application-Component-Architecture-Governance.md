@@ -283,14 +283,14 @@ The descriptor SHOULD be able to declare:
 - provider definitions;
 - capability contract versions;
 - mandatory/optional consumption;
-- component configuration schemas;
-- provider-instance configuration schemas;
+- component-target configuration schemas;
+- provider-instance-target configuration schemas;
 - persistent extension-data schemas;
 - supported readable schema versions;
 - writable/current schema versions;
 - available migrations;
 - provisioning declarations required by the lifecycle specification;
-- entitlement requirements where applicable;
+- per-provided-capability-version permission vocabulary, accepted entitlement-scope types, and optional entitlement/remediation metadata where applicable;
 - declarative conditions that affect availability.
 
 ## III.2 Descriptor completeness
@@ -694,16 +694,25 @@ The consumer component can be shown the resolved binding, but it is not authorit
 
 Every persisted provider reference in a binding MUST identify the target by provider instance `id`. Human-readable instance names MAY be stored or displayed as derived metadata, but MUST NOT be authoritative references.
 
-## V.6 Binding scopes
+## V.6 Binding-preference scopes
 
-Where meaningful, Core SHOULD support:
+Binding preferences are Core-owned contextual topology and MAY be associated with explicit **binding-preference scopes**. Binding-preference scopes reuse stable contextual identities but remain distinct from configuration-scopes and entitlement-scopes.
 
-1. **consumer-specific binding**;
-2. **global/workspace default binding**;
-3. **automatic binding** when only one valid provider exists;
-4. **platform default binding** where explicitly defined.
+AAC does not define a universal binding-preference-scope enum or precedence chain. A product/profile MAY derive its ordered binding-preference-scope chain from the active configuration profile when that is appropriate, or MAY define a separate binding-preference context.
 
-Consumer-specific binding takes precedence over a global/workspace default.
+For example, one deployment might resolve binding preferences through:
+
+```text
+consumer-instance override
+    > USER(artur)
+    > WORKSPACE(project-x)
+    > CUSTOMER(acme)
+    > SYSTEM
+```
+
+while another product uses a different chain. Names such as `CUSTOMER`, `ORGANIZATION`, or `TEAM` are product/deployment-defined contextual types, not AAC baseline enum values.
+
+Automatic selection remains possible only when policy permits and resolution is unambiguous. Binding topology remains distinct from ordinary configuration values even when both reuse the same contextual identities.
 
 ## V.7 Ambiguous provider selection
 
@@ -735,18 +744,18 @@ The binding may be editable or read-only depending on permissions and product po
 
 ## V.9 Recommended binding precedence
 
-Unless a product profile defines otherwise:
+Unless a product/profile defines otherwise:
 
 ```text
 1. explicit consumer-specific binding
-2. explicit global/workspace binding
+2. explicit contextual binding according to the product-defined binding-preference-scope chain
 3. capability-specific qualifier rule
 4. sole valid provider
 5. explicitly declared platform default
 6. ambiguity -> request selection
 ```
 
----
+The contextual step is deterministic only after the active binding-preference-scope chain is known; AAC does not hard-code `ORGANIZATION`, `CUSTOMER`, `USER`, `WORKSPACE`, or another custom contextual type into this precedence.
 
 # VI. Capability Graph Resolution
 
@@ -782,6 +791,14 @@ requires component eu.algites.s3
 ```
 
 unless the identity itself is semantically required.
+
+## VI.2.1 Mandatory Core invocation bridge
+
+Cross-component calls MUST always pass through a Core-owned capability handle/proxy and invocation bridge, even when consumer and provider run in the same process/language. A consumer MUST NOT receive or discover the provider implementation/runtime object directly.
+
+The bridge is responsible for resolved-binding enforcement, canonical contract identity, normalized validation, invocation identity, observation/redaction, isolation transport, standardized errors, entitlement remediation, retry policy, timeout/cancellation and diagnostics. Technology profiles may optimize dispatch but MUST preserve these semantics.
+
+A provider endpoint address, socket, process handle, class-loader-local object, or interpreter-local implementation reference is never an alternative binding mechanism.
 
 ## VI.3 Version negotiation for a selected provider
 
@@ -856,66 +873,48 @@ When resolution fails, Core SHOULD identify:
 
 # VII. Configuration Governance
 
-## VII.1 Core owns persistent component configuration
+## VII.1 Core owns contextual configuration
 
-Persistent component configuration SHOULD be stored and versioned by Core rather than directly by component implementation code.
+Persistent component/provider configuration is Core-managed. Components declare normalized schemas and accepted **configuration-scope types**; they do not own filesystem paths, database tables, VCS layout, or remote configuration endpoints.
 
-A component SHOULD declare a normalized configuration schema.
+The normative configuration-scope/configuration-provider/bootstrap/profile model is defined by `Application-Component-Context-Configuration-and-Entitlement-Specification.md`.
 
-Core is responsible for:
+AAC defines well-known configuration-scope types `SYSTEM`, `USER`, and `WORKSPACE` but does **not** define a closed enum. Product/deployment profiles may define additional types such as `ORGANIZATION`, `TEAM`, `CUSTOMER`, `CUSTOMER_GROUP`, `TENANT`, `ENVIRONMENT`, or domain-specific equivalents.
 
-- persistence;
-- loading;
-- schema-version tracking;
-- generic validation;
-- editing/UI generation where practical;
-- VCS participation where configuration belongs to the project;
-- migration orchestration;
-- passing normalized configuration to the component at runtime.
+`REMOTE` is not a configuration-scope. It describes storage/transport of a configuration-provider. A `USER` configuration-scope can be supplied by a remote profile service, and a `WORKSPACE` configuration-scope can be supplied by a remote project service rather than Git/local files.
 
-## VII.2 Component-level configuration
+## VII.2 Configuration profiles are bootstrap-governed
 
-A component MAY declare component-level configuration that applies to the component as a whole.
+The ordered configuration-scope chain is defined by an active **configuration profile**, not by AAC and not by a fixed product enum. The same product may select different configuration profiles for different workspaces/usages.
 
-Examples:
+Bootstrap structures used to discover/select configuration profiles, configuration-scope resolvers, and trusted configuration-providers MUST conform to fixed schemas supplied with the product and MUST be available through a non-recursive bootstrap path.
 
-```text
-global behavior flags
-default timeout
-logging policy
-component-specific feature settings
-```
+A lower bootstrap authority (including a workspace) MUST NOT remove mandatory trusted configuration-scopes, configuration-providers, or policy authority imposed by a higher trusted bootstrap authority.
 
-Core stores this configuration in a Core-owned namespace associated with the component identity.
+## VII.3 Components declare allowed configuration-scopes
 
-## VII.3 Provider-definition configuration
+A configuration schema SHOULD declare the configuration-scope types in which each property or fragment may be defined. AAC baseline configuration targets are `COMPONENT` and `PROVIDER_INSTANCE`. A component target is component-global; a provider-instance target is identified by the immutable provider-instance ID. Component and provider-instance configuration use separate schemas where both exist, and Core MUST NOT implicitly inherit component-target values or policy into provider-instance-target configuration.
 
-A provider definition MAY declare a configuration schema applicable to its provider instances.
+Core computes effective configuration and retains provenance for effective values and policy contributions.
 
-Every provider instance receives its own independent configuration object, even when only one instance currently exists.
+## VII.4 Configuration-providers and deterministic ordering
 
-Example:
+Configuration contributions are obtained through typed Core-managed **configuration-providers**. Configuration-providers may be local or remote. If several configuration-providers contribute within one concrete configuration-scope, their ordering/merge behavior MUST be explicit and deterministic; accidental discovery order MUST NOT decide conflicts. Writable providers expose normalized mutation capabilities, but all mutations pass through Core authorization and are confined to the selected component namespace/configuration target. Change sets MAY contain multiple logical value/policy mutations and SHOULD support atomic application plus optimistic concurrency.
 
-```text
-Provider definition:
-    s3-object-store
+## VII.5 Monotonic configuration policy
 
-Provider instance:
-    id: 6b...
-    name: Production S3
-    description: Primary production object store
-    configuration:
-        endpoint: ...
-        region: ...
-        bucket: ...
-```
+A property may receive one or more policy-modes such as `LOCK`, `MIN`, `MAX`, `IN_SET`, `NOT_IN_SET`, and `DEFAULT`.
 
-## VII.4 Configuration is not binding policy
+Restricting policy is evaluated from less-specific toward more-specific configuration-scopes and composes monotonically: later policy may tighten but MUST NOT broaden an existing restriction. `DEFAULT` is a policy-owned fallback candidate and does not itself restrict the allowed domain.
+
+After policy is resolved, ordinary values are selected from most-specific toward least-specific configuration-scope. The first explicit value is authoritative only if it satisfies effective policy; an invalid explicit value produces a policy/configuration error rather than silently falling back.
+
+## VII.6 Configuration is not binding policy
 
 Provider-instance configuration answers:
 
 ```text
-How is this provider instance configured?
+How is this provider instance configured in this context?
 ```
 
 Capability binding answers:
@@ -924,124 +923,15 @@ Capability binding answers:
 Which provider instance does this consumer use?
 ```
 
-These are different concerns and MUST remain separately persisted.
+They remain separately persisted and governed.
 
-For example:
+## VII.7 Normalized delivery and secrets
 
-```text
-Vault provider instance configuration:
-    endpoint, authentication mode, namespace
+Core delivers normalized effective configuration to provider instances. Secret material SHOULD use secret references/facilities when available. A logical `WORKSPACE` configuration-scope does not imply that secret bytes are stored in the workspace or in VCS.
 
-Core binding configuration:
-    Git component -> provider instance id 62c0d4c3-3209-4ba5-850e-6fcd0e758f54 for algites.secrets.store
-```
+## VII.8 Configuration schema identity
 
-## VII.5 Normalized configuration delivery
-
-Core SHOULD pass normalized configuration to a component during instantiation/bootstrap.
-
-A component SHOULD NOT need to know:
-
-- configuration file paths;
-- repository layout;
-- serialization format on disk;
-- VCS implementation;
-- how other products persist configuration.
-
-Conceptually:
-
-```text
-Core persistence
-    -> validate/migrate
-    -> normalized configuration object
-    -> component runtime
-```
-
-This makes component implementations portable between products and storage models.
-
-
-```mermaid
-flowchart LR
-    STORE["Core Persistence"]
-    SCHEMA["Component-declared Schema"]
-    MIG["Core-orchestrated Migration / Validation"]
-    NORM["Normalized Configuration"]
-    RUN["Component Runtime"]
-    BIND["Core Binding Store"]
-    RES["Capability Resolver"]
-
-    STORE --> MIG
-    SCHEMA --> MIG
-    MIG --> NORM --> RUN
-
-    BIND --> RES
-    RES --> RUN
-```
-
-The configuration stream and the capability-binding stream meet only when Core instantiates/wires the component. They remain separately owned and separately persisted.
-
-## VII.6 Configuration schema identity and version
-
-Every persistent configuration schema MUST have a stable schema identity and explicit version.
-
-A component descriptor SHOULD declare:
-
-```text
-schema id
-readable versions
-current writable version
-available migration steps
-```
-
-Configuration-schema version is separate from:
-
-```text
-component release version
-capability contract version
-Core product version
-```
-
-## VII.7 Configuration migrations
-
-When a component is upgraded and stored configuration is not already in the target writable schema version, Core SHOULD orchestrate migration before normal activation.
-
-The preferred sequence is:
-
-```text
-read old configuration
-determine migration path
-stage transformed configuration
-validate target schema
-commit migrated configuration
-activate component
-```
-
-Migration code MAY be supplied by the component but execution is coordinated by Core.
-
-## VII.8 No migration path
-
-If existing configuration cannot be migrated to a schema supported by the installed component:
-
-- Core MUST NOT silently discard it;
-- normal activation of the affected configured scope SHOULD be blocked;
-- the user/admin SHOULD be offered reconfiguration/reset;
-- old configuration SHOULD remain recoverable until explicitly replaced or deleted.
-
-This covers both upgrades and downgrades.
-
-## VII.9 Secrets
-
-Secret material SHOULD NOT be persisted as ordinary component configuration when the product provides a secret-store capability.
-
-Configuration should preferably store:
-
-```text
-secret reference / handle
-```
-
-rather than the secret value itself.
-
----
+Configuration schemas and bootstrap/profile schemas MUST use explicit version identity according to the applicable product/framework compatibility policy.
 
 # VIII. Provider Instance Lifecycle Ownership
 
@@ -1069,163 +959,68 @@ The lifecycle specification defines how an initial instance may be provisioned a
 
 ## IX.1 Data categories
 
-The architecture distinguishes at least four data classes:
+The architecture distinguishes at least:
 
-1. **configuration** — user/admin intent used to configure a component/provider;
-2. **semantic extension data** — component-owned persistent domain data that extends or relates to Core data;
-3. **runtime state/cache** — rebuildable or operational state not part of project meaning;
-4. **secrets** — sensitive values handled through an appropriate secret facility.
+```text
+configuration
+semantic extension data
+runtime state/cache
+secrets
+```
 
-These classes MUST NOT be conflated.
+These categories MUST NOT be conflated.
 
 ## IX.2 Semantic extension data
 
-A component MAY need to persist data related to Core domain objects.
+A component may own persistent semantic data associated with a Core-managed workspace/project or Core-domain entity. If the data affects project meaning, Core owns the persistence boundary and preserves it independently of component availability.
 
-Examples:
+AAC defines only a logical extension-data contract. **AAC does not prescribe a `.aac/extensions/...` filesystem layout or any other physical mapping.** A product may embed opaque extension payloads inside the Core entity serialization, store them in related database records, use companion files, or use another product-defined mechanism.
 
-```text
-analysis annotations
-component-specific metadata
-external-system mappings
-additional relations
-cached-but-authoritative imported metadata
-component-specific policies
-```
+Components SHOULD statically declare the Core entity type IDs for which they provide semantic/UI extensions, the required Core-entity access (baseline `READ`), whether extension data is absent/read-only/read-write, the extension schema ID/version, and logical UI contribution metadata when applicable. This lets Core discover extension contributions without invoking arbitrary plugin code. Declaring extension data does not grant permission to mutate the Core entity itself.
 
-If the data changes project meaning, Core SHOULD own its persistence.
+## IX.3 Extension-data envelope and references
 
-The component SHOULD receive and return normalized data through Core APIs rather than writing arbitrary files into Core-managed project structures.
-
-## IX.3 Extension-data envelope
-
-Core SHOULD persist semantic extension data in a generic envelope containing enough information to preserve and route it even when the owning component is absent.
-
-Conceptually:
+Core SHOULD retain at least:
 
 ```text
 owner component id
-data type id
-data schema version
-stable subject/reference scope
+extension/data schema id
+schema version
+stable Core subject/entity reference
 payload
+optionally writer component version
 ```
 
-Products MAY choose different physical serialization.
+Extension data references Core objects through stable Core identities, not filesystem paths, implementation-class names, memory addresses, or UI identifiers.
 
-## IX.4 References to Core data
+## IX.4 Core migration without plugin participation
 
-Component semantic data SHOULD reference Core objects only through stable Core-defined identifiers or reference types.
+Core MUST be able to migrate its own domain/storage structure while preserving unknown extension payloads opaquely. If an entity is moved, renamed, or represented differently but its identity survives, associated extension data SHOULD move with it automatically.
 
-It SHOULD NOT rely on:
+If a Core migration splits, merges, or removes entities and cannot unambiguously map extension payloads, Core MUST NOT silently discard them. Product policy may preserve them as orphaned extension data requiring later reconciliation.
+
+## IX.5 Component absent, incompatible, or unentitled
+
+If extension data exists but the owning component is missing, incompatible, or currently lacks entitlement:
 
 ```text
-filesystem paths
-memory addresses
-implementation-class names
-unstable UI identifiers
+Core preserves it losslessly
+Core does not interpret unknown semantics
+Core does not drop it on save/migration
+Core may expose diagnostics/read-only metadata
 ```
 
-This allows Core to preserve referential integrity across storage changes and migrations.
+The product decides whether the workspace remains fully editable, degraded, or read-only according to whether that extension is optional or required for project meaning.
 
-## IX.5 VCS portability
+## IX.6 VCS portability
 
-Semantic extension data that is part of project meaning SHOULD travel with the Core-managed project data through VCS or equivalent replication.
+Semantic extension data that belongs to project/workspace meaning SHOULD travel with the Core-managed project data through VCS or equivalent replication. Runtime cache/state generally SHOULD NOT.
 
-Runtime state/cache SHOULD generally not.
+A receiving installation must inspect component/schema compatibility before allowing component-specific interpretation, but preservation of the opaque payload does not require the component to be installed.
 
-Therefore moving a project through VCS to another installation may also move component-owned semantic data and configuration.
+## IX.7 Runtime state and cache
 
-The receiving Core MUST inspect schema compatibility before handing that data to the installed component version.
-
-## IX.6 Component absent on the receiving installation
-
-If semantic extension data exists but the owning component is not installed:
-
-- Core SHOULD preserve the data losslessly;
-- Core MUST NOT interpret unknown component semantics;
-- Core MUST NOT delete the data automatically;
-- UI MAY report that the data belongs to an unavailable component.
-
-Explicit purge MAY be supported.
-
-## IX.7 Stored data newer than the installed component
-
-If VCS or downgrade produces data in a schema version the installed component cannot read:
-
-- Core MUST NOT pass it to that component for interpretation;
-- Core SHOULD preserve it unchanged;
-- the affected functionality MUST be marked incompatible/unavailable;
-- Core SHOULD report the stored schema version and the component's readable versions.
-
-Example:
-
-```text
-Stored data:
-    algites.git.repository-metadata / schema 5
-
-Installed Git component can read:
-    [2,3,4]
-
-Result:
-    preserve schema 5 data
-    do not activate functionality that would interpret it
-```
-
-## IX.8 Data-schema versioning
-
-Persistent semantic extension data MUST use explicit schema versions.
-
-A component descriptor SHOULD declare:
-
-```text
-data type id
-readable schema versions
-current writable schema version
-migration paths
-```
-
-## IX.9 Data migration on component upgrade
-
-Core SHOULD orchestrate component data migrations using the same broad safety principles as configuration migrations:
-
-```text
-discover stored versions
-determine migration path
-stage transformed data
-validate
-commit
-activate
-```
-
-Migrations SHOULD be transactional or recoverable where practical.
-
-## IX.10 No data migration path
-
-If no migration path exists:
-
-- Core MUST preserve the old data;
-- Core MUST NOT silently reinterpret it;
-- affected functionality SHOULD remain unavailable;
-- the user/admin may install a compatible component, restore older VCS data, or explicitly purge/recreate the extension data.
-
-Unlike simple configuration, semantic data may not be safely recreated merely by filling out a form.
-
-## IX.11 Runtime state and cache
-
-Components MAY use Core-provided runtime-state facilities for:
-
-```text
-cache
-temporary indexes
-last-run timestamps
-ephemeral synchronization cursors
-rebuildable derived data
-```
-
-Such state SHOULD be stored outside version-controlled semantic project data unless the state itself affects project meaning.
-
----
+Rebuildable cache, process state, temporary discovery results, local telemetry buffers, and similar operational state are not semantic extension data and SHOULD remain outside version-controlled project semantics unless a product explicitly defines otherwise.
 
 # X. Instantiation, Wiring, and Activation
 
@@ -1263,9 +1058,15 @@ It SHOULD contain only what is required to:
 
 ## XI.2 Bootstrap is not product functionality
 
-Product business functionality belongs in capability contracts.
+Product business functionality belongs in capability contracts. The component-runtime bootstrap exists only to make the component graph operational.
 
-The bootstrap exists only to make the component graph operational.
+## XI.3 Configuration bootstrap is a separate fixed-schema concern
+
+The component runtime bootstrap contract above is distinct from the **configuration bootstrap structures** defined by `Application-Component-Context-Configuration-and-Entitlement-Specification.md`.
+
+Configuration bootstrap structures determine trusted configuration profiles, configuration-scope resolvers, configuration-provider registrations, entitlement-provider registrations/trust where applicable, and profile-selection rules. Their schema MUST be fixed and supplied with the product so Core can validate them before ordinary component configuration is available.
+
+A workspace may select or parameterize an allowed configuration profile, but it MUST NOT use ordinary workspace configuration to redefine the trusted bootstrap rules that decide which higher-authority configuration-scopes or policy authorities apply.
 
 ---
 
@@ -1315,6 +1116,14 @@ A technology profile MUST document the exact constraints.
 If a library cannot operate correctly under the selected isolation profile, a component using it is incompatible with that profile.
 
 The platform MUST NOT silently weaken isolation to make the component load.
+
+## XII.5 Runtime profiles are realized per provider instance
+
+A runtime/isolation profile is selected by a provider definition but is **realized for each concrete Core-managed provider instance**. Provider instances remain the unit of configuration, lifecycle, binding identity and runtime ownership.
+
+For the baseline `PROCESS` profile, Core MUST create and own one persistent child process per active provider instance. Two instances of the same provider definition therefore have independent processes, configuration state and lifecycle even when they execute the same implementation code. A future profile MAY explicitly define safe process sharing, but such sharing is not part of the baseline `PROCESS` semantics.
+
+Core MUST retain the runtime handle required to control each instance and MUST be able to terminate/restart that runtime independently. A process-hosted provider MAY consume already-resolved capabilities only through Core-provided handles/proxies; it MUST NOT bypass the resolved binding graph by discovering or directly addressing peer processes.
 
 ---
 
@@ -1403,7 +1212,11 @@ panels
 notifications
 ```
 
-## XIV.3 Native widget profiles
+## XIV.3 Reusable UI contract
+
+Technology-neutral administration UI semantics are defined by `Application-Component-UI-Specification.md`. The baseline UI contract represents components, provider instances, configuration forms, unresolved requirements, binding preferences and observation topology without toolkit-native objects. A concrete renderer MUST submit mutations back through Core-owned administration APIs.
+
+## XIV.4 Native widget profiles
 
 Products MAY support native-widget capabilities, but a technology profile must explicitly define:
 
@@ -1420,17 +1233,56 @@ compatibility restrictions
 
 # XV. Licensing and Entitlements
 
-## XV.1 Architectural rule
+## XV.1 Capability-version permission model
 
-Technical compatibility and commercial entitlement are separate concerns, but entitlement may affect whether a component, provider definition, provider instance, or capability is eligible to participate in graph resolution and activation.
+Technical compatibility and commercial entitlement are separate concerns. Entitlement is modeled as Core-validated contextual grants over component-owned permissions. Permission identity includes:
 
-Components declare entitlement requirements; Core is authoritative for evaluation and enforcement. A component MUST NOT make itself authoritative by merely returning an `isLicensed()` decision from ordinary implementation code.
+```text
+component id
++ provided capability id
++ provided capability version
++ permission id
+```
 
-Entitlement scopes, decision states, constraints, dynamic revalidation, interaction with in-flight calls, and provisioning behavior are defined by `Application-Component-Lifecycle-and-Provisioning-Specification.md`.
+It is not merely a boolean licensed flag. A component MAY remain installed and active with an empty/minimal permission set and provide free, configuration, diagnostic, or degraded functionality.
 
-Entitlement SHOULD apply to complete capability contracts rather than secretly disabling individual operations within an otherwise advertised capability version. Independently licensed functionality SHOULD normally be modeled as a separate capability.
+## XV.2 Capability-declared entitlement-scopes
 
----
+Permission vocabulary and accepted **entitlement-scope types** are declared for each provided capability version that uses entitlement. Entitlement-scopes are not the customizable ordered configuration-scope chain. An end user cannot invent a new licensing scope that the provided capability did not declare.
+
+A capability may accept well-known or contract-specific licensing scope identifiers such as `USER`, `WORKSPACE`, `ORGANIZATION`, `CUSTOMER`, or `TENANT`. The product/runtime must additionally establish a trusted concrete subject identity for the scope and product entitlement policy may restrict applicability further.
+
+Entitlement-providers may be local or remote. `REMOTE` is not itself an entitlement-scope.
+
+## XV.3 Signed/verified evidence and subjects
+
+Core is authoritative for validating entitlement evidence, including issuer/trust, signature/tamper evidence, every component identity carried by the evidence document, provided capability ID/version, permission identity, entitlement-scope type, stable subject ID, validity interval, constraints, and revocation/refresh state. A single entitlement document MAY bundle grants for multiple components when they share the same issuer, entitlement-scope, and subject; Core validates each component/capability-version/permission entry independently.
+
+Human-readable subject names/addresses are signed metadata; stable subject IDs are normative for matching. A workspace-scoped grant is therefore bound to immutable workspace identity.
+
+Evidence verification is pluggable; detached Sigstore evidence is a valid reference mechanism but not the only permitted technology. One signed entitlement evidence document may contain `components[]` entries for multiple plugins/components sharing the same issuer, entitlement-scope, and subject. Component entries are semantically validated independently so an absent/unadmitted bundled component does not suppress otherwise valid grants for another bundled component.
+
+## XV.4 Multiple grants and dynamic effective rights
+
+Valid applicable grants normally accumulate per `(component, capability, capability-version, permission)`, regardless of whether those grants arrived in separate evidence documents or as component entries inside one multi-component entitlement bundle. Core computes effective current rights and effective validity/expiry from the temporal union of applicable trusted grants and supplies that capability-version-grouped context to the provider instance.
+
+Core re-evaluates entitlement at expiration/lease boundaries, provider refresh/revocation, and context changes and delivers entitlement-context updates to running providers. Providers do not need to maintain independent license-expiry timers.
+
+The component interprets its own permission strings. Consumers do not declare or need to know another provider's commercial permission tiers.
+
+## XV.5 Capability bindings survive ordinary permission changes
+
+A provider that advertises capability `X/v1` implements that canonical contract. The consumer binds to `X/v1`; it does not bind to a commercial tier or an entitlement-specific operation subset.
+
+A particular operation may reject execution at runtime with standardized `PERMISSION_DENIED` according to the provider's effective permissions for `X/v1`. Ordinary permission changes therefore SHOULD NOT force graph re-resolution by themselves.
+
+## XV.6 Central remediation through the Core bridge
+
+Because every cross-component invocation passes through Core, Core may intercept standardized permission failures, refresh/acquire entitlement through product policy/UI, update the provider instance's entitlement context, and—when retry safety is explicitly established—retry the same operation transparently.
+
+Core MUST NOT transparently retry an operation after entitlement remediation unless the provider/contract failure semantics establish that no externally visible side effect occurred or that the operation is otherwise safe to repeat.
+
+The detailed normative model is defined by `Application-Component-Context-Configuration-and-Entitlement-Specification.md` and lifecycle delivery semantics by `Application-Component-Lifecycle-and-Provisioning-Specification.md`.
 
 # XVI. Conformance
 
@@ -1694,46 +1546,49 @@ No silent downgrade or destructive rewrite occurs.
 17. **Core owns persistent provider bindings.**
 18. **Consumers do not independently select concrete providers.**
 19. **A provider-instance-scoped consumer requirement must never resolve to that same provider instance.**
-20. **Bindings may have global/workspace defaults and consumer-specific overrides.**
+20. **Binding preferences may use product-defined binding-preference scopes and consumer-instance-specific overrides; AAC does not hard-code a contextual scope enum or universal precedence chain.**
 21. **The resolved provider should be visible in administration/configuration UI.**
 22. **Every provider definition is used through Core-managed provider instances; there is no singleton/multi-instance provider-definition type split.**
 23. **A provider definition may have multiple instances; when enabled, it participates through Core-created provider instances rather than a singleton special case.**
 24. **Persistent provider-instance identity uses immutable Core-generated GUID/UUID-style IDs; names, including the initial name `default`, are mutable display values only.**
-25. **Persistent component configuration is Core-managed and delivered in normalized form.**
+25. **Persistent configuration is Core-managed for explicit `COMPONENT` or `PROVIDER_INSTANCE` targets through configuration-scopes/configuration-providers, bootstrap-selected configuration profiles, monotonic policy resolution, authorized normalized mutation, and effective delivery with provenance. There is no implicit component-to-instance configuration inheritance.**
 26. **Provider-instance configuration and consumer binding configuration are separate.**
 27. **Configuration schemas are explicitly versioned.**
-28. **Component upgrades must migrate configuration when required or require explicit reconfiguration.**
+28. **Configuration compatibility/migration policy must be explicit once a compatibility baseline is declared; pre-baseline development may use breaking schema changes.**
 29. **Semantic component data is distinct from configuration and runtime cache.**
-30. **Semantic extension data that belongs to project meaning should be Core-persisted and VCS-portable.**
+30. **Semantic extension data that belongs to project meaning is logically component-owned but physically persisted by the Core product and should be VCS-portable when appropriate.**
 31. **Unknown or unsupported extension-data versions are preserved, not silently interpreted or deleted.**
-32. **Persistent semantic data schemas are explicitly versioned and migratable.**
+32. **Persistent semantic extension data carries explicit schema identity/version and unknown payloads survive Core migrations opaquely.**
 33. **Declarative component/provider-definition dependency cycles may exist, but the resolved extension provider-instance binding graph MUST be acyclic.**
 34. **Resolution, contract admission, instantiation, wiring, readiness, and activation are distinct stages.**
 35. **Plugin-private dependencies are isolated from Core and other extension components.**
 36. **Technology profiles define how isolation and shared contract identity are implemented.**
 37. **The highest common allowed version is chosen only after provider selection.**
 38. **Contract lifecycle may explicitly deprecate and retire versions.**
-39. **Commercial entitlement is separate from technical compatibility.**
+39. **Commercial entitlement is separate from technical compatibility and is represented as capability-version-scoped permission/constraint grants, not merely a boolean.**
 40. **Provisioning, entitlement, graph resolution, and activation are distinct lifecycle concerns governed by the lifecycle specification.**
-41. **Components declare entitlement requirements; Core is authoritative for entitlement evaluation and enforcement.**
-42. **UI integration should preserve Core ownership of configuration and isolation boundaries.**
-43. **Capability implementations should be conformance-testable.**
-44. **Newer components may work with older Core versions when newer contract bundles can be admitted or older shared contracts remain available.**
-45. **Older components may work with newer Core versions through preserved contracts.**
-46. **The architecture enables long compatibility but does not promise eternal compatibility.**
-47. **A capability version owns its operation set; operation IDs are scoped to `(capability id, version)` rather than one global operation registry.**
-48. **Dynamically admitted capability contracts may introduce new operations unknown when the Core binary was built.**
-49. **Generic invocation observation is an independently versioned capability with Core-owned observer bindings.**
-50. **Generic observers are read-only with respect to the observed invocation and do not replace its authoritative provider result.**
-51. **The observation capability must be excluded from generic observation delivery, and sensitive contract data must be redacted according to Core policy.**
+41. **Provided capability versions declare permission vocabulary/accepted entitlement-scope types; one trusted entitlement document may bundle grants for multiple components, while Core independently validates/temporally aggregates each component/capability-version permission identity and the component interprets its own effective permission strings.**
+42. **All cross-component invocations pass through a Core-owned capability bridge; direct provider implementation references are forbidden.**
+43. **A standardized permission failure may be centrally remediated by Core; transparent retry requires explicit retry safety.**
+44. **UI integration should preserve Core ownership of configuration, entitlement, topology, and isolation boundaries.**
+45. **Capability implementations should be conformance-testable.**
+46. **Newer components may work with older Core versions when newer contract bundles can be admitted or older shared contracts remain available.**
+47. **Older components may work with newer Core versions through preserved contracts.**
+48. **The architecture enables long compatibility but does not promise eternal compatibility.**
+49. **A capability version owns its operation set; operation IDs are scoped to `(capability id, version)` rather than one global operation registry.**
+50. **Dynamically admitted capability contracts may introduce new operations unknown when the Core binary was built.**
+51. **Generic invocation observation is an independently versioned capability with Core-owned observer bindings.**
+52. **Generic observers are read-only with respect to the observed invocation and do not replace its authoritative provider result.**
+53. **The observation capability must be excluded from generic observation delivery, and sensitive contract data must be redacted according to Core policy.**
 ## XIX.2 Companion specifications
 
 This governance standard is intended to be complemented by:
 
 - **Application Component Descriptor Specification**
 - **Application Component Capability Contract Specification** (`Application-Component-Capability-Contract-Specification.md`)
-- **Application Component Configuration and Data Specification**
-- **Application Component Lifecycle and Provisioning Specification**
+- **Application Component Context, Configuration, and Entitlement Specification** (`Application-Component-Context-Configuration-and-Entitlement-Specification.md`)
+- **Application Component Lifecycle and Provisioning Specification** (`Application-Component-Lifecycle-and-Provisioning-Specification.md`)
+- **Application Component UI Specification** (`Application-Component-UI-Specification.md`)
 - **Application Component Python Runtime Profile**
 - **Application Component Java Runtime Profile**
 - product-specific SDK documentation

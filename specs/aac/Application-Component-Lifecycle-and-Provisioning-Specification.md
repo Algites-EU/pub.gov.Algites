@@ -109,11 +109,11 @@ A product may combine implementation steps internally, but diagnostics and confo
 
 ## III.2 Discovery
 
-Core reads static descriptors without executing arbitrary component business logic. Discovery identifies component identity, provider definitions, consumed/provided capabilities, contract bundles, configuration/data schemas, provisioning declarations, and entitlement requirements.
+Core reads static descriptors without executing arbitrary component business logic. Discovery identifies component identity, provider definitions, consumed/provided capabilities, contract bundles, component/provider-instance configuration schemas, semantic extension declarations/data schemas, provisioning declarations, per-provided-capability-version permission vocabulary/accepted entitlement-scope types, runtime profile, and package provenance metadata when present.
 
 ## III.3 Verification
 
-Verification covers package integrity, signatures/trust policy where applicable, descriptor validity, runtime-profile compatibility, and other install-time safety checks. Verification failure blocks later runtime stages.
+Verification covers package integrity, signatures/trust policy where applicable, descriptor validity, runtime-profile compatibility, and other install-time safety checks. For downloaded packages, the exact bytes that will become installed/admitted MUST be verified immediately before atomic installation/admission; an earlier download-time verification is useful but not sufficient by itself. Verification failure blocks later runtime stages.
 
 ## III.4 Contract admission
 
@@ -121,7 +121,7 @@ Any canonical capability contract used across component boundaries MUST be admit
 
 ## III.5 Provisioning
 
-Provisioning creates or reconciles Core-owned persistent state required for the component/provider definitions to participate in the system. Provisioning MAY succeed even when entitlement is currently denied.
+Provisioning creates or reconciles Core-owned persistent state required for the component/provider definitions to participate in the system. Provisioning does not require a non-empty commercial permission set unless the product/component explicitly declares a hard provisioning prerequisite.
 
 ## III.6 Validation
 
@@ -129,11 +129,11 @@ Core validates configuration schema versions, required fields, persistent semant
 
 ## III.7 Entitlement evaluation
 
-Entitlement is evaluated before final graph resolution whenever it affects provider/capability availability. Installed and provisioned but unentitled components remain visible and diagnosable; they need not be uninstalled.
+Core evaluates contextual entitlement before/around activation so the provider receives a validated effective permission context. Ordinary permission sets do not normally participate in provider selection or graph validity; a provider may remain active in free/degraded mode. Explicit hard activation prerequisites, when declared, are evaluated separately.
 
 ## III.8 Graph resolution
 
-Core computes provider candidates, applies compatibility, lifecycle, configuration, entitlement, and binding policy, selects provider instances, negotiates contract versions, and validates the resulting concrete extension-instance binding graph. Resolution MUST fail if the concrete graph contains any directed cycle; direct self-binding is the one-node special case of that rule.
+Core computes provider candidates, applies compatibility, lifecycle/configuration validity and binding policy, selects provider instances, negotiates contract versions, and validates the resulting concrete extension-instance binding graph. Ordinary component-owned permission tiers are not provider-selection criteria. Resolution MUST fail if the concrete graph contains any directed cycle; direct self-binding is the one-node special case of that rule.
 
 ## III.9 Runtime construction and activation
 
@@ -174,12 +174,12 @@ The baseline stages map to technology-neutral hooks as follows:
 | Lifecycle stage | Component hook | Meaning |
 | --- | --- | --- |
 | `PACKAGE PRESENT / INSTALLED` | none | The component distribution is physically available to the application. Installation is package/distribution management, not runtime activation. |
-| `DISCOVER` | none | Core reads static descriptors, schemas, capability declarations, provider definitions, provisioning declarations, and entitlement requirements without running arbitrary component business code. |
+| `DISCOVER` | none | Core reads static descriptors, schemas, capability declarations, provider definitions, provisioning declarations, semantic extension declarations, per-provided-capability-version permission vocabulary/accepted entitlement-scope types, and entitlement metadata without running arbitrary component business code. |
 | `VERIFY` | none | Core verifies descriptor validity, integrity/trust policy, runtime-profile compatibility, signatures where applicable, and other package-level prerequisites. |
 | `ADMIT CONTRACTS` | none | Core validates and admits canonical capability contracts into the active Core-owned contract catalog. This stage establishes contract identity; it does not instantiate providers. |
 | `PROVISION` | optional `provision(context)` | Core creates or reconciles persistent Core-owned component/provider state. Declarative provisioning is preferred; a hook is used only when additional component-specific initialization is required. |
 | `VALIDATE CONFIGURATION / DATA` | optional `validate(context)` | Core performs generic schema/version validation and may invoke component-specific semantic validation. This stage does **not** decide licensing/entitlement and does not select providers. |
-| `EVALUATE ENTITLEMENT` | no ordinary component hook | A trusted Core entitlement facility determines whether the component, provider definition, instance, or capability is currently entitled and which Core-enforced constraints apply. |
+| `EVALUATE ENTITLEMENT` | no ordinary component hook | Trusted Core facilities validate scoped entitlement evidence and compute the effective permission/constraint context grouped by provided capability/version and delivered to the provider instance. Ordinary permission tiers do not redefine the capability binding graph. |
 | `RESOLVE GRAPH` | none | Core selects concrete provider instances, negotiates contract versions, validates bindings, and verifies that the resolved extension-instance graph satisfies the DAG invariant. Components do not choose their own providers here. |
 | `INSTANTIATE` | optional `instantiate(context)` | The runtime representation of the component/provider instance is constructed, but normal business activity has not started. |
 | `WIRE` | optional `wire(bindings)` | Core supplies the already-resolved capability bindings/proxies/handles and other wiring required by the runtime instance. Wiring does not permit the component to replace Core-selected bindings. |
@@ -318,15 +318,19 @@ Entitlement is deliberately evaluated in the separate `EVALUATE ENTITLEMENT` sta
 
 ### IV.2.4 `instantiate(context)`
 
-`instantiate(context)` participates in `INSTANTIATE`. It creates the technology-specific runtime object, interpreter endpoint, process endpoint, service object, or equivalent implementation for a provisioned provider/component instance.
+`instantiate(context)` participates in `INSTANTIATE`. It creates the technology-specific runtime object, interpreter endpoint, process endpoint, service object, or equivalent implementation for **one concrete provisioned provider instance**.
 
 Instantiation MUST NOT be treated as activation. The resulting runtime may exist before bindings are injected and before normal capability calls are permitted. Constructors/factories SHOULD avoid mandatory peer business calls.
+
+For the baseline `PROCESS` runtime profile, `INSTANTIATE` starts and bootstraps one persistent child process for the provider instance. Core owns the process handle and IPC channel. The runtime receives the normalized effective `COMPONENT` configuration for its component (when declared) and the normalized effective `PROVIDER_INSTANCE` configuration for that concrete immutable instance as separate configuration objects. Core does not merge one target into the other. A second provider instance, even of the same provider definition, receives a different process and independent provider-instance configuration/lifecycle while observing the same applicable component-target configuration for that application context.
 
 ### IV.2.5 `wire(bindings)`
 
 `wire(bindings)` participates in `WIRE`. Core supplies the concrete bindings already selected during `RESOLVE GRAPH`, together with the negotiated contract versions and technology-specific invocation handles/proxies.
 
 The component consumes the supplied topology; it does not perform provider discovery or substitute a different provider behind Core's back. Any persistent topology change requires a new Core-mediated resolution.
+
+For an out-of-process runtime, the injected handle is represented inside the child process by a local proxy. Invoking that proxy sends a normalized request back to Core, which invokes the already-resolved target provider instance. The child process therefore never needs unrestricted knowledge of Core's endpoint registry or of other child processes.
 
 ### IV.2.6 `ready()`
 
@@ -366,17 +370,21 @@ A hook MUST NOT create hidden provider-instance IDs, persist private binding top
 
 ## IV.4 Entitlement is not a component self-check hook
 
-Ordinary component implementation code MUST NOT be the authority for a lifecycle decision by exposing only:
+Ordinary component implementation code MUST NOT establish entitlement authority through a private self-check such as:
 
 ```text
 isLicensed() -> boolean
 ```
 
-The component declares entitlement requirements; a trusted Core entitlement facility evaluates them. The component may receive the resulting effective entitlement/constraints as lifecycle context after Core has made the decision.
+Instead, each provided capability version declares its permission vocabulary, accepted **entitlement-scope types**, and optional display/remediation metadata. Trusted Core facilities validate entitlement evidence from trusted entitlement-providers and deliver the resulting effective permission/constraint context grouped by provided capability/version to each provider instance. The provider interprets those permission identifiers for its own business operations.
 
-## IV.5 Pluggable entitlement evaluator
+## IV.5 Pluggable entitlement-providers
 
-The entitlement facility MAY itself be implemented through a versioned capability/service contract so different products can use local licenses, subscriptions, enterprise servers, or test providers. Because entitlement participates before ordinary graph activation, the evaluator MUST be available through a trusted bootstrap/pre-resolution path and MUST NOT recursively depend on an entitlement decision that it is responsible for producing.
+Entitlement evidence MAY be supplied by multiple trusted **entitlement-providers** so products can combine signed local licenses, multi-component plugin-bundle licenses, user grants, workspace grants, customer/team/organization grants, remote services, offline leases, or test entitlement-providers.
+
+Entitlement-scope types are part of a provided capability version's licensing contract rather than the user-customizable configuration-scope chain. A capability may accept types such as `USER`, `WORKSPACE`, `CUSTOMER`, `ORGANIZATION`, `TEAM`, or `TENANT`; the product must also be able to establish a trusted concrete subject identity of the accepted type. Local/remote is an entitlement-provider transport characteristic and is not an entitlement-scope.
+
+Entitlement-providers are part of a trusted bootstrap/context path and MUST NOT recursively depend on the entitlement result they are responsible for establishing. The detailed entitlement-scope/entitlement-provider model is defined by `Application-Component-Context-Configuration-and-Entitlement-Specification.md`.
 
 ## IV.6 Hook failure semantics
 
@@ -435,96 +443,72 @@ Unprovisioning is a potentially destructive Core-owned operation. Core MUST dete
 
 ## VI.1 Separation from technical compatibility
 
-A technically compatible component may be unentitled, and an entitled component may be technically incompatible. Core MUST represent those outcomes separately.
+Technical compatibility, configuration validity, capability binding, and entitlement are distinct. A technically compatible provider may have an empty/minimal entitlement permission set and still remain active in a free/degraded mode.
 
-## VI.2 Declarative requirements
+## VI.2 Effective entitlement context
 
-Components declare entitlement requirements in static metadata. They do not become the authority for deciding their own commercial validity through an ordinary `isLicensed()` implementation callback.
+Core evaluates trusted entitlement evidence and supplies each provider instance an effective context containing, for each provided capability/version, capability-owned permission identifiers, constraints, provenance, and effective validity/expiry metadata. One entitlement evidence document may bundle grants for multiple components; Core validates the document-level issuer/scope/subject once as applicable, validates every component entry, and supplies each runtime only the effective rights relevant to its component/capabilities. A component entry for a component not yet installed/admitted remains dormant/preserved; it does not prevent other component entries in the same verified bundle from contributing rights.
 
 Conceptually:
 
-```yaml
-entitlements:
-  - id: component-use
-    entitlement: vendor.product.feature
-    scope: component
+```text
+capabilities:
+    <capability-id>/<capability-version>:
+        permissions:
+            <permission-id>:
+                effective_valid_from / effective_valid_until
+                constraints
+                provenance: entitlement-provider / entitlement-scope subject / grant
 ```
 
-## VI.3 Core-authoritative evaluation
+Entitlement is not reduced to `ALLOWED/DENIED` for the whole provider unless the product/component explicitly declares a hard activation prerequisite.
 
-Core evaluates entitlement through a trusted entitlement facility. The concrete source may be:
+## VI.3 Capability permission vocabulary and entitlement-scopes
+
+Provided capability versions MAY declare permission metadata (identifier, display description, implicit/free status, accepted entitlement-scope types). The accepted entitlement-scope set is part of the capability licensing contract and cannot be broadened by user/deployment configuration. Product/runtime support for a scope type supplies trusted concrete subject identities but does not itself make that scope acceptable to the capability.
+
+Core validates entitlement evidence and applicable product policy; the provider interprets the business meaning of its own permission strings. A component MUST NOT establish authority through `isLicensed()` or editable configuration values.
+
+Permission identity is `(component_id, capability_id, capability_version, permission_id)`. Core aggregates overlapping valid grants per identity, computes effective validity/expiry, and re-evaluates/pushes a new entitlement context at expiry, revocation, refresh, or application-context changes.
+
+## VI.4 Entitlement-providers
+
+Evidence may come from local signed licenses, multi-component plugin-bundle licenses, user grants, workspace grants, customer/team/organization grants, subscription services, offline lease caches, or test/development entitlement-providers. Entitlement-provider transport may be local or remote; `REMOTE` is not an entitlement-scope.
+
+Entitlement facilities participate through a trusted bootstrap path that does not recursively depend on the entitlement decision being produced. Product bootstrap structures used to register entitlement-providers, trusted entitlement subject resolvers/enrollment sources, evidence verifiers, issuers, and trust roots conform to fixed product-supplied schemas. They do not define or extend the entitlement-scope types accepted by a capability; those are part of the capability's descriptor contract.
+
+## VI.5 Workspace-scoped entitlement
+
+A workspace grant is bound to immutable workspace identity and may authorize use/features only in that workspace. Such a grant may be VCS-portable when signed/tamper-evident and independently verifiable by Core.
+
+Use entitlement and package-download authorization are distinct. A remediation service may obtain short-lived repository credentials, but possession of a workspace grant does not automatically make a package repository public.
+
+## VI.6 Graph eligibility and runtime authorization
+
+Ordinary component-owned permission changes do **not** redefine capability contract identity and SHOULD NOT invalidate an otherwise compatible binding. Consumers bind to capability/version, not to provider-specific license tiers.
+
+Provider operations may reject execution through the standardized `PERMISSION_DENIED` capability error according to the current effective entitlement context.
+
+A product MAY support an explicit hard activation entitlement prerequisite for components that cannot offer any meaningful unentitled mode, but this is distinct from normal per-operation permission semantics.
+
+## VI.7 Dynamic revalidation and delivery
+
+Core MUST support policy-driven refresh/revalidation while a provider instance is running and MUST deliver the updated effective entitlement context through a Core-controlled context/lifecycle update path.
+
+A provider may change its permitted behavior immediately after such an update without graph re-resolution. If the implementation requires restart for a context change, it must declare/return that requirement explicitly.
+
+## VI.8 Core-mediated permission remediation
+
+All capability invocation is Core-mediated. If a provider returns standardized `PERMISSION_DENIED`, Core MAY invoke a product entitlement-remediation flow (refresh, login, purchase, accept workspace grant, etc.), update the provider entitlement context, and retry the invocation only when retry safety is established.
+
+The provider SHOULD perform permission checks before externally visible side effects whenever possible and report a retry disposition equivalent to:
 
 ```text
-local signed license
-subscription service
-enterprise license server
-offline entitlement cache/lease
-test/development provider
+SAFE_AFTER_ENTITLEMENT_CHANGE
+DO_NOT_RETRY
 ```
 
-The entitlement source may itself be pluggable, but it MUST participate in a privileged bootstrap path that does not recursively depend on the entitlement decision it is responsible for producing.
-
-## VI.4 Decision states
-
-A baseline entitlement decision SHOULD distinguish at least:
-
-```text
-ALLOWED
-DENIED
-UNKNOWN
-EXPIRED
-ERROR
-```
-
-The decision MAY carry validity/lease metadata, reason codes, and standardized constraints.
-
-## VI.5 Entitlement scopes
-
-Entitlement MAY apply to:
-
-```text
-component
-provider definition
-provider instance
-complete capability contract
-```
-
-Entitlement SHOULD NOT silently enable only selected operations of an otherwise advertised capability version. If functionality is independently licensed, it SHOULD normally be represented as a separate capability so that a resolved capability contract remains complete and trustworthy.
-
-## VI.6 Constraints
-
-Entitlement may produce constraints such as maximum active instances or product-defined resource limits. A constraint that Core is expected to enforce MUST have standardized semantics known to Core or a product-profile extension owned by Core. Opaque constraints interpreted only by untrusted component code are not sufficient for Core-level enforcement.
-
-## VI.7 Graph eligibility
-
-A provider instance is an eligible candidate only when all applicable conditions are satisfied. Conceptually:
-
-```text
-verified
-+ contracts admitted
-+ provisioned
-+ configuration/data valid
-+ entitlement allowed
-+ lifecycle allowed
-+ contract-version intersection
-= eligible candidate
-```
-
-## VI.8 Dynamic revalidation
-
-Entitlement can change while a component is installed or running. Core MUST support policy-driven revalidation.
-
-When entitlement becomes invalid, Core SHOULD normally:
-
-1. prevent new affected invocations once the invalid state becomes authoritative;
-2. avoid arbitrarily corrupting an already-running transaction;
-3. transition affected provider instances toward suspension/deactivation at a defined safe boundary;
-4. preserve persistent configuration/data unless explicit unprovisioning/purge is requested;
-5. expose a clear diagnostic state.
-
-Security-critical policy MAY define stronger immediate revocation behavior.
-
----
+Without explicit retry safety Core MUST NOT silently repeat the operation.
 
 # VII. Binding and Graph-Safety Rules
 
@@ -588,7 +572,6 @@ INSTALLED
 VERIFIED
 PROVISIONED_UNCONFIGURED
 PROVISIONED
-UNENTITLED
 RESOLVED
 INSTANTIATED
 WIRED
@@ -659,7 +642,7 @@ Removing a component package may leave Core-owned configuration and semantic ext
 
 ## X.2 Explicit purge
 
-Permanent deletion of component-owned semantic data or provider-instance configuration SHOULD require an explicit Core-mediated purge/unprovision operation with reference checks and diagnostics.
+Permanent deletion of component-owned semantic data, component-target configuration, or provider-instance-target configuration SHOULD require an explicit Core-mediated purge/unprovision operation with reference checks and diagnostics.
 
 ---
 
@@ -680,7 +663,7 @@ runtime activation state
 last failure stage
 ```
 
-This model applies equally to desktop, web, CLI, and headless administration surfaces.
+This model applies equally to desktop, web, CLI, and headless administration surfaces. The normalized administration contract is specified in `Application-Component-UI-Specification.md`; UI submission never bypasses Core lifecycle, schema validation, entitlement, reference, or graph rules.
 
 ---
 
@@ -693,7 +676,7 @@ Conformance suites SHOULD cover at least:
 - initial instance with mutable display name;
 - unconfigured instance excluded from provider candidates;
 - allowed/denied/expired/unknown entitlement;
-- entitlement-dependent graph resolution;
+- contextual entitlement refresh and permission-remediation behavior;
 - entitlement loss while running;
 - preservation of in-flight operation semantics under ordinary entitlement expiry;
 - direct self-binding rejection as a one-node cycle;
@@ -712,9 +695,9 @@ Conformance suites SHOULD cover at least:
 1. **Installation, provisioning, entitlement, resolution, and activation are different states.**
 2. **Core owns persistent provider-instance identity and lifecycle topology.**
 3. **Provisioning may exist without entitlement or activation.**
-4. **An unconfigured or unentitled instance is not an eligible provider candidate.**
-5. **Components declare entitlement requirements; Core is authoritative for entitlement enforcement.**
-6. **Independently licensed functionality should be a separate capability rather than a partially disabled operation set inside one advertised capability contract.**
+4. **An unconfigured instance is not an eligible provider candidate; ordinary missing permission tiers do not by themselves invalidate the binding.**
+5. **Provided capability versions declare permission vocabulary/accepted entitlement-scope types; entitlement documents may bundle multiple component entries, and Core validates/aggregates applicable evidence into dynamic effective permission contexts grouped by component/capability/version.**
+6. **Consumers bind to capability/version, not to provider-specific entitlement tiers; operation authorization is runtime provider semantics over a Core-validated permission context.**
 7. **A provider-instance-scoped requirement never binds to that same provider instance.**
 8. **Distinct instances of the same implementation may bind to one another.**
 9. **The resolved extension provider-instance binding graph is a DAG; declarative component/provider-definition cycles remain allowed.**

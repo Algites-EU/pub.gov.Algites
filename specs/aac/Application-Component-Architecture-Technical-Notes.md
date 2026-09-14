@@ -254,335 +254,121 @@ The canonical contract definition should therefore describe the operation list a
 
 ---
 
-# III. Configuration Architecture
+# III. Contextual Configuration Architecture
 
-## III.1 Core-owned persistence
+## III.1 Configuration-scopes are contextual identities, not storage locations
 
-The recommended model is that extension components do not own arbitrary persistent config files.
+Components should see normalized effective configuration, not storage paths. The physical source may be local files, database records, workspace serialization, a remote service, or another product-defined configuration-provider.
 
-Instead:
-
-```text
-component descriptor
-    defines configuration schema
-
-Core
-    owns persistence
-    validates
-    versions
-    migrates
-    presents UI
-    injects normalized configuration
-
-component runtime
-    consumes normalized configuration
-```
-
-This removes storage-format and repository-layout knowledge from component code.
-
-## III.2 Why this matters
-
-If every component invents its own:
+AAC well-known configuration-scope types are:
 
 ```text
-file path
-YAML format
-JSON file
-registry key
-SQLite database
-migration strategy
+SYSTEM
+USER
+WORKSPACE
 ```
 
-the product cannot consistently provide:
+They are not a closed enum. A deployment may add `ORGANIZATION`, `TEAM`, `CUSTOMER`, `CUSTOMER_GROUP`, `TENANT`, `ENVIRONMENT`, or other contextual types.
 
-- VCS integration;
-- backup;
-- migration;
-- UI;
-- validation;
-- portability;
-- auditing.
+A configuration-scope type says **which context the value governs**. It does not say where the value lives. For example, `USER(artur)` may come from a remote intranet profile; `WORKSPACE(project-x)` may come from a remote project service; `CUSTOMER(acme)` may come from a mounted share.
 
-Centralized normalized configuration avoids that fragmentation.
+## III.2 Fixed-schema bootstrap and configuration profiles
 
-## III.3 Proposed configuration scopes
+A product ships a fixed bootstrap schema and a safe built-in configuration profile. Trusted installation/bootstrap state may register additional profile sources and configuration-providers without recursively relying on the scoped configuration being constructed.
 
-At least two persistent configuration scopes are useful:
+A configuration profile determines the ordered configuration-scope chain for a particular product usage/workspace and the resolvers/configuration-providers used for each configuration-scope. Therefore the same application can use different chains for different projects without recompiling an enum into the product.
 
-### Component scope
+A workspace may select or parameterize a profile only as allowed by higher bootstrap policy. It cannot remove mandatory trusted configuration-scopes or policy authorities imposed above it.
 
-One configuration object for the component itself.
+## III.3 Component-declared allowed configuration-scopes
 
-### Provider-instance scope
+A schema property should declare the configuration-scope types where it may be defined. This prevents nonsensical placement while allowing one provider instance to combine values from many contexts.
 
-One configuration object per Core-created provider instance.
+Examples include a user-local executable path, workspace repository URL, customer deployment endpoint, organization-wide proxy, and system-level default.
 
-These are separate from capability binding configuration.
+## III.4 Configuration targets and writes
 
-## III.4 Uniform provider-instance model
+AAC baseline configuration targets are `COMPONENT` and `PROVIDER_INSTANCE`. Component configuration is shared independently of any one instance; provider-instance configuration belongs to one immutable provider-instance GUID. These are separate configuration contracts and do not implicitly inherit into one another.
 
-The earlier distinction between `SINGLETON` and `MULTI_INSTANCE` provider definitions is unnecessary and creates two lifecycle/binding models for the same architectural concept.
+Configuration mutations travel through Core as normalized change sets, not storage-format YAML/JSON. A change set targets one configuration-scope, configuration-provider, and configuration target and may contain multiple value/policy changes. Writable providers expose technical capabilities such as `WRITE_VALUE` or `WRITE_POLICY`; Core authorization separately decides whether the current principal may use them. Optimistic concurrency prevents accidental overwrite of newer provider state.
 
-The simpler invariant is:
+## III.5 Configuration-providers are ordered within a configuration-scope
+
+A configuration profile may bind one or more configuration-providers to one concrete configuration-scope. Their priority/merge behavior must be deterministic. Equal-priority conflicting scalar values should be diagnosed rather than resolved by incidental load order.
+
+Local/remote is a configuration-provider characteristic, not a configuration-scope.
+
+## III.6 Policy-modes compose monotonically
+
+The baseline policy-modes are `LOCK`, `MIN`, `MAX`, `IN_SET`, `NOT_IN_SET`, and `DEFAULT`. Multiple policy-modes may apply to one property.
+
+Restricting modes are evaluated from the least-specific configuration-scope toward the most-specific and may only tighten the allowed domain. For example:
 
 ```text
-provider definition / implementation
-    -> one or more Core-managed provider instances
+ORGANIZATION: MIN(20), MAX(50)
+WORKSPACE:    IN_SET([10, 30, 40, 80])
+
+=> effective allowed values = [30, 40]
 ```
 
-Every concrete provider used by a binding is an instance. A definition that currently has one instance is not a different type from a definition that has several.
+A later `MIN(10)` cannot relax `MIN(20)`; it simply has no broadening effect. Incompatible restrictions that produce an empty domain are a policy conflict.
 
-This is useful even for apparently singleton implementations because a second independently configured use can appear later without changing the provider-definition model.
+`DEFAULT(x)` is not a restriction. It is a policy-owned fallback whose provenance remains visible. `LOCK(x)` restricts the property to one value and thereby forces that policy value.
 
-For example, one Git implementation may have:
+## III.7 Ordinary values resolve in the opposite direction
+
+Once effective policy is known, ordinary values resolve from the most-specific toward the least-specific configuration-scope. The first explicit value wins only if it satisfies effective policy. A violating explicit value is an error, not a reason to silently fall back to an older value.
+
+If no ordinary value is present, the most-specific valid policy `DEFAULT` is used, followed by a valid component-schema default.
+
+## III.8 Provenance matters
+
+Core should retain, per property:
 
 ```text
-instance A: Source repository
-instance B: Deployment results repository
+value source kind
+configuration-scope type/id
+configuration-provider
+all effective policy-modes and their provenance
+shadowed contributions
+policy conflicts/violations
 ```
 
-with different repository URLs, credentials, branches, proxies, or other stable configuration. Different consumers or requirements bind to the appropriate instance.
+This is required for understandable UI and reproducible diagnostics.
 
-## III.5 Core creates provider instances
+## III.9 Configuration is separate from binding
 
-For every provider definition:
+Configuration answers how one provider instance is configured. Binding answers which provider instance a consumer uses. Binding preferences may reuse contextual identities through their own binding-preference scopes, but are not ordinary configuration values.
 
-```text
-user/admin
-    asks Core to create instance
+# IV. Persistent Semantic Extension Data
 
-Core:
-    generates immutable globally unique GUID/UUID-style instance id
-    stores name/description
-    stores instance config
-    makes instance visible to resolver
+## IV.1 Configuration versus semantic extension data
 
-component:
-    receives instance identity + normalized config
-    constructs runtime implementation
-```
+Configuration expresses intent used to configure a component/provider. Semantic extension data is component-owned project/domain meaning associated with a Core-managed workspace/entity. Runtime cache is neither.
 
-The provider component does not invent persistent IDs on its own.
+## IV.2 Static entity-extension declarations
 
-If no instance exists yet, Core creates the initial instance. Its initial display name may be `default`, but `default` is not a reserved identity or implicit binding target. The name may be changed without affecting references. When mandatory configuration is missing, the instance can remain unconfigured/non-ready; the uniform identity model does not require an invalid instance to be activatable.
+A component should statically declare which Core entity type IDs it extends, whether it only reads the Core entity, whether it stores extension data, the extension schema ID/version, and whether it contributes logical UI. Core can then expose generic extension sections/actions for matching entity types without loading arbitrary plugin implementation code. Extension-data write access does not imply Core-entity write access.
 
-## III.6 Suggested provider-instance record
+## IV.3 Physical storage belongs to the Core product
 
-Conceptually:
+AAC should not require `.aac/extensions` or any fixed path. Embedding an opaque extension envelope directly in a Core entity serialization can be excellent for a file-oriented product because Core entity migrations naturally carry the payload. A database-oriented product may instead keep a related extension table/document.
 
-```yaml
-id: "6dca4e9b-4d4e-4a67-9e3e-70c83aad75c1"
-name: "Production S3"
-description: "Primary production object store"
+The component should never need to know which representation was chosen.
 
-owner_component: "eu.algites.component.s3"
-provider_definition: "s3-object-store"
+## IV.4 Opaque migration is the key property
 
-configuration:
-  schema: "eu.algites.s3.object-store.config"
-  schema_version: 3
-  value:
-    endpoint: "..."
-    region: "eu-central-1"
-```
+The most important requirement is that Core can move/rename/restructure its own entity storage while preserving unknown extension data even when the plugin is absent. Core understands owner/schema/subject metadata but not plugin semantics.
 
-The exact serialization is product-specific.
+When a Core migration cannot map extension payloads unambiguously after split/merge/removal, it should preserve/orphan them rather than silently delete them.
 
-## III.7 Capability binding is a separate Core object
+## IV.5 Component absence and VCS
 
-A Core binding might conceptually be:
+A workspace checkout may contain extension data for a component that is not installed, not currently entitled, or incompatible. Core preserves it and reports compatibility state. Plugin-specific interpretation stays disabled until a suitable component is available.
 
-```yaml
-consumer:
-  component: "eu.algites.component.git"
+This is why semantic extension data can safely be VCS-portable without making the workspace dependent on the plugin being present during every Core migration.
 
-capability:
-  id: "algites.secrets.store"
-
-provider_instance_id: "62c0d4c3-3209-4ba5-850e-6fcd0e758f54"
-```
-
-This record must not be confused with the Git component's private configuration.
-
-The binding belongs to the system graph. It references the immutable provider instance ID, not a mutable display name such as `Corporate Vault` or `default`.
-
-### Example: two Git instances
-
-The same Git provider definition can be instantiated twice:
-
-```yaml
-provider_definition: git
-instances:
-  - id: "0d5a1c6d-c33b-40fb-a463-85ec378004f4"
-    name: "Source repository"
-    configuration:
-      repository: "git@git.algites.internal:application.git"
-      credentials: "corporate-git"
-      branch: "main"
-
-  - id: "aa023174-8517-4ce0-b820-26c40dc8cbc8"
-    name: "Deployment results"
-    configuration:
-      repository: "git@github.com:algites/deployment.git"
-      credentials: "github-token"
-      branch: "production"
-```
-
-A source-management requirement may bind to the first instance while a deployment-result requirement binds to the second. Stable repository identity and long-lived configuration belong to the instance; per-call values such as a requested revision or local checkout path remain invocation parameters.
-
-## III.8 Configuration UI
-
-A component administration page can combine several Core-owned views:
-
-```text
-Component settings
-
-Consumes:
-    algites.secrets.store
-        provider: Corporate Vault
-        contract: v2
-        binding source: workspace default
-
-Provides:
-    algites.vcs.status [v1,v2,v3]
-
-Provider instances:
-    ...
-```
-
-The provider line may be editable or read-only.
-
-The important point is that it is visible and sourced from Core resolution state.
-
----
-
-# IV. Persistent Semantic Data
-
-## IV.1 Configuration versus semantic data
-
-Configuration answers:
-
-```text
-How should this component behave?
-```
-
-Semantic extension data answers:
-
-```text
-What additional persistent information does this component add to the project/model?
-```
-
-Those are different.
-
-Example:
-
-```text
-Git component config:
-    remote timeout = 30 s
-
-Git semantic extension data:
-    Core object X maps to repository object Y
-```
-
-## IV.2 Why Core should persist semantic extension data
-
-If semantic data belongs to project meaning, storing it in arbitrary component-private files creates problems:
-
-- Core cannot preserve it when plugin absent;
-- VCS behavior becomes inconsistent;
-- references to Core objects become fragile;
-- migrations become component-specific side effects;
-- a different machine may lack the expected directory structure.
-
-A generic Core-managed extension-data store is safer.
-
-## IV.3 Suggested envelope
-
-Conceptually:
-
-```yaml
-owner_component: "eu.algites.component.foo"
-data_type: "core-object-mapping"
-schema_version: 4
-
-subject:
-  core_reference: "..."
-
-payload:
-  ...
-```
-
-Core can preserve the envelope even without understanding the payload semantics.
-
-## IV.4 Reference discipline
-
-References from extension data into Core domain data should use stable Core-defined IDs/reference objects.
-
-Do not use:
-
-```text
-file path to entity
-display name
-GUI row number
-implementation class name
-```
-
-unless the specific product explicitly defines such a value as stable identity.
-
-## IV.5 VCS scenario
-
-Suppose:
-
-```text
-Machine A:
-    Foo component v8
-    writes schema 5
-
-commit to Git
-
-Machine B:
-    Foo component v6
-    understands schemas [2,3,4]
-```
-
-Machine B should not attempt to parse schema 5 as schema 4.
-
-Core should:
-
-```text
-preserve schema 5
-mark it unsupported by installed Foo version
-block affected feature/scope
-show diagnostic
-```
-
-If Machine B later installs Foo v8, the same preserved data becomes usable.
-
-## IV.6 Component absent
-
-If a project contains extension data and the owning component is not installed, Core should treat it as opaque but preserved.
-
-This is analogous to retaining unknown-but-well-framed data.
-
-Explicit user deletion is different from automatic cleanup.
-
-## IV.7 Runtime state/cache
-
-Rebuildable state should normally live in a different Core facility, outside project/VCS semantics.
-
-Examples:
-
-```text
-cache
-temporary index
-last API response
-temporary synchronization cursor
-performance hints
-```
-
-If loss changes project meaning, it is not merely cache.
-
----
+The normative model is in `Application-Component-Context-Configuration-and-Entitlement-Specification.md`.
 
 # V. Configuration and Data Migration
 
@@ -687,8 +473,10 @@ Explicit readable-version declarations are required.
 Recommended order:
 
 ```text
-consumer override
-global/workspace binding
+consumer-instance override
+workspace binding
+user binding
+organization/system binding
 qualifier-based rule
 sole compatible provider
 platform default
@@ -864,6 +652,32 @@ The detailed normative model is specified in `Application-Component-Capability-C
 
 ---
 
+# VI.A Core Invocation Bridge and Entitlement Runtime Semantics
+
+## VI.A.1 Consumers never call provider implementations directly
+
+Even for an in-process Python or Java profile, the consumer receives a Core-owned capability handle/proxy. Core mediation is what makes tracing, version identity, process/subinterpreter transport, normalized errors, timeout/cancellation, and entitlement remediation consistent across runtime profiles.
+
+An in-process implementation can be fast, but bypassing Core would create different semantics from process/remote providers and would prevent central handling of permission failures.
+
+## VI.A.2 Entitlement is provider-owned permission semantics over Core-validated evidence
+
+Core validates entitlement evidence; one verified entitlement document may contain grant sections for multiple components sharing one issuer/scope/subject. Core extracts and validates the relevant component entries and supplies each runtime an effective permission/constraint context grouped by provided capability ID/version. Permission identity is `(component_id, capability_id, capability_version, permission_id)`. The provider interprets its own strings (`WRITE`, `EXPORT`, etc.) within that capability/version namespace. Consumers do not know or request those tiers; they know only the capability contract they consume.
+
+Core also carries effective validity/expiry and grant provenance per permission, including the source entitlement document/bundle and component entry where useful, and refreshes the provider context when grants expire, are revoked, or are refreshed. This allows an unlicensed provider to expose basic/configuration/diagnostic behavior and reject only restricted actions. A bundle document is not exploded into separate trust objects merely because it contains several components: signature/issuer/scope/subject evidence remains document-level, while applicability and descriptor validation remain component-entry-level.
+
+## VI.A.3 Central permission remediation
+
+When the provider returns standardized `PERMISSION_DENIED`, the bridge can refresh entitlement, invoke product licensing UI, obtain a new grant for an entitlement-scope type accepted by that provided capability version and a trusted matching subject identity, update the provider context, and optionally retry.
+
+Transparent retry is allowed only if the failure is explicitly marked safe after entitlement change or contract idempotency makes repetition safe. Otherwise Core can finish the licensing flow but must ask the caller/user to repeat the operation.
+
+## VI.A.4 Bindings are stable across ordinary permission changes
+
+Changing a provider permission set should not normally rebuild the capability graph. The binding still points to the same provider implementing the same contract; runtime authorization determines whether the current invocation is allowed.
+
+---
+
 # VII. Resolution, Wiring, and Cycles
 
 ## VII.1 Read all descriptors first
@@ -943,225 +757,121 @@ Class loaders and subinterpreters isolate dependencies/state but should not be s
 
 # IX. Python Runtime Notes
 
-## IX.1 Proposed baseline: CPython 3.14+
+## IX.1 Baseline: CPython 3.13+ with multiple runtime profiles
 
-The current preferred Python baseline is **CPython 3.14 or newer**.
-
-Python 3.14 added the public standard-library module:
-
-```python
-concurrent.interpreters
-```
-
-which exposes multiple interpreters as an application-level facility.
-
-Historically subinterpreters existed through lower-level APIs, but 3.14 is a much cleaner baseline for a reusable public runtime profile.
-
-## IX.2 Private environment plus private interpreter
-
-A private virtual environment or `site-packages` directory alone is not sufficient if all components run in one interpreter.
-
-The proposed profile therefore combines:
+The reusable Python binding should support **CPython 3.13 or newer** as its baseline. The baseline does not require subinterpreters. AAC distinguishes runtime profiles:
 
 ```text
-component-private dependency path
-+
-component-private interpreter
+IN_PROCESS
+    trusted/lightweight provider runs as a Python object in the Core interpreter
+
+PROCESS
+    provider instance runs in its own persistent child process
+    available on the 3.13+ baseline
+
+SUBINTERPRETER
+    provider instance runs in a CPython subinterpreter
+    optional Python 3.14+ profile
 ```
 
-## IX.3 Proposed runtime structure
+`PROCESS` is the portable dependency-isolation profile when private dependencies, native-extension incompatibility, crash containment, or language independence matter. `SUBINTERPRETER` is a lighter optimization profile where the runtime and dependencies are known to be compatible.
 
-```mermaid
-flowchart TB
-    MAIN["Main CPython Interpreter<br/>Core"]
-    DISP["Core Capability Dispatcher"]
-    PA["Component A Interpreter"]
-    PB["Component B Interpreter"]
-    AE["A private site-packages<br/>Library L v1"]
-    BE["B private site-packages<br/>Library L v2"]
+## IX.2 Provider-instance runtime ownership
 
-    MAIN --> DISP
-    DISP --> PA
-    DISP --> PB
-    PA --> AE
-    PB --> BE
-```
-
-## IX.4 Interpreter isolation characteristics
-
-Each interpreter has its own execution context, including import state and builtins.
-
-That allows two component interpreters to import different versions of a pure-Python package without sharing one `sys.modules` namespace.
-
-The interpreters still inhabit one OS process, so this is not a security boundary.
-
-## IX.5 Core active contract catalog representation in Python
-
-The Python Core should own the canonical schema/binding definition for every capability version in its active catalog.
-
-The active catalog may include:
+Runtime isolation is realized per **provider instance**, not merely per provider definition. If one provider definition has instances `A1` and `A2`, their configuration/lifecycle state is independent. Under `PROCESS`, Core therefore owns two persistent process handles:
 
 ```text
-built-in contract definitions
-+
-validated contract bundles supplied by extension packages
+Provider definition A
+    A1 -> child process P1
+    A2 -> child process P2
 ```
 
-A newly admitted contract may provide:
+The default profile does not multiplex several provider instances into one child process. A future explicit shared-process profile could be specified separately if a concrete need justifies the additional failure/configuration coupling.
 
-- canonical DTO/schema definitions;
-- proxy/dispatcher metadata;
-- generated or loadable Python bindings;
-- conformance identity.
+## IX.3 Persistent process profile
 
-A component may declare support for a newer capability version, but that version cannot be selected until Core has admitted the corresponding canonical contract definition.
-
-Unlike Java, Python does not require all isolated interpreters to share one `Class` object. Nevertheless, they must still operate from the same Core-owned canonical contract definition and dispatch semantics.
-
-## IX.6 Consumer-side proxy## IX.6 Consumer-side proxy
-
-Cross-interpreter components should not exchange arbitrary implementation objects.
-
-Consumer interpreter:
-
-```text
-ObjectStoreV3Proxy
-```
-
-Core dispatcher:
-
-```text
-selected provider instance
-selected contract version
-```
-
-Provider interpreter:
-
-```text
-S3ObjectStoreV3 implementation
-```
-
-## IX.7 Core-provided context
+A process runtime is started during `INSTANTIATE` and normally remains alive until `DEACTIVATE`. Core owns the process handle, IPC channel, timeout/error state and endpoint registration. The provider process receives only its own instance identity/configuration and the resolved capability proxies injected during `WIRE`.
 
 Conceptually:
 
-```python
-class ComponentContext:
-    def capability(self, capability_id: str):
-        ...
-```
-
-For `SINGLE` consumption, the returned proxy is already bound to the provider selected by Core.
-
-A component should not receive unrestricted discovery authority merely to choose another provider.
-
-## IX.8 Configuration delivery
-
-Core can pass a normalized configuration object into the component interpreter at bootstrap.
-
-The component does not need to know the physical persistence format.
-
-Provider instances can be instantiated with:
-
 ```text
-instance id
-name
-description
-normalized instance config
-resolved consumed-capability proxies
+Core                                      Provider process
+  |                                             |
+  |-- bootstrap(instance + configuration) ---->|
+  |-- wire(binding descriptors) -------------->|
+  |-- ready ---------------------------------->|
+  |-- activate -------------------------------->|
+  |                                             |
+  |-- invocation ----------------------------->|
+  |<----------------------------- result/error |
+  |                                             |
+  |<-- core_invoke(requirement, operation) -----|
+  |-- core_response -------------------------->|
+  |                                             |
+  |-- deactivate ----------------------------->|
+  |-- shutdown -------------------------------->|
 ```
 
-## IX.9 Data delivery
+The reference Python profile uses a persistent JSON-lines control protocol. Requests carry correlation IDs. Normalized `InvocationInput` / `InvocationOutput` values cross the boundary; arbitrary Python implementation objects do not. A non-Python executable may implement the same wire protocol.
 
-Core can deliver only extension-data schemas the installed component has declared readable.
+A provider definition may select the profile declaratively, for example:
 
-Unsupported newer data remains outside the component interpreter and is preserved by Core.
-
-## IX.10 Cross-interpreter data
-
-Capability contracts should prefer predictable transferable/serializable data.
-
-Good candidates include:
-
-```text
-None
-booleans
-numbers
-strings
-bytes
-structured immutable records
-explicit DTO serialization
+```yaml
+providers:
+  - id: audit
+    capability:
+      id: _AAC.capability.observation
+      version: 1
+    implementation_class: example.audit:AIcAuditProvider
+    runtime:
+      profile: PROCESS
 ```
 
-Arbitrary implementation objects are a poor contract boundary.
+For the reference Python binding, omission of `runtime.command` means that Core starts the standard AAC Python process host using the selected Python executable. A profile may instead declare an explicit command/environment to enter a component-private Python environment or a different executable implementing the AAC process protocol.
 
-## IX.11 Native extension limitation
+Provider code may call a consumed capability from the child process. The process-local capability handle sends a reverse request to Core identifying the already injected requirement/handle. Core performs the normal invocation against the already-resolved provider instance. This preserves centralized binding/version/observation policy.
 
-This remains the major constraint.
+The resolved provider-instance graph is a DAG before activation. That invariant is especially useful for process runtimes because nested capability calls cannot form a binding cycle that deadlocks a chain of mutually waiting child processes.
 
-Not every CPython native extension supports use from multiple interpreters.
+The baseline process profile may serialize requests per provider instance while allowing different provider-instance processes to execute concurrently. More advanced multiplexing can be added without changing capability contracts.
 
-A formal profile should classify dependencies roughly as:
+## IX.4 Process streams
 
-```text
-pure Python:
-    normally acceptable
+The reference JSON-lines Python host reserves its control stdout for protocol frames and redirects provider standard output to a diagnostic stream controlled by Core. Products may provide richer stream routing, logging, structured diagnostics, sockets or other transports, but component code MUST NOT be allowed to corrupt the control channel.
 
-standard-library/runtime extension:
-    validated with supported CPython baseline
+## IX.5 Private environments
 
-third-party native extension:
-    explicit multi-interpreter validation required
+A process command may point to the product Python executable or to a component-private environment. The latter allows a provider to use private Python/native dependencies without placing them in Core's environment. The provider package still depends on the shared AAC language-binding surface required by its process host/protocol.
 
-known incompatible:
-    rejected for this profile
-```
+## IX.6 Optional CPython 3.14+ subinterpreter profile
 
-## IX.12 Conformance for native dependencies
+Python 3.14 added the public standard-library `concurrent.interpreters` API. A `SUBINTERPRETER` profile may use one private interpreter per provider instance while keeping Core and all interpreters inside one OS process.
 
-Tests should create multiple isolated component interpreters and repeatedly import/use/destroy native-extension users to detect:
+Subinterpreters isolate import/module state and can be lighter than OS processes, but they are not a hostile-code security boundary. Not every third-party native extension is safe in multiple interpreters; incompatible providers must use another supported profile rather than silently weakening isolation.
 
-```text
-process-global state leakage
-crashes
-interpreter destruction problems
-unsupported multiple-interpreter assumptions
-```
+## IX.7 Core active contract catalog representation in Python
 
-## IX.13 GUI recommendation
+The Python Core owns the canonical schema/binding definition for every capability version in its active catalog. The active catalog may combine built-in contracts and validated contract bundles supplied by extensions. Cross-runtime proxies operate from these Core-owned definitions.
 
-Keep PySide/Qt in the Core interpreter for the baseline profile.
+## IX.8 Consumer-side handles/proxies
 
-Extension components contribute:
+A consumer receives only handles for providers selected during graph resolution. It does not receive unrestricted discovery authority. In-process handles may call Core directly; process/subinterpreter handles proxy normalized invocation requests across their runtime boundary.
 
-```text
-commands
-form descriptions
-panel models
-data models
-callbacks
-notifications
-```
+## IX.9 Configuration and data delivery
 
-through capabilities.
+Core delivers component-target and provider-instance-target effective configuration as separate normalized objects, plus only declared/allowed semantic data contexts. The component does not need to know the physical persistence format. Unsupported/newer semantic data remains Core-owned and preserved.
 
-Arbitrary private `QWidget` objects across interpreters should require a dedicated future profile.
+## IX.10 Native extension considerations
 
-## IX.14 Memory/performance
+Process isolation naturally handles dependencies that are unsafe in multiple interpreters because each provider instance owns an independent OS process. Subinterpreter compatibility must be explicitly validated for third-party native extensions.
 
-Subinterpreters are lighter than full processes in many cases but not free.
+## IX.11 GUI recommendation
 
-The profile should benchmark:
+Keep the primary GUI/web rendering implementation in Core/product-owned code for the baseline. Extension components contribute logical form/panel/data/action descriptions and callbacks through capabilities. Reusable AAC UI artifacts are now defined separately: `aac/uiintf` provides toolkit-neutral view/form/controller contracts and `aac/uiqt` provides the baseline PySide6 renderer. Arbitrary framework-native widget objects still do not cross process/interpreter boundaries.
 
-```text
-startup
-per-component interpreter memory
-duplicate module memory
-cross-interpreter dispatch cost
-shutdown/restart
-```
+## IX.12 Performance
 
-before publishing hard operational expectations.
+Process isolation costs additional memory, startup and serialization but provides stronger crash/native-library isolation. Subinterpreters can reduce those costs where supported. Products should measure startup, per-instance memory, invocation latency and shutdown/restart rather than assuming one profile is universally superior.
 
 ---
 
@@ -1672,11 +1382,11 @@ runtime invocation endpoint
 
 ## XI.2 Java
 
-The runtime endpoint can often be a direct reference implementing a shared parent-loaded Java interface.
+The consumer can receive a Core-created proxy/handle implementing the shared parent-loaded Java capability interface. Even when the provider is in the same JVM/class-loader topology, the proxy keeps Core mediation in the call path; the consumer does not receive the provider implementation object directly.
 
 ## XI.3 Python
 
-The endpoint is more likely a consumer-local proxy dispatching through Core into the provider interpreter.
+The consumer receives a Core-owned handle/proxy exposing the capability operations. The handle dispatches through Core to an in-process, process-isolated, subinterpreter or other provider endpoint according to the selected runtime profile.
 
 ## XI.4 Why Core owns the binding configuration
 
@@ -1710,7 +1420,7 @@ Consumes:
     capability
     selected provider instance
     selected contract version
-    binding scope/source
+    binding-preference scope/source
 
 Provides:
     provider definitions
@@ -1741,35 +1451,13 @@ The representation should not imply that the binding is stored in the component'
 
 ---
 
-# XIII. Process Isolation as an Alternative Runtime Profile
+# XIII. Process Isolation Runtime Profile
 
-## XIII.1 Benefits
+Process isolation is a first-class AAC runtime profile, not merely a future fallback. It is especially useful for native/private dependencies, crash containment and mixed-language providers.
 
-Separate processes improve isolation for:
+The baseline profile creates **one persistent process per provider instance**. Core owns each process handle and the corresponding invocation endpoint for the provider instance lifetime. This intentionally mirrors the Core-owned provider-instance model: different instance configuration implies independent runtime state and independent lifecycle.
 
-```text
-native dependencies
-crashes
-memory corruption
-mixed languages
-stronger security boundaries
-```
-
-## XIII.2 Costs
-
-They add:
-
-```text
-memory
-startup
-IPC
-serialization
-lifecycle complexity
-```
-
-## XIII.3 Baseline position
-
-Process isolation remains a valid future profile when interpreter/class-loader isolation cannot support required libraries.
+The profile costs additional memory, startup, IPC and serialization. Those costs are accepted in exchange for a clear dependency/failure boundary. Products may select lighter profiles for compatible trusted providers, but MUST NOT silently merge independent provider instances into one process or bypass the Core-resolved binding graph.
 
 ---
 
@@ -1851,11 +1539,20 @@ Test:
 
 - component configuration;
 - instance configuration;
+- fixed-schema bootstrap/profile loading;
+- different configuration-scope chains for different workspaces;
+- custom configuration-scope types such as CUSTOMER/TEAM/ORGANIZATION;
+- multiple configuration-providers within one configuration-scope;
+- deterministic equal-priority conflict handling;
+- monotonic MIN/MAX/IN_SET/NOT_IN_SET/LOCK composition;
+- policy conflict producing an empty domain;
+- policy DEFAULT provenance;
+- explicit value violating effective policy;
 - normalized injection;
 - config schema migration;
 - missing migration;
 - reconfiguration path;
-- secret reference handling.
+- secret reference handling without assuming WORKSPACE means Git storage.
 
 ## XVI.3 Persistent data tests
 
@@ -1874,14 +1571,17 @@ Test:
 
 Test:
 
-- separate interpreter per component;
-- conflicting private pure-Python dependencies;
-- cross-interpreter proxies;
-- configuration injection;
-- instance creation;
+- Core bridge/proxy mediation even for in-process providers;
+- persistent process per provider instance for the PROCESS profile;
+- two instances of one provider definition receive independent runtime state;
+- reverse process-to-Core consumed-capability invocation;
+- parent-invocation propagation across process boundaries;
+- conflicting private dependencies;
+- scoped effective configuration injection;
+- entitlement-context update and standardized permission denial;
 - resolved-instance cycle rejection;
-- interpreter restart;
-- native extension certification.
+- optional CPython 3.14+ subinterpreter profile when available;
+- native extension compatibility/certification.
 
 ## XVI.5 Java profile tests
 
@@ -1891,7 +1591,7 @@ Test:
 - common Core-owned active contract class loader;
 - separate component class loaders;
 - conflicting private library versions;
-- provider object through shared interface;
+- Core-created proxy/handle through the shared interface, with no direct provider object exposure;
 - old Core + new component using old interface class;
 - ensure v4 implementation class is not loaded when old Core selects v3;
 - reject plugin-private shadow copy of shared API;
@@ -1948,15 +1648,16 @@ The architecture would benefit from separate specifications for:
 - component descriptor schema;
 - capability contract schema (now initially formalized in `Application-Component-Capability-Contract-Specification.md`);
 - Core active contract catalog and dynamic contract-bundle admission;
-- configuration schema and normalized representation;
+- configuration-scope/configuration-provider/bootstrap-profile/policy representation (formalized in `Application-Component-Context-Configuration-and-Entitlement-Specification.md`);
 - provider-instance schema;
 - binding schema;
-- extension-data envelope;
+- semantic extension-data envelope and Core persistence adapter contract (partially formalized in `Application-Component-Context-Configuration-and-Entitlement-Specification.md`);
 - migration protocol;
 - Python runtime profile;
 - Java runtime profile;
 - process runtime profile;
-- UI capability catalog.
+- package-management/source/provenance specification;
+- entitlement-remediation provider/UI contracts beyond the baseline context model.
 
 ## XVIII.2 Promotion rule
 
@@ -1967,3 +1668,15 @@ A technical mechanism should become a formal public runtime/profile commitment w
 3. conformance tests exist;
 4. third-party authors can reasonably rely on it;
 5. Algites is prepared to support the published behavior.
+
+## XII.3 AAC reusable UI artifacts
+
+The Python AAC baseline separates UI contracts from the renderer:
+
+```text
+coreintf <- uiintf
+coreintf <- coreimpl
+uiintf + coreimpl <- uiqt
+```
+
+`uiintf` exposes normalized administration models and `AIiAacUiController`. `uiqt` maps registered JSON Schema properties to Qt editors, shows unresolved requirements as well as resolved topology, and stores provider selections as GUID-based Core binding preferences. The product owns QApplication/event-loop/window integration. Package installation UI is intentionally deferred until package-store semantics are defined.

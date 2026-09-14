@@ -218,6 +218,14 @@ invocation_id
 
 The identifier is runtime correlation metadata and is not a persistent provider or domain identity.
 
+## III.1.1 Core bridge is mandatory
+
+A consumer MUST invoke another component only through a Core-owned capability handle/proxy. It MUST NOT hold the provider implementation/runtime object directly, even for an in-process profile.
+
+Every cross-component call therefore passes through the Core invocation dispatcher, which preserves binding identity, contract/version identity, normalized validation, invocation/parent identity, observation/redaction, isolation transport and standardized error/remediation semantics.
+
+Technology profiles may optimize dispatch but MUST NOT expose a bypass path around Core mediation.
+
 ## III.2 Invocation target must preserve the resolved instance DAG
 
 A capability invocation is valid only through a binding that belongs to the Core-resolved acyclic extension provider-instance graph.
@@ -343,6 +351,47 @@ token: "<redacted>"
 rather than the secret.
 
 Redaction is a Core responsibility because generic observer plugins must not be trusted to redact values after receiving them.
+
+---
+
+# IV.A Standard Permission Failure and Remediation
+
+## IV.A.1 Permission denial is a normalized invocation outcome
+
+A provider may reject an operation according to its current Core-validated entitlement context. The normalized error category is:
+
+```text
+PERMISSION_DENIED
+```
+
+Language profiles may map this to a typed exception such as `AIxPermissionDenied`.
+
+The error may carry a capability-owned diagnostic permission identifier and remediation/offer metadata. The permission identifier is interpreted in the namespace of the invoked `(component, capability id, capability version)`. Consumers are not required to understand that provider permission vocabulary.
+
+## IV.A.2 Capability binding is not entitlement-tier binding
+
+A consumer requires a capability/version, not another component's commercial permission level. Therefore ordinary permission changes do not alter the resolved binding. The same provider remains the target; an operation may succeed or return `PERMISSION_DENIED` according to current provider entitlement context.
+
+Entitlement-scope subject identity, grant validity, entitlement-document/bundle structure, and entitlement-provider provenance are evaluated outside the invocation contract according to `Application-Component-Context-Configuration-and-Entitlement-Specification.md`. A single signed entitlement document may carry grant sections for multiple components; invocation semantics see only the effective permission context for the invoked provider/capability. The presence, absence, or semantic invalidity of another component entry in that bundle does not become part of this capability's invocation contract. The provided capability/version nevertheless declares its own permission vocabulary and accepted entitlement-scope types. Capability consumers MUST NOT depend on which applicable entitlement-scope/provider supplied the effective permission.
+
+## IV.A.3 Core remediation
+
+Because the invocation bridge sees standardized permission failures, Core may attempt a product-defined entitlement remediation flow before exposing the failure to the consumer.
+
+After successful remediation Core updates the target provider's entitlement context. Core MAY transparently retry the original invocation only when retry safety is explicitly established by the provider/contract failure semantics.
+
+A permission failure SHOULD include a retry disposition equivalent to:
+
+```text
+SAFE_AFTER_ENTITLEMENT_CHANGE
+DO_NOT_RETRY
+```
+
+`SAFE_AFTER_ENTITLEMENT_CHANGE` means the authorization failure occurred before externally visible business effects, or the operation is otherwise safe to repeat according to the contract's idempotency semantics.
+
+## IV.A.4 No unsafe transparent retry
+
+If retry safety is absent/unknown, Core MUST NOT silently repeat the operation. It may report that entitlement remediation succeeded but the caller/user must initiate the operation again.
 
 ---
 
@@ -491,10 +540,10 @@ Technology-private stack traces MUST NOT be assumed to be part of the portable c
 The observation provider exposes an operation conceptually equivalent to:
 
 ```text
-observe(ObservationEvent) -> ObservationAck
+observe(ObservationInput) -> ObservationOutput
 ```
 
-`ObservationAck` confirms delivery/processing status only.
+`ObservationOutput` confirms delivery/processing status only.
 
 It MUST NOT contain:
 
@@ -717,7 +766,7 @@ For an observed successful invocation, the logical sequence is:
 1. resolve consumer binding and operation
 2. normalize/redact PRE arguments
 3. emit PRE observation to matching observer instances
-4. invoke the authoritative provider instance
+4. invoke the authoritative provider instance through the Core bridge
 5. capture success result
 6. normalize/redact POST result
 7. emit POST observation to matching observer instances
@@ -829,9 +878,11 @@ Observation data should cross interpreter boundaries in normalized transferable 
 
 ## VIII.3 Process/RPC profiles
 
-A process-isolated profile may map capability/operation identity directly to an IPC/RPC method identifier.
+A process-isolated profile may map capability/operation identity directly to an IPC/RPC method identifier. The same operation tuple remains authoritative regardless of wire encoding.
 
-The same operation tuple remains authoritative regardless of wire encoding.
+In the baseline AAC process profile the process boundary belongs to a concrete provider instance. Core owns a persistent endpoint for that instance and transmits normalized invocation envelopes over the process channel. If the provider itself consumes another capability, its process-local consumer handle sends a reverse request to Core identifying the already injected requirement/handle; Core remains responsible for selecting and invoking the resolved target. A process provider MUST NOT use IPC addresses as an alternative binding/discovery mechanism.
+
+Correlation/causal metadata such as invocation and parent-invocation identity MUST survive the process boundary so observation/tracing remains one logical invocation chain.
 
 ---
 
@@ -982,7 +1033,11 @@ Test at least:
 - sensitive values are redacted;
 - observation delivery does not recursively observe itself;
 - nested capability calls carry correlation where supported;
-- provider remains singular/authoritative for a `SINGLE` business capability.
+- provider remains singular/authoritative for a `SINGLE` business capability;
+- in-process consumers still invoke through the Core bridge/proxy rather than a provider object;
+- `PERMISSION_DENIED` is normalized consistently;
+- safe entitlement remediation may retry when explicitly allowed;
+- unsafe/unknown retry disposition is never transparently retried.
 
 ## XII.4 Dynamic contract tests
 
@@ -1023,3 +1078,7 @@ No global Core operation enum should need modification.
 13. **Sensitive contract values are redacted before generic observer dispatch unless explicitly authorized.**
 14. **Generic observation uses canonical normalized contract data, not private implementation objects.**
 15. **Product-specific capability namespaces, such as Orchestrator `_AO.*`, are profiles of the general model rather than changes to the general architecture.**
+16. **Every cross-component invocation passes through a Core-owned capability handle/proxy and invocation bridge, including in-process profiles.**
+17. **A consumer binds to capability/version rather than another provider's commercial permission tier.**
+18. **`PERMISSION_DENIED` is a standardized runtime invocation outcome; permission identifiers are capability-version-owned diagnostic/provider semantics and are not consumer dependency requirements.**
+19. **Core may remediate a permission failure centrally, but transparent retry requires explicit retry safety.**
