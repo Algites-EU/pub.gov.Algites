@@ -3,7 +3,7 @@
 **Status:** Draft public specification  
 **Scope:** Technology-neutral lifecycle, provisioning, entitlement, graph eligibility, activation, suspension, unprovisioning, and uninstall semantics for application component architectures  
 **Audience:** Core implementers, component/plugin authors, SDK authors, product architects, entitlement-provider authors, and technology-profile authors  
-**Companion documents:** `Application-Component-Architecture-Governance.md`, `Application-Component-Architecture-Technical-Notes.md`, `Application-Component-Capability-Contract-Specification.md`
+**Companion documents:** `Application-Component-Architecture-Governance.md`, `Application-Component-Architecture-Technical-Notes.md`, `Application-Component-Capability-Contract-Specification.md`, `Application-Component-Upgrade-Transaction-Specification.md`
 
 ---
 
@@ -17,7 +17,7 @@ The goal is that Core can always explain *which stage* prevents a component or p
 
 ## I.2 Relationship to Governance
 
-`Application-Component-Architecture-Governance.md` defines the architectural invariants. This document owns the detailed lifecycle semantics. Governance documents SHOULD reference this specification instead of duplicating lifecycle state machines.
+`Application-Component-Architecture-Governance.md` defines the architectural invariants. This document owns the detailed lifecycle semantics. `Application-Component-Upgrade-Transaction-Specification.md` specializes lifecycle behavior for complete target-state component replacement and rollback. Governance documents SHOULD reference these specifications instead of duplicating lifecycle state machines.
 
 ## I.3 Relationship to capability contracts
 
@@ -114,6 +114,15 @@ Core reads static descriptors without executing arbitrary component business log
 ## III.3 Verification
 
 Verification covers package integrity, signatures/trust policy where applicable, descriptor validity, runtime-profile compatibility, and other install-time safety checks. For downloaded packages, the exact bytes that will become installed/admitted MUST be verified immediately before atomic installation/admission; an earlier download-time verification is useful but not sufficient by itself. Verification failure blocks later runtime stages.
+
+
+### III.3.1 Package-store states
+
+Package storage distinguishes `DOWNLOADED`, `INSTALLED`, and `OBSOLETE`. `INSTALLED` does not mean active: multiple immutable artifacts may coexist physically while replacement candidates are staged, but within one Core-managed runtime/package-selection domain at most one artifact version of a component identity is active/selected. After a successful replacement, the superseded unselected artifact SHOULD move to `OBSOLETE` according to retention policy; rollback/recovery may explicitly restore it.
+
+The host product supplies the filesystem root/layout. AAC recommends `plugins/downloaded`, `plugins/installed`, and `plugins/obsolete` below the product root, but products MAY override those relative names.
+
+Immediately before install promotion, the exact temporary-destination artifact bytes MUST be re-verified and then atomically promoted unchanged. An obsolete artifact MUST NOT participate in ordinary automatic selection unless it is explicitly restored first.
 
 ## III.4 Contract admission
 
@@ -386,7 +395,15 @@ Entitlement-scope types are part of a provided capability version's licensing co
 
 Entitlement-providers are part of a trusted bootstrap/context path and MUST NOT recursively depend on the entitlement result they are responsible for establishing. The detailed entitlement-scope/entitlement-provider model is defined by `Application-Component-Context-Configuration-and-Entitlement-Specification.md`.
 
-## IV.6 Hook failure semantics
+Issuer signature verification and issuer authorization are separate. Products MUST fail closed when evidence is signed by an identity that is not trusted to issue entitlement for the affected component. A fixed-schema entitlement bootstrap MAY register file entitlement-providers, trusted issuer rules, entitlement subject resolvers, and evidence-verifier bindings.
+
+## IV.6 Bootstrap authentication dependencies
+
+Authentication required before ordinary configuration resolution MUST be established from fixed product/bootstrap state and bootstrap-safe secret providers. Lifecycle construction MUST NOT create a dependency cycle in which an authentication credential is obtainable only from the remote provider whose authentication requires that credential.
+
+Transport authentication and Core authorization remain distinct lifecycle concerns: successful login to a remote configuration service does not authorize the current application principal to mutate configuration or policy.
+
+## IV.7 Hook failure semantics
 
 Lifecycle hook failures MUST be attributed to the relevant lifecycle stage. Core SHOULD execute state-changing hooks transactionally, against staging state, or with an explicit recovery protocol. A failed hook MUST NOT leave Core claiming that a later lifecycle stage completed successfully.
 
@@ -494,6 +511,7 @@ A product MAY support an explicit hard activation entitlement prerequisite for c
 ## VI.7 Dynamic revalidation and delivery
 
 Core MUST support policy-driven refresh/revalidation while a provider instance is running and MUST deliver the updated effective entitlement context through a Core-controlled context/lifecycle update path.
+ Core SHOULD schedule revalidation at the earliest known future grant transition and MAY also revalidate on provider change notifications, revocation signals, explicit refresh, or application-context changes.
 
 A provider may change its permitted behavior immediately after such an update without graph re-resolution. If the implementation requires restart for a context change, it must declare/return that requirement explicitly.
 
@@ -509,6 +527,28 @@ DO_NOT_RETRY
 ```
 
 Without explicit retry safety Core MUST NOT silently repeat the operation.
+
+# VI.A. Component Authorization Admission
+
+## VI.A.1 Requested authority is declarative
+
+A consumer requirement may declare `requested_authorizations` belonging to the canonical authorization vocabulary of the capability version it consumes. This is independent of entitlement metadata.
+
+During admission/resolution Core MUST validate requested identifiers against the negotiated/admitted capability contract. Invalid identifiers are descriptor/contract errors.
+
+## VI.A.2 Grant is separate from request and binding
+
+The request is not a grant. Product/system policy, administrator approval, trusted installation policy, or built-in-product trust determines the granted subset. The grant is persisted against the concrete consumer instance/requirement so changing a binding does not silently invent additional authority.
+
+A component MUST NOT receive permissions it did not request.
+
+## VI.A.3 Invocation check
+
+Before dispatching a protected operation, Core checks canonical `all_of`/`any_of` requirements against the component grant and, if configured, current-principal authorization. Denial occurs before provider business logic.
+
+## VI.A.4 Built-in product components
+
+Trusted built-in product components enter the same lifecycle after product bootstrap/admission. Product policy MAY pre-approve their requested authorization permissions, but their cross-component calls still use Core capability handles so observation and current-principal checks remain consistent.
 
 # VII. Binding and Graph-Safety Rules
 
@@ -616,25 +656,71 @@ This is essential for actionable diagnostics.
 
 # IX. Upgrade, Downgrade, and Migration
 
-## IX.1 Upgrade flow
+## IX.1 Versioned component-owned persisted payloads
 
-Component upgrade may require configuration/data migration before activation. Core SHOULD stage, validate, and commit migrations before exposing the new runtime as active.
+Component configuration and component-extension data use schema identities/versions independent of component package version. Writer component version is provenance, not the persisted-format identity.
 
-## IX.2 Downgrade
+## IX.2 Complete target-state replacement flow
 
-Downgrade is the same compatibility problem in reverse. Newer stored schemas MUST NOT be silently interpreted by an older component that does not declare them readable.
+An upgrade is a replacement transaction from one complete active component state to another. One transaction MAY replace one component or multiple components. The runtime MUST NOT require each arbitrary sequential intermediate combination to be valid; compatibility is evaluated against the complete requested target state.
 
-## IX.3 Entitlement changes are not migrations
+Before deactivation of the current runtime or mutation of authoritative persisted state, Core MUST perform target-state preflight as far as static/declarative information permits:
 
-Losing entitlement does not authorize destructive configuration or semantic-data migration/deletion. Persistent state remains preserved unless a separate explicit lifecycle operation requires modification.
+```text
+construct target component set by applying all replacements
+rebuild target active contract catalog from that target set
+validate canonical contract conflicts/admission
+resolve all mandatory target provider/consumer requirements
+validate target provider-instance reconciliation
+inspect persisted component-owned schema compatibility
+stage required migrations without committing live state
+```
 
----
+Core SHOULD inspect all persisted component-owned payloads relevant to every replaced/affected component:
+
+```text
+component-target configuration
+provider-instance-target configuration
+component-extension payloads associated with Core entities
+```
+
+For older schemas requiring migration, Core SHOULD stage component-supplied transformations and validate target schemas before the commit boundary. Configuration migration MUST include policy-modes as well as ordinary values.
+
+If preflight fails, the current active state remains unchanged. Diagnostics SHOULD identify all known affected components/requirements when practical so an administrator can add further replacements to the same transaction.
+
+After successful preflight, Core MAY execute implementation steps sequentially, but activation is one logical cutover to the complete target state. The target becomes authoritative only when commit succeeds. Detailed replacement semantics are specified by `Application-Component-Upgrade-Transaction-Specification.md`.
+
+## IX.3 Core-domain migration and component-extension migration are distinct
+
+The concrete Core application owns migration of its own entities/storage and decides how component-extension collections are carried through application-specific transformations. AAC does not parameterize arbitrary entity split/merge/replacement/new-ID migrations.
+
+The generic requirement is preservation: unknown component-extension data MUST NOT be silently lost merely because the owning component is absent.
+
+A later component-extension migration operates only on the component-owned payload as attached to the current Core entity. Core supplies the current Core entity type/id, schema ID/version, and normalized snapshot when required.
+
+## IX.3.1 Configuration-provider persistence during migration
+
+When persisted configuration requires a declared schema migration, Core orchestrates read -> migrate -> validate -> compare-and-swap replacement. Provider persistence is not performed by component migration code directly. If the provider is read-only, Core may use a safe in-memory migrated view but MUST NOT pretend the source was upgraded. Concurrent revision mismatch aborts persistence rather than overwriting a newer contribution.
+
+## IX.4 Unsupported newer schemas
+
+If persisted configuration or component-extension data use a schema version newer than the installed component declares readable, Core MUST preserve the payload and prevent incompatible rewriting. No implicit downgrade, partial interpretation, truncation, or normalization is permitted.
+
+## IX.5 Downgrade and transaction-wide rollback
+
+Downgrade is the same compatibility problem in reverse and MUST use the same complete target-state validation. Newer stored schemas MUST NOT be silently interpreted by an older component. A downgrade is valid only when the target component explicitly declares the schema readable, an explicit downgrade migration exists, or compatible persisted snapshots are restored.
+
+If a replacement fails after the transaction boundary, Core MUST attempt restoration of the previous complete state, including as applicable package selection/lifecycle, configuration and component-extension data, admitted descriptors/contracts/schemas, provider-instance/binding state, and runtime instances. Reverting only executable/package bytes is not universally sufficient.
+
+## IX.6 Entitlement changes are not migrations
+
+Losing entitlement does not authorize destructive configuration or semantic component-extension migration/deletion. Persistent state remains preserved unless a separate explicit lifecycle operation requires modification.
 
 # X. Uninstall and Data Preservation
 
 ## X.1 Uninstall is not purge
 
-Removing a component package may leave Core-owned configuration and semantic extension data preserved so that:
+Removing a component package may leave Core-owned configuration and semantic component-extension data preserved so that:
 
 - VCS/project meaning is not silently lost;
 - reinstalling a compatible component can restore functionality;
@@ -651,7 +737,9 @@ Permanent deletion of component-owned semantic data, component-target configurat
 A Core administration UI SHOULD be able to expose separately:
 
 ```text
-package installed/present
+package downloaded/installed/obsolete state
+active package version/digest
+replacement-transaction/preflight state
 verification state
 provisioning state
 configuration validity
@@ -684,6 +772,11 @@ Conformance suites SHOULD cover at least:
 - concrete provider-instance cycle rejection and diagnostic cycle paths;
 - observation-delivery exclusion;
 - failed provisioning rollback/recovery;
+- single-component replacement as a one-item transaction;
+- multi-component replacement whose sequential intermediate states are invalid but whose complete target state is valid;
+- target active contract-catalog rebuild when a replaced component supplied contract bundles;
+- target-state rejection without live-state mutation;
+- transaction-wide rollback after package/configuration/extension-data/runtime changes;
 - upgrade/downgrade migration;
 - uninstall without semantic-data purge;
 - explicit purge/reference protection.
@@ -706,3 +799,7 @@ Conformance suites SHOULD cover at least:
 12. **Uninstall does not imply purge.**
 13. **Core should attribute lifecycle failures to the stage in which they occur.**
 14. **The lifecycle model is technology- and presentation-host-independent.**
+15. **At most one artifact version of a component identity is active/selected in one Core-managed runtime/package-selection domain.**
+16. **Upgrade/downgrade is complete-state replacement; one transaction may replace multiple components and intermediate states need not be valid.**
+17. **The target contract catalog and provider/consumer graph are rebuilt/validated before live-state mutation.**
+18. **Required component-owned data migrations and rollback participate in the same Core-controlled replacement transaction.**

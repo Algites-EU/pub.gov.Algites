@@ -3,7 +3,7 @@
 **Status:** Draft public specification  
 **Scope:** Capability contracts, operations, invocation identity, and generic invocation observation in application component architectures  
 **Audience:** Core implementers, component/plugin authors, SDK authors, technology-profile authors, and third-party integration developers  
-**Companion documents:** `Application-Component-Architecture-Governance.md`, `Application-Component-Architecture-Technical-Notes.md`, `Application-Component-Lifecycle-and-Provisioning-Specification.md`
+**Companion documents:** `Application-Component-Architecture-Governance.md`, `Application-Component-Architecture-Technical-Notes.md`, `Application-Component-Lifecycle-and-Provisioning-Specification.md`, `Application-Component-Upgrade-Transaction-Specification.md`
 
 ---
 
@@ -380,6 +380,8 @@ Because the invocation bridge sees standardized permission failures, Core may at
 
 After successful remediation Core updates the target provider's entitlement context. Core MAY transparently retry the original invocation only when retry safety is explicitly established by the provider/contract failure semantics.
 
+A technology binding may expose an `AIiEntitlementRemediator`-equivalent service. Core passes normalized context such as target capability/version, provider-instance identity, missing permission identifier when supplied, and remediation hint. The remediation service does not receive authority to bypass issuer verification; successful remediation means new/changed evidence is available and Core must re-evaluate it before retry. Baseline Core performs at most one transparent remediation retry per original invocation.
+
 A permission failure SHOULD include a retry disposition equivalent to:
 
 ```text
@@ -394,6 +396,111 @@ DO_NOT_RETRY
 If retry safety is absent/unknown, Core MUST NOT silently repeat the operation. It may report that entitlement remediation succeeded but the caller/user must initiate the operation again.
 
 ---
+
+# IV.B. Capability Authorization Contracts
+
+## IV.B.1 Authorization is distinct from entitlement
+
+Capability **authorization** answers which operations a consumer component and the current application principal are allowed to invoke through an already-resolved capability binding. It is distinct from entitlement:
+
+- entitlement permissions are capability-owned commercial/use rights delivered to the provider; Core may treat their identifiers as opaque;
+- authorization permissions are part of the canonical capability contract and therefore are understood by Core, the provider binding, and the consumer admission process.
+
+`provides`/`consumes` establishes topology and contract compatibility. It does not by itself authorize every operation of the capability.
+
+## IV.B.2 Canonical authorization vocabulary
+
+A capability version MAY publish an authorization vocabulary. Every authorization permission intended for user/admin interaction MUST carry stable machine identity and presentation metadata:
+
+```yaml
+capability:
+  id: _AO.core.siteManagement
+  version: 1
+  name:
+    text: Site management
+    resource_key: ao.siteManagement.name
+  description:
+    text: Read and modify Orchestrator Site entities.
+    resource_key: ao.siteManagement.description
+
+authorization_permissions:
+  - id: VIEW_SITE
+    name:
+      text: View sites
+      resource_key: ao.siteManagement.authorization.view.name
+    description:
+      text: Allows the component to read Site data.
+
+  - id: EDIT_SITE
+    name:
+      text: Edit sites
+      resource_key: ao.siteManagement.authorization.edit.name
+    description:
+      text: Allows the component to modify writable Site attributes.
+```
+
+`id` is the stable semantic identity. `name` and `description` are presentation metadata and MUST NOT be used as identity. A display text MAY contain direct `text`, an opaque `resource_key`, or both. When both are present, direct text is the baseline fallback. AAC does not require a localization engine in the baseline specification.
+
+## IV.B.3 Operation authorization requirements
+
+Each operation MAY reference authorization permissions declared by that same capability version. The baseline authorization expression contains only two flat constructs:
+
+```yaml
+authorization:
+  all_of: [EDIT_SITE]
+  any_of: [STANDARD_EDITOR, ADVANCED_EDITOR]
+```
+
+Semantics are:
+
+1. every permission in `all_of` MUST be effective;
+2. when `any_of` is non-empty, at least one permission in `any_of` MUST be effective;
+3. both conditions apply when both constructs are present.
+
+AAC v1 does not define `NOT`, nesting, or a general expression language. Capability designers SHOULD prefer meaningful denormalized permissions where doing so produces a clearer administrative contract.
+
+Every referenced permission ID MUST exist in the capability-version authorization vocabulary. This is a contract-admission validation rule.
+
+## IV.B.4 Consumer-requested authorization
+
+A consumer requirement MAY request a subset of the authorization vocabulary of the negotiated capability version:
+
+```yaml
+consumes:
+  capability: _AO.core.siteManagement
+  version: 1
+  requested_authorizations:
+    - VIEW_SITE
+    - EDIT_SITE
+```
+
+The request expresses least-privilege intent. It does not itself grant access. Product/system policy, administrator approval, installation/admission policy, or another Core authorization authority grants an allowed subset.
+
+A component MUST NOT be granted an authorization permission it did not request for that requirement. A request containing an identifier not declared by the negotiated capability version is invalid.
+
+## IV.B.5 Runtime enforcement
+
+Before invoking a protected provider operation, the Core bridge MUST verify the operation's canonical authorization requirement against the consumer-instance/requirement grant. When the product uses current-principal authorization, Core MUST additionally verify the same required permissions against the current application principal.
+
+Conceptually:
+
+```text
+canonical operation authorization
+        ⊆ component authorization grant
+        AND
+canonical operation authorization
+        ⊆ current-principal authorization, when configured
+```
+
+Authorization failure MUST be rejected by Core before provider business logic is entered.
+
+## IV.B.6 Product/Core capabilities use the same model
+
+A host product SHOULD expose reusable Core/domain/UI services as normal capabilities of one or more built-in product components. External and built-in consumers call them through the same Core bridge.
+
+For example, an Orchestrator map component may consume `_AO.core.siteManagement/1` to read/update Site data and a UI capability to invoke the standard Site editor. Its map coordinates remain component-extension data, while changes to `display_name` remain Core-owned Site mutations mediated by the Core capability.
+
+Built-in components may be pre-authorized by product trust policy, but they SHOULD NOT bypass the capability bridge merely because their implementation ships with the product.
 
 # V. Generic Capability Invocation Observation
 
@@ -846,35 +953,31 @@ Other observer instances may still receive those nested invocations according to
 
 ## VIII.1 Java
 
-A Java capability contract may map operations to methods on a shared Core-owned contract interface.
-
-Example:
+Java language bindings SHOULD be generated from the canonical capability contract rather than manually duplicating operation/security metadata. A generated interface uses the Algites generated-interface prefix and generated DTOs, for example:
 
 ```java
-public interface VcsRepositoryV1 {
-    CommitResult commit(CommitRequest request);
-    PushResult push(PushRequest request);
+public interface AIigSiteManagement_1 {
+    @AIaOperation("get_site")
+    @AIaAuthorization(allOf = {"VIEW_SITE"})
+    AIcgdGetSiteOutput getSite(AIcgdGetSiteInput input);
+
+    @AIaOperation("update_site")
+    @AIaAuthorization(allOf = {"EDIT_SITE"})
+    AIcgdUpdateSiteOutput updateSite(AIcgdUpdateSiteInput input);
 }
 ```
 
-The canonical contract metadata must still identify:
+Java annotations use the `AIa` prefix. They are generated language-binding metadata, not an independent source of authorization truth. The implementation implements the generated interface and MUST NOT redefine a conflicting operation/authorization mapping.
 
-```text
-example.vcs.repository / 1 / commit
-example.vcs.repository / 1 / push
-```
-
-The observer MUST receive normalized contract data, not arbitrary provider-private Java objects.
-
-Shared request/result DTOs follow the Core-owned class-loader identity rules defined in the Java runtime notes/profile.
+Shared generated interfaces and DTOs follow the Core-owned class-loader identity rules defined in the Java runtime profile.
 
 ## VIII.2 Python
 
-A Python capability may expose consumer-local proxy methods corresponding to canonical operation IDs.
+Python bindings SHOULD likewise be generated from the canonical capability contract. Generated interfaces use `AIig...`; generated DTO classes use `AIcgd...`. A generated method SHOULD accept one normalized/generated input DTO and return one output DTO rather than expanding schema properties into a fragile variable method signature.
 
-The proxy/dispatcher maps the logical operation to the selected provider interpreter.
+Generated decorators/metadata map the method to the canonical operation ID and authorization requirement. The canonical contract remains authoritative; generated Python metadata is only the binding representation.
 
-Observation data should cross interpreter boundaries in normalized transferable form rather than by sharing arbitrary implementation objects.
+This approach preserves identical contract identity across in-process, subinterpreter and process/RPC profiles and allows the same input/output schemas to drive validation and, where appropriate, generic UI forms.
 
 ## VIII.3 Process/RPC profiles
 
@@ -885,6 +988,22 @@ In the baseline AAC process profile the process boundary belongs to a concrete p
 Correlation/causal metadata such as invocation and parent-invocation identity MUST survive the process boundary so observation/tracing remains one logical invocation chain.
 
 ---
+
+## VIII.4 User-visible metadata
+
+Definitions that may be presented to users or administrators SHOULD carry `name` and `description` presentation metadata in addition to their stable technical IDs. This applies at least to components, provider definitions, consumer requirements, capabilities, operations, authorization permissions, entitlement permissions, configuration profiles/scopes/providers, authentication profiles, and entity-extension contributions when those definitions appear in product UI.
+
+The common display-text shape permits:
+
+```yaml
+name:
+  text: Edit sites
+  resource_key: ao.authorization.editSite.name
+```
+
+or either field alone. `resource_key` is intentionally opaque to AAC v1; a product-localization engine MAY resolve it. No localization engine is required by this specification. `text` is the baseline fallback when available.
+
+For schema-driven configuration fields, products MAY use equivalent schema presentation extensions such as `x-aac-name` and `x-aac-description`, while ordinary JSON Schema `title`/`description` remain valid fallback metadata.
 
 # IX. Descriptor and Contract-Bundle Considerations
 
@@ -909,6 +1028,8 @@ plugin package contains contract bundle
 ```
 
 This permits third-party components to communicate through new capability contracts without requiring a global Core release containing every future operation name.
+
+During a component replacement transaction, contract admission is evaluated against the complete target component set. Core MUST rebuild the target active contract catalog from built-in contracts plus canonical bundles supplied by the target set; it MUST NOT merely union new candidate bundles into the current catalog. A contract supplied only by a replaced/removed component therefore disappears from the target catalog unless another target source supplies the same canonical definition.
 
 ## IX.3 Unknown-at-build-time does not mean unknown-at-binding-time
 
@@ -992,6 +1113,16 @@ Only canonical contract data and explicitly allowed runtime metadata belong in t
 A product may expose additional privileged diagnostic fields, but such fields should be separately classified and must not silently become part of the portable capability contract.
 
 ---
+
+## XI.5 Persistence-migration failures remain Core-mediated
+
+Configuration and component-extension migrations are not ordinary direct component-to-storage calls. Technology bindings MUST preserve the general AAC rule that component-owned persisted payload transformations are invoked under Core control; components do not bypass Core persistence merely because migration code runs in-process. Detailed schema/migration semantics are defined by `Application-Component-Context-Configuration-and-Entitlement-Specification.md` and `Application-Component-Lifecycle-and-Provisioning-Specification.md`.
+
+## XI.6 External-service authentication is not capability entitlement
+
+Authentication to an external HTTP/service endpoint and AAC entitlement permission are separate concepts. A capability provider may use a shared AAC authentication profile/secret reference to reach an external service while independently interpreting Core-validated entitlement permissions for its own capability operations. Consumers MUST NOT receive or depend on the provider's external credential material.
+
+Core invocation mediation MUST NOT leak resolved passwords, bearer tokens, private keys, or equivalent authentication material into normalized observation events.
 
 # XII. Conformance Requirements
 
@@ -1082,3 +1213,15 @@ No global Core operation enum should need modification.
 17. **A consumer binds to capability/version rather than another provider's commercial permission tier.**
 18. **`PERMISSION_DENIED` is a standardized runtime invocation outcome; permission identifiers are capability-version-owned diagnostic/provider semantics and are not consumer dependency requirements.**
 19. **Core may remediate a permission failure centrally, but transparent retry requires explicit retry safety.**
+20. **Component replacement rebuilds the active contract catalog from the complete target component set before target binding resolution; removed suppliers do not leave stale target contract definitions behind.**
+
+
+# Package identity versus capability identity
+
+Package resolution and capability contract negotiation use different identities. A package store/lock may distinguish component package version, exact artifact digest/build, source, and signer provenance. None of those fields changes the canonical operation identity:
+
+```text
+(capability_id, capability_version, operation_id)
+```
+
+Two different artifact digests may therefore implement the same capability version. Core verifies/adopts package artifacts according to package policy, then independently admits/deduplicates canonical capability definitions according to capability-contract rules. A workspace package lock MUST NOT be interpreted as a new capability contract version.

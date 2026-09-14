@@ -5,7 +5,7 @@
 **Reference framework:** Algites Application Components (AAC), reserved public namespace `_AAC.*`  
 **Audience:** Algites product teams, component authors, plugin authors, integration developers, and third-party implementers  
 **Applicability:** Product- and implementation-language-independent  
-**Companion documents:** `Application-Component-Architecture-Technical-Notes.md`, `Application-Component-Capability-Contract-Specification.md`, `Application-Component-Lifecycle-and-Provisioning-Specification.md`
+**Companion documents:** `Application-Component-Architecture-Technical-Notes.md`, `Application-Component-Capability-Contract-Specification.md`, `Application-Component-Lifecycle-and-Provisioning-Specification.md`, `Application-Component-Upgrade-Transaction-Specification.md`
 
 ---
 
@@ -757,6 +757,10 @@ Unless a product/profile defines otherwise:
 
 The contextual step is deterministic only after the active binding-preference-scope chain is known; AAC does not hard-code `ORGANIZATION`, `CUSTOMER`, `USER`, `WORKSPACE`, or another custom contextual type into this precedence.
 
+### Entitlement trust boundary
+
+Entitlement evidence is authoritative only after both evidence verification and issuer authorization. A valid signature from an arbitrary identity MUST NOT imply license authority. Workspace scope denotes a declared logical licensing subject and MUST NOT be represented as a cryptographic anti-cloning guarantee.
+
 # VI. Capability Graph Resolution
 
 ## VI.1 Complete graph before activation
@@ -933,6 +937,16 @@ Core delivers normalized effective configuration to provider instances. Secret m
 
 Configuration schemas and bootstrap/profile schemas MUST use explicit version identity according to the applicable product/framework compatibility policy.
 
+## VII.9 Authentication, secret storage, and authorization
+
+Remote configuration-providers and other AAC facilities MUST use the common separation defined by `Application-Component-Context-Configuration-and-Entitlement-Specification.md`:
+
+- authentication establishes transport/service identity;
+- secret providers resolve credential material;
+- Core/product authorization decides whether an application principal may perform an AAC operation.
+
+A provider MUST NOT infer Core authorization merely from successful remote authentication or from filesystem write access. Portable configuration SHOULD contain secret references rather than secret bytes. Authentication profiles SHOULD be reusable across configuration-providers, entitlement-providers, package repositories, licensing services, and other remote facilities.
+
 # VIII. Provider Instance Lifecycle Ownership
 
 ## VIII.1 Core owns provider-instance lifecycle
@@ -963,45 +977,64 @@ The architecture distinguishes at least:
 
 ```text
 configuration
-semantic extension data
+semantic component-extension data
 runtime state/cache
 secrets
 ```
 
 These categories MUST NOT be conflated.
 
-## IX.2 Semantic extension data
+## IX.2 Semantic component-extension data
 
 A component may own persistent semantic data associated with a Core-managed workspace/project or Core-domain entity. If the data affects project meaning, Core owns the persistence boundary and preserves it independently of component availability.
 
-AAC defines only a logical extension-data contract. **AAC does not prescribe a `.aac/extensions/...` filesystem layout or any other physical mapping.** A product may embed opaque extension payloads inside the Core entity serialization, store them in related database records, use companion files, or use another product-defined mechanism.
+AAC defines only a logical component-extension-data contract. **AAC does not prescribe a `.aac/extensions/...` filesystem layout or any other physical mapping.** A product may embed opaque payloads inside Core entity serialization, store them in related database records, use companion files, or use another product-defined mechanism.
 
-Components SHOULD statically declare the Core entity type IDs for which they provide semantic/UI extensions, the required Core-entity access (baseline `READ`), whether extension data is absent/read-only/read-write, the extension schema ID/version, and logical UI contribution metadata when applicable. This lets Core discover extension contributions without invoking arbitrary plugin code. Declaring extension data does not grant permission to mutate the Core entity itself.
+One Core entity MAY contain component-extension data from any number of components. Baseline AAC permits at most one component-extension payload for each `(Core entity, owner component)` pair; multiple logical substructures owned by one component should be represented inside one modular component-extension schema.
 
-## IX.3 Extension-data envelope and references
+Components SHOULD statically declare the Core entity type IDs for which they provide semantic/UI extensions, required Core-entity access (baseline `READ`), component-extension-data access, component-extension schema identity/readable/current-write versions, optional compatibility with Core entity schema versions, and logical UI contribution metadata. Declaring component-extension data does not grant permission to mutate the Core entity itself.
+
+## IX.3 Component-extension envelope and references
 
 Core SHOULD retain at least:
 
 ```text
-owner component id
-extension/data schema id
-schema version
-stable Core subject/entity reference
+owner component ID
+component-extension schema ID/version
+stable Core entity type/identity
+writer component version as provenance
 payload
-optionally writer component version
 ```
 
-Extension data references Core objects through stable Core identities, not filesystem paths, implementation-class names, memory addresses, or UI identifiers.
+When a component interprets or migrates the payload, Core MUST also be able to identify the current Core entity schema ID/version and SHOULD provide a normalized current entity snapshot when needed.
+
+Component-extension data reference Core objects through stable Core identities, not filesystem paths, implementation-class names, memory addresses, or UI identifiers.
 
 ## IX.4 Core migration without plugin participation
 
-Core MUST be able to migrate its own domain/storage structure while preserving unknown extension payloads opaquely. If an entity is moved, renamed, or represented differently but its identity survives, associated extension data SHOULD move with it automatically.
+AAC does not define a universal Core-entity migration language. Entity split, merge, replacement, generated IDs, storage restructuring and similar transformations belong to the concrete Core application.
 
-If a Core migration splits, merges, or removes entities and cannot unambiguously map extension payloads, Core MUST NOT silently discard them. Product policy may preserve them as orphaned extension data requiring later reconciliation.
+Core/application migrations MUST nevertheless preserve unknown component-extension data unless that concrete product migration explicitly transforms or explicitly removes them. A plugin need not be installed merely so Core can preserve its opaque payload.
 
-## IX.5 Component absent, incompatible, or unentitled
+AAC does not require generic lineage graphs, successor mappings, or migration-candidate states for this purpose.
 
-If extension data exists but the owning component is missing, incompatible, or currently lacks entitlement:
+## IX.5 Component-extension schema migration
+
+Component-extension schema evolution is owned by the component but orchestrated by Core. Schema version is independent of component package version. Component declarations SHOULD state readable component-extension schema versions, the current writable version, and available explicit migrations.
+
+A component-extension migrator operates against the **current** Core entity/schema context after the Core application has established where the payload belongs. It is not responsible for parameterizing or reconstructing the Core application's domain migration history.
+
+Newer unsupported extension payloads MUST be preserved and MUST NOT be implicitly downgraded, truncated, normalized, or overwritten by an older component.
+
+## IX.6 Configuration and component-extension migrations share safety rules
+
+Configuration and semantic component-extension payloads are both versioned component-owned persisted data under a Core-controlled persistence boundary. Both require explicit schema identity/version, controlled migration, validation, commit/rollback, preservation of unsupported newer data, and no implicit downgrade.
+
+Configuration migration additionally preserves configuration policy-modes. Component-extension migration additionally receives current Core entity schema context.
+
+## IX.7 Component absent, incompatible, or unentitled
+
+If component-extension data exists but the owning component is missing, incompatible, unable to read the stored component-extension schema/current Core entity schema, or currently lacks entitlement:
 
 ```text
 Core preserves it losslessly
@@ -1012,15 +1045,15 @@ Core may expose diagnostics/read-only metadata
 
 The product decides whether the workspace remains fully editable, degraded, or read-only according to whether that extension is optional or required for project meaning.
 
-## IX.6 VCS portability
+## IX.8 VCS portability
 
-Semantic extension data that belongs to project/workspace meaning SHOULD travel with the Core-managed project data through VCS or equivalent replication. Runtime cache/state generally SHOULD NOT.
+Semantic component-extension data that belongs to project/workspace meaning SHOULD travel with the Core-managed project data through VCS or equivalent replication. Runtime cache/state generally SHOULD NOT.
 
-A receiving installation must inspect component/schema compatibility before allowing component-specific interpretation, but preservation of the opaque payload does not require the component to be installed.
+A receiving installation must inspect component/schema compatibility before allowing component-specific interpretation, but preservation of opaque payloads does not require components to be installed.
 
-## IX.7 Runtime state and cache
+## IX.9 Runtime state and cache
 
-Rebuildable cache, process state, temporary discovery results, local telemetry buffers, and similar operational state are not semantic extension data and SHOULD remain outside version-controlled project semantics unless a product explicitly defines otherwise.
+Rebuildable cache, process state, temporary discovery results, local telemetry buffers, and similar operational state are not semantic component-extension data and SHOULD remain outside version-controlled project semantics unless a product explicitly defines otherwise.
 
 # X. Instantiation, Wiring, and Activation
 
@@ -1230,6 +1263,119 @@ compatibility restrictions
 ```
 
 ---
+
+# XIV.A. Built-in Product Components and Capability Authorization
+
+## XIV.A.1 Host product participates as AAC components
+
+The host/Core product SHOULD register one or more **built-in components** through the same component/contract domain used by extension components. A built-in component differs in provenance/admission: it is supplied by trusted product/bootstrap code rather than installed from an extension package. After admission it uses the same configuration, entitlement, provider-instance, capability, binding, observation and Core-bridge semantics.
+
+Ordinary host-product settings and licensing SHOULD therefore use the same AAC mechanisms as other components. Only the minimal bootstrap/trust root required to create AAC infrastructure remains outside ordinary scoped configuration.
+
+## XIV.A.2 Core/domain/UI services are capabilities
+
+Core-owned domain mutation, query, and reusable UI actions SHOULD be exposed to modular consumers as versioned capabilities rather than direct database, filesystem, YAML, widget, or private-object access. A component changing Core-owned data MUST do so through product-defined Core capabilities so product validation, current-principal authorization, revision control, persistence, and observation remain authoritative.
+
+A built-in component MAY publish a UI capability such as opening a standard editor. External components may consume such a capability to reuse product behavior without linking to toolkit-private classes.
+
+## XIV.A.3 Authorization vocabulary belongs to the canonical capability
+
+A capability version MAY define named authorization permissions. Operations MAY require flat `all_of` and/or `any_of` sets of those permissions. Consumer requirements MAY request a subset. Admission/product policy grants a subset, and the Core bridge enforces the operation requirement before provider execution.
+
+Authorization permission identity and operation mapping are canonical contract material. They are not provider-private strings and are distinct from entitlement permissions.
+
+## XIV.A.4 Generated bindings avoid duplicate security declarations
+
+Technology bindings SHOULD be generated from canonical capability contracts. Generated Java interfaces use `AIig...` and `AIa...` annotations; generated Python interfaces use `AIig...` plus generated DTO/decorator metadata. Implementations do not manually restate an authorization mapping already defined by the canonical contract.
+
+## XIV.A.5 Presentation metadata
+
+Stable technical IDs are not display labels. Any definition expected to appear in user/admin UI SHOULD provide `name` and `description` display metadata. Display metadata MAY include direct fallback text, an opaque localization resource key, or both. AAC v1 preserves these keys but does not mandate a localization engine.
+
+# XIV.B Package Store and Workspace Resolution
+
+## XIV.B.1 Product-owned physical layout
+
+AAC MUST NOT hardcode a global `plugins` path. The host product supplies a package-store root/layout. `plugins/downloaded`, `plugins/installed`, and `plugins/obsolete` are the recommended baseline names and therefore a **SHOULD**, not a **MUST**. Products may override them without changing logical package identity.
+
+## XIV.B.2 Installed does not mean concurrently active
+
+The package store MAY temporarily hold multiple immutable versions/digests of one component concurrently, for example while a replacement candidate is staged beside the currently active artifact. Physical presence under `installed` therefore does not itself mean runtime activation.
+
+Within one Core-managed runtime/package-selection domain, however, **at most one artifact version of a component identity may be active/selected at a time**. A new version replaces the old active version; two versions of the same component are not simultaneously admitted as active participants in one resolved AAC runtime graph. Products that require different active versions for different workspaces must isolate them into separate runtime/package-selection domains rather than activating both in one domain.
+
+After a successful replacement, the superseded artifact is non-active. The recommended baseline moves a superseded unselected artifact to `obsolete` while retaining it according to rollback/retention policy. `obsolete` artifacts are excluded from ordinary automatic resolution until explicitly restored. During a failed replacement, Core restores the previous artifact/state rather than leaving both versions active.
+
+## XIV.B.3 Requirements, locks, and source provenance
+
+Workspace requirements specify acceptable component identities/versions. A workspace lock records the exact resolved artifact, including a cryptographic digest and source/artifact provenance. Package source identity and URI are not trust; every artifact is independently verified according to package policy.
+
+Different workspaces MAY carry requirements/locks for different versions of the same component. Such locks do not authorize those versions to be active concurrently in one Core-managed runtime/package-selection domain. Activating a workspace whose resolved lock differs from the current active component version requires a validated replacement transaction (or a separately isolated runtime domain).
+
+Remote package sources reuse AAC authentication profiles and secret references. Entitlement-to-use and repository/download authorization remain independent.
+
+## XIV.B.4 Verification and safe promotion
+
+Core MAY verify on download and MUST verify the exact temporary install bytes immediately before atomic promotion to the immutable installed store. Detached evidence required by the verifier travels alongside the artifact. Descriptor inspection SHOULD occur without executing/importing arbitrary component implementation code. Promotion/staging of package bytes is not runtime activation and MUST NOT bypass target-state validation.
+
+## XIV.B.5 Automatic update is explicit policy
+
+`MANUAL`, `NOTIFY`, `AUTO_COMPATIBLE`, and `AUTO_LOCKED` are baseline product policies. Entitlement MAY be used as an additional gate for unattended installation of paid-only components, but absence of entitlement does not universally prohibit package installation because a component may legitimately support free/degraded operation. Every automatic replacement MUST pass through the same complete target-state validator and transaction machinery as a manually requested replacement; automation MUST NOT create a weaker compatibility path.
+
+# XIV.C Transactional Component Replacement
+
+## XIV.C.1 Replacement is a complete-state transformation
+
+An AAC component upgrade is a **replacement transaction** from one complete active component state to another complete active component state. The transaction MAY replace one component or many components. A single-component upgrade is merely the one-replacement case of the same primitive.
+
+Compatibility MUST be evaluated against the complete target state after applying every requested replacement. Intermediate states produced by an arbitrary sequential installation order do not need to be valid and MUST NOT be used to reject an otherwise valid atomic target state.
+
+## XIV.C.2 Target active contract catalog is rebuilt
+
+Before mutation of the live runtime, Core MUST construct the hypothetical target component set and rebuild the target active contract catalog from built-in contracts plus contract bundles supplied by that target set. The target catalog is not produced by merely adding candidate contracts to the current catalog: a contract definition supplied only by a component being replaced/removed disappears unless another target component or Core still supplies it. Canonical conflict and contract-admission rules remain unchanged.
+
+Core then resolves the complete target provider/consumer graph using the ordinary authoritative resolver and the ordinary version intersection:
+
+```text
+consumer supported versions
+    ∩ provider supported versions
+    ∩ target Core active contract catalog versions
+    ∩ lifecycle-allowed versions
+```
+
+The preflight checker MUST NOT be a second, weaker compatibility model. It SHOULD use the same resolver/rules that will govern activation of the committed target state.
+
+## XIV.C.3 Preflight is side-effect-free with respect to live state
+
+Before deactivating the current runtime or mutating authoritative persisted state, Core MUST validate as much of the target state as static/declarative metadata permits. The current active state remains authoritative if preflight fails. Diagnostics SHOULD identify every known affected component, unsatisfied mandatory requirement, missing provider, incompatible capability version, contract conflict, provider-instance incompatibility, or migration obstacle rather than stopping at the first error when practical.
+
+A user or automated planner MAY then add further component replacements and resubmit the complete target state. AAC does not require an automatic dependency solver, but any solver that proposes additional versions MUST submit the resulting set through the same target-state validator.
+
+## XIV.C.4 Staging is not activation
+
+Candidate artifacts MAY be downloaded, verified, unpacked, promoted into a non-active installed/staging position, and statically inspected before commit. Such physical preparation MUST NOT make the candidate an active graph participant.
+
+## XIV.C.5 Transaction boundary includes component-owned persisted state
+
+When replacement requires configuration-schema migration or semantic component-extension migration, Core MUST stage and validate those transformations as part of the same replacement plan. The transaction commit/rollback boundary encompasses every state whose mismatch could make the previous or target component graph invalid, including as applicable:
+
+```text
+package selection / package lifecycle
+configuration payloads and policy modes
+semantic component-extension data
+admitted descriptors, contracts and schemas
+provider-instance reconciliation
+Core-owned binding topology
+runtime instances and wiring
+```
+
+Components MAY supply migration transformations but MUST NOT directly bypass Core-owned persistence/transaction control.
+
+## XIV.C.6 Commit and rollback
+
+Once preflight succeeds, Core MAY perform sequential implementation steps internally, but the replacement is logically atomic from the managed runtime's perspective. The target state becomes authoritative only when the transaction commits successfully.
+
+If any post-boundary step fails, Core MUST attempt transaction-wide rollback to the previous complete valid state. Rolling back only the package bytes is insufficient whenever configuration, extension data, admitted contracts/schemas, provider instances, bindings, or runtime state have already changed. Rollback failure MUST be surfaced as a high-severity state and MUST NOT be reported as a healthy previous state.
 
 # XV. Licensing and Entitlements
 
@@ -1558,7 +1704,7 @@ No silent downgrade or destructive rewrite occurs.
 29. **Semantic component data is distinct from configuration and runtime cache.**
 30. **Semantic extension data that belongs to project meaning is logically component-owned but physically persisted by the Core product and should be VCS-portable when appropriate.**
 31. **Unknown or unsupported extension-data versions are preserved, not silently interpreted or deleted.**
-32. **Persistent semantic extension data carries explicit schema identity/version and unknown payloads survive Core migrations opaquely.**
+32. **Persistent semantic component-extension data carries explicit component-extension schema identity/version; one Core entity may carry data for many components, and unknown payloads survive product-specific Core migrations opaquely.**
 33. **Declarative component/provider-definition dependency cycles may exist, but the resolved extension provider-instance binding graph MUST be acyclic.**
 34. **Resolution, contract admission, instantiation, wiring, readiness, and activation are distinct stages.**
 35. **Plugin-private dependencies are isolated from Core and other extension components.**
@@ -1580,6 +1726,20 @@ No silent downgrade or destructive rewrite occurs.
 51. **Generic invocation observation is an independently versioned capability with Core-owned observer bindings.**
 52. **Generic observers are read-only with respect to the observed invocation and do not replace its authoritative provider result.**
 53. **The observation capability must be excluded from generic observation delivery, and sensitive contract data must be redacted according to Core policy.**
+54. **Host products may register trusted built-in components; after admission, built-in and extension components share the same AAC configuration, entitlement, capability and Core-bridge model.**
+55. **Core/domain/UI data access across component boundaries is performed through versioned capabilities, not direct access to Core persistence/private objects.**
+56. **Authorization vocabularies and operation authorization mappings are canonical capability-contract material; entitlement permission vocabularies remain distinct.**
+57. **Runtime authorization is Core-mediated and may require both a consumer-component grant and current-principal authorization.**
+58. **Canonical capability contracts are the source of truth for generated language interfaces, DTOs, operation identity and authorization annotations/metadata.**
+59. **User-visible definitions carry stable ID plus presentation metadata; localization resource keys are optional metadata, not identity.**
+60. **Within one Core-managed runtime/package-selection domain, at most one artifact version of a component identity is active/selected at a time.**
+61. **A component upgrade is a complete-state replacement transaction; a one-component upgrade is only the one-item case.**
+62. **Multi-component replacement is validated against the complete target state; sequential intermediate states need not be valid.**
+63. **The target active contract catalog is rebuilt from the complete target component set before target graph resolution.**
+64. **Target-state preflight uses the ordinary authoritative graph/contract rules and does not establish a weaker compatibility path.**
+65. **Configuration and semantic extension-data migrations that are required by replacement participate in the same Core-controlled transaction and rollback boundary.**
+66. **A failed post-boundary replacement restores the previous complete state as far as possible; package-only rollback is not sufficient after dependent state changed.**
+
 ## XIX.2 Companion specifications
 
 This governance standard is intended to be complemented by:
@@ -1588,6 +1748,7 @@ This governance standard is intended to be complemented by:
 - **Application Component Capability Contract Specification** (`Application-Component-Capability-Contract-Specification.md`)
 - **Application Component Context, Configuration, and Entitlement Specification** (`Application-Component-Context-Configuration-and-Entitlement-Specification.md`)
 - **Application Component Lifecycle and Provisioning Specification** (`Application-Component-Lifecycle-and-Provisioning-Specification.md`)
+- **Application Component Upgrade Transaction Specification** (`Application-Component-Upgrade-Transaction-Specification.md`)
 - **Application Component UI Specification** (`Application-Component-UI-Specification.md`)
 - **Application Component Python Runtime Profile**
 - **Application Component Java Runtime Profile**
