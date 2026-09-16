@@ -1,8 +1,8 @@
-[[FINALLY-APPROVED]]
-# Algites Repository and Artifact Naming Standard
-**Version:** 1.7
-**Status:** Normative
-**Scope:** All repositories and build artifacts within the Algites ecosystem
+[[PROPOSAL]]
+# Algites Development Structure Specification
+**Version:** 2.0-draft
+**Status:** Consolidated proposal
+**Scope:** All repositories, logical artifacts, source structures, artifact kinds, source types, publication outputs, and dependency models within the Algites ecosystem
 
 ## 1. Introduction
 
@@ -12,10 +12,12 @@
 
 ### 2.1. Purpose
 
-This document defines a unified and normative standard for naming:
+This document defines a unified structural and naming standard for:
 
-- Git repositories,
-- Maven/Gradle artifacts (JARs),
+- source repositories,
+- logical Algites artifacts,
+- technology-specific publication outputs and coordinates,
+- source directory kinds and generated-source conventions,
 - and related identifiers
 
 across the Algites platform, tools, libraries, products, and customer solutions.
@@ -41,7 +43,10 @@ The goals are:
   `[<folders>.]<moduleroot>` (e.g., `mymodule.blfacadeintf`, `tools.profiler`, `build.parent`).
 - **Module Root Folder** – the last segment of the module path that identifies the primary module name.
 - **Variant** – a suffix identifying a specialized flavor of a module (e.g., `tests`).
-- **Artifact** – a build output, typically a JAR published to a Maven repository.
+- **Artifact** – a logical, modeled buildable unit. One artifact MAY support multiple build technologies and MAY produce multiple technology-specific outputs.
+- **ArtifactCoordinateId** – the stable Algites identity of a logical artifact. It is independent of ecosystem-specific publication coordinates such as Maven GAV or a Python distribution name.
+- **ArtifactKind** – a supported build/publication technology (for example `java`, `python`, or `mps`). Artifact kinds are registry-/enum-like, deliberately few, and not arbitrary free-form strings. The name describes the technology/build nature of the artifact and is distinct from artifact roles such as Core, Aggregator, Policy, or BOM.
+- **SourceType** – a semantic type of source directory below `src/product` or `src/develop` (for example `java`, `python`, `xmldefs`, `yamldefs`, `config`, or `resources`). Source types are a broader classification than artifact kinds and do not automatically select a build/publication technology.
 
 ---
 
@@ -80,11 +85,11 @@ priv.tool.Java
 
 ---
 
-### 2.4. Artifact Naming (artifactId)
+### 2.4. Logical Artifact Naming (`artifactCoordinateId`)
 
 #### 2.4.1 Canonical Form
 
-Each artifactId MUST be composed of:
+Each logical `artifactCoordinateId` MUST be composed of:
 
 ```
 <vis>.<role>.<BusinessName[.reposubname]>_<module.path>[-<variant>]
@@ -102,7 +107,7 @@ Where:
 
 - `<vis>`, `<role>`, `<reposubname>`, all module path folders, module root, and `<variant>` MUST be lowercase.
 - `<BusinessName>` MUST preserve PascalCase from the repository name.
-- The underscore `_` MUST be used exactly once in the artifactId.
+- The underscore `_` MUST be used exactly once in the `artifactCoordinateId`.
 - The variant suffix, if present, MUST be appended using `-`.
 
 #### 2.4.3 Examples
@@ -154,11 +159,11 @@ priv.tool.Java_tools.profiler
 
 ---
 
-### 2.5. groupId Naming
+### 2.5. Java/Maven `groupId` Mapping
 
 #### 2.5.1 Canonical Form
 
-groupId MUST follow:
+For the Java/Maven publication mapping, `groupId` MUST follow:
 
 ```
 eu.algites.<role>.<businessname-lc>[.<reposubname>]
@@ -197,7 +202,7 @@ Visibility represents **governance and distribution scope**.
 Visibility MUST:
 
 - be part of the **repository name**,
-- be part of the **artifactId**,
+- be part of the **artifactCoordinateId**,
 - influence CI/CD and publishing targets.
 
 Visibility MUST NOT:
@@ -206,11 +211,11 @@ Visibility MUST NOT:
 
 #### 2.6.2 Rationale
 
-Including visibility in the artifactId provides:
+Including visibility in the logical artifact identity provides:
 
 - immediate visual distinction in dependency trees and logs,
 - early detection of accidental use of private artifacts in public builds,
-- clear auditability of JAR files by name alone.
+- clear auditability of logical artifact identities and technology-specific outputs.
 
 ---
 
@@ -264,7 +269,7 @@ Artifact root becomes:
 <vis>.<role>.<BusinessName>[.<reposubname>]
 ```
 
-and the artifactId is completed by appending:
+and the `artifactCoordinateId` is completed by appending:
 
 ```
 _<module.path>[-<variant>]
@@ -282,22 +287,144 @@ Java -> java
 
 ---
 
-### 2.9. JAR Naming
+### 2.9. Technology-Specific Publication Naming
 
-The resulting JAR file name MUST follow Maven convention:
+The logical `artifactCoordinateId` is technology-neutral. Each ArtifactKind maps that logical identity to the native coordinates and package names of its ecosystem. The mapping MUST be deterministic and defined by the corresponding ArtifactKind adapter. Ecosystem-specific identities that are deterministically derivable MUST NOT become independent sources of truth in Algites metadata.
 
-```
-<artifactId>-<version>.jar
+#### 2.9.1 Java/Maven publication naming
+
+For Java/Maven publications, the Maven `artifactId` is the logical `artifactCoordinateId` unless a documented output-specific mapping requires an additional suffix or classifier. The resulting JAR file name follows Maven convention:
+
+```text
+<artifactCoordinateId>-<version>.jar
 ```
 
 Examples:
 
-```
+```text
 pub.pltf.Modustro_core-1.2.0.jar
 priv.lib.Customers.common_bai.blfacadeintf-1.0.0.jar
 priv.lib.Customers.common_bai.blfacadeintf-tests-1.0.0.jar
 pub.tool.Java_build.parent-1.4.0.jar
 ```
+
+The Java/Maven `groupId` is derived independently according to section 2.5.
+
+#### 2.9.2 Python distribution/project naming
+
+Python uses one distribution/project name rather than a Maven-style `groupId` + `artifactId` pair. Algites therefore derives a globally Algites-namespaced Python distribution name directly from `artifactCoordinateId`.
+
+The normative mapping is:
+
+```text
+pythonDistributionName = "algites-" + normalizePythonProjectName(artifactCoordinateId)
+```
+
+where `normalizePythonProjectName`:
+
+1. converts ASCII letters to lowercase, and
+2. replaces every contiguous run of `.`, `_`, or `-` with one `-`.
+
+The generated Algites Python distribution name MUST already be in this canonical normalized form and MUST be used consistently for Python project metadata and repository lookup. No separate Python equivalent of Maven `groupId` is defined.
+
+Example:
+
+```text
+artifactCoordinateId:
+priv.lib.Customers.common_aaa.blfacadeintf-tests
+
+Python distribution/project name:
+algites-priv-lib-customers-common-aaa-blfacadeintf-tests
+```
+
+The `algites-` prefix is an ecosystem namespace prefix, not a DNS-derived group identifier. The Maven `eu.algites...` groupId MUST NOT be prepended to the Python distribution name.
+
+#### 2.9.3 Python import namespace
+
+The Python import namespace is distinct from the distribution/project name. It MUST preserve Algites governance visibility so that public and private artifacts cannot install into the same derived namespace.
+
+The canonical namespace is derived as follows:
+
+```text
+algites.<vis>.<role>.<businessname-lc>[.<reposubname>].<module-path>
+```
+
+Rules:
+
+- `algites` is the mandatory root package namespace;
+- repository identity components, including `pub` or `priv`, are preserved as lowercase package segments;
+- the module path is preserved as lowercase package segments;
+- an optional Algites artifact variant such as `-tests` is appended to the final module-root package identifier using `_`, e.g. `blfacadeintf_tests`, so that a variant does not collide with a real child package named `tests`;
+- every resulting package segment MUST be a valid Python identifier. If the deterministic mapping produces an invalid identifier, validation MUST fail rather than silently inventing a different namespace;
+- shared parent packages below the common `algites` root MUST use Python namespace-package-compatible layout so multiple independently published Algites distributions can contribute descendants without owning/conflicting parent-package files. The Python adapter MUST NOT generate conflicting shared-parent `__init__.py` files.
+
+Examples:
+
+```text
+artifactCoordinateId:
+priv.lib.Customers.common_aaa.blfacadeintf
+
+Python import namespace:
+algites.priv.lib.customers.common.aaa.blfacadeintf
+```
+
+```text
+artifactCoordinateId:
+priv.lib.Customers.common_aaa.blfacadeintf-tests
+
+Python import namespace:
+algites.priv.lib.customers.common.aaa.blfacadeintf_tests
+```
+
+The corresponding public artifact would use `algites.pub...`, not the private namespace.
+
+#### 2.9.4 Cross-ecosystem mapping example
+
+For the logical artifact:
+
+```text
+priv.lib.Customers.common_aaa.blfacadeintf-tests
+```
+
+the deterministic identities are:
+
+```text
+Algites artifactCoordinateId:
+priv.lib.Customers.common_aaa.blfacadeintf-tests
+
+Java/Maven groupId:
+eu.algites.lib.customers.common
+
+Java/Maven artifactId:
+priv.lib.Customers.common_aaa.blfacadeintf-tests
+
+Python distribution/project name:
+algites-priv-lib-customers-common-aaa-blfacadeintf-tests
+
+Python import namespace:
+algites.priv.lib.customers.common.aaa.blfacadeintf_tests
+```
+
+This example is intentionally asymmetric: Maven has a two-part publication coordinate, while Python has one distribution/project name plus an independent import namespace. Both are projections of the same Algites identity.
+
+#### 2.9.5 Generated `pyproject.toml`
+
+The effective Python project descriptor is derived development/build metadata. Its Algites-owned values MUST be generated from the resolved Algites model rather than duplicated manually.
+
+For a Python-capable artifact:
+
+- `pyproject.toml` is the effective generated descriptor placed in the artifact root for compatibility with Python tooling and IDEs;
+- generated `pyproject.toml` MUST NOT be committed to VCS and SHOULD be covered by repository ignore rules;
+- the generated `[project].name` MUST equal the Python distribution/project name from section 2.9.2;
+- version and dependency metadata that are owned by the Algites model MUST likewise be generated from the resolved effective model;
+- an optional committed `pyproject.toml.tpl` MAY provide Python-specific settings that are not otherwise deterministically owned by Algites, for example `[tool.*]` configuration or adapter-supported build-backend settings;
+- the template MUST NOT override Algites-owned derived identity, version, or dependency values. The ArtifactKind adapter defines deterministic merge rules and MUST fail on conflicting definitions rather than choosing one silently.
+
+The generated descriptor is a working/development artifact, not an independent source of project identity.
+
+#### 2.9.6 Other ArtifactKinds
+
+Every additional ArtifactKind MUST define its own deterministic publication-coordinate mapping before it can be declared in `kinds`. Unknown or unsupported ArtifactKinds are validation errors.
 
 ### 2.10. Generated Documentation Location
 
@@ -314,9 +441,7 @@ Generated documentation for an artifact SHOULD use the following canonical struc
 ```text
 <docs-site-root>/generated/artifacts/<module.local.id>/<documentation-channel>/
 ```
-which contains the index.html generated specifically for every given artifact 
-and the documentations like javadoc or mpsdoc are placed into the given folder, what allows
-to integrate multiple documentation informations for every given version of the given artifact.
+The channel directory contains the artifact-level `index.html`. Technology-specific documentation SHOULD be placed below that channel in a subdirectory identified by ArtifactKind when more than one technology is documented, for example `java/`, `python/`, or `mps/`. This allows one logical artifact/version to aggregate several technology-specific documentation outputs without inventing separate logical artifact identities.
 
 Also there is generated an additonal index with following publication agnostic generated path structure:
 
@@ -328,7 +453,7 @@ Meaning of the fields is:
 
 - `<docs-site-root>` is the repository-local root directory for generated documentation site content,
 - `generated` is the root of generated documentation, which can be potentially removed and regenerated without impacting the manually created documentation. This folder should never contain manually created documentation.
-- `<module.local.id>` is the same module id used in the artifactId or artifactSetId after the mandatory `_` repository separator,
+- `<module.local.id>` is the same local module id used in the `artifactCoordinateId` after the mandatory `_` repository separator,
 - `<documentation-channel>` identifies the published documentation view. it consists from <publication-kind>/<publication-id>
 - `<docs-site-root>/generated/publications/<documentation-channel>/index.html` - contains the index generated dynamically to point the unique page in the canonical structure
 
@@ -423,7 +548,7 @@ over:
 docs-site/generated/artifacts/pub.lib.Mps_common.base.mpslang/
 ```
 
-The full artifactId remains available as metadata inside the generated documentation.
+The full `artifactCoordinateId` remains available as metadata inside the generated documentation, together with any technology-specific publication coordinates.
 
 #### 2.10.5 Module Path Reuse
 
@@ -432,11 +557,11 @@ The documentation path SHOULD reuse `<module.local.id>` whcih is derived from th
 This keeps the relationship between repository structure, artifact identity, and generated documentation deterministic:
 
 ```text
-artifactId = <repository-id>_<module.local.id>
-docs path  = <docs-site-root>/<module.local.id>/
+artifactCoordinateId = <repository-id>_<module.local.id>
+docs path            = <docs-site-root>/<module.local.id>/
 ```
 
-#### 2.10.6 Artifact Kind Disambiguation
+#### 2.10.6 Module Path Disambiguation
 
 If multiple artifacts in the same repository would otherwise have the same logical module name, the module path SHOULD include a disambiguating folder segment.
 
@@ -464,8 +589,8 @@ Such index pages SHOULD display human-readable module names and MAY omit redunda
 Example display label:
  `common.base.mpslang ` 
 with metadata:
- `artifactId = pub.lib.Mps_common.base.mpslang 
- groupId    = <derived-groupId> `
+ `artifactCoordinateId = pub.lib.Mps_common.base.mpslang
+ Java groupId         = <derived-groupId> `
 where:
 - `<derived-groupId>` is the groupId derived according to section 2.5 using the repository naming rules and the applicable domain prefix.
 
@@ -486,18 +611,18 @@ New roles MAY be introduced but MUST be lowercase and documented.
 
 ---
 
-### 2.12. CI/CD Governance
+### 2.12. Build and Publication Governance
 
-CI pipelines MUST:
+Build and publication automation MUST:
 
-- infer visibility from repository name prefix (`pub.` vs `priv.`),
-- enforce that artifactId starts with the same visibility prefix and follows the `_` separator rule,
+- infer visibility from the repository name prefix (`pub.` vs `priv.`),
+- enforce that `artifactCoordinateId` starts with the same visibility prefix and follows the `_` separator rule,
 - enforce variant rules, including the terminal nature of `-tests`,
-- publish artifacts to the corresponding Maven repository:
-  - public repo for `pub.*`,
-  - private repo for `priv.*`.
+- validate every declared ArtifactKind against the supported ArtifactKind registry,
+- resolve the effective publication repository matrix for the selected ArtifactKinds,
+- publish each technology-specific output only to a target permitted by repository visibility and the effective publication configuration.
 
-groupId MUST remain identical for public and private variants within the same domain.
+Java/Maven `groupId` remains identical for public and private variants within the same domain. Other ArtifactKinds MUST define equivalent visibility-safe publication mappings in their kind adapters.
 
 ---
 
@@ -507,7 +632,7 @@ When migrating legacy projects:
 
 - Preserve BusinessName and structure where possible.
 - Align repository names to this standard.
-- ArtifactId MUST be adapted to include visibility, the `_` separator,
+- Artifact identity MUST be adapted to include visibility, the `_` separator,
   and, where applicable, the `-tests` variant suffix.
 
 ---
@@ -519,8 +644,8 @@ This standard balances:
 - **Domain identity** (PascalCase BusinessName),
 - **Technical structure** (lowercase qualifiers),
 - **Practical build compatibility** (lowercase groupId),
-- **Governance clarity** (visibility in repository and artifactId),
-- **Human auditability** (pub/priv visible in JAR names),
+- **Governance clarity** (visibility in repository and logical artifact identity),
+- **Human auditability** (pub/priv visible in logical identity and kind-specific publication names where applicable),
 - **Structural readability** (explicit `_` separator between repo and module identity),
 - **Maven idioms** (use of `-tests` for test variants),
 - **Module semantics** (explicit distinction between module path folders and module root).
@@ -538,25 +663,21 @@ while extending them with explicit visibility and repository/module separation s
 ### 2.15. Summary
 
 - Repositories express **visibility + role + business identity**.
-- Artifacts express **visibility + role + business identity + module specialization**, separated by `_`.
+- Logical artifact identities express **visibility + role + business identity + module specialization**, separated by `_`.
 - `<module.path>` is composed of optional path folders and a mandatory module root.
 - Optional variant suffixes (e.g., `-tests`) express specialized flavors of the module root.
 - `-tests` is terminal and MUST NOT be nested.
-- groupId expresses **organizational and domain namespace only**.
-- Visibility is part of artifact identity, but not of groupId.
+- Java/Maven `groupId` expresses **organizational and domain namespace only**.
+- Visibility is part of the logical artifact identity, but not of the Java/Maven `groupId`.
 - BusinessName remains PascalCase across repos and artifacts.
 - The `_` separator cleanly delineates repository identity from module identity.
 
 This standard is normative for all Algites projects.
 
 ---
-[[/FINALLY-APPROVED]]
-
-[[PROPOSAL]]
-
 ## 3. Algites Artifact and Dependency Model
 
-This chapter defines the **model-first** structure used by Algites to describe artifacts, versioning, dependency intents, inheritance, and how these concepts are later **mapped** to build tools (Gradle/Maven). The intent is to keep the core model deterministic and transparent, with explicit resolution rules and diagnostics.
+This chapter defines the **model-first** structure used by Algites to describe logical artifacts, ArtifactKinds, SourceTypes, versioning, publication targets, dependency intents, inheritance, and how these concepts are later mapped to technology-specific build and publication mechanisms. The intent is to keep the core model deterministic and transparent, with explicit resolution rules and diagnostics.
 
 ---
 
@@ -582,8 +703,10 @@ We distinguish the artifact through **Artifact Class** which defines how the art
 
 In the case of the internal handling of the Artifacts, we recognize the following concepts:
 
-- **Artifact**: a modeled buildable unit (module), producing one or more **outputs**.
-- **ArtifactCoordinateId**: a stable identifier for an artifact in the Algites model (not necessarily identical to Maven GAV).
+- **Artifact**: a modeled logical buildable unit (module), supporting one or more ArtifactKinds and producing one or more **outputs**.
+- **ArtifactCoordinateId**: a stable technology-neutral identifier for an artifact in the Algites model (not necessarily identical to Maven GAV, a Python distribution name, or another ecosystem coordinate).
+- **ArtifactKind**: a supported build/publication technology selected from the Algites ArtifactKind registry (initially including `java`, `python`, and `mps`). It is distinct from Artifact Roles.
+- **SourceType**: a source-directory category; SourceTypes are independent from ArtifactKind and MAY be consumed by several ArtifactKinds.
 - **OutputType**: a specific output contract of an artifact (e.g., jar, parent-pom, bom, plugin-marker, etc.).
 - **Output key (`outputKey`)**: `artifactCoordinateId + outputType` used to identify a dependency intent target.
 - **Repository configuration**: the root of a repository model, treated as:
@@ -638,9 +761,13 @@ A **ContainerVersionContext** defines how controlled artifacts acquire versions.
 - It can be **defined** at repo or artifact scope (definition layer).
 - It becomes effective only when **activated** in a node context (activation layer).
 
-Inheritance rule (normative for v1):
+Inheritance rule (normative):
 - ContainerVersionContext **inherits only via container edges** (repo → container → contained artifacts).
 - Parent chain **does not** change controlled versions.
+
+Version is a property of the logical artifact/version context, not of a technology implementation. A build or release MAY select only a subset of the artifact's effective `kinds`. Therefore a logical version MAY have a Java publication without a Python publication, or vice versa. A technology-specific publication that does not exist for a version is simply absent; it does not require a separate technology-specific version sequence.
+
+If multiple technologies are published with the same logical version, they MUST originate from the same immutable source revision/version context. A previously omitted technology MAY be published later for that version only from that same source revision; otherwise a new version is required.
 
 #### 3.4.2 Controlled vs Uncontrolled Version Resolution
 
@@ -653,7 +780,7 @@ Inheritance rule (normative for v1):
         - optional `preferred` (concrete choice inside the allowed set),
         - conflict resolution via weight and final validation policy.
 
-Version selection must remain deterministic without querying remote metadata (v1):
+Version selection must remain deterministic without querying remote metadata:
 - If `preferred` exists and lies in the final allowed set → choose it.
 - If no valid preferred exists → the version is unresolved and handled by validation policy.
 
@@ -712,7 +839,7 @@ An artifact context decides:
 - which rule template catalogs are available,
 - which dependency intent template sets are activated to form the effective dependency set.
 
-Inheritance (v1 intent):
+Inheritance:
 - catalogs (template sets) may merge from repo + container + parent, with id rules,
 - **effective dependency intents** (baseline dependencies) flow primarily via parent chain,
 - repo-root may inject baseline intents as “virtual parent defaults”.
@@ -734,7 +861,7 @@ and consumers decide what to activate in their own contexts.
 
 #### 3.6.1 What inherits from Container vs Parent
 
-Normative v1 rules:
+Normative rules:
 
 - **Container inheritance (contains/includes)**
     - ContainerVersionContext activation and overrides,
@@ -817,6 +944,8 @@ and the identification is interpreted as complete uid, the custom types must hav
 - `MAIN_JAVA_SOURCE_JAR` (`builtin:sourcesJar`) — sources artifact
 - `MAIN_JAVA_DOC_JAR` (`builtin:javadocJar`) — javadoc artifact
 - `MAIN_MAVEN_POM` (`builtin:mavenPom`) — standard module POM publication
+- `MAIN_PYTHON_WHEEL` (`builtin:pythonWheel`) — Python wheel distribution
+- `MAIN_PYTHON_SDIST` (`builtin:pythonSdist`) — Python source distribution
  
 to be later discussed if something like this is reasonable, probably not::
 - `PARENT_POM` (`builtin:parentPom`) — parent-style POM (inheritance contract)
@@ -828,7 +957,7 @@ to be later discussed if something like this is reasonable, probably not::
 
 
 Notes:
-- Builtin kinds are intended to be *minimal but sufficient* for Algites v1.
+- Builtin kinds are intended to be *minimal but sufficient* for the current Algites model.
 - Adding new builtin kinds is a compatibility-sensitive change; prefer `CUSTOM` when possible.
 
 ---
@@ -983,74 +1112,218 @@ This keeps authoring concise while preserving deterministic behavior.
 
 ---
 
-### 3.8. Mapping to Build Tools
+### 3.8. Mapping to Build and Ecosystem Tools
 
-#### 3.8.1 Gradle mapping
+#### 3.8.1 Gradle as the unified build orchestrator
 
-- Intent rule templates map to Gradle configurations:
-    - `api`, `implementation`, `compileOnly`, `runtimeOnly`,
-    - test variants: `testImplementation`, `testRuntimeOnly`, etc.
-- Dependency steering maps to:
-    - `platform(...)` / `enforcedPlatform(...)`,
-    - Gradle constraints and dependency locking strategies (when used).
+Gradle is the single Algites build orchestrator. This does not imply that every artifact is JVM-based. An ArtifactKind adapter MAY invoke the native toolchain of its ecosystem while exposing deterministic Gradle tasks, inputs, outputs, dependencies, diagnostics, and publication operations.
 
-#### 3.8.2 Maven mapping
+Technology-specific task graphs MUST remain independently selectable. Building `java` MUST NOT implicitly require building `python`, and vice versa, unless an explicit task dependency exists because one output is a real input of the other. A build selecting several technologies MAY aggregate their task graphs in one Gradle invocation.
 
-- Intent rules map to Maven scopes:
-    - compile/runtime/provided/test (and/or plugin-related constructs),
-- Dependency steering maps to `dependencyManagement` (including BOM imports),
-- Parent chain mapping (v1): internal-only; external parent import is deferred.
+Shared source transformations SHOULD be represented as shared Gradle tasks when the transformation is genuinely identical. Different technology-specific transformations of the same source MAY execute independently. Cacheable tasks MUST declare stable inputs and non-overlapping owned outputs.
 
-#### Maven `<optional>`: mapping-only, not a semantic source of truth
+#### 3.8.2 Java/Maven mapping
 
-Maven’s `<optional>true</optional>` is treated as a **mapping artifact** only. In Maven, `optional`
-mainly means: “do not propagate this dependency transitively to downstream consumers.” 
-It does **not** define a product variant, does not guarantee runtime availability, 
-and does not express deterministic “feature selection”.
+For Java outputs:
 
-Therefore, Algites does not use Maven optional as the semantic basis for “optional components”. 
-Instead, optionality/variability is represented via:
-- **DependencyIntentSets** (explicit activation sets), and
-- **intent-only exports** (PIBOM/PVBOM-style outputs) that provide 
-- a selectable catalog of intents.
+- intent rule templates map to Gradle configurations such as `api`, `implementation`, `compileOnly`, `runtimeOnly`, and corresponding develop/test configurations,
+- dependency steering maps to Gradle platforms, constraints, and locking strategies where applicable,
+- published compatibility metadata maps to Maven scopes and `dependencyManagement`,
+- Maven remains a publication/consumption compatibility format, not an Algites build tool.
 
-If Maven optional emission is needed for compatibility with Maven consumers, it may be generated
-as a **best-effort metadata hint** by the Maven mapping layer. Such emission must not change
-the Algites semantic model and must not be relied upon as the primary expression of product composition.
+Maven `<optional>` remains mapping-only and MUST NOT become a semantic source of truth for Algites product variability.
 
-Normative rule (v1): Algites MUST NOT require Maven `<optional>` to preserve correctness 
-of the resolved model; optionality MUST be expressed via intent sets / intent-only exports,
-not via Maven optional.
+#### 3.8.3 Python mapping
 
-#### 3.8.3 Known semantic mismatches
+The `python` ArtifactKind adapter defines Python source discovery, build/test task mapping, distribution naming, wheel/sdist outputs, dependency metadata mapping, and publication to Python-compatible repositories. These operations are orchestrated from Gradle but MAY delegate execution to Python-native tooling.
 
-- Gradle distinguishes API exposure vs internal usage more explicitly (`api` vs `implementation`).
-- Maven’s scope system is coarser; mapping requires careful interpretation of “export”.
-- Source processing (annotation processors / kapt) has tool-specific behavior.
+#### 3.8.4 MPS and additional types
 
-Algites mapping must be documented per OutputType and intent rule preset.
+The `mps` adapter and any future ArtifactKind MUST define equivalent source, build, validation, output, coordinate, repository, and publication contracts before the ArtifactKind can be activated.
+
+#### 3.8.5 Known semantic mismatches
+
+Different ecosystems expose different dependency, packaging, and source-processing semantics. ArtifactKind adapters MUST document such mismatches explicitly rather than forcing all technologies into Java/Maven semantics.
 
 ---
 
-### 3.9. Repository Structure and Build Integration
+### 3.9. Repository Structure, SourceTypes, ArtifactKinds, and Publication Repositories
 
-Practical repository expectations (v1):
-- Repository config provides:
-    - default ContainerVersionContext (if the repo is controlled),
-    - baseline dependency intents (if desired),
-    - catalogs of rule templates and dependency intent templates.
+#### 3.9.1 Canonical source layout
 
-Build integration:
-- settings.gradle.kts: project structure and inclusion rules.
-- build.gradle.kts: build behavior, publishing definitions, and mapping of model resolution to tool configuration.
-- CI: supplies publishing targets (download/upload endpoints) via environment/properties consistent with Algites conventions.
+Algites uses the following canonical source-directory pattern:
+
+```text
+src/{product|develop}/<source-type>[.<generation-kind>]
+```
+
+where `<generation-kind>` is either absent, `gen`, or `extgen`. SourceTypes describe what the source is; they do not by themselves select a build technology.
+
+The initial general-purpose SourceTypes are:
+
+- `java`
+- `python`
+- `xmldefs`
+- `yamldefs`
+- `config`
+- `resources`
+
+Technology adapters MAY define additional source types when required by the ecosystem. Generic logical grouping names such as `tools` or `test-models` SHOULD NOT be introduced merely to organize a project; they are appropriate only when they identify a real source type with technology/build semantics.
+
+`schema` SHOULD NOT be used as a catch-all for XML and YAML definitions. `xmldefs` is used for XML-family definitions such as XSD or WSDL; `yamldefs` is used for definitions represented in YAML. `schema` MAY be used only where the source is genuinely format-neutral and has a defined adapter contract.
+
+#### 3.9.2 Generated and externally generated sources
+
+For any source type, the following semantics apply:
+
+```text
+<source-type>          manually maintained source
+<source-type>.gen      generated inside the standard Algites/Gradle build lifecycle
+<source-type>.extgen   generated by an external process not integrated into the standard build lifecycle
+```
+
+Rules:
+
+- `*.gen` directories MUST NOT be committed to VCS. They MUST be reproducible and MUST be removed by the appropriate Algites clean lifecycle.
+- `*.extgen` directories ARE committed to VCS because their generator is external to the normal build lifecycle, but their contents MUST NOT be edited manually.
+- A repository SHOULD enforce the `*.gen` exclusion by VCS ignore rules and SHOULD validate that no files below such directories are tracked.
+- Generation suffix semantics apply only at the canonical source-type level below `src/product` or `src/develop`; a coincidental `.gen` suffix elsewhere does not acquire these semantics.
+
+Examples:
+
+```text
+src/product/java
+src/product/java.gen
+src/product/java.extgen
+src/product/python
+src/product/xmldefs
+src/product/yamldefs.extgen
+src/develop/java
+src/develop/python.gen
+```
+
+#### 3.9.3 ArtifactKind declaration
+
+An artifact declares one or more supported build/publication technologies using `kinds`. Examples:
+
+```yaml
+kinds: [java]
+```
+
+```yaml
+kinds: [java, python]
+```
+
+`kinds` is the normative technology declaration in the current model.
+
+ArtifactKinds are registry-/enum-like. Supporting a kind requires an Algites adapter defining at least:
+
+- source discovery and SourceType relationships,
+- build and test tasks,
+- output kinds and packaging,
+- dependency mapping,
+- publication-coordinate naming,
+- repository protocol and defaults,
+- publication and documentation integration.
+
+Unknown kinds MUST fail validation.
+
+#### 3.9.4 Publication repository matrix
+
+Publication repositories are resolved on three independent axes:
+
+1. **ArtifactKind / technology** — e.g. `java`, `python`, `mps`;
+2. **stability** — `final` or `snapshot`;
+3. **URL usage** — `download` or `upload`.
+
+Conceptually, configuration therefore addresses cells such as:
+
+```text
+java.final.download
+java.final.upload
+java.snapshot.download
+java.snapshot.upload
+python.final.download
+python.final.upload
+...
+```
+
+The concrete URL/protocol rules are defined by the corresponding ArtifactKind adapter. A repository MAY configure publication targets for ArtifactKinds that are not currently produced by any artifact; `kinds` controls what an artifact builds, while the repository matrix controls where a selected kind resolves or publishes.
+
+#### 3.9.5 Repository configuration inheritance
+
+The effective publication repository configuration follows the structural container hierarchy:
+
+```text
+Algites built-in defaults
+        -> algites-source-repository.yml
+        -> ancestor algites-artifact.yml
+        -> descendant algites-artifact.yml
+```
+
+A lower level overrides only explicitly specified matrix cells. Unspecified cells continue to inherit. Artifact-level settings affect the current artifact and descendants unless overridden further below, analogously to other container-scoped policy such as version context.
+
+Resolution MUST be deterministic and diagnostics SHOULD identify the source node that supplied every effective matrix cell.
+
+#### 3.9.6 Build selection
+
+A build operation has an effective set of selected ArtifactKinds:
+
+- without an explicit selection, all effective `kinds` of the targeted artifact/cascade are selected;
+- with an explicit selection, only the intersection of requested kinds and supported kinds is built;
+- artifacts in a cascade that do not support a requested kind are skipped for that kind rather than treated as erroneous.
+
+Technology task graphs remain independent. A release, verification, or construction operation MAY therefore target only Java, only Python, or any supported subset without requiring the remaining ArtifactKinds to execute.
+
+#### 3.9.7 Gradle bootstrap repositories vs artifact publication repositories
+
+Gradle bootstrap repositories and Algites artifact publication repositories are distinct concepts.
+
+- **Gradle bootstrap repositories** are the minimal repositories needed before shared Algites build logic can be evaluated (for example plugin resolution). They remain explicitly defined in repository-local `settings.gradle.kts`.
+- **Algites artifact repositories** are the effective ArtifactKind x stability x usage matrix resolved from Algites metadata and kind adapters. They may vary by artifact/container and MUST NOT be hard-wired into the bootstrap layer merely because a Java/Maven implementation historically used them there.
+
+This distinction preserves deterministic repository-local Gradle startup while allowing artifact-specific multi-technology publication policy.
 
 ---
+
+#### 3.9.8 YAML schema naming and versioning
+
+Machine-readable schemas defining Algites YAML configuration formats MUST be explicitly versioned in their filenames from the first published schema version.
+
+The normative stem convention is:
+
+```text
+<schema-base>_<schema-version>.<schema-extension>
+```
+
+The initial schema version therefore uses suffix `_1`; an unversioned canonical schema filename MUST NOT be used as the authoritative schema contract. Conceptual examples are:
+
+```text
+algites-source-repository_1.<schema-extension>
+algites-artifact_1.<schema-extension>
+```
+
+The exact schema serialization/extension is defined by the schema ArtifactKind/SourceType conventions, but the `_N` version suffix is independent of serialization. An incompatible schema-contract change requires a new schema version (for example `_2`) rather than silently changing the meaning of `_1`. Multiple schema versions MAY coexist when compatibility requires it.
+
+Schemas for public Algites YAML formats SHOULD be maintained as controlled sources in a dedicated artifact of the public governance repository, so they can be versioned, validated, published, and consumed through the same Algites artifact model as other governed definitions. Such schemas naturally belong to an appropriate definition SourceType such as `yamldefs`.
+
+#### 3.9.9 Derived development metadata
+
+Derived development descriptors such as a generated Python `pyproject.toml` are not source-code generation directories and therefore are not represented by the `.gen` SourceType suffix. They are working metadata maintained by the build/development lifecycle.
+
+Rules:
+
+- derived development metadata MUST NOT be committed when it can be reproduced deterministically from committed Algites metadata and optional templates;
+- it MAY remain present across ordinary `clean` operations so IDE/tool integration remains stable;
+- dedicated preparation/refresh lifecycle tasks are responsible for creating and updating it;
+- build tasks that consume such metadata MUST depend on the corresponding generation task so stale metadata cannot be used silently.
+
+For Python, section 2.9.5 defines `pyproject.toml` and optional `pyproject.toml.tpl` as the canonical example.
 
 ### 3.10. Artifact Roles
 
 This chapter defines the logical classification of artifacts used within the Algites ecosystem.
-Artifact types are **cummulateable**; each type has a clearly defined role, but one artifact can play multiple roles at the same time
+Artifact **roles** are cumulative; each role has a clearly defined purpose, and one artifact can play multiple roles at the same time. Roles are distinct from ArtifactKinds such as `java` or `python`.
 The distinction between artifact roles is fundamental for general better organization of large projects.
 
 #### 3.10.1 General Artifact Classification
@@ -1087,7 +1360,7 @@ Core artifacts represent deliverables that contain executable or consumable func
 
 A Production Artifact is an artifact that:
 - contains source code and/or resources,
-- produces a runtime or compile-time deliverable (e.g. JAR),
+- produces one or more runtime or compile-time deliverables (for example a JAR, Python wheel, or another kind-specific package),
 - is intended to be consumed by other artifacts or applications.
 
 ##### 3.10.2.2 Characteristics
@@ -1213,7 +1486,7 @@ flowchart LR
 
 #### 3.10.5 BOM Artifacts
 
-BOM artifacts (Bill Of Materials) are **POM-packaged** artifacts whose primary purpose is to provide **version alignment** to consumers. They are published to the Maven repository alongside production artifacts and may be consumed by both Maven and Gradle builds.
+For Java/Maven-compatible publications, BOM artifacts (Bill Of Materials) are **POM-packaged** outputs whose primary purpose is to provide **version alignment** to consumers. They are published through the Java ArtifactKind repository mapping and may be consumed by both Maven and Gradle builds. The logical Algites artifact may simultaneously produce non-Java outputs through other ArtifactKinds.
 
 This section standardizes Algites BOM terminology, responsibilities, generation rules, and usage patterns. It also clarifies why different BOM categories exist and what problems each category solves.
 
@@ -1491,7 +1764,7 @@ Maven permits importing any POM via `<scope>import</scope>` and will effectively
 
 - PBBOM artifacts **MUST** be generated from Policy Artifacts.
 - PBBOM generation is deterministic:
-    - inputs: `algites-artifact.properties`
+    - inputs: resolved `algites-artifact.yml` metadata
     - outputs: `*-pbbom.pom` (and optionally metadata)
 - If policy `Y` inherits from policy `X`:
     - `PBBOM-Y` **MUST import** `PBBOM-X`.
@@ -1621,20 +1894,21 @@ flowchart LR
   D --> E[Activate intents<br/>(apply templates + rules)]
   E --> F[Resolve versions<br/>(controlled via VC;<br/>uncontrolled via ranges/preferred)]
   F --> G[Final validation<br/>(conflicts, unresolved, cycles)]
-  G --> H[Generate build-tool outputs<br/>(Gradle/Maven mapping)]
+  G --> H[Generate ArtifactKind-specific build/publication outputs<br/>(adapter mapping)]
 ```
 
-### 3.12. Migration Notes (temporary; will be removed)
+### 3.12. Migration Notes
 
 This section is intentionally placed at the end and is **temporary**.
 
-- Previous models that relied on **ArtifactKind** (policy/bom/aggregator/etc.) should be migrated by:
+- Historical uses of the name **ArtifactKind** for classifications such as policy/BOM/aggregator are retired. Those classifications are **Artifact Roles** in the current model. `ArtifactKind` now means only the supported build/publication technology (`java`, `python`, `mps`, ...). Historical role-driven models should be migrated by:
     - replacing “kind-driven behavior” with explicit **ContainerVersionContext** + **DependencyIntent** activation,
     - moving BOM/policy logic into **OutputType** + intent rule templates for dependency steering.
 - Aggregator artifacts remain possible, but are no longer mandatory just to express policy inheritance:
     - repo-root and containers can supply catalogs,
     - parent edges define baseline dependency intents.
-
+- Legacy `javagen` and `javaextgen` directories migrate respectively to `java.gen` and `java.extgen`; equivalent suffix rules apply to all SourceTypes.
+- Existing Java/Maven publication coordinates remain valid as the Java mapping of the logical artifact identity. Other technologies add parallel publication mappings rather than redefining the logical artifact.
+- Legacy repository configuration that assumes only Maven repositories should be normalized into the ArtifactKind x stability x usage repository matrix.
 
 [[/PROPOSAL]]
-

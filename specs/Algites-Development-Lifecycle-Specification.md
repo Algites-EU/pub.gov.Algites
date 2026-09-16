@@ -1,16 +1,19 @@
+[[PROPOSAL]]
 # Algites Development Lifecycle Specification
+**Version:** 2.0-draft
+**Status:** Consolidated proposal
+
 
 ## 1. Introduction
 
 
 ### 1.1. Algites CI Policy
 
-This document defines the **standard CI behavior** for Algites repositories using the various CI implementations. By default Github is used as the CI platform, but the general approach may be the same in the case some other platform would be selected.
-In the case of GitHub the GitHub Actions pipeline facility is used.
+This document defines the **standard build, CI, release, and publication lifecycle** for Algites repositories. The common lifecycle is provider-independent. GitHub Actions is the current default CI implementation, but provider-specific workflows are adapters around the same Algites build and release model and MUST NOT become the semantic source of truth.
 
 The goal is to provide a predictable, low-friction workflow:
 
-- Keep **Gradle** as only build tool, no Maven support anymore.
+- Keep **Gradle** as the single Algites build orchestrator across all supported ArtifactKinds; Maven is supported only as a Java publication/consumption compatibility format.
 - Enable **safe test-only runs** on dedicated branches without publishing.
 - Enable **fast compile-only runs** on feature branches.
 - Support Algites-style **variant branches** (e.g. `jvm17/*`, `jvm21/*`, `and21/*`, `mps2025.1/*`) naturally.
@@ -28,15 +31,15 @@ Creation of the releases or nightly build deployments to the artifact repositori
 
 #### 2.1.1. Terminology
 
-- **Stub workflow**: a small workflow committed inside each repository (e.g. `.github/workflows/algites-ci-pub.yml` or `.github/workflows/algites-create-lane-pub.yml`),
-  which triggers on push / manual dispatch and calls the central reusable workflow.
-- **Central workflow**: the reusable workflow hosted centrally (e.g. in `pub.gov.Algites`) that contains the logic for:
-  - deciding what to do based on branch name,
-  - detecting config changes,
-  - resolving Java version,
-  - generating tokens,
-  - running compile/tests/publishing,
-  - detecting issue references for build traceability.
+- **Provider stub/workflow**: a small provider-specific entry point committed inside a repository (for GitHub, typically a file below `.github/workflows/`). It reacts to provider events and delegates to the shared Algites lifecycle entry points.
+- **Algites lifecycle implementation**: shared provider-independent build/release logic, primarily exposed through Gradle and centrally governed scripts/actions. It is responsible for:
+  - resolving repository/artifact metadata,
+  - determining the selected ArtifactKinds,
+  - selecting lifecycle mode from branch/event policy,
+  - resolving kind-specific toolchains only for selected kinds,
+  - running construction, verification, packaging, documentation, and publication operations,
+  - producing provider-neutral diagnostics and build traceability metadata.
+- **Provider adapter**: optional integration that maps provider facilities such as tokens, issue links, summaries, and manual-dispatch inputs to the provider-independent lifecycle.
 
 ---
 
@@ -55,7 +58,7 @@ The CI pipeline chooses a **mode** based on the branch name:
 
 ##### 2.1.3.1 Verification branches
 
-Branches containing the followiong names are treated as to be verified on push:
+Branches containing the following names are treated as to be verified on push:
 
 - `main`
 - `master`
@@ -122,7 +125,9 @@ All branches not matching the above patterns are treated as:
 
 #### 2.1.5. Build Tool - Gradle
 
-The unified build is based uniquely on Gradle in all repositories. But for every artifacts Gradle produces also the Maven artifacts to allow free usage of the generated products also from Maven buuilding system. Artifacts are published by gradle in the maven repositories.
+The unified Algites build is orchestrated by Gradle in all repositories and for all supported ArtifactKinds. Gradle coordinates kind-specific adapters; an adapter MAY delegate execution to a native ecosystem toolchain (for example Python packaging tools or MPS tooling) while preserving a deterministic Gradle task graph.
+
+Java artifacts may additionally publish Maven-compatible metadata and packages for Maven consumers. Maven is not an Algites build tool. Python and other ArtifactKinds publish through their own kind-specific repository protocols and package formats.
 
 ##### 2.1.5.1 Gradle bootstrap handling
 
@@ -181,220 +186,139 @@ This rule favors:
 
 ###### 2.1.5.1.4 Bootstrap responsibilities
 
-The bootstrap defined in `settings.gradle.kts` is responsible only for:
+The bootstrap defined in `settings.gradle.kts` is responsible only for the repositories and settings required **before** shared Algites build logic and artifact metadata can be resolved. Typical responsibilities include:
 
-- `pluginManagement.repositories`
-- `dependencyResolutionManagement.repositories`
+- Gradle plugin resolution,
+- retrieval of the minimal shared Algites build infrastructure when needed,
+- repository-local Gradle initialization required by the selected Gradle distribution.
 
-It must **not**:
+It must **not** become the authoritative configuration for artifact publication repositories, artifact versions, ArtifactKind selection, or build behavior.
 
-- configure project logic
-- define versions
-- apply plugins
-- contain build behavior
+###### 2.1.5.1.5 Bootstrap repositories vs Algites artifact repositories
 
----
+Two repository concepts are intentionally distinct:
 
-###### 2.1.5.1.5 Public vs private repository variants
+- **Bootstrap repositories** are explicit and repository-local in `settings.gradle.kts`. They exist only to make Gradle and shared build infrastructure resolvable.
+- **Algites artifact repositories** are resolved after metadata loading from the publication repository matrix defined by ArtifactKind x stability (`final`/`snapshot`) x URL usage (`download`/`upload`). The matrix inherits from Algites defaults through `algites-source-repository.yml` and nested `algites-artifact.yml` files.
 
-Algites distinguishes two bootstrap variants:
+A Java/Maven repository used for dependency resolution or publication is therefore not automatically a bootstrap repository. Python, MPS, and future kind-specific repositories are resolved by their adapters and effective artifact metadata.
 
-- **Public repositories**
-- **Private repositories**
+###### 2.1.5.1.6 Public vs private trust domains
 
-The difference is **strictly additive**: private repositories extend the public bootstrap.
+Public repository bootstrap MUST NOT require private credentials or private-only endpoints. Private repositories MAY add private bootstrap endpoints when they are actually required for bootstrap. Artifact publication visibility is enforced independently by the effective Algites publication repository matrix and repository visibility policy.
 
----
+###### 2.1.5.1.7 Change management
 
-###### 2.1.5.1.6 Canonical public bootstrap (`settings.gradle.kts`)
+Bootstrap changes should remain rare, deliberate, explicit, and repository-local. Publication repository changes belong in Algites metadata/defaults and SHOULD NOT require copying technology-specific repository URLs into every `settings.gradle.kts`.
 
-Public repositories define only publicly accessible repositories.
+###### 2.1.5.1.8 Normative summary
 
-```kotlin
-// settings.gradle.kts (public repository)
-
-pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        mavenCentral()
-        algitesPublicRepositories()
-    }
-}
-
-dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-        algitesPublicRepositories()
-    }
-}
-```
-
----
-
-###### 2.1.5.1.7 Canonical private bootstrap (`settings.gradle.kts`)
-
-Private repositories extend the public bootstrap with private repositories.
-
-```kotlin
-// settings.gradle.kts (private repository)
-
-pluginManagement {
-    repositories {
-        gradlePluginPortal()
-        mavenCentral()
-        algitesPublicRepository()
-        algitesPrivateRepository()
-    }
-}
-
-dependencyResolutionManagement {
-    repositories {
-        mavenCentral()
-        algitesPublicRepository()
-        algitesPrivateRepository()
-    }
-}
-```
-
----
-
-###### 2.1.5.1.8 Repository helper functions
-
-To avoid duplication and ensure consistency, repository definitions are expressed via helper functions defined **directly in `settings.gradle.kts`**.
-
-These functions are intentionally simple and declarative.
-
-####### 2.1.5.1.8.1 Public repository definition
-
-```kotlin
-fun RepositoryHandler.algitesPublicRepositories() {
-     maven {
-        name = "algites-public-releases"
-        url = uri("https://repo1.maven.org/maven2")
-        mavenContent {
-            releasesOnly()
-        }
-    }
-     maven {
-        name = "algites-public-snapshots"
-        url = uri("https://dl.cloudsmith.io/public/algites/maven-snapshots-pub/")
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
-
-}
-```
-
-####### 2.1.5.1.8.2 Private repository definition
-
-```kotlin
-fun RepositoryHandler.algitesPrivateRepositories() {
-    maven {
-        name = "algites-private-releases"
-        url = uri("https://....")
-        mavenContent {
-            releasesOnly()
-        }
-    }
-    maven {
-        name = "algites-private-snapshots"
-        url = uri("https://....")
-        mavenContent {
-            snapshotsOnly()
-        }
-    }
-}
-```
-
-Private repository definitions are **never present in public repositories**.
-
----
-
-###### 2.1.5.1.9 Change management and evolution
-
-Bootstrap changes are expected to be:
-
-- rare
-- deliberate
-- explicit
-
-When repository definitions change:
-
-- the change is applied directly to `settings.gradle.kts`
-- affected repositories are updated explicitly
-- automation (scripts or bulk refactoring) may be used
-
-This approach avoids hidden coupling and preserves auditability.
-
----
-
-###### 2.1.5.1.10 Rationale and trade-offs
-
-This design intentionally accepts:
-
-- small, explicit duplication
-
-In exchange for:
-
-- zero bootstrap magic
-- full IDE support
-- deterministic behavior
-- minimal onboarding friction
-
-The design aligns with Gradle’s philosophy of **self-describing builds** and prioritizes operational simplicity.
-
----
-
-###### 2.1.5.1.11 Normative summary
-
-- Gradle bootstrap is defined explicitly in each repository
-- `settings.gradle.kts` is the single source of bootstrap truth
-- Public and private variants differ only additively
-- No shared pre-settings bootstrap is used
-- Explicit configuration is preferred over centralized indirection
-
-This approach is considered **final and stable** for Algites.
+- `settings.gradle.kts` remains the explicit source of Gradle bootstrap configuration.
+- No hidden global Gradle init/bootstrap mechanism is required.
+- Bootstrap configuration is minimal and distinct from the Algites publication repository matrix.
+- Artifact-specific repository policy is resolved only after Algites metadata and ArtifactKind adapters are available.
 
 
 ---
 
-##### 2.1.5.2. What Gets Executed (by Mode)
+##### 2.1.5.2. What Gets Executed (by Mode and ArtifactKind)
+
+Lifecycle mode and ArtifactKind selection are independent dimensions. For every targeted artifact/cascade, the lifecycle first resolves the effective selected `kinds` and then asks each selected ArtifactKind adapter to contribute the tasks required by the mode.
 
 ###### 2.1.5.2.1 Mode = approval
 
-- Gradle (default): `./gradlew check`
+Run full verification plus packaging for all selected ArtifactKinds. Publication is a separate explicit lifecycle operation unless a concrete release action requests it.
 
 ###### 2.1.5.2.2 Mode = verification
 
-- Gradle (default): `./gradlew test integrationTest`
+Run all applicable unit/integration verification for the selected ArtifactKinds without requiring publication.
 
 ###### 2.1.5.2.3 Mode = construction
 
-- Gradle (default): `./gradlew testClasses`
+Construct/compile/generate the selected product and develop sources without running the full verification suite.
 
 ###### 2.1.5.2.4 Mode = skip
 
 Exit early after logging the decision.
 
+###### 2.1.5.2.5 ArtifactKind selection
+
+- If no kind filter is supplied, all effective artifact `kinds` are selected.
+- An explicit filter may select one or more kinds, for example only `java` or only `python`.
+- Artifacts in a cascade that do not support a requested kind are skipped for that kind.
+- Selecting several kinds does not require their task graphs to be coupled; Gradle executes only real task dependencies.
+- Shared transformations MAY be shared tasks; technology-specific transformations MAY run independently and remain independently cacheable when their inputs/outputs permit it.
+
 ---
 
-##### 2.1.5.3. Java Version Resolution
+##### 2.1.5.3. ArtifactKind-Specific Toolchain Resolution
 
-If Java version is not provided explicitly, the workflow auto-detects it in this order:
+Toolchains are resolved only for selected ArtifactKinds. Every ArtifactKind adapter owns its resolution rules and diagnostics.
+
+For the Java adapter, unless a more specific Algites metadata rule overrides it, the current compatibility resolution order remains:
 
 1. `.java-version` (single integer per line, e.g. `17`)
 2. `gradle.properties` containing `javaVersion=<n>`
-3. fallback default (currently `17`)
+3. Algites Java default (currently `17`)
+
+Python, MPS, and future adapters MUST define equivalent deterministic resolution rules before their ArtifactKinds are enabled.
 
 ---
 
-#### 2.1.5.4. Issue references (optional but recommended)
+##### 2.1.5.4. Development Environment Preparation
+
+Algites defines repository-level Gradle lifecycle tasks for deterministic preparation of development metadata required by IDEs and ecosystem tooling. These tasks are provider-independent and MUST remain usable without a specific IDE.
+
+###### 2.1.5.4.1 `prepareDevelopment`
+
+`prepareDevelopment` is the canonical idempotent preparation task. It SHOULD:
+
+- resolve repository and artifact metadata required for development tooling;
+- create or update derived development descriptors for all relevant artifacts; when no preparation kind filter is supplied, all effective ArtifactKinds are prepared;
+- generate Python `pyproject.toml` files from resolved Algites metadata plus optional committed `pyproject.toml.tpl` files;
+- preserve unrelated user/development state;
+- perform no release/publication operation.
+
+A freshly cloned repository MUST be able to reach a normal IDE-ready state by running:
+
+```text
+./gradlew prepareDevelopment
+```
+
+Generated development descriptors remain derived data and MUST NOT become independent sources of truth.
+
+###### 2.1.5.4.2 `refreshDevelopment`
+
+`refreshDevelopment` forces recreation of Algites-managed derived development metadata and then establishes the same final state as `prepareDevelopment`. It MAY remove only metadata that the Algites development lifecycle owns. It MUST NOT behave as a general deletion of user IDE settings or unrelated local files.
+
+###### 2.1.5.4.3 Relationship to `clean`
+
+The standard `clean` lifecycle remains primarily destructive for build/generated-source outputs. It SHOULD remove normal build outputs and reproducible `src/{product|develop}/*.gen` directories.
+
+Derived working metadata needed by IDEs, such as generated `pyproject.toml`, SHOULD remain present across ordinary `clean` operations. This avoids destabilizing an open IDE project and avoids giving `clean` the surprising behavior of deleting and immediately regenerating development descriptors.
+
+Build/package tasks that consume generated development metadata MUST depend on the corresponding generation task so that a retained descriptor cannot silently become stale.
+
+###### 2.1.5.4.4 JetBrains IDE/MPS startup bootstrap
+
+Algites repositories that maintain shared JetBrains project metadata SHOULD commit a minimal shared JetBrains project bootstrap that invokes `./gradlew prepareDevelopment` as a project Startup Task when the repository is opened in a supporting JetBrains IDE. This integration is intended to make a fresh clone usable without a manual preparation step while keeping Gradle as the actual implementation.
+
+Rules:
+
+- the bootstrap is repository-level, not duplicated per artifact;
+- only shareable project configuration required to invoke `prepareDevelopment` SHOULD be committed; user-specific workspace state remains ignored;
+- the physical project-configuration location MAY differ by JetBrains product (for example IntelliJ-family `.idea` project files versus MPS-specific project configuration); the repository SHOULD follow the native product convention rather than forcing one path on all products;
+- IDE project-trust / safe-mode behavior MUST be respected; the bootstrap MUST NOT attempt to bypass the IDE security model;
+- the startup integration is an optional convenience layer. `./gradlew prepareDevelopment` remains the portable source of behavior for non-JetBrains IDEs and command-line development.
+
+The committed startup configuration itself is stable bootstrap metadata. It SHOULD NOT contain generated artifact-specific Python identity/version data; those values are produced by `prepareDevelopment`.
+
+##### 2.1.5.5. Issue references (optional but recommended)
 
 Algites CI can automatically detect **GitHub Issue references** related to a build and display them in the
 Actions **Job Summary** as clickable links.
 
-##### 2.1.5.4.1 Branch naming convention (strict)
+###### 2.1.5.5.1 Branch naming convention (strict)
 
 For feature branches, prefix the feature “slug” with an explicit **ID marker** and terminate it with an underscore:
 
@@ -410,7 +334,7 @@ Cross-repository shorthand (Algites-EU only) is also supported:
 > The `ID.` prefix is **required** in branch names to avoid accidental matches (e.g. variant branches like `jvm17/*` or `and21/*`).
 > The underscore `_` acts as the delimiter that ends the issue reference.
 
-##### 2.1.5.4.2 Commit message convention (flexible)
+###### 2.1.5.5.2 Commit message convention (flexible)
 
 In commit subjects, CI detects references introduced by `#`.
 
@@ -421,7 +345,7 @@ Supported forms:
 - `#pub.tool.Java-123` (cross-repo shorthand, Algites-EU only)
 - `#ID.pub.tool.Java-123` (same as above)
 
-##### 2.1.5.4.3 What CI does with it
+###### 2.1.5.5.3 What CI does with it
 
 If issue references are detected (from branch name and/or commit subjects), CI will:
 
@@ -438,12 +362,43 @@ If issue references are detected (from branch name and/or commit subjects), CI w
 - Prefer variant branching (`jvm17/*`, `jvm21/*`, `and21/*`, `mps2025.1/*`) to keep cross-variant feature migration explicit.
 - Use `feature-testrun/*` for safe CI experiments without publishing.
 - Use `feature/*` for normal development with fast compile feedback.
-- Keep publishing limited to publish branches (`main`, `master`, `develop`, `hotfix`, and versioned variants).
-- Use the identification of the issues everywhere it is possible and reasonable to keep the transparency of the changes ión highes possible level
+- Keep publication/release actions explicit and constrained by branch/lane policy; publication MAY target only a selected subset of ArtifactKinds.
+- Use issue identification wherever practical to keep change traceability as transparent as possible.
 
 ---
 
-### 2.2. Specifics of the Integration With Github Actions facility
+#### 2.1.7. Publication Repository Resolution
+
+Before dependency download or publication, the lifecycle resolves the effective repository matrix cell for every selected ArtifactKind and operation:
+
+```text
+<kind> x <final|snapshot> x <download|upload>
+```
+
+Resolution order is:
+
+```text
+Algites built-in defaults
+        -> algites-source-repository.yml
+        -> ancestor algites-artifact.yml
+        -> descendant algites-artifact.yml
+```
+
+Only explicitly configured cells override inherited values. Credentials are supplied by the execution environment/provider and MUST NOT change the resolved semantic target.
+
+---
+
+#### 2.1.8. Governed YAML Schema Resolution
+
+Algites YAML configuration schemas are versioned contracts. Schema filenames MUST carry their schema version suffix from the first version, using the convention defined by the Structure Specification (`_1`, `_2`, ...).
+
+Lifecycle tooling MUST therefore resolve an explicit schema version rather than relying on an unversioned mutable schema filename. Incompatible schema evolution requires selecting a new schema version; old schema versions MAY remain available for validation of older repository states.
+
+Schemas for public Algites YAML configuration SHOULD be sourced from the governed public schema artifact rather than copied ad hoc into individual repositories. CI/development validation MAY cache these schemas, but the resolved schema identity/version MUST remain visible in diagnostics.
+
+---
+
+### 2.2. Specifics of the Integration With GitHub Actions facility
 
 (TBD)
 
@@ -451,11 +406,12 @@ If issue references are detected (from branch name and/or commit subjects), CI w
 
 ## 3. Algites Release & Upmerge Policy
 
-This document describes how Algites repositories do **versioning, releases, and upmerges** using:
+This chapter describes how Algites repositories perform **versioning, releases, and upmerges** independently of the CI provider, using:
 - **variant-prefixed branches** (e.g. `jvm17/...`, `and21/...`)
 - **lane branches** (e.g. `*/lane/1.1`)
-- **version computed from tags** (B1 policy)
-- Workflows for **release** and **lane creation**
+- container-scoped version contexts
+- immutable release source revisions/tags
+- explicit release and lane-creation operations
 
 ---
 
@@ -488,8 +444,8 @@ Lane meaning:
 
 To use the lanes on the project, the repo MUST contain `algites-source-repository.yml` in repository root with the defined lane identification:
 
-```properties
-algites.repository.lane=1.1
+```yaml
+algites.repository.lane: "1.1"
 ```
 
 CI enforces:
@@ -499,53 +455,53 @@ CI enforces:
 
 ---
 
-#### 3.1.3. Versioning: Computed patch
+#### 3.1.3. Versioning and Version Scope
 
-##### 3.1.3.1 Tag format (release)
-Release tags MUST be:
+A controlled version is resolved from the effective `ContainerVersionContext`. Repository root is one possible version scope, but nested containers/artifacts MAY override the context and therefore maintain an independent version lifecycle within the same source repository.
 
-- `v<A>.<B>.<C>-<variant>`
+A release identity MUST therefore identify both:
 
-Example:
-- `v1.1.15-jvm17`
+- the resolved version, and
+- the version scope/source revision to which that version belongs.
 
-##### 3.1.3.2 Snapshot version (CI)
-For lane `<A>.<B>` and variant `<variant>`:
-- Find max released `C` from tags `vA.B.*-variant`
-- Compute `nextC = maxC + 1` (or `0` if no tags exist)
-- CI uses snapshot version:
+The historical tag form `v<A>.<B>.<C>-<variant>` remains valid for repositories where the repository root is the only version scope. Repositories with multiple independent version scopes MUST use a scope-disambiguated release identity defined by the release implementation; the scope identifier MUST be stable and derived from Algites artifact/container identity rather than an arbitrary display label.
 
-- `<A>.<B>.<nextC>-<variant>-SNAPSHOT`
+##### 3.1.3.1 Snapshot versions
 
-Example:
-- last tag: `v1.1.15-jvm17`
-- CI snapshot: `1.1.16-jvm17-SNAPSHOT`
+Snapshot computation is performed per effective version scope. A snapshot version is independent from ArtifactKind selection: the same logical snapshot version MAY be built for Java, Python, MPS, or any selected subset of ArtifactKinds.
 
-This eliminates constant conflicts during upmerge (because `C` is not stored in repo files).
+##### 3.1.3.2 ArtifactKind-specific publication presence
 
----
+A logical version does not imply that every declared ArtifactKind has been published. For example, version `1.4.1` may have a Java final publication while Python remains available only at `1.4.0`. No artificial Python `1.4.1` package is created.
+
+If another ArtifactKind is later published under the same logical version, it MUST be built from the same immutable release source revision. If the source has changed, a new logical version is required.
 
 #### 3.1.4. CI: when/what runs
 
-The unified CI workflow computes the snapshot version and then runs Gradle
+The common CI lifecycle resolves the effective version scope, selected ArtifactKinds, lifecycle mode, and then invokes the corresponding Gradle/ArtifactKind-adapter task graph.
 
 
-#### 3.1.5. Release process (manual action)
+#### 3.1.5. Release process (explicit action)
 
-Releases are **explicit** and start from the GitHub UI:
+Releases are deliberate operations initiated through the active CI/provider integration or an equivalent local/central Algites release entry point. The operation selects:
 
-- **Actions → Algites Universal Release → Run workflow**
-- Choose the branch, typically:
-  - `jvm17/lane/1.1` (or any other lane branch)
+- branch/lane and effective version scope,
+- final logical version,
+- one or more ArtifactKinds to publish (default: all effective kinds),
+- optional upmerge behavior.
 
-The release workflow will:
-1) validate lane consistency (`algites.repository.lane` vs branch lane)
-2) compute next `C` from tags
-3) create a new tag `vA.B.C-variant`
-4) publish artifacts (Gradle or Maven, according to selection / override)
+The release operation MUST:
 
-##### 3.1.5.1 Automated tag naming
-Tag is computed automatically. You do **not** type it manually.
+1. validate lane/version-scope consistency,
+2. resolve and freeze the immutable release source revision,
+3. compute or validate the release identity/tag,
+4. execute construction and verification required by each selected ArtifactKind adapter,
+5. publish only the selected ArtifactKinds to their effective `final.upload` repository matrix cells,
+6. record which ArtifactKind-specific publications actually exist for the logical version.
+
+##### 3.1.5.1 Release identity/tag naming
+
+Release identities are computed automatically from the effective version scope, version, and variant policy. Provider UI MUST NOT be the semantic source of the tag name. Legacy single-scope repositories may continue using `v<A>.<B>.<C>-<variant>`; multi-scope repositories require a stable scope-disambiguated form.
 
 ---
 
@@ -553,7 +509,7 @@ Tag is computed automatically. You do **not** type it manually.
 
 After a successful release, you can upmerge the resulting changes to higher lanes (same major).
 
-The release workflow supports:
+The release lifecycle supports:
 - `upmerge_mode=none` → do nothing
 - `upmerge_mode=next` → upmerge to next minor lane if it exists (e.g. `1.1` → `1.2`)
 - `upmerge_mode=all-higher` → upmerge to all higher lanes that exist (within the same major)
@@ -566,7 +522,7 @@ Set `upmerge_preview_only=true` to only print a **single CSV line** with compati
 jvm17/lane/1.2,jvm17/lane/1.3
 ```
 
-You can copy that line and re-run the release with `upmerge_mode=explicit` and paste it into `upmerge_targets`.
+A provider adapter may expose that line for copy/paste; the semantic input remains `upmerge_mode=explicit` plus `upmerge_targets`.
 
 ##### 3.1.6.2 What the upmerge does technically
 Upmerge is attempted via:
@@ -574,7 +530,7 @@ Upmerge is attempted via:
 - cherry-picking commits from the previous release tag (or only HEAD if no previous tag exists)
 - opening a PR to the target lane
 
-If cherry-pick conflicts, the workflow skips that target (manual resolution is required).
+If cherry-pick conflicts, the release implementation skips that target (manual resolution is required).
 
 ---
 
@@ -582,16 +538,16 @@ If cherry-pick conflicts, the workflow skips that target (manual resolution is r
 
 To start a new minor lane across variants, use:
 
-- **Actions → Algites Create Lane (All Variants) → Run workflow**
+- invoke the provider-specific **Algites Create Lane** action or an equivalent Algites lifecycle entry point
 
 Inputs:
 - `source_lane`: e.g. `1.1`
 - `new_lane`: e.g. `1.2`
 - `variants`: `auto` (discover existing variants with the source lane) or `explicit`
 
-The CI workflow:
+The lane-creation lifecycle:
 - creates `*/lane/<new_lane>` from `*/lane/<source_lane>`
-- updates `algites.repository.lane=<new_lane>` in the new branch
+- updates the `algites.repository.lane` value in `algites-source-repository.yml` to `<new_lane>` in the new branch
 - pushes the new branch
 
 ---
@@ -600,23 +556,28 @@ The CI workflow:
 
 ##### 3.1.8.1 “How do I release the next lane after upmerge?”
 Upmerge only transfers commits. A release of that next lane is still:
-- a deliberate manual action: run the Release workflow on `*/lane/1.2`.
+- a deliberate release action on `*/lane/1.2`.
 
-##### 3.1.8.2 “What if I need different versions for different artifacts?”
-This model assumes **one version per repository**.
-If different artifacts must have independent version lifecycles, split them into separate repositories.
+##### 3.1.8.2 “What if artifacts need different version lifecycles?”
+
+Use distinct `ContainerVersionContext` scopes. Artifacts do not need to be split into separate source repositories solely because their logical versions advance independently. The effective version scope remains inherited through the container hierarchy and may be overridden at an artifact/container boundary.
+
+##### 3.1.8.3 “What if only one technology changed?”
+
+Release only the affected ArtifactKind(s). Other technologies remain at the latest version for which they were actually published. This keeps technology lifecycles operationally decoupled without introducing independent ArtifactKind-specific version counters inside one logical artifact.
 
 ---
 
-#### 3.1.9. Counterpoints (why this might bite you)
+#### 3.1.9. Counterpoints and trade-offs
 
-- **Tag-driven versioning** is great for avoiding merge conflicts, but you lose the “look at sources and see exact patch version” feeling. You’ll rely more on tags/releases and CI summaries.
-- **Cherry-pick upmerge** is pragmatic, but it can silently skip targets on conflicts unless you watch the summary carefully.
-- **One version per repo** simplifies governance, but it can force repo splits earlier than you’d like (more repos, more wiring).
+- Scoped version contexts reduce pressure to split repositories, but release tags/diagnostics must always make the version scope unambiguous.
+- Selective technology publication reduces cross-technology coupling, but consumers cannot assume that every logical version exists in every ecosystem; publication metadata and documentation must show actual availability.
+- Gradle orchestration across non-JVM ecosystems provides one lifecycle entry point, but each ArtifactKind adapter must accurately model native-tool inputs, outputs, and failure modes rather than hiding them behind Java assumptions.
+- Cherry-pick upmerge remains pragmatic, but conflicts require explicit review and resolution.
 
-If any of these are deal-breakers for a particular repo, you can still fall back to “version in a single file” (with more merge conflicts) or maintain separate version tracks per module (with more complexity).
+### 3.2 GitHub Actions specific Policy
 
-### 3.2 Github Actions specific Policy
+GitHub Actions is currently the default provider adapter. Provider-specific workflow structure, reusable actions, credentials, and UI mappings are defined here only insofar as they adapt the provider-independent lifecycle above. Migration of build/release logic out of GitHub-specific YAML and into Algites-owned actions/scripts is intentionally compatible with this model.
 
 (TBD)
 
@@ -625,3 +586,5 @@ If any of these are deal-breakers for a particular repo, you can still fall back
 
 
 **© Algites**
+
+[[/PROPOSAL]]
