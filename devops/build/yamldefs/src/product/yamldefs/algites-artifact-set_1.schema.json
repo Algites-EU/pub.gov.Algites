@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-artifact-set_1.schema.json",
+  "title": "Algites Artifact Set Definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "artifactSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["java", "python", "mps"]
+          }
+        },
+        "name": { "type": "string", "minLength": 1 },
+        "description": { "type": "string" },
+        "groupId": { "type": "string", "minLength": 1 },
+        "repositories": { "$ref": "algites-repository-matrix_1.schema.json" },
+        "versionContext": { "$ref": "algites-version-context_1.schema.json" }
+      }
+    },
+    "versionContext": { "$ref": "algites-version-context_1.schema.json" }
+  },
+  "required": ["artifactSet"]
+}

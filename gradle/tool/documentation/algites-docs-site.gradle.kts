@@ -25,8 +25,14 @@ apply(from = uri(locAlgitesDocsBaseScript))
 val locResolvedArtifactDirectories = extra.properties["algitesDocsResolvedArtifactDirectories"] as? List<Map<String, String?>>
     ?: emptyList()
 
-val locResolvedDocumentationTypes = locResolvedArtifactDirectories
-    .mapNotNull { locArtifactDirectory -> locArtifactDirectory["type"]?.lowercase()?.takeIf { it.isNotBlank() } }
+val locResolvedDocumentationKinds = locResolvedArtifactDirectories
+    .flatMap { locArtifactDirectory ->
+        locArtifactDirectory["kinds"]
+            ?.split(',')
+            ?.map { locKind -> locKind.trim().lowercase() }
+            ?.filter { locKind -> locKind.isNotBlank() }
+            ?: emptyList()
+    }
     .toSet()
 
 logger.lifecycle("Algites documentation artifact directory resolution:")
@@ -34,16 +40,16 @@ locResolvedArtifactDirectories.forEach { locArtifactDirectory ->
     logger.lifecycle(
         " - ${locArtifactDirectory["path"]}: " +
             "kind=${locArtifactDirectory["kind"]}, " +
-            "type=${locArtifactDirectory["type"]}, " +
+            "kinds=${locArtifactDirectory["kinds"]}, " +
             "contentsModel=${locArtifactDirectory["contentsModel"]}, " +
             "version=${locArtifactDirectory["version.resolvedValue"]}"
     )
 }
 
-if ("java" in locResolvedDocumentationTypes) {
+if ("java" in locResolvedDocumentationKinds) {
     apply(from = uri(locAlgitesDocsJavaScript))
 }
 
-if ("mps" in locResolvedDocumentationTypes) {
+if ("mps" in locResolvedDocumentationKinds) {
     apply(from = uri(locAlgitesDocsMpsScript))
 }

@@ -43,21 +43,13 @@ dependencyResolutionManagement {
             mavenLocal()
         }
         mavenCentral()
-        maven {
-            name = "algites-public-releases"
-            url = uri("https://repo1.maven.org/maven2")
-            mavenContent {
-                releasesOnly()
-            }
-        }
-        maven {
-            name = "algites-public-snapshots"
-            url = uri("https://dl.cloudsmith.io/public/algites/maven-snapshots-pub/maven/")
-            mavenContent {
-                snapshotsOnly()
-            }
-        }
     }
 }
 
-apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-root-settings-discovery.gradle.kts"))
+val locAlgitesSettingsDiscoveryScript = file("gradle/tool/repository/algites-root-settings-discovery.gradle.kts")
+if (locAlgitesSettingsDiscoveryScript.isFile) {
+    apply(from = locAlgitesSettingsDiscoveryScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-root-settings-discovery.gradle.kts"))
+}
+

@@ -2,8 +2,8 @@
  * Algites repository settings discovery.
  *
  * This script is a thin Settings adapter over the shared artifact directory
- * metadata resolver. The resolver itself contains the repository scanning and
- * metadata inheritance logic.
+ * metadata resolver. It includes discovered Gradle projects and exposes the
+ * effective Java download repositories required by those projects.
  */
 
 import java.io.File
@@ -56,8 +56,57 @@ locAlgitesArtifactDirectories
         }
     }
 
+val locJavaDownloadRepositories = linkedSetOf<Pair<String, String>>()
+
+@Suppress("UNCHECKED_CAST")
+fun AIcCollectJavaDownloadRepositories(aRepositories: Any?) {
+    val locRepositories = aRepositories as? Map<String, String> ?: return
+    listOf("final", "snapshot").forEach { locStability ->
+        val locUrl = locRepositories["java.$locStability.download"]?.trim()?.takeIf { it.isNotBlank() }
+        if (locUrl != null) {
+            locJavaDownloadRepositories.add(locStability to locUrl)
+        }
+    }
+}
+
+AIcCollectJavaDownloadRepositories(locAlgitesRepositoryMetadata["repositories"])
+locAlgitesArtifactDirectories.forEach { locArtifactDirectory ->
+    AIcCollectJavaDownloadRepositories(locArtifactDirectory["repositories"])
+}
+
+val locRepositoryUser = providers.gradleProperty("ALGITES_REPO_USER").orNull
+    ?: providers.environmentVariable("ALGITES_REPO_USER").orNull
+val locRepositoryPassword = providers.gradleProperty("ALGITES_REPO_PASS").orNull
+    ?: providers.environmentVariable("ALGITES_REPO_PASS").orNull
+
+dependencyResolutionManagement.repositories {
+    locJavaDownloadRepositories.forEachIndexed { locIndex, locEntry ->
+        val locStability = locEntry.first
+        val locUrl = locEntry.second
+        maven {
+            name = "algitesResolvedJava${locStability.replaceFirstChar { it.titlecase() }}Download${locIndex + 1}"
+            url = uri(locUrl)
+            mavenContent {
+                if (locStability == "snapshot") {
+                    snapshotsOnly()
+                } else {
+                    releasesOnly()
+                }
+            }
+            if (!locRepositoryUser.isNullOrBlank() && !locRepositoryPassword.isNullOrBlank()) {
+                credentials {
+                    username = locRepositoryUser
+                    password = locRepositoryPassword
+                }
+            }
+        }
+    }
+}
+
 println(
     "Algites settings discovery included " +
         locIncludedProjectPaths.size +
-        " Gradle artifact project(s)."
+        " Gradle artifact project(s) and " +
+        locJavaDownloadRepositories.size +
+        " resolved Java download repository target(s)."
 )

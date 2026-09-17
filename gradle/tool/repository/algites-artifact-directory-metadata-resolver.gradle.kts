@@ -2,9 +2,9 @@
  * Algites artifact directory metadata resolver core.
  *
  * This script intentionally contains only Settings/Project compatible logic.
- * It does not register tasks and does not use Project-only APIs such as
- * providers, layout, or tasks. Use the companion resolver wrapper when Gradle
- * tasks or command-line output are needed.
+ * It resolves structural metadata, ArtifactKinds, version contexts, and the
+ * effective publication repository matrix inherited through the repository
+ * directory hierarchy.
  */
 
 import java.io.File
@@ -31,7 +31,7 @@ data class AIcAlgitesVersionContext(
             ?.takeIf { it.isNotBlank() }
             ?: qualifierKind
                 ?.takeIf { it.isNotBlank() }
-                ?.takeUnless { it.equals("RELEASE", ignoreCase = true) }
+                ?.takeUnless { it.equals("RELEASE", ignoreCase = true) || it.equals("FINAL", ignoreCase = true) }
 
         val locBaseVersion = if (locRevision == null) {
             locLane
@@ -48,14 +48,16 @@ data class AIcAlgitesVersionContext(
 }
 
 data class AIcAlgitesResolvedState(
-    val type: String? = null,
+    val kinds: List<String>? = null,
     val groupId: String? = null,
+    val repositories: Map<String, String> = emptyMap(),
     val versionContext: AIcAlgitesVersionContext = AIcAlgitesVersionContext()
 ) {
     fun AIcMerge(aOther: AIcAlgitesResolvedState): AIcAlgitesResolvedState {
         return AIcAlgitesResolvedState(
-            type = aOther.type ?: type,
+            kinds = aOther.kinds ?: kinds,
             groupId = aOther.groupId ?: groupId,
+            repositories = repositories + aOther.repositories,
             versionContext = versionContext.AIcMerge(aOther.versionContext)
         )
     }
@@ -70,10 +72,11 @@ data class AIcAlgitesDirectoryConfig(
 data class AIcAlgitesArtifactDirectoryMetadata(
     val path: String,
     val kind: String,
-    val type: String?,
+    val kinds: List<String>,
     val name: String,
     val description: String,
     val groupId: String?,
+    val repositories: Map<String, String>,
     val contentsModel: String,
     val hasGradleBuild: Boolean,
     val gradleProjectPath: String,
@@ -84,7 +87,8 @@ data class AIcAlgitesRepositoryMetadata(
     val id: String,
     val name: String,
     val visibility: String,
-    val groupId: String?
+    val groupId: String?,
+    val repositories: Map<String, String>
 )
 
 data class AIcAlgitesResolutionResult(
@@ -92,10 +96,15 @@ data class AIcAlgitesResolutionResult(
     val artifactDirectories: List<AIcAlgitesArtifactDirectoryMetadata>
 )
 
+val AIcAlgitesSupportedArtifactKinds = linkedSetOf("java", "python", "mps")
+val AIcAlgitesRepositoryStabilities = linkedSetOf("final", "snapshot")
+val AIcAlgitesRepositoryUsages = linkedSetOf("download", "upload")
+
 val AIcAlgitesIgnoredDirectoryNames = setOf(
     ".git",
     ".gradle",
     ".idea",
+    ".mps",
     "build",
     "run",
     "target",
@@ -109,6 +118,16 @@ val AIcAlgitesIgnoredDirectoryNames = setOf(
     "classes_gen"
 )
 
+fun AIcAlgitesBuiltInRepositoryDefaults(aVisibility: String): Map<String, String> {
+    return when (aVisibility.lowercase()) {
+        "pub" -> linkedMapOf(
+            "java.final.download" to "https://repo1.maven.org/maven2",
+            "java.snapshot.download" to "https://dl.cloudsmith.io/public/algites/maven-snapshots-pub/maven/"
+        )
+        else -> emptyMap()
+    }
+}
+
 fun AIcResolveAlgitesArtifactDirectoryMetadata(
     aRepositoryRoot: File,
     aArtifactDirectoryPath: String?,
@@ -116,10 +135,30 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
     aRepositoryNameOverride: String?,
     aRepositoryVisibilityOverride: String?
 ): AIcAlgitesResolutionResult {
-    val locRepository = AIcResolveRepositoryMetadata(
+    val locRepositoryBase = AIcResolveRepositoryMetadataBase(
         aRepositoryRoot = aRepositoryRoot,
         aRepositoryNameOverride = aRepositoryNameOverride,
         aRepositoryVisibilityOverride = aRepositoryVisibilityOverride
+    )
+
+    val locInitialState = AIcAlgitesResolvedState(
+        repositories = AIcAlgitesBuiltInRepositoryDefaults(locRepositoryBase.visibility)
+    )
+
+    val locRootConfig = AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)
+        ?.takeIf { it.kind == "repository" }
+    val locRootState = if (locRootConfig == null) {
+        locInitialState
+    } else {
+        locInitialState.AIcMerge(AIcResolvedStateFromConfig(locRootConfig))
+    }
+
+    val locRepository = AIcAlgitesRepositoryMetadata(
+        id = locRepositoryBase.id,
+        name = locRepositoryBase.name,
+        visibility = locRepositoryBase.visibility,
+        groupId = locRepositoryBase.groupId,
+        repositories = locRootState.repositories
     )
 
     val locNormalizedPath = aArtifactDirectoryPath
@@ -141,11 +180,25 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
     }
 
     val locArtifactDirectories = if (locResolutionKind == "current-only") {
-        listOf(AIcResolveSingleArtifactDirectory(aRepositoryRoot, locNormalizedPath ?: "."))
+        listOf(
+            AIcResolveSingleArtifactDirectory(
+                aRepositoryRoot = aRepositoryRoot,
+                aArtifactDirectoryPath = locNormalizedPath ?: ".",
+                aInitialState = locInitialState
+            )
+        )
     } else if (locNormalizedPath == null) {
-        AIcResolveAllArtifactDirectories(aRepositoryRoot)
+        AIcResolveArtifactDirectoryAndSubdirectories(
+            aRepositoryRoot = aRepositoryRoot,
+            aArtifactDirectoryPath = ".",
+            aInitialState = locInitialState
+        )
     } else {
-        AIcResolveArtifactDirectoryAndSubdirectories(aRepositoryRoot, locNormalizedPath)
+        AIcResolveArtifactDirectoryAndSubdirectories(
+            aRepositoryRoot = aRepositoryRoot,
+            aArtifactDirectoryPath = locNormalizedPath,
+            aInitialState = locInitialState
+        )
     }
 
     return AIcAlgitesResolutionResult(
@@ -154,7 +207,7 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
     )
 }
 
-fun AIcResolveRepositoryMetadata(
+fun AIcResolveRepositoryMetadataBase(
     aRepositoryRoot: File,
     aRepositoryNameOverride: String?,
     aRepositoryVisibilityOverride: String?
@@ -163,53 +216,34 @@ fun AIcResolveRepositoryMetadata(
         ?.takeIf { it.kind == "repository" }
 
     val locRepositoryId = locRootConfig?.values?.let {
-        AIcFirstValue(
-            it,
-            "repository.id",
-            "sourceRepository.id",
-            "id"
-        )
+        AIcFirstValue(it, "sourceRepository.id", "repository.id", "id")
     }?.takeIf { it.isNotBlank() }
         ?: aRepositoryRoot.name
 
     val locRepositoryName = aRepositoryNameOverride
         ?.takeIf { it.isNotBlank() }
         ?: locRootConfig?.values?.let {
-            AIcFirstValue(
-                it,
-                "repository.name",
-                "sourceRepository.name",
-                "name"
-            )
+            AIcFirstValue(it, "sourceRepository.name", "repository.name", "name")
         }?.takeIf { it.isNotBlank() }
         ?: locRepositoryId
 
     val locVisibility = aRepositoryVisibilityOverride
         ?.takeIf { it.isNotBlank() }
         ?: locRootConfig?.values?.let {
-            AIcFirstValue(
-                it,
-                "repository.visibility",
-                "sourceRepository.visibility",
-                "visibility"
-            )
+            AIcFirstValue(it, "sourceRepository.visibility", "repository.visibility", "visibility")
         }?.takeIf { it.isNotBlank() }
         ?: AIcInferVisibilityFromRepositoryName(locRepositoryId)
 
     val locGroupId = locRootConfig?.values?.let {
-        AIcFirstValue(
-            it,
-            "repository.groupId",
-            "sourceRepository.groupId",
-            "groupId"
-        )
+        AIcFirstValue(it, "sourceRepository.groupId", "repository.groupId", "groupId")
     }?.takeIf { it.isNotBlank() }
 
     return AIcAlgitesRepositoryMetadata(
         id = locRepositoryId,
         name = locRepositoryName,
         visibility = locVisibility,
-        groupId = locGroupId
+        groupId = locGroupId,
+        repositories = emptyMap()
     )
 }
 
@@ -221,16 +255,10 @@ fun AIcInferVisibilityFromRepositoryName(aRepositoryName: String): String {
     }
 }
 
-fun AIcResolveAllArtifactDirectories(aRepositoryRoot: File): List<AIcAlgitesArtifactDirectoryMetadata> {
-    return AIcResolveArtifactDirectoryAndSubdirectories(
-        aRepositoryRoot = aRepositoryRoot,
-        aArtifactDirectoryPath = "."
-    )
-}
-
 fun AIcResolveArtifactDirectoryAndSubdirectories(
     aRepositoryRoot: File,
-    aArtifactDirectoryPath: String
+    aArtifactDirectoryPath: String,
+    aInitialState: AIcAlgitesResolvedState
 ): List<AIcAlgitesArtifactDirectoryMetadata> {
     val locStartDirectory = if (aArtifactDirectoryPath == "." || aArtifactDirectoryPath.isBlank()) {
         aRepositoryRoot
@@ -244,7 +272,8 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
 
     val locInheritedState = AIcResolveInheritedStateBeforeDirectory(
         aRepositoryRoot = aRepositoryRoot,
-        aArtifactDirectoryPath = aArtifactDirectoryPath
+        aArtifactDirectoryPath = aArtifactDirectoryPath,
+        aInitialState = aInitialState
     )
 
     val locArtifactDirectories = mutableListOf<AIcAlgitesArtifactDirectoryMetadata>()
@@ -258,10 +287,9 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
         if (locConfig != null) {
             locCurrentState = locCurrentState.AIcMerge(AIcResolvedStateFromConfig(locConfig))
 
-            val locType = locCurrentState.type
             val locContentsModel = AIcContentsModel(
                 aKind = locConfig.kind,
-                aType = locType
+                aKinds = locCurrentState.kinds ?: emptyList()
             )
 
             locArtifactDirectories.add(
@@ -298,15 +326,16 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
 
 fun AIcResolveInheritedStateBeforeDirectory(
     aRepositoryRoot: File,
-    aArtifactDirectoryPath: String
+    aArtifactDirectoryPath: String,
+    aInitialState: AIcAlgitesResolvedState
 ): AIcAlgitesResolvedState {
     val locPathSegments = AIcPathSegments(aArtifactDirectoryPath)
     if (locPathSegments.isEmpty()) {
-        return AIcAlgitesResolvedState()
+        return aInitialState
     }
 
     var locCurrentDirectory = aRepositoryRoot
-    var locCurrentState = AIcAlgitesResolvedState()
+    var locCurrentState = aInitialState
 
     AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.let { locRootConfig ->
         locCurrentState = locCurrentState.AIcMerge(AIcResolvedStateFromConfig(locRootConfig))
@@ -329,10 +358,11 @@ fun AIcResolveInheritedStateBeforeDirectory(
 
 fun AIcResolveSingleArtifactDirectory(
     aRepositoryRoot: File,
-    aArtifactDirectoryPath: String
+    aArtifactDirectoryPath: String,
+    aInitialState: AIcAlgitesResolvedState
 ): AIcAlgitesArtifactDirectoryMetadata {
     var locCurrentDirectory = aRepositoryRoot
-    var locCurrentState = AIcAlgitesResolvedState()
+    var locCurrentState = aInitialState
 
     AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.let { locRootConfig ->
         locCurrentState = locCurrentState.AIcMerge(AIcResolvedStateFromConfig(locRootConfig))
@@ -359,7 +389,7 @@ fun AIcResolveSingleArtifactDirectory(
         aDirectory = locCurrentDirectory,
         aConfig = locDirectoryConfig,
         aState = locCurrentState,
-        aContentsModel = AIcContentsModel(locDirectoryConfig.kind, locCurrentState.type)
+        aContentsModel = AIcContentsModel(locDirectoryConfig.kind, locCurrentState.kinds ?: emptyList())
     )
 }
 
@@ -389,10 +419,11 @@ fun AIcArtifactDirectoryMetadataFromConfig(
     return AIcAlgitesArtifactDirectoryMetadata(
         path = locPath,
         kind = aConfig.kind,
-        type = aState.type,
+        kinds = aState.kinds ?: emptyList(),
         name = locName,
         description = locDescription,
         groupId = aState.groupId,
+        repositories = aState.repositories,
         contentsModel = aContentsModel,
         hasGradleBuild = AIcHasGradleBuild(aDirectory),
         gradleProjectPath = AIcGradleProjectPath(aRepositoryRoot, aDirectory),
@@ -444,23 +475,24 @@ fun AIcResolvedStateFromConfig(aConfig: AIcAlgitesDirectoryConfig): AIcAlgitesRe
     val locValues = aConfig.values
     val locKindPrefix = AIcKindPrefix(aConfig.kind)
 
-    val locType = when (aConfig.kind) {
-        "artifact-set" -> AIcFirstValue(
+    val locKinds = when (aConfig.kind) {
+        "artifact-set", "artifact" -> AIcFirstValue(
             locValues,
-            "artifactSet.type",
-            "type",
-            "documentationType",
-            "artifactType"
-        )
-        "artifact" -> AIcFirstValue(
-            locValues,
-            "artifact.type",
-            "type",
-            "documentationType",
-            "artifactType"
-        )
+            "$locKindPrefix.kinds",
+            "kinds"
+        )?.let { AIcParseYamlStringList(it) }
         else -> null
-    }?.takeIf { it.isNotBlank() }
+    }?.also { locResolvedKinds ->
+        val locUnsupportedKinds = locResolvedKinds.filter { it !in AIcAlgitesSupportedArtifactKinds }
+        if (locUnsupportedKinds.isNotEmpty()) {
+            error(
+                "Unsupported Algites ArtifactKind(s) in '${aConfig.file.path}': " +
+                    locUnsupportedKinds.joinToString(", ") +
+                    ". Supported kinds are: " +
+                    AIcAlgitesSupportedArtifactKinds.joinToString(", ") + "."
+            )
+        }
+    }
 
     val locGroupId = AIcFirstValue(
         locValues,
@@ -469,68 +501,107 @@ fun AIcResolvedStateFromConfig(aConfig: AIcAlgitesDirectoryConfig): AIcAlgitesRe
         "groupId"
     )?.takeIf { it.isNotBlank() }
 
+    val locRepositoryOverrides = AIcRepositoryOverridesFromConfig(
+        aValues = locValues,
+        aPrefix = locKindPrefix
+    )
+
     val locVersionContext = AIcAlgitesVersionContext(
         lane = AIcFirstValue(
             locValues,
             "$locKindPrefix.versionContext.lane",
             "$locKindPrefix.versionContext.releaseLine",
-            "sourceRepository.versionContext.lane",
-            "sourceRepository.versionContext.releaseLine",
             "versionContext.lane",
             "versionContext.releaseLine"
         )?.takeIf { it.isNotBlank() },
         revision = AIcFirstValue(
             locValues,
             "$locKindPrefix.versionContext.revision",
-            "sourceRepository.versionContext.revision",
             "versionContext.revision"
         )?.takeIf { it.isNotBlank() },
         qualifierKind = AIcFirstValue(
             locValues,
             "$locKindPrefix.versionContext.qualifierKind",
-            "sourceRepository.versionContext.qualifierKind",
             "versionContext.qualifierKind"
         )?.takeIf { it.isNotBlank() },
         qualifierLabel = AIcFirstValue(
             locValues,
             "$locKindPrefix.versionContext.qualifierLabel",
-            "sourceRepository.versionContext.qualifierLabel",
             "versionContext.qualifierLabel"
         )?.takeIf { it.isNotBlank() }
     )
 
     return AIcAlgitesResolvedState(
-        type = locType,
+        kinds = locKinds,
         groupId = locGroupId,
+        repositories = locRepositoryOverrides,
         versionContext = locVersionContext
     )
 }
 
+fun AIcRepositoryOverridesFromConfig(
+    aValues: Map<String, String>,
+    aPrefix: String
+): Map<String, String> {
+    val locPrefixes = listOf("$aPrefix.repositories.", "repositories.")
+    val locResult = linkedMapOf<String, String>()
+
+    aValues.forEach { locEntry ->
+        val locMatchingPrefix = locPrefixes.firstOrNull { locEntry.key.startsWith(it) } ?: return@forEach
+        val locCell = locEntry.key.removePrefix(locMatchingPrefix)
+        val locSegments = locCell.split('.')
+
+        if (locSegments.size != 3) {
+            error(
+                "Invalid repository matrix key '${locEntry.key}' in Algites metadata. " +
+                    "Expected <kind>.<final|snapshot>.<download|upload>."
+            )
+        }
+
+        val locKind = locSegments[0]
+        val locStability = locSegments[1]
+        val locUsage = locSegments[2]
+
+        if (locKind !in AIcAlgitesSupportedArtifactKinds) {
+            error("Unsupported ArtifactKind '$locKind' in repository matrix key '${locEntry.key}'.")
+        }
+        if (locStability !in AIcAlgitesRepositoryStabilities) {
+            error("Unsupported repository stability '$locStability' in repository matrix key '${locEntry.key}'.")
+        }
+        if (locUsage !in AIcAlgitesRepositoryUsages) {
+            error("Unsupported repository usage '$locUsage' in repository matrix key '${locEntry.key}'.")
+        }
+
+        val locValue = locEntry.value.trim()
+        if (locValue.isNotBlank()) {
+            locResult["$locKind.$locStability.$locUsage"] = locValue
+        }
+    }
+
+    return locResult
+}
+
 fun AIcKindPrefix(aKind: String): String {
     return when (aKind) {
-        "repository" -> "repository"
+        "repository" -> "sourceRepository"
         "artifact-set" -> "artifactSet"
         "artifact" -> "artifact"
         else -> aKind
     }
 }
 
-fun AIcContentsModel(aKind: String, aType: String?): String {
+fun AIcContentsModel(aKind: String, aKinds: List<String>): String {
     return when {
         aKind == "repository" -> "container"
         aKind == "artifact" -> "self-contained"
-        aKind == "artifact-set" && aType == "mps" -> "self-contained"
-        aKind == "artifact-set" && aType == "java" -> "container"
+        aKind == "artifact-set" && aKinds == listOf("mps") -> "self-contained"
         aKind == "artifact-set" -> "container"
         else -> "container"
     }
 }
 
 fun AIcHasGradleBuild(aDirectory: File): Boolean {
-    return listOf(
-        aDirectory.resolve("build.gradle.kts"),
-        aDirectory.resolve("build.gradle")
-    ).any { it.isFile }
+    return aDirectory.resolve("build.gradle.kts").isFile || aDirectory.resolve("build.gradle").isFile
 }
 
 fun AIcGradleProjectPath(aRepositoryRoot: File, aDirectory: File): String {
@@ -543,7 +614,7 @@ fun AIcGradleProjectPath(aRepositoryRoot: File, aDirectory: File): String {
 }
 
 fun AIcPathSegments(aPath: String): List<String> {
-    val locNormalizedPath = aPath.replace('\\', '/').trim('/')
+    val locNormalizedPath = aPath.trim().replace('\\', '/').trim('/')
     return if (locNormalizedPath.isBlank() || locNormalizedPath == ".") {
         emptyList()
     } else {
@@ -562,9 +633,7 @@ fun AIcFirstValue(
     aValues: Map<String, String>,
     vararg aKeys: String
 ): String? {
-    return aKeys.firstNotNullOfOrNull { locKey ->
-        aValues[locKey]
-    }
+    return aKeys.firstNotNullOfOrNull { locKey -> aValues[locKey] }
 }
 
 fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
@@ -581,6 +650,18 @@ fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
         val locTrimmedLine = locLineWithoutComment.trim()
 
         if (locTrimmedLine.startsWith("- ")) {
+            val locPath = locStack.joinToString(".") { it.second }
+            if (locPath.isNotBlank()) {
+                val locItem = AIcUnquoteYamlScalar(locTrimmedLine.removePrefix("- ").trim())
+                val locExisting = locValues[locPath]
+                val locItems = if (locExisting == null) {
+                    mutableListOf()
+                } else {
+                    AIcParseYamlStringList(locExisting).toMutableList()
+                }
+                locItems.add(locItem)
+                locValues[locPath] = "[" + locItems.joinToString(", ") + "]"
+            }
             return@forEach
         }
 
@@ -606,6 +687,25 @@ fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
     }
 
     return locValues
+}
+
+fun AIcParseYamlStringList(aValue: String): List<String> {
+    val locTrimmed = aValue.trim()
+    val locContent = if (locTrimmed.startsWith("[") && locTrimmed.endsWith("]")) {
+        locTrimmed.substring(1, locTrimmed.length - 1)
+    } else {
+        locTrimmed
+    }
+
+    if (locContent.isBlank()) {
+        return emptyList()
+    }
+
+    return locContent
+        .split(',')
+        .map { AIcUnquoteYamlScalar(it.trim()).lowercase() }
+        .filter { it.isNotBlank() }
+        .distinct()
 }
 
 fun AIcStripYamlComment(aLine: String): String {
@@ -665,6 +765,34 @@ fun AIcPropertiesScalar(aValue: String?): String {
     return aValue ?: "null"
 }
 
+fun StringBuilder.AIcAppendRepositoriesYaml(aIndent: String, aRepositories: Map<String, String>) {
+    appendLine("${aIndent}repositories:")
+    if (aRepositories.isEmpty()) {
+        appendLine("${aIndent}  {}")
+        return
+    }
+
+    aRepositories.keys
+        .map { it.substringBefore('.') }
+        .distinct()
+        .sorted()
+        .forEach { locKind ->
+            appendLine("${aIndent}  $locKind:")
+            AIcAlgitesRepositoryStabilities.forEach { locStability ->
+                val locCells = AIcAlgitesRepositoryUsages.mapNotNull { locUsage ->
+                    val locKey = "$locKind.$locStability.$locUsage"
+                    aRepositories[locKey]?.let { locValue -> locUsage to locValue }
+                }
+                if (locCells.isNotEmpty()) {
+                    appendLine("${aIndent}    $locStability:")
+                    locCells.forEach { locCell ->
+                        appendLine("${aIndent}      ${locCell.first}: ${AIcYamlScalar(locCell.second)}")
+                    }
+                }
+            }
+        }
+}
+
 fun AIcToYaml(aResult: AIcAlgitesResolutionResult): String {
     return buildString {
         appendLine("repository:")
@@ -672,6 +800,7 @@ fun AIcToYaml(aResult: AIcAlgitesResolutionResult): String {
         appendLine("  name: ${AIcYamlScalar(aResult.repository.name)}")
         appendLine("  visibility: ${AIcYamlScalar(aResult.repository.visibility)}")
         appendLine("  groupId: ${AIcYamlScalar(aResult.repository.groupId)}")
+        AIcAppendRepositoriesYaml("  ", aResult.repository.repositories)
         appendLine()
         appendLine("artifactDirectories:")
         appendLine("  count: ${aResult.artifactDirectories.size}")
@@ -680,10 +809,11 @@ fun AIcToYaml(aResult: AIcAlgitesResolutionResult): String {
             appendLine("  $locIndex:")
             appendLine("    path: ${AIcYamlScalar(locDirectory.path)}")
             appendLine("    kind: ${AIcYamlScalar(locDirectory.kind)}")
-            appendLine("    type: ${AIcYamlScalar(locDirectory.type)}")
+            appendLine("    kinds: [${locDirectory.kinds.joinToString(", ") { AIcYamlScalar(it) }}]")
             appendLine("    name: ${AIcYamlScalar(locDirectory.name)}")
             appendLine("    description: ${AIcYamlScalar(locDirectory.description)}")
             appendLine("    groupId: ${AIcYamlScalar(locDirectory.groupId)}")
+            AIcAppendRepositoriesYaml("    ", locDirectory.repositories)
             appendLine("    contentsModel: ${AIcYamlScalar(locDirectory.contentsModel)}")
             appendLine("    hasGradleBuild: ${locDirectory.hasGradleBuild}")
             appendLine("    gradleProjectPath: ${AIcYamlScalar(locDirectory.gradleProjectPath)}")
@@ -703,15 +833,21 @@ fun AIcToDottedProperties(aResult: AIcAlgitesResolutionResult): String {
         appendLine("repository.name=${AIcPropertiesScalar(aResult.repository.name)}")
         appendLine("repository.visibility=${AIcPropertiesScalar(aResult.repository.visibility)}")
         appendLine("repository.groupId=${AIcPropertiesScalar(aResult.repository.groupId)}")
+        aResult.repository.repositories.toSortedMap().forEach { locEntry ->
+            appendLine("repository.repositories.${locEntry.key}=${locEntry.value}")
+        }
         appendLine("artifactDirectories.count=${aResult.artifactDirectories.size}")
 
         aResult.artifactDirectories.forEachIndexed { locIndex, locDirectory ->
             appendLine("artifactDirectories.$locIndex.path=${AIcPropertiesScalar(locDirectory.path)}")
             appendLine("artifactDirectories.$locIndex.kind=${AIcPropertiesScalar(locDirectory.kind)}")
-            appendLine("artifactDirectories.$locIndex.type=${AIcPropertiesScalar(locDirectory.type)}")
+            appendLine("artifactDirectories.$locIndex.kinds=${locDirectory.kinds.joinToString(",")}")
             appendLine("artifactDirectories.$locIndex.name=${AIcPropertiesScalar(locDirectory.name)}")
             appendLine("artifactDirectories.$locIndex.description=${AIcPropertiesScalar(locDirectory.description)}")
             appendLine("artifactDirectories.$locIndex.groupId=${AIcPropertiesScalar(locDirectory.groupId)}")
+            locDirectory.repositories.toSortedMap().forEach { locEntry ->
+                appendLine("artifactDirectories.$locIndex.repositories.${locEntry.key}=${locEntry.value}")
+            }
             appendLine("artifactDirectories.$locIndex.contentsModel=${AIcPropertiesScalar(locDirectory.contentsModel)}")
             appendLine("artifactDirectories.$locIndex.hasGradleBuild=${locDirectory.hasGradleBuild}")
             appendLine("artifactDirectories.$locIndex.gradleProjectPath=${AIcPropertiesScalar(locDirectory.gradleProjectPath)}")
@@ -744,16 +880,18 @@ fun AIcToMap(aResult: AIcAlgitesResolutionResult): Map<String, Any?> {
             "id" to aResult.repository.id,
             "name" to aResult.repository.name,
             "visibility" to aResult.repository.visibility,
-            "groupId" to aResult.repository.groupId
+            "groupId" to aResult.repository.groupId,
+            "repositories" to aResult.repository.repositories
         ),
         "artifactDirectories" to aResult.artifactDirectories.map { locDirectory ->
             linkedMapOf<String, Any?>(
                 "path" to locDirectory.path,
                 "kind" to locDirectory.kind,
-                "type" to locDirectory.type,
+                "kinds" to locDirectory.kinds,
                 "name" to locDirectory.name,
                 "description" to locDirectory.description,
                 "groupId" to locDirectory.groupId,
+                "repositories" to locDirectory.repositories,
                 "contentsModel" to locDirectory.contentsModel,
                 "hasGradleBuild" to locDirectory.hasGradleBuild,
                 "gradleProjectPath" to locDirectory.gradleProjectPath,
@@ -779,16 +917,23 @@ fun AIcFlattenDottedProperties(aResultMap: Map<String, Any?>): Map<String, Strin
     locProperties["repository.name"] = locRepository["name"]?.toString() ?: "null"
     locProperties["repository.visibility"] = locRepository["visibility"]?.toString() ?: "null"
     locProperties["repository.groupId"] = locRepository["groupId"]?.toString() ?: "null"
+    (locRepository["repositories"] as? Map<String, String>)?.forEach { locEntry ->
+        locProperties["repository.repositories.${locEntry.key}"] = locEntry.value
+    }
     locProperties["artifactDirectories.count"] = locArtifactDirectories.size.toString()
 
     locArtifactDirectories.forEachIndexed { locIndex, locDirectory ->
         val locVersion = locDirectory["version"] as Map<String, Any?>
+        val locKinds = locDirectory["kinds"] as? List<*> ?: emptyList<Any?>()
         locProperties["artifactDirectories.$locIndex.path"] = locDirectory["path"]?.toString() ?: "null"
         locProperties["artifactDirectories.$locIndex.kind"] = locDirectory["kind"]?.toString() ?: "null"
-        locProperties["artifactDirectories.$locIndex.type"] = locDirectory["type"]?.toString() ?: "null"
+        locProperties["artifactDirectories.$locIndex.kinds"] = locKinds.joinToString(",")
         locProperties["artifactDirectories.$locIndex.name"] = locDirectory["name"]?.toString() ?: "null"
         locProperties["artifactDirectories.$locIndex.description"] = locDirectory["description"]?.toString() ?: "null"
         locProperties["artifactDirectories.$locIndex.groupId"] = locDirectory["groupId"]?.toString() ?: "null"
+        (locDirectory["repositories"] as? Map<String, String>)?.forEach { locEntry ->
+            locProperties["artifactDirectories.$locIndex.repositories.${locEntry.key}"] = locEntry.value
+        }
         locProperties["artifactDirectories.$locIndex.contentsModel"] = locDirectory["contentsModel"]?.toString() ?: "null"
         locProperties["artifactDirectories.$locIndex.hasGradleBuild"] = locDirectory["hasGradleBuild"]?.toString() ?: "null"
         locProperties["artifactDirectories.$locIndex.gradleProjectPath"] = locDirectory["gradleProjectPath"]?.toString() ?: "null"
@@ -839,6 +984,4 @@ extra["algitesResolveArtifactDirectoryMetadataText"] = fun(
         aOutputKind?.takeIf { it.isNotBlank() } ?: "yaml"
     )
 }
-extra["algitesFlattenArtifactDirectoryMetadata"] = fun(aResultMap: Map<String, Any?>): Map<String, String> {
-    return AIcFlattenDottedProperties(aResultMap)
-}
+extra["algitesFlattenArtifactDirectoryMetadata"] = ::AIcFlattenDottedProperties

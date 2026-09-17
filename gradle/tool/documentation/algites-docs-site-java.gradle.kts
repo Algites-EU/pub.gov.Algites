@@ -127,7 +127,7 @@ fun AIcBuildJavaArtifactMetadata(
         "name" to (locResolvedMetadata["name"] ?: aModulePath),
         "description" to (locResolvedMetadata["description"] ?: ""),
         "kind" to (locResolvedMetadata["kind"] ?: "artifact"),
-        "type" to (locResolvedMetadata["type"] ?: "java"),
+        "kinds" to (locResolvedMetadata["kinds"] ?: "java"),
         "contentsModel" to (locResolvedMetadata["contentsModel"] ?: ""),
         "gradleProjectPath" to (locResolvedMetadata["gradleProjectPath"] ?: aSubproject.path),
         "version.resolvedValue" to (locResolvedMetadata["version.resolvedValue"] ?: ""),

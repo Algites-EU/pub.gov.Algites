@@ -384,7 +384,9 @@ Algites built-in defaults
         -> descendant algites-artifact.yml
 ```
 
-Only explicitly configured cells override inherited values. Credentials are supplied by the execution environment/provider and MUST NOT change the resolved semantic target.
+Only explicitly configured cells override inherited values. The canonical YAML shape is `repositories.<kind>.<final|snapshot>.<download|upload>`. Credentials are supplied by the execution environment/provider and MUST NOT change the resolved semantic target.
+
+The initial built-in public Java defaults preserve the existing Algites behavior for dependency downloads: final Java artifacts resolve from Maven Central and snapshot Java artifacts resolve from the public Algites Cloudsmith snapshot repository. Upload defaults and Python repository defaults are configured only when their canonical endpoints are explicitly defined; execution-time credentials remain separate.
 
 ---
 

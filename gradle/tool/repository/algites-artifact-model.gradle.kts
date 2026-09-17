@@ -20,20 +20,24 @@ val locAlgitesResolvedArtifactDirectories = rootProject.extra["algitesResolvedAr
 val locAlgitesArtifactMetadata = locAlgitesResolvedArtifactDirectories.map { locArtifactDirectory ->
     linkedMapOf<String, Any?>(
         "kind" to locArtifactDirectory["kind"],
-        "type" to locArtifactDirectory["type"],
+        "kinds" to locArtifactDirectory["kinds"],
         "name" to locArtifactDirectory["name"],
         "description" to locArtifactDirectory["description"],
         "relativePath" to locArtifactDirectory["path"],
         "hasGradleBuild" to locArtifactDirectory["hasGradleBuild"],
-        "projectPath" to locArtifactDirectory["gradleProjectPath"]
+        "projectPath" to locArtifactDirectory["gradleProjectPath"],
+        "repositories" to locArtifactDirectory["repositories"]
     )
 }
 
 rootProject.extra["algitesArtifactMetadata"] = locAlgitesArtifactMetadata
 rootProject.extra["algitesArtifactMetadataByProjectPath"] = locAlgitesArtifactMetadata
     .groupBy { locMetadata -> locMetadata["projectPath"] as String }
-rootProject.extra["algitesArtifactTypes"] = locAlgitesArtifactMetadata
-    .mapNotNull { locMetadata -> locMetadata["type"]?.toString() }
+rootProject.extra["algitesArtifactKinds"] = locAlgitesArtifactMetadata
+    .flatMap { locMetadata ->
+        @Suppress("UNCHECKED_CAST")
+        (locMetadata["kinds"] as? List<String>) ?: emptyList()
+    }
     .distinct()
     .sorted()
 
@@ -48,8 +52,8 @@ if (tasks.findByName("printAlgitesArtifactModel") == null) {
                 println(
                     " - " +
                         locMetadata["kind"] +
-                        " type=" +
-                        locMetadata["type"] +
+                        " kinds=" +
+                        locMetadata["kinds"] +
                         " path=" +
                         locMetadata["relativePath"] +
                         " gradle=" +

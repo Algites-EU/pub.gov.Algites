@@ -79,7 +79,7 @@ fun AIcDocsReadArtifactDirectories(aProperties: Map<String, String?>): List<Map<
         mapOf(
             "path" to aProperties["artifactDirectories.${locIndex}.path"],
             "kind" to aProperties["artifactDirectories.${locIndex}.kind"],
-            "type" to aProperties["artifactDirectories.${locIndex}.type"],
+            "kinds" to aProperties["artifactDirectories.${locIndex}.kinds"],
             "name" to aProperties["artifactDirectories.${locIndex}.name"],
             "description" to aProperties["artifactDirectories.${locIndex}.description"],
             "groupId" to aProperties["artifactDirectories.${locIndex}.groupId"],
@@ -727,7 +727,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                         "name" to locParts[4],
                         "description" to locParts[5],
                         "kind" to locParts[6],
-                        "type" to locParts[7],
+                        "kinds" to locParts[7],
                         "contentsModel" to locParts[8],
                         "gradleProjectPath" to locParts[9],
                         "version.resolvedValue" to locParts[10],
@@ -868,7 +868,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                             <dt>Name</dt><dd>${html(valueOrDash(locMetadata["name"]))}</dd>
                             <dt>Description</dt><dd>${html(valueOrDash(locMetadata["description"]))}</dd>
                             <dt>Kind</dt><dd>${html(valueOrDash(locMetadata["kind"]))}</dd>
-                            <dt>Type</dt><dd>${html(valueOrDash(locMetadata["type"]))}</dd>
+                            <dt>Kinds</dt><dd>${html(valueOrDash(locMetadata["kinds"]))}</dd>
                             <dt>Contents model</dt><dd>${html(valueOrDash(locMetadata["contentsModel"]))}</dd>
                             <dt>Source path</dt><dd>${html(valueOrDash(locMetadata["path"]))}</dd>
                             <dt>Gradle project path</dt><dd>${html(valueOrDash(locMetadata["gradleProjectPath"]))}</dd>
@@ -1210,7 +1210,7 @@ fun AIcDocsArtifactMetadataEntryLine(aArtifactDirectory: Map<String, String?>): 
         aArtifactDirectory["name"] ?: "",
         aArtifactDirectory["description"] ?: "",
         aArtifactDirectory["kind"] ?: "",
-        aArtifactDirectory["type"] ?: "",
+        aArtifactDirectory["kinds"] ?: "",
         aArtifactDirectory["contentsModel"] ?: "",
         aArtifactDirectory["gradleProjectPath"] ?: "",
         aArtifactDirectory["version.resolvedValue"] ?: "",

@@ -1248,6 +1248,27 @@ python.final.upload
 ...
 ```
 
+The canonical YAML representation is nested below `repositories` in the owning container. For example, repository-wide overrides are written as:
+
+```yaml
+sourceRepository:
+  id: pub.example.Product
+  repositories:
+    java:
+      final:
+        download: https://example.invalid/maven/releases/
+        upload: https://example.invalid/maven/releases/upload/
+      snapshot:
+        download: https://example.invalid/maven/snapshots/
+        upload: https://example.invalid/maven/snapshots/upload/
+    python:
+      final:
+        download: https://example.invalid/python/releases/simple/
+        upload: https://example.invalid/python/releases/
+```
+
+The same `repositories` subtree MAY occur below `artifact` or `artifactSet`; only the explicitly present cells override inherited values. URLs are configuration, while credentials remain execution-environment concerns and MUST NOT be stored in these YAML files.
+
 The concrete URL/protocol rules are defined by the corresponding ArtifactKind adapter. A repository MAY configure publication targets for ArtifactKinds that are not currently produced by any artifact; `kinds` controls what an artifact builds, while the repository matrix controls where a selected kind resolves or publishes.
 
 #### 3.9.5 Repository configuration inheritance
@@ -1299,13 +1320,16 @@ The normative stem convention is:
 The initial schema version therefore uses suffix `_1`; an unversioned canonical schema filename MUST NOT be used as the authoritative schema contract. Conceptual examples are:
 
 ```text
-algites-source-repository_1.<schema-extension>
-algites-artifact_1.<schema-extension>
+algites-source-repository_1.schema.json
+algites-artifact_1.schema.json
+algites-artifact-set_1.schema.json
 ```
 
 The exact schema serialization/extension is defined by the schema ArtifactKind/SourceType conventions, but the `_N` version suffix is independent of serialization. An incompatible schema-contract change requires a new schema version (for example `_2`) rather than silently changing the meaning of `_1`. Multiple schema versions MAY coexist when compatibility requires it.
 
 Schemas for public Algites YAML formats SHOULD be maintained as controlled sources in a dedicated artifact of the public governance repository, so they can be versioned, validated, published, and consumed through the same Algites artifact model as other governed definitions. Such schemas naturally belong to an appropriate definition SourceType such as `yamldefs`.
+
+The canonical public governance artifact for the first implementation is `pub.gov.Algites_devops.build.yamldefs`, located at `devops/build/yamldefs`. Its controlled schema sources are stored under `src/product/yamldefs`. The artifact declares both `java` and `python` kinds so the same schema sources can be distributed as Java and Python ecosystem packages without copying the schemas into consumer repositories.
 
 #### 3.9.9 Derived development metadata
 

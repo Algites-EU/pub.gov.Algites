@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-source-repository_1.schema.json",
+  "title": "Algites Source Repository Definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "sourceRepository": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "groupId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "visibility": { "type": "string", "enum": ["pub", "priv"] },
+        "repositories": { "$ref": "algites-repository-matrix_1.schema.json" }
+      },
+      "required": ["id"]
+    },
+    "versionContext": { "$ref": "algites-version-context_1.schema.json" }
+  },
+  "required": ["sourceRepository"]
+}
