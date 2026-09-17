@@ -27,7 +27,7 @@ val locResolvedArtifactDirectories = extra.properties["algitesDocsResolvedArtifa
 
 val locResolvedDocumentationKinds = locResolvedArtifactDirectories
     .flatMap { locArtifactDirectory ->
-        locArtifactDirectory["kinds"]
+        locArtifactDirectory["technologyKinds"]
             ?.split(',')
             ?.map { locKind -> locKind.trim().lowercase() }
             ?.filter { locKind -> locKind.isNotBlank() }
@@ -39,8 +39,8 @@ logger.lifecycle("Algites documentation artifact directory resolution:")
 locResolvedArtifactDirectories.forEach { locArtifactDirectory ->
     logger.lifecycle(
         " - ${locArtifactDirectory["path"]}: " +
-            "kind=${locArtifactDirectory["kind"]}, " +
-            "kinds=${locArtifactDirectory["kinds"]}, " +
+            "structureKind=${locArtifactDirectory["structureKind"]}, " +
+            "technologyKinds=${locArtifactDirectory["technologyKinds"]}, " +
             "contentsModel=${locArtifactDirectory["contentsModel"]}, " +
             "version=${locArtifactDirectory["version.resolvedValue"]}"
     )

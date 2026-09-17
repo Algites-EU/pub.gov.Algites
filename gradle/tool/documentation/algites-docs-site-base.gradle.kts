@@ -78,8 +78,8 @@ fun AIcDocsReadArtifactDirectories(aProperties: Map<String, String?>): List<Map<
     return (0 until locCount).map { locIndex ->
         mapOf(
             "path" to aProperties["artifactDirectories.${locIndex}.path"],
-            "kind" to aProperties["artifactDirectories.${locIndex}.kind"],
-            "kinds" to aProperties["artifactDirectories.${locIndex}.kinds"],
+            "structureKind" to aProperties["artifactDirectories.${locIndex}.structureKind"],
+            "technologyKinds" to aProperties["artifactDirectories.${locIndex}.technologyKinds"],
             "name" to aProperties["artifactDirectories.${locIndex}.name"],
             "description" to aProperties["artifactDirectories.${locIndex}.description"],
             "groupId" to aProperties["artifactDirectories.${locIndex}.groupId"],
@@ -726,8 +726,8 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                         "path" to locParts[3],
                         "name" to locParts[4],
                         "description" to locParts[5],
-                        "kind" to locParts[6],
-                        "kinds" to locParts[7],
+                        "structureKind" to locParts[6],
+                        "technologyKinds" to locParts[7],
                         "contentsModel" to locParts[8],
                         "gradleProjectPath" to locParts[9],
                         "version.resolvedValue" to locParts[10],
@@ -867,8 +867,8 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                             <dt>Local artifact ID</dt><dd>${html(locLocalArtifactId)}</dd>
                             <dt>Name</dt><dd>${html(valueOrDash(locMetadata["name"]))}</dd>
                             <dt>Description</dt><dd>${html(valueOrDash(locMetadata["description"]))}</dd>
-                            <dt>Kind</dt><dd>${html(valueOrDash(locMetadata["kind"]))}</dd>
-                            <dt>Kinds</dt><dd>${html(valueOrDash(locMetadata["kinds"]))}</dd>
+                            <dt>Structure kind</dt><dd>${html(valueOrDash(locMetadata["structureKind"]))}</dd>
+                            <dt>Technology kinds</dt><dd>${html(valueOrDash(locMetadata["technologyKinds"]))}</dd>
                             <dt>Contents model</dt><dd>${html(valueOrDash(locMetadata["contentsModel"]))}</dd>
                             <dt>Source path</dt><dd>${html(valueOrDash(locMetadata["path"]))}</dd>
                             <dt>Gradle project path</dt><dd>${html(valueOrDash(locMetadata["gradleProjectPath"]))}</dd>
@@ -1209,8 +1209,8 @@ fun AIcDocsArtifactMetadataEntryLine(aArtifactDirectory: Map<String, String?>): 
         aArtifactDirectory["path"] ?: "",
         aArtifactDirectory["name"] ?: "",
         aArtifactDirectory["description"] ?: "",
-        aArtifactDirectory["kind"] ?: "",
-        aArtifactDirectory["kinds"] ?: "",
+        aArtifactDirectory["structureKind"] ?: "",
+        aArtifactDirectory["technologyKinds"] ?: "",
         aArtifactDirectory["contentsModel"] ?: "",
         aArtifactDirectory["gradleProjectPath"] ?: "",
         aArtifactDirectory["version.resolvedValue"] ?: "",
@@ -1222,7 +1222,7 @@ fun AIcDocsArtifactMetadataEntryLine(aArtifactDirectory: Map<String, String?>): 
 }
 
 val locAlgitesDocsArtifactMetadataEntryLines = locAlgitesDocsResolvedArtifactDirectories
-    .filter { locArtifactDirectory -> locArtifactDirectory["kind"] != "repository" }
+    .filter { locArtifactDirectory -> locArtifactDirectory["structureKind"] != "repository" }
     .map { locArtifactDirectory -> AIcDocsArtifactMetadataEntryLine(locArtifactDirectory) }
 
 if (tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes") == null) {

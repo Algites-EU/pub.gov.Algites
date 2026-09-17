@@ -2,7 +2,7 @@
  * Algites artifact directory metadata resolver core.
  *
  * This script intentionally contains only Settings/Project compatible logic.
- * It resolves structural metadata, ArtifactKinds, version contexts, and the
+ * It resolves structural metadata, TechnologyKinds, version contexts, and the
  * effective publication repository matrix inherited through the repository
  * directory hierarchy.
  */
@@ -48,14 +48,14 @@ data class AIcAlgitesVersionContext(
 }
 
 data class AIcAlgitesResolvedState(
-    val kinds: List<String>? = null,
+    val technologyKinds: List<String>? = null,
     val groupId: String? = null,
     val repositories: Map<String, String> = emptyMap(),
     val versionContext: AIcAlgitesVersionContext = AIcAlgitesVersionContext()
 ) {
     fun AIcMerge(aOther: AIcAlgitesResolvedState): AIcAlgitesResolvedState {
         return AIcAlgitesResolvedState(
-            kinds = aOther.kinds ?: kinds,
+            technologyKinds = aOther.technologyKinds ?: technologyKinds,
             groupId = aOther.groupId ?: groupId,
             repositories = repositories + aOther.repositories,
             versionContext = versionContext.AIcMerge(aOther.versionContext)
@@ -65,14 +65,14 @@ data class AIcAlgitesResolvedState(
 
 data class AIcAlgitesDirectoryConfig(
     val file: File,
-    val kind: String,
+    val structureKind: String,
     val values: Map<String, String>
 )
 
 data class AIcAlgitesArtifactDirectoryMetadata(
     val path: String,
-    val kind: String,
-    val kinds: List<String>,
+    val structureKind: String,
+    val technologyKinds: List<String>,
     val name: String,
     val description: String,
     val groupId: String?,
@@ -96,8 +96,8 @@ data class AIcAlgitesResolutionResult(
     val artifactDirectories: List<AIcAlgitesArtifactDirectoryMetadata>
 )
 
-val AIcAlgitesSupportedArtifactKinds = linkedSetOf("java", "python", "mps")
-val AIcAlgitesRepositoryStabilities = linkedSetOf("final", "snapshot")
+val AIcAlgitesSupportedTechnologyKinds = linkedSetOf("java", "python", "mps")
+val AIcAlgitesRepositoryStabilities = linkedSetOf("release", "snapshot")
 val AIcAlgitesRepositoryUsages = linkedSetOf("download", "upload")
 
 val AIcAlgitesIgnoredDirectoryNames = setOf(
@@ -121,7 +121,7 @@ val AIcAlgitesIgnoredDirectoryNames = setOf(
 fun AIcAlgitesBuiltInRepositoryDefaults(aVisibility: String): Map<String, String> {
     return when (aVisibility.lowercase()) {
         "pub" -> linkedMapOf(
-            "java.final.download" to "https://repo1.maven.org/maven2",
+            "java.release.download" to "https://repo1.maven.org/maven2",
             "java.snapshot.download" to "https://dl.cloudsmith.io/public/algites/maven-snapshots-pub/maven/"
         )
         else -> emptyMap()
@@ -146,7 +146,7 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
     )
 
     val locRootConfig = AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)
-        ?.takeIf { it.kind == "repository" }
+        ?.takeIf { it.structureKind == "repository" }
     val locRootState = if (locRootConfig == null) {
         locInitialState
     } else {
@@ -213,7 +213,7 @@ fun AIcResolveRepositoryMetadataBase(
     aRepositoryVisibilityOverride: String?
 ): AIcAlgitesRepositoryMetadata {
     val locRootConfig = AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)
-        ?.takeIf { it.kind == "repository" }
+        ?.takeIf { it.structureKind == "repository" }
 
     val locRepositoryId = locRootConfig?.values?.let {
         AIcFirstValue(it, "sourceRepository.id", "repository.id", "id")
@@ -288,8 +288,8 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
             locCurrentState = locCurrentState.AIcMerge(AIcResolvedStateFromConfig(locConfig))
 
             val locContentsModel = AIcContentsModel(
-                aKind = locConfig.kind,
-                aKinds = locCurrentState.kinds ?: emptyList()
+                aStructureKind = locConfig.structureKind,
+                aTechnologyKinds = locCurrentState.technologyKinds ?: emptyList()
             )
 
             locArtifactDirectories.add(
@@ -389,7 +389,7 @@ fun AIcResolveSingleArtifactDirectory(
         aDirectory = locCurrentDirectory,
         aConfig = locDirectoryConfig,
         aState = locCurrentState,
-        aContentsModel = AIcContentsModel(locDirectoryConfig.kind, locCurrentState.kinds ?: emptyList())
+        aContentsModel = AIcContentsModel(locDirectoryConfig.structureKind, locCurrentState.technologyKinds ?: emptyList())
     )
 }
 
@@ -400,26 +400,26 @@ fun AIcArtifactDirectoryMetadataFromConfig(
     aState: AIcAlgitesResolvedState,
     aContentsModel: String
 ): AIcAlgitesArtifactDirectoryMetadata {
-    val locKindPrefix = AIcKindPrefix(aConfig.kind)
+    val locStructureKindPrefix = AIcStructureKindPrefix(aConfig.structureKind)
     val locPath = AIcRelativePath(aRepositoryRoot, aDirectory)
     val locName = AIcFirstValue(
         aConfig.values,
-        "$locKindPrefix.name",
+        "$locStructureKindPrefix.name",
         "name",
-        "$locKindPrefix.id",
+        "$locStructureKindPrefix.id",
         "id"
     )?.takeIf { it.isNotBlank() } ?: if (locPath == ".") aRepositoryRoot.name else aDirectory.name
 
     val locDescription = AIcFirstValue(
         aConfig.values,
-        "$locKindPrefix.description",
+        "$locStructureKindPrefix.description",
         "description"
     ) ?: ""
 
     return AIcAlgitesArtifactDirectoryMetadata(
         path = locPath,
-        kind = aConfig.kind,
-        kinds = aState.kinds ?: emptyList(),
+        structureKind = aConfig.structureKind,
+        technologyKinds = aState.technologyKinds ?: emptyList(),
         name = locName,
         description = locDescription,
         groupId = aState.groupId,
@@ -466,73 +466,73 @@ fun AIcFindAlgitesMetadataConfig(
 
     return AIcAlgitesDirectoryConfig(
         file = locCandidate.first,
-        kind = locCandidate.second,
+        structureKind = locCandidate.second,
         values = AIcReadSimpleYamlScalars(locCandidate.first)
     )
 }
 
 fun AIcResolvedStateFromConfig(aConfig: AIcAlgitesDirectoryConfig): AIcAlgitesResolvedState {
     val locValues = aConfig.values
-    val locKindPrefix = AIcKindPrefix(aConfig.kind)
+    val locStructureKindPrefix = AIcStructureKindPrefix(aConfig.structureKind)
 
-    val locKinds = when (aConfig.kind) {
+    val locTechnologyKinds = when (aConfig.structureKind) {
         "artifact-set", "artifact" -> AIcFirstValue(
             locValues,
-            "$locKindPrefix.kinds",
-            "kinds"
+            "$locStructureKindPrefix.technologyKinds",
+            "technologyKinds"
         )?.let { AIcParseYamlStringList(it) }
         else -> null
-    }?.also { locResolvedKinds ->
-        val locUnsupportedKinds = locResolvedKinds.filter { it !in AIcAlgitesSupportedArtifactKinds }
-        if (locUnsupportedKinds.isNotEmpty()) {
+    }?.also { locResolvedTechnologyKinds ->
+        val locUnsupportedTechnologyKinds = locResolvedTechnologyKinds.filter { it !in AIcAlgitesSupportedTechnologyKinds }
+        if (locUnsupportedTechnologyKinds.isNotEmpty()) {
             error(
-                "Unsupported Algites ArtifactKind(s) in '${aConfig.file.path}': " +
-                    locUnsupportedKinds.joinToString(", ") +
-                    ". Supported kinds are: " +
-                    AIcAlgitesSupportedArtifactKinds.joinToString(", ") + "."
+                "Unsupported Algites TechnologyKind(s) in '${aConfig.file.path}': " +
+                    locUnsupportedTechnologyKinds.joinToString(", ") +
+                    ". Supported technology kinds are: " +
+                    AIcAlgitesSupportedTechnologyKinds.joinToString(", ") + "."
             )
         }
     }
 
     val locGroupId = AIcFirstValue(
         locValues,
-        "$locKindPrefix.groupId",
+        "$locStructureKindPrefix.groupId",
         "sourceRepository.groupId",
         "groupId"
     )?.takeIf { it.isNotBlank() }
 
     val locRepositoryOverrides = AIcRepositoryOverridesFromConfig(
         aValues = locValues,
-        aPrefix = locKindPrefix
+        aPrefix = locStructureKindPrefix
     )
 
     val locVersionContext = AIcAlgitesVersionContext(
         lane = AIcFirstValue(
             locValues,
-            "$locKindPrefix.versionContext.lane",
-            "$locKindPrefix.versionContext.releaseLine",
+            "$locStructureKindPrefix.versionContext.lane",
+            "$locStructureKindPrefix.versionContext.releaseLine",
             "versionContext.lane",
             "versionContext.releaseLine"
         )?.takeIf { it.isNotBlank() },
         revision = AIcFirstValue(
             locValues,
-            "$locKindPrefix.versionContext.revision",
+            "$locStructureKindPrefix.versionContext.revision",
             "versionContext.revision"
         )?.takeIf { it.isNotBlank() },
         qualifierKind = AIcFirstValue(
             locValues,
-            "$locKindPrefix.versionContext.qualifierKind",
+            "$locStructureKindPrefix.versionContext.qualifierKind",
             "versionContext.qualifierKind"
         )?.takeIf { it.isNotBlank() },
         qualifierLabel = AIcFirstValue(
             locValues,
-            "$locKindPrefix.versionContext.qualifierLabel",
+            "$locStructureKindPrefix.versionContext.qualifierLabel",
             "versionContext.qualifierLabel"
         )?.takeIf { it.isNotBlank() }
     )
 
     return AIcAlgitesResolvedState(
-        kinds = locKinds,
+        technologyKinds = locTechnologyKinds,
         groupId = locGroupId,
         repositories = locRepositoryOverrides,
         versionContext = locVersionContext
@@ -554,16 +554,16 @@ fun AIcRepositoryOverridesFromConfig(
         if (locSegments.size != 3) {
             error(
                 "Invalid repository matrix key '${locEntry.key}' in Algites metadata. " +
-                    "Expected <kind>.<final|snapshot>.<download|upload>."
+                    "Expected <technology-kind>.<release|snapshot>.<download|upload>."
             )
         }
 
-        val locKind = locSegments[0]
+        val locTechnologyKind = locSegments[0]
         val locStability = locSegments[1]
         val locUsage = locSegments[2]
 
-        if (locKind !in AIcAlgitesSupportedArtifactKinds) {
-            error("Unsupported ArtifactKind '$locKind' in repository matrix key '${locEntry.key}'.")
+        if (locTechnologyKind !in AIcAlgitesSupportedTechnologyKinds) {
+            error("Unsupported TechnologyKind '$locTechnologyKind' in repository matrix key '${locEntry.key}'.")
         }
         if (locStability !in AIcAlgitesRepositoryStabilities) {
             error("Unsupported repository stability '$locStability' in repository matrix key '${locEntry.key}'.")
@@ -574,28 +574,28 @@ fun AIcRepositoryOverridesFromConfig(
 
         val locValue = locEntry.value.trim()
         if (locValue.isNotBlank()) {
-            locResult["$locKind.$locStability.$locUsage"] = locValue
+            locResult["$locTechnologyKind.$locStability.$locUsage"] = locValue
         }
     }
 
     return locResult
 }
 
-fun AIcKindPrefix(aKind: String): String {
-    return when (aKind) {
+fun AIcStructureKindPrefix(aStructureKind: String): String {
+    return when (aStructureKind) {
         "repository" -> "sourceRepository"
         "artifact-set" -> "artifactSet"
         "artifact" -> "artifact"
-        else -> aKind
+        else -> aStructureKind
     }
 }
 
-fun AIcContentsModel(aKind: String, aKinds: List<String>): String {
+fun AIcContentsModel(aStructureKind: String, aTechnologyKinds: List<String>): String {
     return when {
-        aKind == "repository" -> "container"
-        aKind == "artifact" -> "self-contained"
-        aKind == "artifact-set" && aKinds == listOf("mps") -> "self-contained"
-        aKind == "artifact-set" -> "container"
+        aStructureKind == "repository" -> "container"
+        aStructureKind == "artifact" -> "self-contained"
+        aStructureKind == "artifact-set" && aTechnologyKinds == listOf("mps") -> "self-contained"
+        aStructureKind == "artifact-set" -> "container"
         else -> "container"
     }
 }
@@ -808,8 +808,8 @@ fun AIcToYaml(aResult: AIcAlgitesResolutionResult): String {
         aResult.artifactDirectories.forEachIndexed { locIndex, locDirectory ->
             appendLine("  $locIndex:")
             appendLine("    path: ${AIcYamlScalar(locDirectory.path)}")
-            appendLine("    kind: ${AIcYamlScalar(locDirectory.kind)}")
-            appendLine("    kinds: [${locDirectory.kinds.joinToString(", ") { AIcYamlScalar(it) }}]")
+            appendLine("    structureKind: ${AIcYamlScalar(locDirectory.structureKind)}")
+            appendLine("    technologyKinds: [${locDirectory.technologyKinds.joinToString(", ") { AIcYamlScalar(it) }}]")
             appendLine("    name: ${AIcYamlScalar(locDirectory.name)}")
             appendLine("    description: ${AIcYamlScalar(locDirectory.description)}")
             appendLine("    groupId: ${AIcYamlScalar(locDirectory.groupId)}")
@@ -840,8 +840,8 @@ fun AIcToDottedProperties(aResult: AIcAlgitesResolutionResult): String {
 
         aResult.artifactDirectories.forEachIndexed { locIndex, locDirectory ->
             appendLine("artifactDirectories.$locIndex.path=${AIcPropertiesScalar(locDirectory.path)}")
-            appendLine("artifactDirectories.$locIndex.kind=${AIcPropertiesScalar(locDirectory.kind)}")
-            appendLine("artifactDirectories.$locIndex.kinds=${locDirectory.kinds.joinToString(",")}")
+            appendLine("artifactDirectories.$locIndex.structureKind=${AIcPropertiesScalar(locDirectory.structureKind)}")
+            appendLine("artifactDirectories.$locIndex.technologyKinds=${locDirectory.technologyKinds.joinToString(",")}")
             appendLine("artifactDirectories.$locIndex.name=${AIcPropertiesScalar(locDirectory.name)}")
             appendLine("artifactDirectories.$locIndex.description=${AIcPropertiesScalar(locDirectory.description)}")
             appendLine("artifactDirectories.$locIndex.groupId=${AIcPropertiesScalar(locDirectory.groupId)}")
@@ -886,8 +886,8 @@ fun AIcToMap(aResult: AIcAlgitesResolutionResult): Map<String, Any?> {
         "artifactDirectories" to aResult.artifactDirectories.map { locDirectory ->
             linkedMapOf<String, Any?>(
                 "path" to locDirectory.path,
-                "kind" to locDirectory.kind,
-                "kinds" to locDirectory.kinds,
+                "structureKind" to locDirectory.structureKind,
+                "technologyKinds" to locDirectory.technologyKinds,
                 "name" to locDirectory.name,
                 "description" to locDirectory.description,
                 "groupId" to locDirectory.groupId,
@@ -924,10 +924,10 @@ fun AIcFlattenDottedProperties(aResultMap: Map<String, Any?>): Map<String, Strin
 
     locArtifactDirectories.forEachIndexed { locIndex, locDirectory ->
         val locVersion = locDirectory["version"] as Map<String, Any?>
-        val locKinds = locDirectory["kinds"] as? List<*> ?: emptyList<Any?>()
+        val locTechnologyKinds = locDirectory["technologyKinds"] as? List<*> ?: emptyList<Any?>()
         locProperties["artifactDirectories.$locIndex.path"] = locDirectory["path"]?.toString() ?: "null"
-        locProperties["artifactDirectories.$locIndex.kind"] = locDirectory["kind"]?.toString() ?: "null"
-        locProperties["artifactDirectories.$locIndex.kinds"] = locKinds.joinToString(",")
+        locProperties["artifactDirectories.$locIndex.structureKind"] = locDirectory["structureKind"]?.toString() ?: "null"
+        locProperties["artifactDirectories.$locIndex.technologyKinds"] = locTechnologyKinds.joinToString(",")
         locProperties["artifactDirectories.$locIndex.name"] = locDirectory["name"]?.toString() ?: "null"
         locProperties["artifactDirectories.$locIndex.description"] = locDirectory["description"]?.toString() ?: "null"
         locProperties["artifactDirectories.$locIndex.groupId"] = locDirectory["groupId"]?.toString() ?: "null"

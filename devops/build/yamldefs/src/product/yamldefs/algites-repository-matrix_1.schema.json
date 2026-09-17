@@ -28,7 +28,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "final": { "$ref": "#/$defs/usageMatrix" },
+        "release": { "$ref": "#/$defs/usageMatrix" },
         "snapshot": { "$ref": "#/$defs/usageMatrix" }
       },
       "minProperties": 1

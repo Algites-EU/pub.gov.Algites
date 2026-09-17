@@ -10,11 +10,11 @@ src/product/yamldefs/
 
 Schema contract versions are part of the file name from the first version (`_1`, `_2`, ...).
 
-The artifact is multi-kind:
+The artifact supports multiple technology kinds:
 
 ```yaml
 artifact:
-  kinds: [java, python]
+  technologyKinds: [java, python]
 ```
 
 The same schema files are therefore packaged for both ecosystems without copying the controlled source files.

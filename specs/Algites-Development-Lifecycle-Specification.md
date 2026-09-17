@@ -13,7 +13,7 @@ This document defines the **standard build, CI, release, and publication lifecyc
 
 The goal is to provide a predictable, low-friction workflow:
 
-- Keep **Gradle** as the single Algites build orchestrator across all supported ArtifactKinds; Maven is supported only as a Java publication/consumption compatibility format.
+- Keep **Gradle** as the single Algites build orchestrator across all supported TechnologyKinds; Maven is supported only as a Java publication/consumption compatibility format.
 - Enable **safe test-only runs** on dedicated branches without publishing.
 - Enable **fast compile-only runs** on feature branches.
 - Support Algites-style **variant branches** (e.g. `jvm17/*`, `jvm21/*`, `and21/*`, `mps2025.1/*`) naturally.
@@ -34,9 +34,9 @@ Creation of the releases or nightly build deployments to the artifact repositori
 - **Provider stub/workflow**: a small provider-specific entry point committed inside a repository (for GitHub, typically a file below `.github/workflows/`). It reacts to provider events and delegates to the shared Algites lifecycle entry points.
 - **Algites lifecycle implementation**: shared provider-independent build/release logic, primarily exposed through Gradle and centrally governed scripts/actions. It is responsible for:
   - resolving repository/artifact metadata,
-  - determining the selected ArtifactKinds,
+  - determining the selected TechnologyKinds,
   - selecting lifecycle mode from branch/event policy,
-  - resolving kind-specific toolchains only for selected kinds,
+  - resolving technology-kind-specific toolchains only for selected technology kinds,
   - running construction, verification, packaging, documentation, and publication operations,
   - producing provider-neutral diagnostics and build traceability metadata.
 - **Provider adapter**: optional integration that maps provider facilities such as tokens, issue links, summaries, and manual-dispatch inputs to the provider-independent lifecycle.
@@ -125,9 +125,9 @@ All branches not matching the above patterns are treated as:
 
 #### 2.1.5. Build Tool - Gradle
 
-The unified Algites build is orchestrated by Gradle in all repositories and for all supported ArtifactKinds. Gradle coordinates kind-specific adapters; an adapter MAY delegate execution to a native ecosystem toolchain (for example Python packaging tools or MPS tooling) while preserving a deterministic Gradle task graph.
+The unified Algites build is orchestrated by Gradle in all repositories and for all supported TechnologyKinds. Gradle coordinates technology-kind-specific adapters; an adapter MAY delegate execution to a native ecosystem toolchain (for example Python packaging tools or MPS tooling) while preserving a deterministic Gradle task graph.
 
-Java artifacts may additionally publish Maven-compatible metadata and packages for Maven consumers. Maven is not an Algites build tool. Python and other ArtifactKinds publish through their own kind-specific repository protocols and package formats.
+Java artifacts may additionally publish Maven-compatible metadata and packages for Maven consumers. Maven is not an Algites build tool. Python and other TechnologyKinds publish through their own technology-kind-specific repository protocols and package formats.
 
 ##### 2.1.5.1 Gradle bootstrap handling
 
@@ -192,16 +192,16 @@ The bootstrap defined in `settings.gradle.kts` is responsible only for the repos
 - retrieval of the minimal shared Algites build infrastructure when needed,
 - repository-local Gradle initialization required by the selected Gradle distribution.
 
-It must **not** become the authoritative configuration for artifact publication repositories, artifact versions, ArtifactKind selection, or build behavior.
+It must **not** become the authoritative configuration for artifact publication repositories, artifact versions, TechnologyKind selection, or build behavior.
 
 ###### 2.1.5.1.5 Bootstrap repositories vs Algites artifact repositories
 
 Two repository concepts are intentionally distinct:
 
 - **Bootstrap repositories** are explicit and repository-local in `settings.gradle.kts`. They exist only to make Gradle and shared build infrastructure resolvable.
-- **Algites artifact repositories** are resolved after metadata loading from the publication repository matrix defined by ArtifactKind x stability (`final`/`snapshot`) x URL usage (`download`/`upload`). The matrix inherits from Algites defaults through `algites-source-repository.yml` and nested `algites-artifact.yml` files.
+- **Algites artifact repositories** are resolved after metadata loading from the publication repository matrix defined by TechnologyKind x stability (`release`/`snapshot`) x URL usage (`download`/`upload`). The matrix inherits from Algites defaults through `algites-source-repository.yml` and nested `algites-artifact.yml` files.
 
-A Java/Maven repository used for dependency resolution or publication is therefore not automatically a bootstrap repository. Python, MPS, and future kind-specific repositories are resolved by their adapters and effective artifact metadata.
+A Java/Maven repository used for dependency resolution or publication is therefore not automatically a bootstrap repository. Python, MPS, and future technology-kind-specific repositories are resolved by their adapters and effective artifact metadata.
 
 ###### 2.1.5.1.6 Public vs private trust domains
 
@@ -216,22 +216,22 @@ Bootstrap changes should remain rare, deliberate, explicit, and repository-local
 - `settings.gradle.kts` remains the explicit source of Gradle bootstrap configuration.
 - No hidden global Gradle init/bootstrap mechanism is required.
 - Bootstrap configuration is minimal and distinct from the Algites publication repository matrix.
-- Artifact-specific repository policy is resolved only after Algites metadata and ArtifactKind adapters are available.
+- Artifact-specific repository policy is resolved only after Algites metadata and TechnologyKind adapters are available.
 
 
 ---
 
-##### 2.1.5.2. What Gets Executed (by Mode and ArtifactKind)
+##### 2.1.5.2. What Gets Executed (by Mode and TechnologyKind)
 
-Lifecycle mode and ArtifactKind selection are independent dimensions. For every targeted artifact/cascade, the lifecycle first resolves the effective selected `kinds` and then asks each selected ArtifactKind adapter to contribute the tasks required by the mode.
+Lifecycle mode and TechnologyKind selection are independent dimensions. For every targeted artifact/cascade, the lifecycle first resolves the effective selected `technologyKinds` and then asks each selected TechnologyKind adapter to contribute the tasks required by the mode.
 
 ###### 2.1.5.2.1 Mode = approval
 
-Run full verification plus packaging for all selected ArtifactKinds. Publication is a separate explicit lifecycle operation unless a concrete release action requests it.
+Run full verification plus packaging for all selected TechnologyKinds. Publication is a separate explicit lifecycle operation unless a concrete release action requests it.
 
 ###### 2.1.5.2.2 Mode = verification
 
-Run all applicable unit/integration verification for the selected ArtifactKinds without requiring publication.
+Run all applicable unit/integration verification for the selected TechnologyKinds without requiring publication.
 
 ###### 2.1.5.2.3 Mode = construction
 
@@ -241,19 +241,19 @@ Construct/compile/generate the selected product and develop sources without runn
 
 Exit early after logging the decision.
 
-###### 2.1.5.2.5 ArtifactKind selection
+###### 2.1.5.2.5 TechnologyKind selection
 
-- If no kind filter is supplied, all effective artifact `kinds` are selected.
-- An explicit filter may select one or more kinds, for example only `java` or only `python`.
-- Artifacts in a cascade that do not support a requested kind are skipped for that kind.
-- Selecting several kinds does not require their task graphs to be coupled; Gradle executes only real task dependencies.
+- If no technology-kind filter is supplied, all effective artifact `technologyKinds` are selected.
+- An explicit filter may select one or more technology kinds, for example only `java` or only `python`.
+- Artifacts in a cascade that do not support a requested technology kind are skipped for that technology kind.
+- Selecting several technology kinds does not require their task graphs to be coupled; Gradle executes only real task dependencies.
 - Shared transformations MAY be shared tasks; technology-specific transformations MAY run independently and remain independently cacheable when their inputs/outputs permit it.
 
 ---
 
-##### 2.1.5.3. ArtifactKind-Specific Toolchain Resolution
+##### 2.1.5.3. TechnologyKind-Specific Toolchain Resolution
 
-Toolchains are resolved only for selected ArtifactKinds. Every ArtifactKind adapter owns its resolution rules and diagnostics.
+Toolchains are resolved only for selected TechnologyKinds. Every TechnologyKind adapter owns its resolution rules and diagnostics.
 
 For the Java adapter, unless a more specific Algites metadata rule overrides it, the current compatibility resolution order remains:
 
@@ -261,7 +261,7 @@ For the Java adapter, unless a more specific Algites metadata rule overrides it,
 2. `gradle.properties` containing `javaVersion=<n>`
 3. Algites Java default (currently `17`)
 
-Python, MPS, and future adapters MUST define equivalent deterministic resolution rules before their ArtifactKinds are enabled.
+Python, MPS, and future adapters MUST define equivalent deterministic resolution rules before their TechnologyKinds are enabled.
 
 ---
 
@@ -274,7 +274,7 @@ Algites defines repository-level Gradle lifecycle tasks for deterministic prepar
 `prepareDevelopment` is the canonical idempotent preparation task. It SHOULD:
 
 - resolve repository and artifact metadata required for development tooling;
-- create or update derived development descriptors for all relevant artifacts; when no preparation kind filter is supplied, all effective ArtifactKinds are prepared;
+- create or update derived development descriptors for all relevant artifacts; when no preparation technology-kind filter is supplied, all effective TechnologyKinds are prepared;
 - generate Python `pyproject.toml` files from resolved Algites metadata plus optional committed `pyproject.toml.tpl` files;
 - preserve unrelated user/development state;
 - perform no release/publication operation.
@@ -362,17 +362,17 @@ If issue references are detected (from branch name and/or commit subjects), CI w
 - Prefer variant branching (`jvm17/*`, `jvm21/*`, `and21/*`, `mps2025.1/*`) to keep cross-variant feature migration explicit.
 - Use `feature-testrun/*` for safe CI experiments without publishing.
 - Use `feature/*` for normal development with fast compile feedback.
-- Keep publication/release actions explicit and constrained by branch/lane policy; publication MAY target only a selected subset of ArtifactKinds.
+- Keep publication/release actions explicit and constrained by branch/lane policy; publication MAY target only a selected subset of TechnologyKinds.
 - Use issue identification wherever practical to keep change traceability as transparent as possible.
 
 ---
 
 #### 2.1.7. Publication Repository Resolution
 
-Before dependency download or publication, the lifecycle resolves the effective repository matrix cell for every selected ArtifactKind and operation:
+Before dependency download or publication, the lifecycle resolves the effective repository matrix cell for every selected TechnologyKind and operation:
 
 ```text
-<kind> x <final|snapshot> x <download|upload>
+<technology-kind> x <release|snapshot> x <download|upload>
 ```
 
 Resolution order is:
@@ -384,9 +384,9 @@ Algites built-in defaults
         -> descendant algites-artifact.yml
 ```
 
-Only explicitly configured cells override inherited values. The canonical YAML shape is `repositories.<kind>.<final|snapshot>.<download|upload>`. Credentials are supplied by the execution environment/provider and MUST NOT change the resolved semantic target.
+Only explicitly configured cells override inherited values. The canonical YAML shape is `repositories.<technology-kind>.<release|snapshot>.<download|upload>`. Credentials are supplied by the execution environment/provider and MUST NOT change the resolved semantic target.
 
-The initial built-in public Java defaults preserve the existing Algites behavior for dependency downloads: final Java artifacts resolve from Maven Central and snapshot Java artifacts resolve from the public Algites Cloudsmith snapshot repository. Upload defaults and Python repository defaults are configured only when their canonical endpoints are explicitly defined; execution-time credentials remain separate.
+The initial built-in public Java defaults preserve the existing Algites behavior for dependency downloads: release Java artifacts resolve from Maven Central and snapshot Java artifacts resolve from the public Algites Cloudsmith snapshot repository. Upload defaults and Python repository defaults are configured only when their canonical endpoints are explicitly defined; execution-time credentials remain separate.
 
 ---
 
@@ -470,17 +470,17 @@ The historical tag form `v<A>.<B>.<C>-<variant>` remains valid for repositories 
 
 ##### 3.1.3.1 Snapshot versions
 
-Snapshot computation is performed per effective version scope. A snapshot version is independent from ArtifactKind selection: the same logical snapshot version MAY be built for Java, Python, MPS, or any selected subset of ArtifactKinds.
+Snapshot computation is performed per effective version scope. A snapshot version is independent from TechnologyKind selection: the same logical snapshot version MAY be built for Java, Python, MPS, or any selected subset of TechnologyKinds.
 
-##### 3.1.3.2 ArtifactKind-specific publication presence
+##### 3.1.3.2 TechnologyKind-specific publication presence
 
-A logical version does not imply that every declared ArtifactKind has been published. For example, version `1.4.1` may have a Java final publication while Python remains available only at `1.4.0`. No artificial Python `1.4.1` package is created.
+A logical version does not imply that every declared TechnologyKind has been published. For example, version `1.4.1` may have a Java release publication while Python remains available only at `1.4.0`. No artificial Python `1.4.1` package is created.
 
-If another ArtifactKind is later published under the same logical version, it MUST be built from the same immutable release source revision. If the source has changed, a new logical version is required.
+If another TechnologyKind is later published under the same logical version, it MUST be built from the same immutable release source revision. If the source has changed, a new logical version is required.
 
 #### 3.1.4. CI: when/what runs
 
-The common CI lifecycle resolves the effective version scope, selected ArtifactKinds, lifecycle mode, and then invokes the corresponding Gradle/ArtifactKind-adapter task graph.
+The common CI lifecycle resolves the effective version scope, selected TechnologyKinds, lifecycle mode, and then invokes the corresponding Gradle/TechnologyKind-adapter task graph.
 
 
 #### 3.1.5. Release process (explicit action)
@@ -488,8 +488,8 @@ The common CI lifecycle resolves the effective version scope, selected ArtifactK
 Releases are deliberate operations initiated through the active CI/provider integration or an equivalent local/central Algites release entry point. The operation selects:
 
 - branch/lane and effective version scope,
-- final logical version,
-- one or more ArtifactKinds to publish (default: all effective kinds),
+- release logical version,
+- one or more TechnologyKinds to publish (default: all effective technology kinds),
 - optional upmerge behavior.
 
 The release operation MUST:
@@ -497,9 +497,9 @@ The release operation MUST:
 1. validate lane/version-scope consistency,
 2. resolve and freeze the immutable release source revision,
 3. compute or validate the release identity/tag,
-4. execute construction and verification required by each selected ArtifactKind adapter,
-5. publish only the selected ArtifactKinds to their effective `final.upload` repository matrix cells,
-6. record which ArtifactKind-specific publications actually exist for the logical version.
+4. execute construction and verification required by each selected TechnologyKind adapter,
+5. publish only the selected TechnologyKinds to their effective `release.upload` repository matrix cells,
+6. record which TechnologyKind-specific publications actually exist for the logical version.
 
 ##### 3.1.5.1 Release identity/tag naming
 
@@ -566,7 +566,7 @@ Use distinct `ContainerVersionContext` scopes. Artifacts do not need to be split
 
 ##### 3.1.8.3 “What if only one technology changed?”
 
-Release only the affected ArtifactKind(s). Other technologies remain at the latest version for which they were actually published. This keeps technology lifecycles operationally decoupled without introducing independent ArtifactKind-specific version counters inside one logical artifact.
+Release only the affected TechnologyKind(s). Other technologies remain at the latest version for which they were actually published. This keeps technology lifecycles operationally decoupled without introducing independent TechnologyKind-specific version counters inside one logical artifact.
 
 ---
 
@@ -574,7 +574,7 @@ Release only the affected ArtifactKind(s). Other technologies remain at the late
 
 - Scoped version contexts reduce pressure to split repositories, but release tags/diagnostics must always make the version scope unambiguous.
 - Selective technology publication reduces cross-technology coupling, but consumers cannot assume that every logical version exists in every ecosystem; publication metadata and documentation must show actual availability.
-- Gradle orchestration across non-JVM ecosystems provides one lifecycle entry point, but each ArtifactKind adapter must accurately model native-tool inputs, outputs, and failure modes rather than hiding them behind Java assumptions.
+- Gradle orchestration across non-JVM ecosystems provides one lifecycle entry point, but each TechnologyKind adapter must accurately model native-tool inputs, outputs, and failure modes rather than hiding them behind Java assumptions.
 - Cherry-pick upmerge remains pragmatic, but conflicts require explicit review and resolution.
 
 ### 3.2 GitHub Actions specific Policy

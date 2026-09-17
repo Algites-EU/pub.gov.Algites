@@ -134,9 +134,9 @@ val algitesIsCi = providers.environmentVariable("CI")
     .orElse(false)
     .get()
 
-val algitesRequestedKinds = (
-    algitesGradleOrEnvironmentValue("ALGITES_KINDS")
-        ?: algitesGradleOrEnvironmentValue("algites.kinds")
+val algitesRequestedTechnologyKinds = (
+    algitesGradleOrEnvironmentValue("ALGITES_TECHNOLOGY_KINDS")
+        ?: algitesGradleOrEnvironmentValue("algites.technologyKinds")
 )
     ?.split(',')
     ?.map { it.trim().lowercase() }
@@ -180,31 +180,31 @@ allprojects {
 
 val algitesPrepareDevelopment = tasks.register("prepareDevelopment") {
     group = "algites"
-    description = "Generates effective development metadata required by supported artifact kinds."
+    description = "Generates effective development metadata required by supported technology kinds."
 }
 
 val algitesRefreshDevelopment = tasks.register("refreshDevelopment") {
     group = "algites"
-    description = "Forces regeneration of effective development metadata required by supported artifact kinds."
+    description = "Forces regeneration of effective development metadata required by supported technology kinds."
 }
 
 val algitesBuild = tasks.register("algitesBuild") {
     group = "algites"
-    description = "Builds all effective or explicitly selected Algites ArtifactKinds."
+    description = "Builds all effective or explicitly selected Algites TechnologyKinds."
 }
 
 val algitesPublish = tasks.register("algitesPublish") {
     group = "publishing"
-    description = "Publishes all effective or explicitly selected Algites ArtifactKinds."
+    description = "Publishes all effective or explicitly selected Algites TechnologyKinds."
 }
 
 subprojects {
     val locAlgitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
-    val locAlgitesKinds = AIcAlgitesStringList(locAlgitesArtifactDirectory?.get("kinds"))
-    val locEffectiveKinds = if (algitesRequestedKinds.isEmpty()) {
-        locAlgitesKinds.toSet()
+    val locAlgitesTechnologyKinds = AIcAlgitesStringList(locAlgitesArtifactDirectory?.get("technologyKinds"))
+    val locEffectiveTechnologyKinds = if (algitesRequestedTechnologyKinds.isEmpty()) {
+        locAlgitesTechnologyKinds.toSet()
     } else {
-        locAlgitesKinds.filter { it in algitesRequestedKinds }.toSet()
+        locAlgitesTechnologyKinds.filter { it in algitesRequestedTechnologyKinds }.toSet()
     }
 
     val locAlgitesSubprojectPathDots = project.path
@@ -223,13 +223,13 @@ subprojects {
         extensions.configure<BasePluginExtension>("base") {
             archivesName.set(locAlgitesCanonicalArtifactId)
         }
-        if ("java" in locEffectiveKinds) {
+        if ("java" in locEffectiveTechnologyKinds) {
             val locJavaBuildTask = tasks.named("build")
             algitesBuild.configure { dependsOn(locJavaBuildTask) }
         }
     }
 
-    if ("java" in locAlgitesKinds) {
+    if ("java" in locAlgitesTechnologyKinds) {
         plugins.withId("maven-publish") {
             if (algitesIsPublishRequested) {
                 requireAlgitesGroupForPublish(project.path, project.group)
@@ -254,7 +254,7 @@ subprojects {
 
                 repositories {
                     val locIsSnapshot = project.version.toString().endsWith("SNAPSHOT", ignoreCase = true)
-                    val locStability = if (locIsSnapshot) "snapshot" else "final"
+                    val locStability = if (locIsSnapshot) "snapshot" else "release"
                     val locRepositoryUrl = locEffectiveRepositories["java.$locStability.upload"]
                         ?: if (locIsSnapshot) algitesLegacySnapshotRepositoryUrl else algitesLegacyReleaseRepositoryUrl
 
@@ -274,7 +274,7 @@ subprojects {
             }
         }
 
-        if ("java" in locEffectiveKinds) {
+        if ("java" in locEffectiveTechnologyKinds) {
             plugins.withId("maven-publish") {
                 val locJavaPublishTask = tasks.named("publish")
                 algitesPublish.configure { dependsOn(locJavaPublishTask) }
@@ -282,7 +282,7 @@ subprojects {
         }
     }
 
-    if ("python" in locAlgitesKinds) {
+    if ("python" in locAlgitesTechnologyKinds) {
         val locPythonTemplateFile = layout.projectDirectory.file("pyproject.toml.tpl")
         val locPythonProjectFile = layout.projectDirectory.file("pyproject.toml")
         val locPythonDistributionName = AIcAlgitesPythonDistributionName(locAlgitesCanonicalArtifactId)
@@ -391,7 +391,7 @@ subprojects {
 
             doFirst {
                 val locIsSnapshot = project.version.toString().endsWith("SNAPSHOT", ignoreCase = true)
-                val locStability = if (locIsSnapshot) "snapshot" else "final"
+                val locStability = if (locIsSnapshot) "snapshot" else "release"
                 val locRepositoryUrl = locEffectiveRepositories["python.$locStability.upload"]
                     ?: throw GradleException(
                         "No Python $locStability upload repository is configured for project '${project.path}'. " +
@@ -432,7 +432,7 @@ subprojects {
 
         algitesPrepareDevelopment.configure { dependsOn(locGeneratePythonProjectMetadata) }
         algitesRefreshDevelopment.configure { dependsOn(locRefreshPythonDevelopment) }
-        if ("python" in locEffectiveKinds) {
+        if ("python" in locEffectiveTechnologyKinds) {
             algitesBuild.configure { dependsOn(locBuildPython) }
             algitesPublish.configure { dependsOn(locPublishPython) }
         }
@@ -446,13 +446,13 @@ tasks.register("printAlgitesDeploymentPlan") {
     doLast {
         println("Algites deployment plan for ${rootProject.name}:")
         println(" - repository visibility: $algitesRepositoryVisibility")
-        println(" - requested kinds: ${if (algitesRequestedKinds.isEmpty()) "all effective kinds" else algitesRequestedKinds.joinToString(",")}")
+        println(" - requested technology kinds: ${if (algitesRequestedTechnologyKinds.isEmpty()) "all effective technology kinds" else algitesRequestedTechnologyKinds.joinToString(",")}")
         println(" - docs pages branch: $algitesDocsPagesBranch")
         println(" - legacy Maven repository URL override present: ${!algitesLegacyReleaseRepositoryUrl.isNullOrBlank() || !algitesLegacySnapshotRepositoryUrl.isNullOrBlank()}")
 
         algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { locEntry ->
             val locMetadata = locEntry.value
-            println(" - ${locEntry.key}: kinds=${AIcAlgitesStringList(locMetadata["kinds"])}")
+            println(" - ${locEntry.key}: technologyKinds=${AIcAlgitesStringList(locMetadata["technologyKinds"])}")
             AIcAlgitesRepositoryMap(locMetadata["repositories"]).toSortedMap().forEach { locRepositoryEntry ->
                 println("     ${locRepositoryEntry.key}=${locRepositoryEntry.value}")
             }

@@ -61,7 +61,7 @@ val locJavaDownloadRepositories = linkedSetOf<Pair<String, String>>()
 @Suppress("UNCHECKED_CAST")
 fun AIcCollectJavaDownloadRepositories(aRepositories: Any?) {
     val locRepositories = aRepositories as? Map<String, String> ?: return
-    listOf("final", "snapshot").forEach { locStability ->
+    listOf("release", "snapshot").forEach { locStability ->
         val locUrl = locRepositories["java.$locStability.download"]?.trim()?.takeIf { it.isNotBlank() }
         if (locUrl != null) {
             locJavaDownloadRepositories.add(locStability to locUrl)

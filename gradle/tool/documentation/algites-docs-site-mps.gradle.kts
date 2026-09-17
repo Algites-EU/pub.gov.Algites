@@ -101,7 +101,7 @@ fun AIcReadRepositoryId(): String {
 
 fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
     val locMpsArtifactDirectories = locAlgitesDocsResolvedArtifactDirectories.filter { locArtifactDirectory ->
-        locArtifactDirectory["kinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
+        locArtifactDirectory["technologyKinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
             (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
     }
 
@@ -112,7 +112,7 @@ fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
             .any { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
 
         require(locHasMpsDescriptors) {
-            "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with kinds containing mps and contentsModel=self-contained."
+            "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with technologyKinds containing mps and contentsModel=self-contained."
         }
 
         return listOf(
@@ -378,7 +378,7 @@ class AIcMpsSupport(
 
     fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
         val locMpsArtifactDirectories = locResolvedArtifactDirectories.filter { locArtifactDirectory ->
-            locArtifactDirectory["kinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
+            locArtifactDirectory["technologyKinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
             (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
         }
 
@@ -389,7 +389,7 @@ class AIcMpsSupport(
                 .any { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
 
             require(locHasMpsDescriptors) {
-                "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with kinds containing mps and contentsModel=self-contained."
+                "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with technologyKinds containing mps and contentsModel=self-contained."
             }
 
             return listOf(
@@ -798,8 +798,8 @@ class AIcGenerateDummyMpsDocsAction(
             "path" to "",
             "name" to "",
             "description" to "",
-            "kind" to "",
-            "kinds" to (locArtifactSetMetadata["kinds"] ?: "mps"),
+            "structureKind" to "",
+            "technologyKinds" to (locArtifactSetMetadata["technologyKinds"] ?: "mps"),
             "contentsModel" to "",
             "gradleProjectPath" to "",
             "version.resolvedValue" to (locArtifactSetMetadata["version.resolvedValue"] ?: ""),
