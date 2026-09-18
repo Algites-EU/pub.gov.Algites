@@ -9,15 +9,41 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "groupId": { "type": "string", "minLength": 1 },
-        "name": { "type": "string", "minLength": 1 },
-        "visibility": { "type": "string", "enum": ["pub", "priv"] },
-        "repositories": { "$ref": "algites-repository-matrix_1.schema.json" }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "visibility": {
+          "type": "string",
+          "enum": [
+            "pub",
+            "priv"
+          ]
+        },
+        "repositories": {
+          "$ref": "algites-repository-matrix_1.schema.json"
+        }
       },
-      "required": ["id"]
+      "required": [
+        "id"
+      ]
     },
-    "versionContext": { "$ref": "algites-version-context_1.schema.json" }
+    "groupId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "versionContext": {
+      "$ref": "algites-version-context_1.schema.json"
+    },
+    "credentialProfiles": {
+      "$ref": "algites-credential-profiles_1.schema.json"
+    }
   },
-  "required": ["sourceRepository"]
+  "required": [
+    "sourceRepository"
+  ]
 }

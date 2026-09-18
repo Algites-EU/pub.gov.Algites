@@ -1,14 +1,6 @@
-#Algites versions used to filter templates in build/basic.
-# NOTE: keys are referenced from templates via:
-#   @repository.version@
-#   @version_<groupId>_<artifactId>@
-#
-algites.policy.artifact.groupId=eu.algites.tool.build
-algites.policy.artifact.artifactId=pub.gov.Algites_build.policy.base
-algites.policy.id=algites.build.base.pub
-algites.policy.version=2026.01
+artifact:
+  technologyKinds: [java]
+  name: Algites DevOps build policy base
+  description: Base Gradle build-policy plugin and publication metadata for Algites build governance.
 
-# Common dependency / plugin versions used inside templates (adjust as needed):
-#version_org.junit.jupiter_junit-jupiter=5.10.2
-#version_org.slf4j_slf4j-api=2.0.13
-#version_org.apache.maven.plugins_maven-surefire-plugin=3.2.5
+groupId: eu.algites.tool.build

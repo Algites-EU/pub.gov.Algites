@@ -9,6 +9,8 @@
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
+import org.gradle.api.credentials.HttpHeaderCredentials
+import org.gradle.authentication.http.HttpHeaderAuthentication
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.testing.Test
 
@@ -38,8 +40,10 @@ fun String.capitalizedForAlgitesName(): String =
     }
 
 fun algitesGradleOrEnvironmentValue(aName: String): String? =
-    providers.gradleProperty(aName).orNull
-        ?: providers.environmentVariable(aName).orNull
+    (providers.gradleProperty(aName).orNull
+        ?: providers.environmentVariable(aName).orNull)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
 
 fun AIcAlgitesStringList(aValue: Any?): List<String> {
     return when (aValue) {
@@ -49,12 +53,70 @@ fun AIcAlgitesStringList(aValue: Any?): List<String> {
     }
 }
 
+data class AIcAlgitesRepositoryEndpoint(
+    val cell: String,
+    val id: String,
+    val url: String,
+    val credentialProfile: String?
+)
+
+data class AIcAlgitesCredentialProfile(
+    val id: String,
+    val type: String,
+    val configuration: Map<String, String>
+)
+
 @Suppress("UNCHECKED_CAST")
-fun AIcAlgitesRepositoryMap(aValue: Any?): Map<String, String> {
-    return (aValue as? Map<*, *>)
-        ?.entries
-        ?.associate { locEntry -> locEntry.key.toString() to locEntry.value.toString() }
-        ?: emptyMap()
+fun AIcAlgitesRepositoryEndpoints(aValue: Any?, aCell: String): List<AIcAlgitesRepositoryEndpoint> {
+    val locRepositories = aValue as? Map<*, *> ?: return emptyList()
+    val locItems = locRepositories[aCell] as? List<*> ?: return emptyList()
+    return locItems.mapNotNull { locItem ->
+        val locMap = locItem as? Map<*, *> ?: return@mapNotNull null
+        val locEnabled = locMap["enabled"]?.toString()?.toBooleanStrictOrNull() ?: true
+        if (!locEnabled) return@mapNotNull null
+        val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val locCredentialProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
+        AIcAlgitesRepositoryEndpoint(aCell, locId, locUrl, locCredentialProfile)
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+fun AIcAlgitesCredentialProfiles(aValue: Any?): Map<String, AIcAlgitesCredentialProfile> {
+    val locProfiles = aValue as? Map<*, *> ?: return emptyMap()
+    val locResult = linkedMapOf<String, AIcAlgitesCredentialProfile>()
+    locProfiles.forEach { (locRawId, locRawDefinition) ->
+        val locId = locRawId?.toString() ?: return@forEach
+        val locDefinition = locRawDefinition as? Map<*, *> ?: return@forEach
+        val locType = locDefinition["type"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return@forEach
+        val locConfiguration = (locDefinition["configuration"] as? Map<*, *>)
+            ?.entries
+            ?.associate { locEntry -> locEntry.key.toString() to locEntry.value.toString() }
+            ?: emptyMap()
+        locResult[locId] = AIcAlgitesCredentialProfile(locId, locType, locConfiguration)
+    }
+    return locResult
+}
+
+fun AIcAlgitesCredentialEnvironmentPrefix(aProfile: AIcAlgitesCredentialProfile): String =
+    "ALGITES_CREDENTIAL_" +
+        aProfile.id.uppercase().replace('-', '_') +
+        "_" + aProfile.type.uppercase().replace('-', '_')
+
+fun AIcAlgitesCredentialEnvironmentValue(aProfile: AIcAlgitesCredentialProfile, aField: String): String? =
+    algitesGradleOrEnvironmentValue(AIcAlgitesCredentialEnvironmentPrefix(aProfile) + "_" + aField)
+
+fun AIcAlgitesRequireBasicCredential(aProfile: AIcAlgitesCredentialProfile): Pair<String, String> {
+    val locPrefix = AIcAlgitesCredentialEnvironmentPrefix(aProfile)
+    val locUsername = AIcAlgitesCredentialEnvironmentValue(aProfile, "USERNAME")
+    val locPassword = AIcAlgitesCredentialEnvironmentValue(aProfile, "PASSWORD")
+    if (locUsername.isNullOrBlank() || locPassword.isNullOrBlank()) {
+        throw GradleException(
+            "Credential profile '${aProfile.id}' type 'basic' is not available through the current Gradle bootstrap. " +
+                "Define ${locPrefix}_USERNAME and ${locPrefix}_PASSWORD, or provision the profile in the Algites credential store once the public credential bootstrap artifact is installed."
+        )
+    }
+    return locUsername to locPassword
 }
 
 fun AIcAlgitesPythonDistributionName(aArtifactCoordinateId: String): String {
@@ -110,23 +172,32 @@ fun requireAlgitesGroupForPublish(aProjectPath: String, aProjectGroup: Any?) {
     if (locGroupText.isNullOrBlank() || locGroupText == "unspecified") {
         throw GradleException(
             "Project '$aProjectPath' is being published, but no Maven group could be resolved. " +
-                "Define groupId in algites-artifact.yml or algites-source-repository.yml."
+                "Define top-level groupId in algites-source-repository.yml, algites-artifact-set.yml, or algites-artifact.yml."
         )
     }
 }
 
-val algitesRepositoryVisibility = (
-    algitesGradleOrEnvironmentValue("ALGITES_VISIBILITY")
-        ?: algitesResolvedRepositoryMetadata["visibility"]?.toString()
-        ?: "pub"
-).lowercase()
+val algitesRepositoryVisibility = algitesResolvedRepositoryMetadata["visibility"]
+    ?.toString()
+    ?.lowercase()
+    ?.takeIf { it.isNotBlank() }
+    ?: throw GradleException("Algites source repository visibility could not be resolved.")
 
-val algitesRepositoryUser = algitesGradleOrEnvironmentValue("ALGITES_REPO_USER")
-    ?: providers.environmentVariable("GITHUB_ACTOR").orNull
+val algitesRequestedRepositoryVisibility = algitesGradleOrEnvironmentValue("ALGITES_VISIBILITY")
+    ?.lowercase()
+    ?.takeIf { it.isNotBlank() }
+if (algitesRequestedRepositoryVisibility != null && algitesRequestedRepositoryVisibility != algitesRepositoryVisibility) {
+    throw GradleException(
+        "Requested Algites visibility '$algitesRequestedRepositoryVisibility' does not match " +
+            "source repository visibility '$algitesRepositoryVisibility'."
+    )
+}
 
-val algitesRepositoryPassword = algitesGradleOrEnvironmentValue("ALGITES_REPO_PASS")
-    ?: providers.environmentVariable("GITHUB_TOKEN").orNull
-    ?: providers.environmentVariable("ALGITES_MAVEN_TOKEN").orNull
+val algitesPublicationRepositoryVisibility = when (algitesRepositoryVisibility) {
+    "pub" -> "public"
+    "priv" -> "private"
+    else -> throw GradleException("Unsupported Algites repository visibility '$algitesRepositoryVisibility'.")
+}
 
 val algitesDocsPagesBranch = algitesGradleOrEnvironmentValue("ALGITES_DOCS_PAGES_BRANCH") ?: "gh-pages"
 val algitesIsCi = providers.environmentVariable("CI")
@@ -143,11 +214,6 @@ val algitesRequestedTechnologyKinds = (
     ?.filter { it.isNotBlank() }
     ?.toSet()
     ?: emptySet()
-
-val algitesLegacyReleaseRepositoryUrl = algitesGradleOrEnvironmentValue("ALGITES_MAVEN_RELEASES_URL")
-    ?: algitesGradleOrEnvironmentValue("ALGITES_REPO_URL")
-val algitesLegacySnapshotRepositoryUrl = algitesGradleOrEnvironmentValue("ALGITES_MAVEN_SNAPSHOTS_URL")
-    ?: algitesGradleOrEnvironmentValue("ALGITES_REPO_URL")
 
 val algitesRequestedTasks = gradle.startParameter.taskNames
 val algitesIsPublishRequested = algitesRequestedTasks.any { locTaskName ->
@@ -217,7 +283,8 @@ subprojects {
         "${rootProject.name}_${locAlgitesSubprojectPathDots}"
     }
 
-    val locEffectiveRepositories = AIcAlgitesRepositoryMap(locAlgitesArtifactDirectory?.get("repositories"))
+    val locEffectiveRepositories = locAlgitesArtifactDirectory?.get("repositories")
+    val locEffectiveCredentialProfiles = AIcAlgitesCredentialProfiles(locAlgitesArtifactDirectory?.get("credentialProfiles"))
 
     plugins.withId("base") {
         extensions.configure<BasePluginExtension>("base") {
@@ -255,17 +322,59 @@ subprojects {
                 repositories {
                     val locIsSnapshot = project.version.toString().endsWith("SNAPSHOT", ignoreCase = true)
                     val locStability = if (locIsSnapshot) "snapshot" else "release"
-                    val locRepositoryUrl = locEffectiveRepositories["java.$locStability.upload"]
-                        ?: if (locIsSnapshot) algitesLegacySnapshotRepositoryUrl else algitesLegacyReleaseRepositoryUrl
+                    val locCell = "java.$algitesPublicationRepositoryVisibility.$locStability.upload"
+                    val locEndpoints = AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locCell)
 
-                    if (!locRepositoryUrl.isNullOrBlank()) {
+                    locEndpoints.forEach { locEndpoint ->
                         maven {
-                            name = "algitesJava${locStability.capitalizedForAlgitesName()}Upload"
-                            url = uri(locRepositoryUrl)
-                            if (!algitesRepositoryUser.isNullOrBlank() && !algitesRepositoryPassword.isNullOrBlank()) {
-                                credentials {
-                                    username = algitesRepositoryUser
-                                    password = algitesRepositoryPassword
+                            name = locEndpoint.id.replace('-', '_')
+                            url = uri(locEndpoint.url)
+                            val locProfileId = locEndpoint.credentialProfile
+                            if (!locProfileId.isNullOrBlank()) {
+                                val locProfile = locEffectiveCredentialProfiles[locProfileId]
+                                    ?: throw GradleException(
+                                        "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
+                                    )
+                                when (locProfile.type) {
+                                    "basic" -> {
+                                        val locCredential = AIcAlgitesRequireBasicCredential(locProfile)
+                                        credentials {
+                                            username = locCredential.first
+                                            password = locCredential.second
+                                        }
+                                    }
+                                    "bearer" -> {
+                                        val locToken = AIcAlgitesCredentialEnvironmentValue(locProfile, "TOKEN")
+                                            ?: throw GradleException(
+                                                "Credential profile '${locProfile.id}' type 'bearer' is not available. " +
+                                                    "Define ${AIcAlgitesCredentialEnvironmentPrefix(locProfile)}_TOKEN or provision the profile through the Algites credential bootstrap."
+                                            )
+                                        credentials(HttpHeaderCredentials::class) {
+                                            name = "Authorization"
+                                            value = "Bearer $locToken"
+                                        }
+                                        authentication { create<HttpHeaderAuthentication>("header") }
+                                    }
+                                    "api-key" -> {
+                                        val locApiKey = AIcAlgitesCredentialEnvironmentValue(locProfile, "API_KEY")
+                                            ?: throw GradleException(
+                                                "Credential profile '${locProfile.id}' type 'api-key' is not available. " +
+                                                    "Define ${AIcAlgitesCredentialEnvironmentPrefix(locProfile)}_API_KEY or provision the profile through the Algites credential bootstrap."
+                                            )
+                                        val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() }
+                                            ?: throw GradleException(
+                                                "Credential profile '${locProfile.id}' type 'api-key' requires configuration.headerName for Java/Maven publication."
+                                            )
+                                        credentials(HttpHeaderCredentials::class) {
+                                            name = locHeaderName
+                                            value = locApiKey
+                                        }
+                                        authentication { create<HttpHeaderAuthentication>("header") }
+                                    }
+                                    else -> throw GradleException(
+                                        "Java/Maven upload endpoint '${locEndpoint.id}' uses credential type '${locProfile.type}', " +
+                                            "which is not supported by the Java/Maven repository adapter."
+                                    )
                                 }
                             }
                         }
@@ -384,19 +493,22 @@ subprojects {
             outputs.dir(locPythonDistDirectory)
         }
 
-        val locPublishPython = tasks.register<Exec>("publishPython") {
+        val locPublishPython = tasks.register("publishPython") {
             group = "publishing"
             description = "Publishes Python distributions for this Algites artifact."
             dependsOn(locBuildPython)
 
-            doFirst {
+            doLast {
                 val locIsSnapshot = project.version.toString().endsWith("SNAPSHOT", ignoreCase = true)
                 val locStability = if (locIsSnapshot) "snapshot" else "release"
-                val locRepositoryUrl = locEffectiveRepositories["python.$locStability.upload"]
-                    ?: throw GradleException(
-                        "No Python $locStability upload repository is configured for project '${project.path}'. " +
-                            "Configure repositories.python.$locStability.upload in Algites metadata or its inherited defaults."
+                val locCell = "python.$algitesPublicationRepositoryVisibility.$locStability.upload"
+                val locEndpoints = AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locCell)
+                if (locEndpoints.isEmpty()) {
+                    throw GradleException(
+                        "No enabled Python $locStability upload repository endpoint is configured for project '${project.path}'. " +
+                            "Configure repositories.python.$algitesPublicationRepositoryVisibility.$locStability.upload in Algites metadata or its inherited defaults."
                     )
+                }
                 val locDistributionFiles = locPythonDistDirectory.asFile.listFiles()
                     ?.filter { locFile -> locFile.isFile }
                     ?.sortedBy { locFile -> locFile.name }
@@ -406,27 +518,37 @@ subprojects {
                     throw GradleException("No Python distribution files were produced for project '${project.path}'.")
                 }
 
-                val locPythonRepositoryUser = algitesGradleOrEnvironmentValue("ALGITES_PYTHON_REPO_USER")
-                    ?: algitesRepositoryUser
-                val locPythonRepositoryPassword = algitesGradleOrEnvironmentValue("ALGITES_PYTHON_REPO_PASS")
-                    ?: algitesRepositoryPassword
-
-                val locCommand = mutableListOf(
-                    algitesGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3",
-                    "-m",
-                    "twine",
-                    "upload",
-                    "--repository-url",
-                    locRepositoryUrl
-                )
-                if (!locPythonRepositoryUser.isNullOrBlank()) {
-                    locCommand.addAll(listOf("--username", locPythonRepositoryUser))
+                locEndpoints.forEach { locEndpoint ->
+                    val locCommand = mutableListOf(
+                        algitesGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3",
+                        "-m",
+                        "twine",
+                        "upload",
+                        "--repository-url",
+                        locEndpoint.url
+                    )
+                    val locProfileId = locEndpoint.credentialProfile
+                    if (!locProfileId.isNullOrBlank()) {
+                        val locProfile = locEffectiveCredentialProfiles[locProfileId]
+                            ?: throw GradleException(
+                                "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
+                            )
+                        when (locProfile.type) {
+                            "basic" -> {
+                                val locCredential = AIcAlgitesRequireBasicCredential(locProfile)
+                                locCommand.addAll(listOf("--username", locCredential.first, "--password", locCredential.second))
+                            }
+                            else -> throw GradleException(
+                                "Python upload endpoint '${locEndpoint.id}' uses credential type '${locProfile.type}'. " +
+                                    "The current Twine adapter supports 'basic'. Define a TechnologyKind-specific adapter before using another type."
+                            )
+                        }
+                    }
+                    locCommand.addAll(locDistributionFiles.map { locFile -> locFile.absolutePath })
+                    project.exec {
+                        commandLine(locCommand)
+                    }
                 }
-                if (!locPythonRepositoryPassword.isNullOrBlank()) {
-                    locCommand.addAll(listOf("--password", locPythonRepositoryPassword))
-                }
-                locCommand.addAll(locDistributionFiles.map { locFile -> locFile.absolutePath })
-                commandLine(locCommand)
             }
         }
 
@@ -448,13 +570,13 @@ tasks.register("printAlgitesDeploymentPlan") {
         println(" - repository visibility: $algitesRepositoryVisibility")
         println(" - requested technology kinds: ${if (algitesRequestedTechnologyKinds.isEmpty()) "all effective technology kinds" else algitesRequestedTechnologyKinds.joinToString(",")}")
         println(" - docs pages branch: $algitesDocsPagesBranch")
-        println(" - legacy Maven repository URL override present: ${!algitesLegacyReleaseRepositoryUrl.isNullOrBlank() || !algitesLegacySnapshotRepositoryUrl.isNullOrBlank()}")
 
         algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { locEntry ->
             val locMetadata = locEntry.value
             println(" - ${locEntry.key}: technologyKinds=${AIcAlgitesStringList(locMetadata["technologyKinds"])}")
-            AIcAlgitesRepositoryMap(locMetadata["repositories"]).toSortedMap().forEach { locRepositoryEntry ->
-                println("     ${locRepositoryEntry.key}=${locRepositoryEntry.value}")
+            val locRepositories = locMetadata["repositories"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+            locRepositories.toSortedMap(compareBy { it.toString() }).forEach { (locCell, locEndpoints) ->
+                println("     $locCell=$locEndpoints")
             }
         }
     }

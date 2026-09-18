@@ -1229,65 +1229,233 @@ TechnologyKinds are registry-/enum-like. Supporting a technology kind requires a
 
 Unknown technology kinds MUST fail validation.
 
-#### 3.9.4 Publication repository matrix
+##### Source-repository discovery traversal
 
-Publication repositories are resolved on three independent axes:
+Source-repository discovery is structural rather than based on a global blacklist of directory names. Only children directly below the source-repository root are filtered by the repository-root infrastructure ignore set (for example `.git`, `.gradle`, `.idea`, `.mps`, `run`, and root-level `build`). The same directory names MUST NOT be generically ignored below container or artifact-set nodes because they may be legitimate parts of the Algites artifact hierarchy (for example `devops/build`).
 
-1. **TechnologyKind / technology** — e.g. `java`, `python`, `mps`;
-2. **stability** — `release` or `snapshot`;
-3. **URL usage** — `download` or `upload`.
-
-Conceptually, configuration therefore addresses cells such as:
+Once discovery reaches a self-contained `artifact`, traversal MUST stop at that node. Internal artifact directories are not candidate Algites structural nodes and therefore need no generic recursive ignore rules. This gives the following semantics:
 
 ```text
-java.release.download
-java.release.upload
-java.snapshot.download
-java.snapshot.upload
-python.release.download
-python.release.upload
-...
+/sourceRepositoryRoot/build            ignored as root infrastructure
+/sourceRepositoryRoot/devops/build     discoverable structural path
+/.../artifact/run                      not traversed because discovery stopped at artifact
 ```
 
-The canonical YAML representation is nested below `repositories` in the owning container. For example, repository-wide overrides are written as:
+Root-only ignore rules MUST be evaluated against repository-relative structural position, not merely against a directory basename at arbitrary depth.
+
+#### 3.9.4 Inherited `groupId` metadata
+
+The Java/Maven `groupId` is an independent container-scoped metadata value. It MUST NOT be nested inside `sourceRepository`, `artifactSet`, or `artifact`; it is declared as a top-level sibling of the structural section in any Algites metadata file.
+
+Repository-level example:
 
 ```yaml
 sourceRepository:
-  id: pub.example.Product
-  repositories:
-    java:
-      release:
-        download: https://example.invalid/maven/releases/
-        upload: https://example.invalid/maven/releases/upload/
-      snapshot:
-        download: https://example.invalid/maven/snapshots/
-        upload: https://example.invalid/maven/snapshots/upload/
-    python:
-      release:
-        download: https://example.invalid/python/releases/simple/
-        upload: https://example.invalid/python/releases/
+  id: pub.lib.Mps
+  name: Algites public MPS libraries repository
+
+groupId: eu.algites.lib.mps
 ```
 
-The same `repositories` subtree MAY occur below `artifact` or `artifactSet`; only the explicitly present cells override inherited values. URLs are configuration, while credentials remain execution-environment concerns and MUST NOT be stored in these YAML files.
+Artifact-set override example:
 
-The concrete URL/protocol rules are defined by the corresponding TechnologyKind adapter. A repository MAY configure publication targets for TechnologyKinds that are not currently produced by any artifact; `technologyKinds` controls what an artifact builds, while the repository matrix controls where a selected technology kind resolves or publishes.
+```yaml
+artifactSet:
+  name: Specialized artifact family
 
-#### 3.9.5 Repository configuration inheritance
+groupId: eu.algites.lib.specialized
+```
 
-The effective publication repository configuration follows the structural container hierarchy:
+Artifact override example:
+
+```yaml
+artifact:
+  technologyKinds: [java]
+  name: Specialized Java artifact
+
+groupId: eu.algites.lib.specialized.api
+```
+
+`groupId` inherits through the structural container hierarchy independently of `structureKind`:
 
 ```text
-Algites built-in defaults
-        -> algites-source-repository.yml
-        -> ancestor algites-artifact.yml
-        -> descendant algites-artifact.yml
+repository top-level groupId
+        -> descendant artifact-set
+        -> descendant artifact
 ```
 
-A lower level overrides only explicitly specified matrix cells. Unspecified cells continue to inherit. Artifact-level settings affect the current artifact and descendants unless overridden further below, analogously to other container-scoped policy such as version context.
+If a descendant metadata file declares its own top-level `groupId`, that value replaces the inherited value for that node and all descendants until another override is encountered. An artifact that does not declare `groupId` therefore receives the nearest ancestor value. This inheritance is independent of `sourceRepository`, `artifactSet`, and `artifact` fields and independent of `technologyKinds`, repository configuration, and version context.
 
-Resolution MUST be deterministic and diagnostics SHOULD identify the source node that supplied every effective matrix cell.
+#### 3.9.5 Publication repository matrix
 
-#### 3.9.6 Build selection
+Artifact repositories are resolved on four independent axes:
+
+1. **TechnologyKind / technology** — e.g. `java`, `python`, `mps`;
+2. **visibility** — `public` or `private`;
+3. **stability** — `release` or `snapshot`;
+4. **usage** — `download` or `upload`.
+
+A matrix cell contains an ordered list of repository endpoints rather than a single URL. Each endpoint has a stable `id` so inherited endpoints can be amended, disabled, re-enabled, or supplemented without identifying them by URL.
+
+```yaml
+repositories:
+  java:
+    private:
+      release:
+        download:
+          - id: algites-java-private-release-download
+            url: https://example.invalid/maven/private/releases/
+            credentialProfile: algites-java-private-release-download
+
+          - id: algites-acme-java-private-release-download
+            url: https://acme.example.invalid/maven/
+            credentialProfile: algites-acme-java-private-release-download
+            enabled: true
+
+        upload:
+          - id: algites-java-private-release-upload
+            url: https://example.invalid/maven/private/releases/upload/
+            credentialProfile: algites-java-private-release-upload
+```
+
+`enabled` defaults to `true`. A descendant may therefore disable an inherited endpoint without restating its URL or credential profile:
+
+```yaml
+repositories:
+  java:
+    private:
+      release:
+        download:
+          - id: algites-java-private-release-download
+            enabled: false
+```
+
+Repository endpoint inheritance is a merge by endpoint `id` within the same four-dimensional matrix cell. Properties omitted by the lower level remain inherited. New endpoint ids append additional repository targets.
+
+Standard Algites endpoint ids MUST start with `algites-` and encode all four dimensions in this order:
+
+```text
+algites-<technology-kind>-<visibility>-<stability>-<usage>
+```
+
+A qualified external endpoint MAY insert an additional owner/provider qualifier while retaining the four-dimensional suffix, for example:
+
+```text
+algites-acme-java-private-release-download
+```
+
+Repository visibility is distinct from source-repository visibility, but source-repository visibility constrains which repository branches may be used:
+
+- artifacts from a `pub` source repository MUST resolve dependencies only from `public` repository cells and MUST publish only to `public` upload cells;
+- artifacts from a `priv` source repository MAY resolve dependencies from both `public` and `private` repository cells and MUST publish their own outputs only to `private` upload cells.
+
+This asymmetry allows private artifacts to depend on public artifacts while preventing public artifacts from acquiring a dependency on private infrastructure or private-only artifacts.
+
+The concrete protocol/client behaviour is defined by the corresponding TechnologyKind adapter. A repository MAY configure targets for TechnologyKinds that are not currently produced by any artifact; `technologyKinds` controls what an artifact builds, while the repository matrix controls where a selected technology kind resolves or publishes.
+
+#### 3.9.6 Credential profiles
+
+Repository endpoints never contain secret credential values. An endpoint MAY instead reference a named `credentialProfile`:
+
+```yaml
+credentialProfiles:
+  algites-java-private-release-download:
+    type: basic
+
+repositories:
+  java:
+    private:
+      release:
+        download:
+          - id: algites-java-private-release-download
+            url: https://example.invalid/maven/private/releases/
+            credentialProfile: algites-java-private-release-download
+```
+
+`credentialProfiles` is an independent top-level inherited metadata map, like `groupId`. It MAY be declared in `algites-source-repository.yml`, `algites-artifact-set.yml`, and `algites-artifact.yml`. Profiles merge by profile id through the structural hierarchy:
+
+```text
+built-in / governance profiles
+        -> source repository
+        -> artifact set
+        -> artifact
+```
+
+A lower level MAY redefine only the profile `type`, only non-secret `configuration`, or both. If a profile id did not previously exist, declaring it creates a new profile. Changing a profile type does not require changing the repository endpoint that references the profile.
+
+Credential type is a closed, implementation-supported enum because each type defines required secret fields and application semantics:
+
+| Type | Required secret fields | Optional secret fields |
+|---|---|---|
+| `basic` | `USERNAME`, `PASSWORD` | — |
+| `bearer` | `TOKEN` | — |
+| `api-key` | `API_KEY` | — |
+| `client-certificate` | `CERTIFICATE`, `PRIVATE_KEY` | `PRIVATE_KEY_PASSWORD` |
+
+Type-specific non-secret options belong under `configuration`. For example an `api-key` profile used by an HTTP adapter may define the header name there.
+
+Runtime environment fallback names are deterministic:
+
+```text
+ALGITES_CREDENTIAL_<NORMALIZED_PROFILE_ID>_<CREDENTIAL_TYPE>_<FIELD>
+```
+
+Examples:
+
+```text
+ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BASIC_USERNAME
+ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BASIC_PASSWORD
+ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BEARER_TOKEN
+```
+
+Persistent credential-store identity is the pair `<profile-id>/<credential-type>`. Consequently a profile may change type without reinterpreting or destroying credentials stored for the previous type.
+
+The public Algites credential subsystem is split into `coreintf`, `coreimpl`, `cli`, `winstore`, `macstore`, and `secretservicestore`. Environment injection has precedence over OS secure-store resolution. OS backends are discovered through `ServiceLoader` and expose structured availability/remediation diagnostics. Linux desktop integration targets the Freedesktop Secret Service D-Bus API directly and does not require the `secret-tool` executable.
+
+Credential-type support in `coreintf` is distinct from authentication support in a concrete TechnologyKind repository adapter. The core subsystem defines and stores all four credential types, but each repository client MUST explicitly define which types it can apply. Unsupported endpoint/type combinations MUST fail with a diagnostic that identifies the endpoint id, profile id, effective type, and the supported alternatives. The current adapter status is:
+
+| Adapter operation | Supported credential types | Notes |
+|---|---|---|
+| Java/Maven download | `basic`, `bearer`, `api-key` | `api-key` requires non-secret `configuration.headerName`; client-certificate is not yet wired into the Gradle Maven transport |
+| Java/Maven upload | `basic`, `bearer`, `api-key` | same transport limitation as download |
+| Python/Twine upload | `basic` | additional authentication types require explicit Python repository-adapter support |
+| Python download | not yet implemented | Python dependency repository consumption adapter remains to be defined |
+| MPS repository access | not yet implemented | declaration of `mps` alone does not provide a repository adapter |
+
+This support matrix describes the current adapter implementation, not the allowed metadata model. A profile MAY use any credential type supported by the core model; the selected TechnologyKind adapter determines whether that profile can be applied to a particular endpoint operation.
+
+#### 3.9.7 Repository and credential inheritance
+
+The effective repository/credential configuration follows the structural container hierarchy:
+
+```text
+Algites public built-in defaults
+        -> optional private-governance defaults overlays
+        -> algites-source-repository.yml
+        -> ancestor algites-artifact-set.yml / algites-artifact.yml
+        -> descendant algites-artifact-set.yml / algites-artifact.yml
+```
+
+Public governance MUST contain only repository information safe to expose publicly. Canonical private repository endpoints and canonical upload endpoints MUST NOT be embedded in `pub.gov.Algites`. Private governance supplies them as authorized overlays.
+
+Private-governance overlay files use `algites-repository-defaults_1.schema.json` and MAY contain both:
+
+- `repositories` — endpoint-list overrides for selected matrix cells;
+- `credentialProfiles` — non-secret profile definitions referenced by those endpoints.
+
+Actual credential values MUST NOT be stored in governance YAML.
+
+The standard private-governance overlays are separated by purpose and visibility:
+
+- private download defaults;
+- public upload defaults;
+- private upload defaults.
+
+A normal public build requires no private-governance overlay. A normal private build requires only the private-download overlay. Governed public publication receives only the public-upload overlay; governed private publication receives the private-download and private-upload overlays.
+
+Resolution MUST be deterministic and diagnostics SHOULD identify the effective endpoint id, URL source, credential profile and profile type.
+
+#### 3.9.8 Build selection
 
 A build operation has an effective set of selected TechnologyKinds:
 
@@ -1297,18 +1465,18 @@ A build operation has an effective set of selected TechnologyKinds:
 
 Technology task graphs remain independent. A release, verification, or construction operation MAY therefore target only Java, only Python, or any supported subset without requiring the remaining TechnologyKinds to execute.
 
-#### 3.9.7 Gradle bootstrap repositories vs artifact publication repositories
+`algitesPublish` is the common orchestration entry point. Technology-specific adapters remain distinct tasks (for example Java `publish` and Python `publishPython`). MPS build/publication adapters are a separate TechnologyKind implementation concern and MUST NOT be implied merely by declaring `mps` as a supported metadata kind.
 
-Gradle bootstrap repositories and Algites artifact publication repositories are distinct concepts.
+#### 3.9.9 Gradle bootstrap repositories vs artifact repositories
+
+Gradle bootstrap repositories and Algites artifact repositories are distinct concepts.
 
 - **Gradle bootstrap repositories** are the minimal repositories needed before shared Algites build logic can be evaluated (for example plugin resolution). They remain explicitly defined in repository-local `settings.gradle.kts`.
-- **Algites artifact repositories** are the effective TechnologyKind x stability x usage matrix resolved from Algites metadata and TechnologyKind adapters. They may vary by artifact/container and MUST NOT be hard-wired into the bootstrap layer merely because a Java/Maven implementation historically used them there.
+- **Algites artifact repositories** are the effective TechnologyKind × visibility × stability × usage endpoint lists resolved from Algites metadata. They may vary by artifact/container and MUST NOT be hard-wired into the plugin bootstrap layer merely because a Java/Maven implementation historically used them there.
 
-This distinction preserves deterministic repository-local Gradle startup while allowing artifact-specific multi-technology publication policy.
+This distinction preserves deterministic repository-local Gradle startup while allowing artifact-specific multi-technology repository policy.
 
----
-
-#### 3.9.8 YAML schema naming and versioning
+#### 3.9.10 YAML schema naming and versioning
 
 Machine-readable schemas defining Algites YAML configuration formats MUST be explicitly versioned in their filenames from the first published schema version.
 
@@ -1332,7 +1500,7 @@ Schemas for public Algites YAML formats SHOULD be maintained as controlled sourc
 
 The canonical public governance artifact for the first implementation is `pub.gov.Algites_devops.build.yamldefs`, located at `devops/build/yamldefs`. Its controlled schema sources are stored under `src/product/yamldefs`. The artifact declares both `java` and `python` technology kinds so the same schema sources can be distributed as Java and Python ecosystem packages without copying the schemas into consumer repositories.
 
-#### 3.9.9 Derived development metadata
+#### 3.9.11 Derived development metadata
 
 Derived development descriptors such as a generated Python `pyproject.toml` are not source-code generation directories and therefore are not represented by the `.gen` SourceType suffix. They are working metadata maintained by the build/development lifecycle.
 
@@ -1934,6 +2102,6 @@ This section is intentionally placed at the end and is **temporary**.
     - parent edges define baseline dependency intents.
 - Legacy `javagen` and `javaextgen` directories migrate respectively to `java.gen` and `java.extgen`; equivalent suffix rules apply to all SourceTypes.
 - Existing Java/Maven publication coordinates remain valid as the Java mapping of the logical artifact identity. Other technologies add parallel publication mappings rather than redefining the logical artifact.
-- Legacy repository configuration that assumes only Maven repositories should be normalized into the TechnologyKind x stability x usage repository matrix.
+- Legacy repository configuration that assumes only Maven repositories should be normalized into the TechnologyKind x visibility x stability x usage repository matrix.
 
 [[/PROPOSAL]]

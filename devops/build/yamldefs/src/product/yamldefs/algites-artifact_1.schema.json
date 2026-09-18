@@ -15,18 +15,43 @@
           "uniqueItems": true,
           "items": {
             "type": "string",
-            "enum": ["java", "python", "mps"]
+            "enum": [
+              "java",
+              "python",
+              "mps"
+            ]
           }
         },
-        "name": { "type": "string", "minLength": 1 },
-        "description": { "type": "string" },
-        "groupId": { "type": "string", "minLength": 1 },
-        "repositories": { "$ref": "algites-repository-matrix_1.schema.json" },
-        "versionContext": { "$ref": "algites-version-context_1.schema.json" }
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string"
+        },
+        "repositories": {
+          "$ref": "algites-repository-matrix_1.schema.json"
+        },
+        "versionContext": {
+          "$ref": "algites-version-context_1.schema.json"
+        }
       },
-      "required": ["technologyKinds"]
+      "required": [
+        "technologyKinds"
+      ]
     },
-    "versionContext": { "$ref": "algites-version-context_1.schema.json" }
+    "groupId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "versionContext": {
+      "$ref": "algites-version-context_1.schema.json"
+    },
+    "credentialProfiles": {
+      "$ref": "algites-credential-profiles_1.schema.json"
+    }
   },
-  "required": ["artifact"]
+  "required": [
+    "artifact"
+  ]
 }

@@ -199,7 +199,7 @@ It must **not** become the authoritative configuration for artifact publication 
 Two repository concepts are intentionally distinct:
 
 - **Bootstrap repositories** are explicit and repository-local in `settings.gradle.kts`. They exist only to make Gradle and shared build infrastructure resolvable.
-- **Algites artifact repositories** are resolved after metadata loading from the publication repository matrix defined by TechnologyKind x stability (`release`/`snapshot`) x URL usage (`download`/`upload`). The matrix inherits from Algites defaults through `algites-source-repository.yml` and nested `algites-artifact.yml` files.
+- **Algites artifact repositories** are resolved after metadata loading from the publication repository matrix defined by TechnologyKind x visibility (`public`/`private`) x stability (`release`/`snapshot`) x URL usage (`download`/`upload`). The matrix inherits from Algites defaults through `algites-source-repository.yml` and nested `algites-artifact.yml` files.
 
 A Java/Maven repository used for dependency resolution or publication is therefore not automatically a bootstrap repository. Python, MPS, and future technology-kind-specific repositories are resolved by their adapters and effective artifact metadata.
 
@@ -372,23 +372,80 @@ If issue references are detected (from branch name and/or commit subjects), CI w
 Before dependency download or publication, the lifecycle resolves the effective repository matrix cell for every selected TechnologyKind and operation:
 
 ```text
-<technology-kind> x <release|snapshot> x <download|upload>
+<technology-kind> x <public|private> x <release|snapshot> x <download|upload>
 ```
+
+Each cell contains zero or more repository endpoints. Endpoints are merged by stable endpoint `id`; `enabled` defaults to `true`. Lower metadata levels can therefore disable or re-enable inherited endpoints, change only an endpoint URL/profile reference, or add another endpoint without replacing the whole cell.
 
 Resolution order is:
 
 ```text
-Algites built-in defaults
+Algites public built-in defaults
+        -> optional private-governance defaults overlays
         -> algites-source-repository.yml
-        -> ancestor algites-artifact.yml
-        -> descendant algites-artifact.yml
+        -> ancestor algites-artifact-set.yml / algites-artifact.yml
+        -> descendant algites-artifact-set.yml / algites-artifact.yml
 ```
 
-Only explicitly configured cells override inherited values. The canonical YAML shape is `repositories.<technology-kind>.<release|snapshot>.<download|upload>`. Credentials are supplied by the execution environment/provider and MUST NOT change the resolved semantic target.
+The canonical endpoint shape is:
 
-The initial built-in public Java defaults preserve the existing Algites behavior for dependency downloads: release Java artifacts resolve from Maven Central and snapshot Java artifacts resolve from the public Algites Cloudsmith snapshot repository. Upload defaults and Python repository defaults are configured only when their canonical endpoints are explicitly defined; execution-time credentials remain separate.
+```yaml
+repositories:
+  java:
+    private:
+      release:
+        download:
+          - id: algites-java-private-release-download
+            url: https://example.invalid/maven/
+            credentialProfile: algites-java-private-release-download
+            enabled: true
+```
 
----
+Canonical Algites endpoint ids encode all four dimensions. External/custom targets keep the same four-dimensional suffix and may add a qualifier, for example `algites-acme-java-private-release-download`.
+
+Credential profiles are independent inherited metadata. A profile may be defined or overridden at repository, artifact-set, or artifact level:
+
+```yaml
+credentialProfiles:
+  algites-java-private-release-download:
+    type: basic
+```
+
+Supported profile types are the closed set `basic`, `bearer`, `api-key`, and `client-certificate`. The effective type determines the required secret fields. Core support for a credential type does not imply that every TechnologyKind repository adapter can apply that authentication mechanism. Java/Maven repository access currently supports `basic`, `bearer`, and `api-key`; Python/Twine publication currently supports `basic`; Python download and MPS repository adapters remain explicit implementation work. Unsupported combinations MUST fail rather than silently fall back to another authentication mechanism. Runtime environment fallback variables follow:
+
+```text
+ALGITES_CREDENTIAL_<NORMALIZED_PROFILE_ID>_<CREDENTIAL_TYPE>_<FIELD>
+```
+
+For example a basic profile `algites-java-private-release-download` requires:
+
+```text
+ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BASIC_USERNAME
+ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BASIC_PASSWORD
+```
+
+The same profile redefined as `bearer` instead requires:
+
+```text
+ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BEARER_TOKEN
+```
+
+Local desktop builds SHOULD resolve credentials from the Algites OS credential subsystem after checking injected environment credentials. CI/headless builds normally inject the exact variables required by the effective credential profile. Persistent OS-store keys include both profile id and credential type, preventing a later type override from reinterpreting an older stored credential.
+
+Private repository locations and all canonical upload locations remain private-governance data. Private overlays use `algites-repository-defaults_1.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies private-download defaults and `ALGITES_REPOSITORY_UPLOAD_DEFAULTS_FILE` supplies the visibility-specific publication defaults.
+
+Repository visibility usage is constrained by source-repository visibility:
+
+- `pub` repositories resolve only `public` download cells and publish only to `public` upload cells;
+- `priv` repositories may resolve both `public` and `private` download cells and publish their own artifacts only to `private` upload cells.
+
+Source-repository visibility is authoritative. Provider or execution inputs MAY validate the expected `pub`/`priv` value but MUST NOT change repository visibility.
+
+The initial built-in Java public download defaults preserve existing behaviour: Maven Central for release dependencies and the public Algites Cloudsmith repository for snapshot dependencies. Private downloads and all canonical uploads are supplied only from private governance.
+
+Provider integrations SHOULD transfer only the required private-governance definition files, not clone the complete governance repository. The GitHub integration obtains the required files through authenticated GitHub Contents API requests. `PRIVATE_GOVERNANCE_GITHUB_APP_*` credentials are distinct from `GITHUB_APP_*`: the former authorize reading `priv.gov.Algites`, while the latter operate on the target repository and may refer to a different GitHub App.
+
+Publication workflows invoke the common `algitesPublish` orchestration task. Technology-specific publication remains adapter-specific (for example Java `publish`, Python `publishPython`); declaration of a TechnologyKind alone does not imply that its build/publication adapter already exists.
 
 #### 2.1.8. Governed YAML Schema Resolution
 
@@ -497,9 +554,12 @@ The release operation MUST:
 1. validate lane/version-scope consistency,
 2. resolve and freeze the immutable release source revision,
 3. compute or validate the release identity/tag,
-4. execute construction and verification required by each selected TechnologyKind adapter,
-5. publish only the selected TechnologyKinds to their effective `release.upload` repository matrix cells,
-6. record which TechnologyKind-specific publications actually exist for the logical version.
+4. obtain the governed private-download and upload repository-default overlays from private governance,
+5. execute construction and verification required by each selected TechnologyKind adapter,
+6. publish only the selected TechnologyKinds to the effective upload cells matching the source repository visibility and release stability,
+7. record which TechnologyKind-specific publications actually exist for the logical version.
+
+Ordinary repository builds do not receive the upload-default overlay. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible only for deterministic repository-matrix resolution.
 
 ##### 3.1.5.1 Release identity/tag naming
 

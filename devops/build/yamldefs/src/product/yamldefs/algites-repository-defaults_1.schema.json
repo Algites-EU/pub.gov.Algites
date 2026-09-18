@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-repository-defaults_1.schema.json",
+  "title": "Algites Repository Defaults Overlay v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "repositories": {
+      "$ref": "algites-repository-matrix_1.schema.json"
+    },
+    "credentialProfiles": {
+      "$ref": "algites-credential-profiles_1.schema.json"
+    }
+  }
+}
