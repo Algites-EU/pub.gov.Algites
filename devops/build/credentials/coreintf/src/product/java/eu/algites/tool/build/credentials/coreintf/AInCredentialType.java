@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * Closed set of authentication mechanisms supported by Algites repository clients.
+ * Closed set of authentication mechanisms supported by the Algites credential model.
  */
 public enum AInCredentialType {
     BASIC(
@@ -22,10 +22,10 @@ public enum AInCredentialType {
         List.of(AInCredentialField.API_KEY),
         List.of()
     ),
-    CLIENT_CERTIFICATE(
-        "client-certificate",
-        List.of(AInCredentialField.CERTIFICATE, AInCredentialField.PRIVATE_KEY),
-        List.of(AInCredentialField.PRIVATE_KEY_PASSWORD)
+    CERTIFICATE(
+        "certificate",
+        List.of(AInCredentialField.CERTIFICATE),
+        List.of(AInCredentialField.PRIVATE_KEY, AInCredentialField.PRIVATE_KEY_PASSWORD)
     );
 
     private final String id;

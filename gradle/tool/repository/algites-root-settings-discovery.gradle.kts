@@ -17,6 +17,19 @@ if (locAlgitesResolverCoreScript.isFile) {
     apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts"))
 }
 
+val locAlgitesCredentialValuesScript = File(rootDir, "gradle/tool/repository/algites-credential-values.gradle.kts")
+if (locAlgitesCredentialValuesScript.isFile) {
+    apply(from = locAlgitesCredentialValuesScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-credential-values.gradle.kts"))
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesResolveCredentialValue = extra["algitesResolveCredentialValue"] as (String, String, String, File) -> String?
+
+val locAlgitesCredentialPreflight = System.getenv("ALGITES_CREDENTIAL_PREFLIGHT")
+    ?.equals("true", ignoreCase = true) == true
+
 @Suppress("UNCHECKED_CAST")
 val locAlgitesResolveMetadataMap = extra["algitesResolveArtifactDirectoryMetadataMap"] as (
     File,
@@ -116,15 +129,6 @@ fun AIcCollectJavaDownloadRepositories(
     }
 }
 
-fun AIcCredentialEnvironmentPrefix(aProfile: AIcSettingsCredentialProfile): String =
-    "ALGITES_CREDENTIAL_" + aProfile.id.uppercase().replace('-', '_') + "_" + aProfile.type.uppercase().replace('-', '_')
-
-fun AIcCredentialEnvironmentValue(aProfile: AIcSettingsCredentialProfile, aField: String): String? =
-    providers.environmentVariable(AIcCredentialEnvironmentPrefix(aProfile) + "_" + aField).orNull
-        ?.trim()?.takeIf { it.isNotBlank() }
-        ?: providers.gradleProperty(AIcCredentialEnvironmentPrefix(aProfile) + "_" + aField).orNull
-            ?.trim()?.takeIf { it.isNotBlank() }
-
 val locJavaDownloadRepositories = linkedMapOf<String, AIcSettingsRepositoryEndpoint>()
 AIcCollectJavaDownloadRepositories(
     locAlgitesRepositoryMetadata["repositories"],
@@ -150,18 +154,16 @@ dependencyResolutionManagement.repositories {
                 if (locStability == "snapshot") snapshotsOnly() else releasesOnly()
             }
             val locProfileId = locEndpoint.credentialProfile
-            if (!locProfileId.isNullOrBlank()) {
+            if (!locProfileId.isNullOrBlank() && !locAlgitesCredentialPreflight) {
                 val locProfile = locEndpoint.profiles[locProfileId]
                     ?: error("Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'.")
-                val locPrefix = AIcCredentialEnvironmentPrefix(locProfile)
                 when (locProfile.type) {
                     "basic" -> {
-                        val locUsername = AIcCredentialEnvironmentValue(locProfile, "USERNAME")
-                        val locPassword = AIcCredentialEnvironmentValue(locProfile, "PASSWORD")
-                        if (locUsername.isNullOrBlank() || locPassword.isNullOrBlank()) {
+                        val locUsername = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "username", rootDir)
+                        val locPassword = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "password", rootDir)
+                        if (locUsername.isNullOrEmpty() || locPassword.isNullOrEmpty()) {
                             error(
-                                "Credential profile '${locProfile.id}' type 'basic' is required by '${locEndpoint.id}'. " +
-                                    "Provision it through the Algites credential bootstrap or define ${locPrefix}_USERNAME and ${locPrefix}_PASSWORD."
+                                "Credential profile '${locProfile.id}' type 'basic' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                             )
                         }
                         credentials {
@@ -170,10 +172,9 @@ dependencyResolutionManagement.repositories {
                         }
                     }
                     "bearer" -> {
-                        val locToken = AIcCredentialEnvironmentValue(locProfile, "TOKEN")
+                        val locToken = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "token", rootDir)
                             ?: error(
-                                "Credential profile '${locProfile.id}' type 'bearer' is required by '${locEndpoint.id}'. " +
-                                    "Provision it through the Algites credential bootstrap or define ${locPrefix}_TOKEN."
+                                "Credential profile '${locProfile.id}' type 'bearer' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                             )
                         credentials(HttpHeaderCredentials::class) {
                             name = "Authorization"
@@ -182,13 +183,14 @@ dependencyResolutionManagement.repositories {
                         authentication { create<HttpHeaderAuthentication>("header") }
                     }
                     "api-key" -> {
-                        val locApiKey = AIcCredentialEnvironmentValue(locProfile, "API_KEY")
+                        val locApiKey = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "apiKey", rootDir)
                             ?: error(
-                                "Credential profile '${locProfile.id}' type 'api-key' is required by '${locEndpoint.id}'. " +
-                                    "Provision it through the Algites credential bootstrap or define ${locPrefix}_API_KEY."
+                                "Credential profile '${locProfile.id}' type 'api-key' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                             )
                         val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() }
-                            ?: error("Credential profile '${locProfile.id}' type 'api-key' requires configuration.headerName for Java/Maven repository access.")
+                            ?: error(
+                                "Credential profile '${locProfile.id}' type 'api-key' requires configuration.headerName for Java/Maven repository access."
+                            )
                         credentials(HttpHeaderCredentials::class) {
                             name = locHeaderName
                             value = locApiKey
@@ -197,7 +199,7 @@ dependencyResolutionManagement.repositories {
                     }
                     else -> error(
                         "Java/Maven download endpoint '${locEndpoint.id}' uses credential type '${locProfile.type}', " +
-                            "which is not supported by the Java/Maven repository adapter."
+                            "which is not supported by the Java/Maven repository adapter. Supported types: basic, bearer, api-key."
                     )
                 }
             }

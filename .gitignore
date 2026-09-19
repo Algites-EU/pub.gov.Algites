@@ -11,7 +11,12 @@ docs-site/
 # Build outputs (u vás do run/)
 run/*
 **/run/*
+build/*
 
-# Development folders:
-**/javagen/*
-**/configgen/*
+# Generated sources and derived development metadata
+**/src/product/*.gen/
+**/src/develop/*.gen/
+**/pyproject.toml
+
+# Python packaging metadata
+**/*.egg-info/

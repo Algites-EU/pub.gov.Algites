@@ -92,7 +92,7 @@ public final class AIcSecretServiceCredentialStore implements AIiCredentialStore
                 try {
                     return Base64.getDecoder().decode(locEncoded);
                 } catch (IllegalArgumentException aException) {
-                    throw new AIxCredentialException("Stored Algites Secret Service value is not a valid credential blob.", aException);
+                    throw new AIxCredentialException("Stored Algites Secret Service value is not valid Base64-encoded Algites secure-store data.", aException);
                 } finally {
                     Arrays.fill(locEncoded, (byte) 0);
                 }

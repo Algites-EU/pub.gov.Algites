@@ -13,6 +13,13 @@ import org.gradle.api.credentials.HttpHeaderCredentials
 import org.gradle.authentication.http.HttpHeaderAuthentication
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.testing.Test
+import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import java.io.File
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
 
 apply(plugin = "base")
 
@@ -22,6 +29,19 @@ if (locAlgitesResolverWrapperScript.isFile) {
 } else {
     apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
 }
+
+val locAlgitesCredentialValuesScript = rootProject.file("gradle/tool/repository/algites-credential-values.gradle.kts")
+if (locAlgitesCredentialValuesScript.isFile) {
+    apply(from = locAlgitesCredentialValuesScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-credential-values.gradle.kts"))
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesResolveCredentialValue = extra["algitesResolveCredentialValue"] as (String, String, String, File) -> String?
+
+val algitesCredentialPreflight = System.getenv("ALGITES_CREDENTIAL_PREFLIGHT")
+    ?.equals("true", ignoreCase = true) == true
 
 val locAlgitesDocsSiteScript = rootProject.file("gradle/tool/documentation/algites-docs-site.gradle.kts")
 if (locAlgitesDocsSiteScript.isFile) {
@@ -57,7 +77,8 @@ data class AIcAlgitesRepositoryEndpoint(
     val cell: String,
     val id: String,
     val url: String,
-    val credentialProfile: String?
+    val credentialProfile: String?,
+    val managementAdapter: String?
 )
 
 data class AIcAlgitesCredentialProfile(
@@ -77,7 +98,8 @@ fun AIcAlgitesRepositoryEndpoints(aValue: Any?, aCell: String): List<AIcAlgitesR
         val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val locCredentialProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-        AIcAlgitesRepositoryEndpoint(aCell, locId, locUrl, locCredentialProfile)
+        val locManagementAdapter = locMap["managementAdapter"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
+        AIcAlgitesRepositoryEndpoint(aCell, locId, locUrl, locCredentialProfile, locManagementAdapter)
     }
 }
 
@@ -98,22 +120,15 @@ fun AIcAlgitesCredentialProfiles(aValue: Any?): Map<String, AIcAlgitesCredential
     return locResult
 }
 
-fun AIcAlgitesCredentialEnvironmentPrefix(aProfile: AIcAlgitesCredentialProfile): String =
-    "ALGITES_CREDENTIAL_" +
-        aProfile.id.uppercase().replace('-', '_') +
-        "_" + aProfile.type.uppercase().replace('-', '_')
-
-fun AIcAlgitesCredentialEnvironmentValue(aProfile: AIcAlgitesCredentialProfile, aField: String): String? =
-    algitesGradleOrEnvironmentValue(AIcAlgitesCredentialEnvironmentPrefix(aProfile) + "_" + aField)
+fun AIcAlgitesCredentialValue(aProfile: AIcAlgitesCredentialProfile, aField: String): String? =
+    locAlgitesResolveCredentialValue(aProfile.id, aProfile.type, aField, rootProject.projectDir)
 
 fun AIcAlgitesRequireBasicCredential(aProfile: AIcAlgitesCredentialProfile): Pair<String, String> {
-    val locPrefix = AIcAlgitesCredentialEnvironmentPrefix(aProfile)
-    val locUsername = AIcAlgitesCredentialEnvironmentValue(aProfile, "USERNAME")
-    val locPassword = AIcAlgitesCredentialEnvironmentValue(aProfile, "PASSWORD")
-    if (locUsername.isNullOrBlank() || locPassword.isNullOrBlank()) {
+    val locUsername = AIcAlgitesCredentialValue(aProfile, "username")
+    val locPassword = AIcAlgitesCredentialValue(aProfile, "password")
+    if (locUsername.isNullOrEmpty() || locPassword.isNullOrEmpty()) {
         throw GradleException(
-            "Credential profile '${aProfile.id}' type 'basic' is not available through the current Gradle bootstrap. " +
-                "Define ${locPrefix}_USERNAME and ${locPrefix}_PASSWORD, or provision the profile in the Algites credential store once the public credential bootstrap artifact is installed."
+            "Credential profile '${aProfile.id}' type 'basic' is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
         )
     }
     return locUsername to locPassword
@@ -147,6 +162,231 @@ fun AIcAlgitesPythonVersion(aVersion: String): String {
         return aVersion.dropLast(locSnapshotSuffix.length) + ".dev0"
     }
     return aVersion.replace('-', '.')
+}
+
+
+fun AIcAlgitesCanonicalArtifactId(aProjectPath: String): String {
+    val locPathDots = aProjectPath.removePrefix(":").replace(':', '.')
+    return if (locPathDots.isBlank()) rootProject.name else "${rootProject.name}_$locPathDots"
+}
+
+fun AIcAlgitesSnapshotVersionForTechnology(aReleaseVersion: String, aTechnology: String): String = when (aTechnology) {
+    "java" -> "$aReleaseVersion-SNAPSHOT"
+    "python" -> AIcAlgitesPythonVersion("$aReleaseVersion-SNAPSHOT")
+    else -> "$aReleaseVersion-SNAPSHOT"
+}
+
+fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcAlgitesRepositoryEndpoint, aProfiles: Map<String, AIcAlgitesCredentialProfile>): Map<String, String> {
+    val locProfileId = aEndpoint.credentialProfile
+        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id}' requires a credentialProfile.")
+    val locProfile = aProfiles[locProfileId]
+        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id}' references undefined credential profile '$locProfileId'.")
+    return when (locProfile.type) {
+        "api-key" -> {
+            val locApiKey = AIcAlgitesCredentialValue(locProfile, "apiKey")
+                ?: throw GradleException("Credential profile '$locProfileId' does not provide required apiKey.")
+            val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() } ?: "Authorization"
+            val locPrefix = locProfile.configuration["headerValuePrefix"] ?: "token "
+            mapOf(locHeaderName to "$locPrefix$locApiKey")
+        }
+        "bearer" -> {
+            val locToken = AIcAlgitesCredentialValue(locProfile, "token")
+                ?: throw GradleException("Credential profile '$locProfileId' does not provide required token.")
+            mapOf("Authorization" to "Bearer $locToken")
+        }
+        else -> throw GradleException(
+            "Cloudsmith manage endpoint '${aEndpoint.id}' uses credential type '${locProfile.type}'. " +
+                "The Cloudsmith management adapter supports 'api-key' and 'bearer'."
+        )
+    }
+}
+
+fun AIcAlgitesHttpRequest(aMethod: String, aUrl: String, aHeaders: Map<String, String>): Pair<Int, String> {
+    val locConnection = URL(aUrl).openConnection() as HttpURLConnection
+    locConnection.requestMethod = aMethod
+    locConnection.connectTimeout = 30_000
+    locConnection.readTimeout = 60_000
+    locConnection.instanceFollowRedirects = true
+    locConnection.setRequestProperty("Accept", "application/json")
+    aHeaders.forEach { (locName, locValue) -> locConnection.setRequestProperty(locName, locValue) }
+    return try {
+        val locStatus = locConnection.responseCode
+        val locStream = if (locStatus in 200..299) locConnection.inputStream else locConnection.errorStream
+        val locBody = locStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+        locStatus to locBody
+    } finally {
+        locConnection.disconnect()
+    }
+}
+
+fun AIcAlgitesHttpJsonRequest(
+    aMethod: String,
+    aUrl: String,
+    aHeaders: Map<String, String>,
+    aBody: String
+): Pair<Int, String> {
+    val locConnection = URL(aUrl).openConnection() as HttpURLConnection
+    locConnection.requestMethod = aMethod
+    locConnection.connectTimeout = 30_000
+    locConnection.readTimeout = 60_000
+    locConnection.instanceFollowRedirects = true
+    locConnection.doOutput = true
+    locConnection.setRequestProperty("Accept", "application/json")
+    locConnection.setRequestProperty("Content-Type", "application/json")
+    aHeaders.forEach { (locName, locValue) -> locConnection.setRequestProperty(locName, locValue) }
+    return try {
+        locConnection.outputStream.use { locStream ->
+            locStream.write(aBody.toByteArray(Charsets.UTF_8))
+        }
+        val locStatus = locConnection.responseCode
+        val locStream = if (locStatus in 200..299) locConnection.inputStream else locConnection.errorStream
+        val locResponseBody = locStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
+        locStatus to locResponseBody
+    } finally {
+        locConnection.disconnect()
+    }
+}
+
+fun AIcAlgitesUrlPathSegment(aValue: String): String =
+    URLEncoder.encode(aValue, StandardCharsets.UTF_8.toString()).replace("+", "%20")
+
+fun AIcAlgitesRepsyLoginUrl(aEndpointUrl: String): String {
+    val locMarker = "/api/"
+    val locMarkerIndex = aEndpointUrl.indexOf(locMarker)
+    if (locMarkerIndex < 0) {
+        throw GradleException(
+            "Repsy manage URL '$aEndpointUrl' must contain '/api/' so the adapter can derive the Repsy authentication endpoint."
+        )
+    }
+    return aEndpointUrl.substring(0, locMarkerIndex).trimEnd('/') + "/api/auth/login"
+}
+
+@Suppress("UNCHECKED_CAST")
+fun AIcAlgitesRepsyHeaders(
+    aEndpoint: AIcAlgitesRepositoryEndpoint,
+    aProfiles: Map<String, AIcAlgitesCredentialProfile>
+): Map<String, String> {
+    val locProfileId = aEndpoint.credentialProfile
+        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id}' requires a credentialProfile.")
+    val locProfile = aProfiles[locProfileId]
+        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id}' references undefined credential profile '$locProfileId'.")
+    val locToken = when (locProfile.type) {
+        "bearer" -> AIcAlgitesCredentialValue(locProfile, "token")
+            ?: throw GradleException("Credential profile '$locProfileId' does not provide required token.")
+        "basic" -> {
+            val (locUsername, locPassword) = AIcAlgitesRequireBasicCredential(locProfile)
+            val locLoginBody = JsonOutput.toJson(mapOf("username" to locUsername, "password" to locPassword))
+            val (locStatus, locBody) = AIcAlgitesHttpJsonRequest(
+                "POST",
+                AIcAlgitesRepsyLoginUrl(aEndpoint.url),
+                emptyMap(),
+                locLoginBody
+            )
+            if (locStatus !in 200..299) {
+                throw GradleException(
+                    "Repsy authentication failed for endpoint '${aEndpoint.id}' with HTTP $locStatus: $locBody"
+                )
+            }
+            val locParsed = JsonSlurper().parseText(locBody) as? Map<*, *>
+            val locData = locParsed?.get("data") as? Map<*, *>
+            locData?.get("token")?.toString()?.takeIf { it.isNotBlank() }
+                ?: throw GradleException("Repsy authentication response for endpoint '${aEndpoint.id}' did not contain data.token.")
+        }
+        else -> throw GradleException(
+            "Repsy manage endpoint '${aEndpoint.id}' uses credential type '${locProfile.type}'. " +
+                "The Repsy management adapter supports 'basic' and 'bearer'."
+        )
+    }
+    return mapOf("Authorization" to "Bearer $locToken")
+}
+
+fun AIcAlgitesDeleteRepsySnapshot(
+    aEndpoint: AIcAlgitesRepositoryEndpoint,
+    aProfiles: Map<String, AIcAlgitesCredentialProfile>,
+    aPackageName: String,
+    aVersion: String,
+    aFormat: String,
+    aGroupId: String?
+): Int {
+    val locBaseUrl = aEndpoint.url.trimEnd('/')
+    val locExpectedSuffix = when (aFormat.lowercase()) {
+        "maven" -> "/api/mvn/artifacts/"
+        "python" -> "/api/pypi/packages/"
+        else -> throw GradleException(
+            "Repsy management adapter does not support package format '$aFormat' for endpoint '${aEndpoint.id}'."
+        )
+    }
+    if (!locBaseUrl.contains(locExpectedSuffix)) {
+        throw GradleException(
+            "Repsy manage endpoint '${aEndpoint.id}' URL '$locBaseUrl' must identify the configured repository using " +
+                "'$locExpectedSuffix<repoName>' for format '$aFormat'."
+        )
+    }
+    val locDeleteUrl = when (aFormat.lowercase()) {
+        "maven" -> {
+            val locGroupId = aGroupId?.takeIf { it.isNotBlank() }
+                ?: throw GradleException("Repsy Maven snapshot cleanup for '$aPackageName' requires an effective groupId.")
+            "$locBaseUrl/${AIcAlgitesUrlPathSegment(locGroupId)}/${AIcAlgitesUrlPathSegment(aPackageName)}/versions/${AIcAlgitesUrlPathSegment(aVersion)}"
+        }
+        "python" ->
+            "$locBaseUrl/${AIcAlgitesUrlPathSegment(aPackageName)}/releases/${AIcAlgitesUrlPathSegment(aVersion)}"
+        else -> error("unreachable")
+    }
+    val locHeaders = AIcAlgitesRepsyHeaders(aEndpoint, aProfiles)
+    val (locStatus, locBody) = AIcAlgitesHttpRequest("DELETE", locDeleteUrl, locHeaders)
+    return when {
+        locStatus in 200..299 -> 1
+        locStatus == 404 -> 0
+        else -> throw GradleException(
+            "Repsy package deletion failed for '$aPackageName/$aVersion' at endpoint '${aEndpoint.id}' " +
+                "with HTTP $locStatus: $locBody"
+        )
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+fun AIcAlgitesDeleteCloudsmithSnapshot(
+    aEndpoint: AIcAlgitesRepositoryEndpoint,
+    aProfiles: Map<String, AIcAlgitesCredentialProfile>,
+    aPackageName: String,
+    aVersion: String,
+    aFormat: String
+): Int {
+    val locBaseUrl = aEndpoint.url.trimEnd('/') + "/"
+    val locHeaders = AIcAlgitesCloudsmithHeaders(aEndpoint, aProfiles)
+    val locQuery = "name:$aPackageName AND version:$aVersion AND format:$aFormat"
+    val locEncodedQuery = URLEncoder.encode(locQuery, StandardCharsets.UTF_8.toString())
+    val locListUrl = "${locBaseUrl}?page_size=100&query=$locEncodedQuery"
+    val (locStatus, locBody) = AIcAlgitesHttpRequest("GET", locListUrl, locHeaders)
+    if (locStatus !in 200..299) {
+        throw GradleException("Cloudsmith package lookup failed for endpoint '${aEndpoint.id}' with HTTP $locStatus: $locBody")
+    }
+    val locParsed = JsonSlurper().parseText(locBody)
+    val locItems = when (locParsed) {
+        is List<*> -> locParsed
+        is Map<*, *> -> (locParsed["results"] as? List<*>) ?: (locParsed["data"] as? List<*>) ?: emptyList<Any?>()
+        else -> emptyList<Any?>()
+    }
+    val locMatches = locItems.mapNotNull { it as? Map<*, *> }.filter { locItem ->
+        locItem["name"]?.toString() == aPackageName &&
+            locItem["version"]?.toString() == aVersion &&
+            locItem["format"]?.toString()?.equals(aFormat, ignoreCase = true) == true
+    }
+    var locDeleted = 0
+    locMatches.forEach { locItem ->
+        val locIdentifier = locItem["slug_perm"]?.toString()?.takeIf { it.isNotBlank() }
+            ?: locItem["identifier_perm"]?.toString()?.takeIf { it.isNotBlank() }
+            ?: throw GradleException("Cloudsmith package '$aPackageName/$aVersion' did not expose a permanent identifier.")
+        val (locDeleteStatus, locDeleteBody) = AIcAlgitesHttpRequest("DELETE", "$locBaseUrl$locIdentifier/", locHeaders)
+        if (locDeleteStatus !in setOf(204, 404)) {
+            throw GradleException(
+                "Cloudsmith package deletion failed for '$aPackageName/$aVersion' at endpoint '${aEndpoint.id}' " +
+                    "with HTTP $locDeleteStatus: $locDeleteBody"
+            )
+        }
+        if (locDeleteStatus == 204) locDeleted++
+    }
+    return locDeleted
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -264,6 +504,128 @@ val algitesPublish = tasks.register("algitesPublish") {
     description = "Publishes all effective or explicitly selected Algites TechnologyKinds."
 }
 
+
+val algitesResolveRequiredCredentials = tasks.register("resolveAlgitesRequiredCredentials") {
+    group = "algites"
+    description = "Resolves enabled repository endpoints and the credential profiles required by the selected repository context."
+
+    doLast {
+        val locRequestedUsages = (
+            algitesGradleOrEnvironmentValue("algites.credential.usages")
+                ?: System.getenv("ALGITES_CREDENTIAL_USAGES")
+                ?: "download"
+            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+        val locDownloadStabilities = (
+            algitesGradleOrEnvironmentValue("algites.credential.download.stabilities")
+                ?: System.getenv("ALGITES_CREDENTIAL_DOWNLOAD_STABILITIES")
+                ?: "release,snapshot"
+            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+        val locUploadStabilities = (
+            algitesGradleOrEnvironmentValue("algites.credential.upload.stabilities")
+                ?: System.getenv("ALGITES_CREDENTIAL_UPLOAD_STABILITIES")
+                ?: "release,snapshot"
+            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+        val locManageStabilities = (
+            algitesGradleOrEnvironmentValue("algites.credential.manage.stabilities")
+                ?: System.getenv("ALGITES_CREDENTIAL_MANAGE_STABILITIES")
+                ?: "release,snapshot"
+            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+
+        val locSupportedUsages = setOf("download", "upload", "manage")
+        val locSupportedStabilities = setOf("release", "snapshot")
+        if (!locSupportedUsages.containsAll(locRequestedUsages)) {
+            throw GradleException("Unsupported credential usage. Supported values: download, upload, manage.")
+        }
+        if (!locSupportedStabilities.containsAll(locDownloadStabilities + locUploadStabilities + locManageStabilities)) {
+            throw GradleException("Unsupported credential stability. Supported values: release, snapshot.")
+        }
+
+        val locDownloadVisibilities = when (algitesRepositoryVisibility) {
+            "pub" -> setOf("public")
+            "priv" -> setOf("public", "private")
+            else -> throw GradleException("Unsupported Algites repository visibility '$algitesRepositoryVisibility'.")
+        }
+        val locUploadVisibilities = setOf(algitesPublicationRepositoryVisibility)
+        val locManageVisibilities = setOf(algitesPublicationRepositoryVisibility)
+        val locOperationTechnologyKinds = if (algitesRequestedTechnologyKinds.isNotEmpty()) {
+            algitesRequestedTechnologyKinds
+        } else {
+            algitesResolvedArtifactDirectoriesByGradleProjectPath.values
+                .flatMap { locMetadata -> AIcAlgitesStringList(locMetadata["technologyKinds"]) }
+                .toSet()
+        }
+        val locRepositories = linkedMapOf<String, Map<String, String?>>()
+        val locCredentials = linkedMapOf<String, Map<String, String>>()
+
+        fun AIcCollect(aMetadata: Map<String, Any?>, aScope: String) {
+            val locScopeTechnologyKinds = AIcAlgitesStringList(aMetadata["technologyKinds"]).toSet()
+            val locRepositoryMap = aMetadata["repositories"] as? Map<*, *> ?: return
+            val locProfiles = AIcAlgitesCredentialProfiles(aMetadata["credentialProfiles"])
+
+            locRepositoryMap.keys.mapNotNull { it?.toString() }.sorted().forEach { locCell ->
+                val locSegments = locCell.split('.')
+                if (locSegments.size != 4) return@forEach
+                val (locTechnology, locVisibility, locStability, locUsage) = locSegments
+                if (locUsage !in locRequestedUsages) return@forEach
+                if (locUsage == "download" && locVisibility !in locDownloadVisibilities) return@forEach
+                if (locUsage == "upload" && locVisibility !in locUploadVisibilities) return@forEach
+                if (locUsage == "manage" && locVisibility !in locManageVisibilities) return@forEach
+                if (locUsage == "download" && locStability !in locDownloadStabilities) return@forEach
+                if (locUsage == "upload" && locStability !in locUploadStabilities) return@forEach
+                if (locUsage == "manage" && locStability !in locManageStabilities) return@forEach
+                if (locUsage == "manage" && aScope == "repository") return@forEach
+                if (locUsage == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@forEach
+                if (locOperationTechnologyKinds.isNotEmpty() && locTechnology !in locOperationTechnologyKinds) return@forEach
+                if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@forEach
+
+                AIcAlgitesRepositoryEndpoints(aMetadata["repositories"], locCell).forEach { locEndpoint ->
+                    val locProfileId = locEndpoint.credentialProfile
+                    val locProfile = if (locProfileId.isNullOrBlank()) null else locProfiles[locProfileId]
+                        ?: throw GradleException(
+                            "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
+                        )
+                    val locRepositoryKey = "$aScope|$locCell|${locEndpoint.id}"
+                    locRepositories[locRepositoryKey] = linkedMapOf(
+                        "scope" to aScope,
+                        "cell" to locCell,
+                        "id" to locEndpoint.id,
+                        "credentialProfile" to locProfileId,
+                        "credentialType" to locProfile?.type
+                    )
+                    if (locProfile != null) {
+                        val locCredentialKey = "${locProfile.id}|${locProfile.type}"
+                        locCredentials[locCredentialKey] = linkedMapOf(
+                            "profileId" to locProfile.id,
+                            "type" to locProfile.type
+                        )
+                    }
+                }
+            }
+        }
+
+        AIcCollect(algitesResolvedRepositoryMetadata, "repository")
+        algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locPath, locMetadata) ->
+            AIcCollect(locMetadata, "artifact:$locPath")
+        }
+
+        val locPlan = linkedMapOf<String, Any>(
+            "repositories" to locRepositories.values.toList(),
+            "credentials" to locCredentials.values.toList()
+        )
+        val locJson = JsonOutput.toJson(locPlan)
+        val locOutputPath = algitesGradleOrEnvironmentValue("algites.credential.output")
+            ?: System.getenv("ALGITES_CREDENTIAL_OUTPUT")
+        if (locOutputPath.isNullOrBlank()) {
+            println(locJson)
+        } else {
+            val locOutputFile = File(locOutputPath)
+            locOutputFile.parentFile?.mkdirs()
+            locOutputFile.writeText(locJson + System.lineSeparator(), Charsets.UTF_8)
+            println("Algites credential preflight wrote ${locCredentials.size} required credential profile/type pair(s) to ${locOutputFile.path}.")
+        }
+    }
+}
+
 subprojects {
     val locAlgitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
     val locAlgitesTechnologyKinds = AIcAlgitesStringList(locAlgitesArtifactDirectory?.get("technologyKinds"))
@@ -330,7 +692,7 @@ subprojects {
                             name = locEndpoint.id.replace('-', '_')
                             url = uri(locEndpoint.url)
                             val locProfileId = locEndpoint.credentialProfile
-                            if (!locProfileId.isNullOrBlank()) {
+                            if (!locProfileId.isNullOrBlank() && !algitesCredentialPreflight) {
                                 val locProfile = locEffectiveCredentialProfiles[locProfileId]
                                     ?: throw GradleException(
                                         "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
@@ -344,10 +706,9 @@ subprojects {
                                         }
                                     }
                                     "bearer" -> {
-                                        val locToken = AIcAlgitesCredentialEnvironmentValue(locProfile, "TOKEN")
+                                        val locToken = AIcAlgitesCredentialValue(locProfile, "token")
                                             ?: throw GradleException(
-                                                "Credential profile '${locProfile.id}' type 'bearer' is not available. " +
-                                                    "Define ${AIcAlgitesCredentialEnvironmentPrefix(locProfile)}_TOKEN or provision the profile through the Algites credential bootstrap."
+                                                "Credential profile '${locProfile.id}' type 'bearer' is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                                             )
                                         credentials(HttpHeaderCredentials::class) {
                                             name = "Authorization"
@@ -356,10 +717,9 @@ subprojects {
                                         authentication { create<HttpHeaderAuthentication>("header") }
                                     }
                                     "api-key" -> {
-                                        val locApiKey = AIcAlgitesCredentialEnvironmentValue(locProfile, "API_KEY")
+                                        val locApiKey = AIcAlgitesCredentialValue(locProfile, "apiKey")
                                             ?: throw GradleException(
-                                                "Credential profile '${locProfile.id}' type 'api-key' is not available. " +
-                                                    "Define ${AIcAlgitesCredentialEnvironmentPrefix(locProfile)}_API_KEY or provision the profile through the Algites credential bootstrap."
+                                                "Credential profile '${locProfile.id}' type 'api-key' is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                                             )
                                         val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() }
                                             ?: throw GradleException(
@@ -558,6 +918,92 @@ subprojects {
             algitesBuild.configure { dependsOn(locBuildPython) }
             algitesPublish.configure { dependsOn(locPublishPython) }
         }
+    }
+}
+
+
+val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapshots") {
+    group = "publishing"
+    description = "Deletes snapshot packages corresponding to a successfully published release according to effective Algites lifecycle policy."
+
+    doLast {
+        var locConfiguredTargets = 0
+        var locDeletedPackages = 0
+        algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locProjectPath, locMetadata) ->
+            val locTechnologyKinds = AIcAlgitesStringList(locMetadata["technologyKinds"]).toSet()
+            if (locTechnologyKinds.isEmpty()) return@forEach
+            val locDeleteEnabled = locMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() ?: true
+            if (!locDeleteEnabled) {
+                logger.lifecycle("Skipping released-snapshot cleanup for '$locProjectPath': deleteSnapshotWhenReleased=false.")
+                return@forEach
+            }
+            val locProject = rootProject.findProject(locProjectPath)
+                ?: throw GradleException("Resolved Algites artifact project '$locProjectPath' is not present in the Gradle build.")
+            val locReleaseVersion = algitesGradleOrEnvironmentValue("algites.cleanup.releaseVersion")
+                ?: System.getenv("ALGITES_CLEANUP_RELEASE_VERSION")
+                ?: locProject.version.toString()
+            if (locReleaseVersion.endsWith("SNAPSHOT", ignoreCase = true)) {
+                throw GradleException("Released-snapshot cleanup requires a release version, but '$locProjectPath' resolved '$locReleaseVersion'.")
+            }
+            val locRepositories = locMetadata["repositories"]
+            val locProfiles = AIcAlgitesCredentialProfiles(locMetadata["credentialProfiles"])
+            val locGroupId = locMetadata["groupId"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
+            val locArtifactId = AIcAlgitesCanonicalArtifactId(locProjectPath)
+
+            locTechnologyKinds.sorted().forEach { locTechnology ->
+                val locCell = "$locTechnology.$algitesPublicationRepositoryVisibility.snapshot.manage"
+                val locEndpoints = AIcAlgitesRepositoryEndpoints(locRepositories, locCell)
+                if (locEndpoints.isEmpty()) {
+                    logger.lifecycle("No enabled $locTechnology snapshot manage endpoint is configured for '$locProjectPath'; cleanup is skipped for this TechnologyKind.")
+                    return@forEach
+                }
+                val locSnapshotVersion = AIcAlgitesSnapshotVersionForTechnology(locReleaseVersion, locTechnology)
+                val locPackageName = when (locTechnology) {
+                    "java" -> locArtifactId
+                    "python" -> AIcAlgitesPythonDistributionName(locArtifactId)
+                    else -> throw GradleException(
+                        "Released-snapshot cleanup for TechnologyKind '$locTechnology' has no management package-coordinate adapter yet."
+                    )
+                }
+                val locFormat = when (locTechnology) {
+                    "java" -> "maven"
+                    "python" -> "python"
+                    else -> locTechnology
+                }
+
+                locEndpoints.forEach { locEndpoint ->
+                    locConfiguredTargets++
+                    val locDeleted = when (locEndpoint.managementAdapter) {
+                        "cloudsmith" -> AIcAlgitesDeleteCloudsmithSnapshot(
+                            locEndpoint,
+                            locProfiles,
+                            locPackageName,
+                            locSnapshotVersion,
+                            locFormat
+                        )
+                        "repsy" -> AIcAlgitesDeleteRepsySnapshot(
+                            locEndpoint,
+                            locProfiles,
+                            locPackageName,
+                            locSnapshotVersion,
+                            locFormat,
+                            locGroupId
+                        )
+                        null -> throw GradleException("Manage endpoint '${locEndpoint.id}' has no managementAdapter.")
+                        else -> throw GradleException(
+                            "Manage endpoint '${locEndpoint.id}' uses unsupported managementAdapter '${locEndpoint.managementAdapter}'."
+                        )
+                    }
+                    locDeletedPackages += locDeleted
+                    logger.lifecycle(
+                        "Released-snapshot cleanup endpoint '${locEndpoint.id}': package=$locPackageName version=$locSnapshotVersion deleted=$locDeleted"
+                    )
+                }
+            }
+        }
+        logger.lifecycle(
+            "Algites released-snapshot cleanup completed: configuredTargets=$locConfiguredTargets deletedPackages=$locDeletedPackages"
+        )
     }
 }
 

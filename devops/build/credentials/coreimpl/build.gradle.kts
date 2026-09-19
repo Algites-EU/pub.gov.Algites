@@ -21,6 +21,7 @@ java {
 
 dependencies {
     api(project(":devops:build:credentials:coreintf"))
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
 
     runtimeOnly(project(":devops:build:credentials:winstore"))
     runtimeOnly(project(":devops:build:credentials:macstore"))

@@ -5,7 +5,7 @@ import java.util.Optional;
 /**
  * Persistent secure-store service provider interface.
  *
- * Each credential profile/type pair is stored as one opaque, versioned secret blob.
+ * The store persists opaque Algites credential values under implementation-defined storage keys.
  */
 public interface AIiCredentialStore {
     String getId();

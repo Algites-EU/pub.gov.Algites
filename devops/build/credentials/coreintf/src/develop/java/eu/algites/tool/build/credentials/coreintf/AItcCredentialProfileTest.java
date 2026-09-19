@@ -26,13 +26,15 @@ public final class AItcCredentialProfileTest {
         Assert.assertEquals(AInCredentialType.BEARER.getRequiredFields(), List.of(AInCredentialField.TOKEN));
         Assert.assertEquals(AInCredentialType.API_KEY.getRequiredFields(), List.of(AInCredentialField.API_KEY));
         Assert.assertEquals(
-            AInCredentialType.CLIENT_CERTIFICATE.getRequiredFields(),
-            List.of(AInCredentialField.CERTIFICATE, AInCredentialField.PRIVATE_KEY)
+            AInCredentialType.CERTIFICATE.getRequiredFields(),
+            List.of(AInCredentialField.CERTIFICATE)
         );
         Assert.assertEquals(
-            AInCredentialType.CLIENT_CERTIFICATE.getOptionalFields(),
-            List.of(AInCredentialField.PRIVATE_KEY_PASSWORD)
+            AInCredentialType.CERTIFICATE.getOptionalFields(),
+            List.of(AInCredentialField.PRIVATE_KEY, AInCredentialField.PRIVATE_KEY_PASSWORD)
         );
+        Assert.assertEquals(AInCredentialField.PRIVATE_KEY.getId(), "privateKey");
+        Assert.assertEquals(AInCredentialValueSource.SECRET_CONTENT.name(), "SECRET_CONTENT");
     }
 
     @Test

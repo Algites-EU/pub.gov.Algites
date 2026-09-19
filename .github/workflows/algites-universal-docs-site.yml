@@ -128,6 +128,18 @@ jobs:
           path: source
           fetch-depth: 0
 
+      - name: Fetch Algites public download repository defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          locDefaultsDir="${RUNNER_TEMP}/algites-governance-defaults"
+          locPublicDownloadFile="${locDefaultsDir}/algites-repository-download-defaults-public.yml"
+          mkdir -p "${locDefaultsDir}"
+          curl -fsSL \
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/repository/defaults/algites-repository-download-defaults-public.yml" \
+            > "${locPublicDownloadFile}"
+          echo "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE=${locPublicDownloadFile}" >> "${GITHUB_ENV}"
+
       - name: Show checked out source revision
         working-directory: source
         shell: bash

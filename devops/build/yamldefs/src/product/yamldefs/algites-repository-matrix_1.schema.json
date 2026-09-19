@@ -5,9 +5,15 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "java": { "$ref": "#/$defs/visibilityMatrix" },
-    "python": { "$ref": "#/$defs/visibilityMatrix" },
-    "mps": { "$ref": "#/$defs/visibilityMatrix" }
+    "java": {
+      "$ref": "#/$defs/visibilityMatrix"
+    },
+    "python": {
+      "$ref": "#/$defs/visibilityMatrix"
+    },
+    "mps": {
+      "$ref": "#/$defs/visibilityMatrix"
+    }
   },
   "$defs": {
     "repositoryEndpoint": {
@@ -27,22 +33,42 @@
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         },
-        "enabled": { "type": "boolean" }
+        "enabled": {
+          "type": "boolean"
+        },
+        "managementAdapter": {
+          "type": "string",
+          "enum": [
+            "cloudsmith",
+            "repsy"
+          ]
+        }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "minProperties": 1
     },
     "repositoryEndpointList": {
       "type": "array",
       "minItems": 1,
-      "items": { "$ref": "#/$defs/repositoryEndpoint" }
+      "items": {
+        "$ref": "#/$defs/repositoryEndpoint"
+      }
     },
     "usageMatrix": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "download": { "$ref": "#/$defs/repositoryEndpointList" },
-        "upload": { "$ref": "#/$defs/repositoryEndpointList" }
+        "download": {
+          "$ref": "#/$defs/repositoryEndpointList"
+        },
+        "upload": {
+          "$ref": "#/$defs/repositoryEndpointList"
+        },
+        "manage": {
+          "$ref": "#/$defs/repositoryEndpointList"
+        }
       },
       "minProperties": 1
     },
@@ -50,8 +76,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "release": { "$ref": "#/$defs/usageMatrix" },
-        "snapshot": { "$ref": "#/$defs/usageMatrix" }
+        "release": {
+          "$ref": "#/$defs/usageMatrix"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/usageMatrix"
+        }
       },
       "minProperties": 1
     },
@@ -59,8 +89,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "public": { "$ref": "#/$defs/stabilityMatrix" },
-        "private": { "$ref": "#/$defs/stabilityMatrix" }
+        "public": {
+          "$ref": "#/$defs/stabilityMatrix"
+        },
+        "private": {
+          "$ref": "#/$defs/stabilityMatrix"
+        }
       },
       "minProperties": 1
     }

@@ -26,7 +26,8 @@ val locAlgitesArtifactMetadata = locAlgitesResolvedArtifactDirectories.map { loc
         "relativePath" to locArtifactDirectory["path"],
         "hasGradleBuild" to locArtifactDirectory["hasGradleBuild"],
         "projectPath" to locArtifactDirectory["gradleProjectPath"],
-        "repositories" to locArtifactDirectory["repositories"]
+        "repositories" to locArtifactDirectory["repositories"],
+        "deleteSnapshotWhenReleased" to locArtifactDirectory["deleteSnapshotWhenReleased"]
     )
 }
 

@@ -1,0 +1,40 @@
+# Algites PUBLIC artifact repository download defaults.
+#
+# This is public governance data. Concrete public download repository endpoints
+# belong here rather than in the repository resolver implementation.
+# Replace explicit dummy.invalid placeholders before enabling the corresponding
+# TechnologyKind in a production build.
+#
+# Schema: algites-repository-defaults_1.schema.json
+
+repositories:
+  java:
+    public:
+      release:
+        download:
+          - id: algites-java-public-release-download
+            url: "https://repo1.maven.org/maven2"
+      snapshot:
+        download:
+          - id: algites-java-public-snapshot-download
+            url: "https://dl.cloudsmith.io/public/algites/maven-snapshots-pub/maven/"
+  python:
+    public:
+      release:
+        download:
+          - id: algites-python-public-release-download
+            url: "https://pypi.org/simple/"
+      snapshot:
+        download:
+          - id: algites-python-public-snapshot-download
+            url: "https://dummy.invalid/algites/python/public/snapshot/download/"
+  mps:
+    public:
+      release:
+        download:
+          - id: algites-mps-public-release-download
+            url: "https://dummy.invalid/algites/mps/public/release/download/"
+      snapshot:
+        download:
+          - id: algites-mps-public-snapshot-download
+            url: "https://dummy.invalid/algites/mps/public/snapshot/download/"

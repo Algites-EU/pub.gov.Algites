@@ -33,12 +33,28 @@ on:
         required: false
         default: false
 
+      private-repository-defaults-enabled:
+        type: boolean
+        description: "Load the private Algites download-repository defaults overlay."
+        required: false
+        default: false
+
     secrets:
       GITHUB_APP_ID:
         required: false
       GITHUB_APP_INSTALLATION_ID:
         required: false
       GITHUB_APP_PEM:
+        required: false
+      PRIVATE_GOVERNANCE_GITHUB_APP_ID:
+        required: false
+      PRIVATE_GOVERNANCE_GITHUB_APP_PEM:
+        required: false
+      ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS:
+        description: "Universal Algites credential document JSON. Only credential profiles required by the current operation are materialized and forwarded to Gradle."
+        required: false
+      ALGITES_CREDENTIAL_SECRETS_JSON:
+        description: "Serialized GitHub secrets context used only by the trusted Algites credential bridge to resolve SECRET_CONTENT references."
         required: false
 
 jobs:
@@ -55,6 +71,47 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+
+      - name: Fetch Algites public download repository defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          locDefaultsDir="${RUNNER_TEMP}/algites-governance-defaults"
+          locPublicDownloadFile="${locDefaultsDir}/algites-repository-download-defaults-public.yml"
+          mkdir -p "${locDefaultsDir}"
+          curl -fsSL \
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/repository/defaults/algites-repository-download-defaults-public.yml" \
+            > "${locPublicDownloadFile}"
+          echo "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE=${locPublicDownloadFile}" >> "${GITHUB_ENV}"
+
+      - name: Create private governance read token
+        id: governance_token
+        if: ${{ inputs.private-repository-defaults-enabled }}
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.PRIVATE_GOVERNANCE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.PRIVATE_GOVERNANCE_GITHUB_APP_PEM }}
+          owner: Algites-EU
+          repositories: priv.gov.Algites
+          permission-contents: read
+
+      - name: Fetch Algites private download repository defaults
+        if: ${{ inputs.private-repository-defaults-enabled }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.governance_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          locDefaultsDir="${RUNNER_TEMP}/algites-governance-defaults"
+          locPrivateDownloadFile="${locDefaultsDir}/algites-repository-download-defaults-private.yml"
+          mkdir -p "${locDefaultsDir}"
+
+          gh api \
+            -H "Accept: application/vnd.github.raw+json" \
+            "repos/Algites-EU/priv.gov.Algites/contents/repository/defaults/algites-repository-download-defaults-private.yml?ref=main" \
+            > "${locPrivateDownloadFile}"
+
+          echo "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE=${locPrivateDownloadFile}" >> "${GITHUB_ENV}"
 
       - name: Decide mode by branch
         id: mode
@@ -269,6 +326,31 @@ jobs:
         with:
           distribution: temurin
           java-version: ${{ inputs.java-version != '' && inputs.java-version || steps.detect-java.outputs.version }}
+
+      - name: Resolve required Algites credentials
+        id: algites-credential-plan
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        shell: bash
+        env:
+          ALGITES_CREDENTIAL_PREFLIGHT: "true"
+        run: |
+          set -euo pipefail
+          chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
+          locPlanFile="${RUNNER_TEMP}/algites-required-credentials.json"
+          "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q \
+            resolveAlgitesRequiredCredentials \
+            -Palgites.credential.usages=download \
+            -Palgites.credential.download.stabilities=release,snapshot \
+            -Palgites.credential.output="${locPlanFile}"
+          echo "plan_file=${locPlanFile}" >> "${GITHUB_OUTPUT}"
+
+      - name: Materialize required Algites credentials
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        uses: Algites-EU/pub.gov.Algites/.github/actions/algites-export-credential-secrets@main
+        with:
+          credentials-json: ${{ secrets.ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS }}
+          required-credentials-file: ${{ steps.algites-credential-plan.outputs.plan_file }}
+          secrets-json: ${{ secrets.ALGITES_CREDENTIAL_SECRETS_JSON }}
 
       - name: Resolve Algites artifact metadata
         id: algites-metadata

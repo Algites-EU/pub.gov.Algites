@@ -13,11 +13,16 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.ServiceLoader;
+import java.util.regex.Pattern;
 
 /**
- * Resolves credentials from the highest-priority available OS secure-store backend.
+ * Access facade for the highest-priority available Algites OS secure-store backend.
  */
 public final class AIcCredentialStoreProvider implements AIiCredentialProvider {
+    public static final String CREDENTIAL_DOCUMENT_STORAGE_KEY = "document/ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS";
+
+    private static final Pattern NAMED_SECRET_ID_PATTERN = Pattern.compile("^[A-Za-z0-9][A-Za-z0-9._-]*$");
+
     private final List<AIiCredentialStore> stores;
 
     public AIcCredentialStoreProvider() {
@@ -41,6 +46,10 @@ public final class AIcCredentialStoreProvider implements AIiCredentialProvider {
         return stores.stream().map(AIiCredentialStore::getAvailability).toList();
     }
 
+    /**
+     * Legacy profile/type blob resolution retained only for backward compatibility.
+     * Standard resolution uses the universal credential document instead.
+     */
     @Override
     public Optional<AIcCredential> resolve(AIcCredentialProfile aProfile) {
         Objects.requireNonNull(aProfile, "Credential profile must not be null.");
@@ -62,6 +71,53 @@ public final class AIcCredentialStoreProvider implements AIiCredentialProvider {
 
     public AIiCredentialStore requireAvailableStore() {
         return getAvailableStore().orElseThrow(() -> new AIxCredentialException(buildUnavailableStoreMessage()));
+    }
+
+    public Optional<byte[]> readCredentialDocument() {
+        Optional<AIiCredentialStore> locStore = getAvailableStore();
+        if (locStore.isEmpty()) {
+            return Optional.empty();
+        }
+        return locStore.get().read(CREDENTIAL_DOCUMENT_STORAGE_KEY);
+    }
+
+    public void writeCredentialDocument(byte[] aValue) {
+        Objects.requireNonNull(aValue, "Credential document must not be null.");
+        requireAvailableStore().write(CREDENTIAL_DOCUMENT_STORAGE_KEY, aValue);
+    }
+
+    public void deleteCredentialDocument() {
+        requireAvailableStore().delete(CREDENTIAL_DOCUMENT_STORAGE_KEY);
+    }
+
+    public Optional<byte[]> readNamedSecret(String aSecretId) {
+        Objects.requireNonNull(aSecretId, "Secret id must not be null.");
+        Optional<AIiCredentialStore> locStore = getAvailableStore();
+        if (locStore.isEmpty()) {
+            return Optional.empty();
+        }
+        return locStore.get().read(namedSecretStorageKey(aSecretId));
+    }
+
+    public void writeNamedSecret(String aSecretId, byte[] aValue) {
+        Objects.requireNonNull(aSecretId, "Secret id must not be null.");
+        Objects.requireNonNull(aValue, "Secret value must not be null.");
+        requireAvailableStore().write(namedSecretStorageKey(aSecretId), aValue);
+    }
+
+    public void deleteNamedSecret(String aSecretId) {
+        Objects.requireNonNull(aSecretId, "Secret id must not be null.");
+        requireAvailableStore().delete(namedSecretStorageKey(aSecretId));
+    }
+
+    private static String namedSecretStorageKey(String aSecretId) {
+        String locId = aSecretId.trim();
+        if (!NAMED_SECRET_ID_PATTERN.matcher(locId).matches()) {
+            throw new AIxCredentialException(
+                "Secret id must use only letters, digits, dot, underscore, or dash and must start with a letter or digit: " + aSecretId
+            );
+        }
+        return "secret/" + locId;
     }
 
     public String buildUnavailableStoreMessage() {

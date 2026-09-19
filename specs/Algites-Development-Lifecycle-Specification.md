@@ -199,7 +199,7 @@ It must **not** become the authoritative configuration for artifact publication 
 Two repository concepts are intentionally distinct:
 
 - **Bootstrap repositories** are explicit and repository-local in `settings.gradle.kts`. They exist only to make Gradle and shared build infrastructure resolvable.
-- **Algites artifact repositories** are resolved after metadata loading from the publication repository matrix defined by TechnologyKind x visibility (`public`/`private`) x stability (`release`/`snapshot`) x URL usage (`download`/`upload`). The matrix inherits from Algites defaults through `algites-source-repository.yml` and nested `algites-artifact.yml` files.
+- **Algites artifact repositories** are resolved after metadata loading from the publication repository matrix defined by TechnologyKind x visibility (`public`/`private`) x stability (`release`/`snapshot`) x URL usage (`download`/`upload`/`manage`). The matrix inherits from Algites defaults through `algites-source-repository.yml` and nested `algites-artifact.yml` files.
 
 A Java/Maven repository used for dependency resolution or publication is therefore not automatically a bootstrap repository. Python, MPS, and future technology-kind-specific repositories are resolved by their adapters and effective artifact metadata.
 
@@ -372,7 +372,7 @@ If issue references are detected (from branch name and/or commit subjects), CI w
 Before dependency download or publication, the lifecycle resolves the effective repository matrix cell for every selected TechnologyKind and operation:
 
 ```text
-<technology-kind> x <public|private> x <release|snapshot> x <download|upload>
+<technology-kind> x <public|private> x <release|snapshot> x <download|upload|manage>
 ```
 
 Each cell contains zero or more repository endpoints. Endpoints are merged by stable endpoint `id`; `enabled` defaults to `true`. Lower metadata levels can therefore disable or re-enable inherited endpoints, change only an endpoint URL/profile reference, or add another endpoint without replacing the whole cell.
@@ -380,7 +380,7 @@ Each cell contains zero or more repository endpoints. Endpoints are merged by st
 Resolution order is:
 
 ```text
-Algites public built-in defaults
+Algites public-governance download defaults
         -> optional private-governance defaults overlays
         -> algites-source-repository.yml
         -> ancestor algites-artifact-set.yml / algites-artifact.yml
@@ -411,41 +411,74 @@ credentialProfiles:
     type: basic
 ```
 
-Supported profile types are the closed set `basic`, `bearer`, `api-key`, and `client-certificate`. The effective type determines the required secret fields. Core support for a credential type does not imply that every TechnologyKind repository adapter can apply that authentication mechanism. Java/Maven repository access currently supports `basic`, `bearer`, and `api-key`; Python/Twine publication currently supports `basic`; Python download and MPS repository adapters remain explicit implementation work. Unsupported combinations MUST fail rather than silently fall back to another authentication mechanism. Runtime environment fallback variables follow:
+Supported profile types are the closed set `basic`, `bearer`, `api-key`, and `certificate`. Their canonical fields are:
 
-```text
-ALGITES_CREDENTIAL_<NORMALIZED_PROFILE_ID>_<CREDENTIAL_TYPE>_<FIELD>
+| type | required fields | optional fields |
+| --- | --- | --- |
+| `basic` | `username`, `password` | — |
+| `bearer` | `token` | — |
+| `api-key` | `apiKey` | — |
+| `certificate` | `certificate` | `privateKey`, `privateKeyPassword` |
+
+Core support for a credential type does not imply that every TechnologyKind repository adapter can apply that authentication mechanism. Unsupported endpoint/type combinations MUST fail rather than silently fall back to another authentication mechanism.
+
+Secret values use one provider-independent credential document supplied as `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` and governed by `algites-credentials_1.schema.json`. Every credential field has exactly the properties `source` and `value`. The closed value-source enum is:
+
+| source | interpretation of `value` |
+| --- | --- |
+| `DIRECT_VALUE` | `value` is the credential content itself |
+| `FILE_CONTENT` | `value` is a file path; the file content is the credential content |
+| `SECRET_CONTENT` | `value` is a secret name/key in the current secret-provider context |
+| `ENVIRONMENT_VARIABLE_CONTENT` | `value` is an environment-variable name |
+
+The `_CONTENT` suffix identifies the content produced by resolution, not the literal content of `value`. In particular, `FILE_CONTENT.value` is a path and `SECRET_CONTENT.value` is a secret identifier.
+
+The document is keyed first by credential profile id and then by credential type. A profile MAY retain multiple typed values even though its effective non-secret profile declaration selects exactly one type for a particular endpoint. Example:
+
+```json
+{
+  "algites-java-private-release-download": {
+    "basic": {
+      "username": { "source": "DIRECT_VALUE", "value": "algites-user" },
+      "password": { "source": "SECRET_CONTENT", "value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
+    },
+    "bearer": {
+      "token": { "source": "ENVIRONMENT_VARIABLE_CONTENT", "value": "ALGITES_JAVA_PRIVATE_TOKEN" }
+    }
+  }
+}
 ```
 
-For example a basic profile `algites-java-private-release-download` requires:
+Local users need only the subset of profiles required by the operations they execute. The universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document is also the canonical persistent local representation; there is no second profile/type credential format. A non-empty `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` environment variable is an explicit per-process override. Otherwise the installed local credential bootstrap reads the same document from the highest-priority available Algites operating-system secure store. Because one document may retain multiple typed entries under a profile, a later type override does not reinterpret or destroy values retained for another type.
 
-```text
-ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BASIC_USERNAME
-ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BASIC_PASSWORD
-```
+Provider adapters MAY materialize a credential document before invoking the final processing. Materialization MUST preserve the same schema: a resolved field becomes `DIRECT_VALUE` with the resolved content. A provider adapter MUST NOT invent a second credential format.
 
-The same profile redefined as `bearer` instead requires:
+For GitHub Actions the resolution is deliberately two-phase. `resolveAlgitesRequiredCredentials` first evaluates the same inherited repository metadata in credential-preflight mode and returns the union of profile/type pairs referenced by enabled repository endpoints in the requested download/upload/manage context. The trusted GitHub credential bridge then receives the original `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, the GitHub secret context, environment, and runner filesystem; discards every profile/type pair not listed by the preflight plan; materializes all retained fields; and exposes only the reduced `DIRECT_VALUE` document to the subsequent Gradle processing.
 
-```text
-ALGITES_CREDENTIAL_ALGITES_JAVA_PRIVATE_RELEASE_DOWNLOAD_BEARER_TOKEN
-```
+`ALGITES_CREDENTIAL_SECRETS_JSON` carries an optional provider secret context required for exact-name `SECRET_CONTENT` lookup. It is not a credential document and MUST NOT contain profile-selection semantics. GitHub wrappers populate it from the complete GitHub Actions `secrets` context for the trusted bridge. For local processing it is normally absent: the installed Java resolver and Gradle bootstrap resolve a missing `SECRET_CONTENT` key from a named value in the Algites local secure store. When `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` itself is not set in the environment, the Gradle bootstrap obtains the stored universal document through the installed `algites-credentials` helper (`ALGITES_CREDENTIAL_CLI` MAY override its executable path). This does not create another credential schema; the helper is only a secure-store bootstrap adapter.
 
-Local desktop builds SHOULD resolve credentials from the Algites OS credential subsystem after checking injected environment credentials. CI/headless builds normally inject the exact variables required by the effective credential profile. Persistent OS-store keys include both profile id and credential type, preventing a later type override from reinterpreting an older stored credential.
-
-Private repository locations and all canonical upload locations remain private-governance data. Private overlays use `algites-repository-defaults_1.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies private-download defaults and `ALGITES_REPOSITORY_UPLOAD_DEFAULTS_FILE` supplies the visibility-specific publication defaults.
+Concrete public download locations are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`; they are not hard-coded in the resolver. Private repository locations and all canonical upload and management locations remain private-governance data. All defaults files use `algites-repository-defaults_1.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies private-download defaults, `ALGITES_REPOSITORY_UPLOAD_DEFAULTS_FILE` supplies the visibility-specific publication defaults, and `ALGITES_REPOSITORY_MANAGE_DEFAULTS_FILE` supplies visibility-specific repository-management defaults.
 
 Repository visibility usage is constrained by source-repository visibility:
 
-- `pub` repositories resolve only `public` download cells and publish only to `public` upload cells;
-- `priv` repositories may resolve both `public` and `private` download cells and publish their own artifacts only to `private` upload cells.
+- `pub` repositories resolve only `public` download cells, publish only to `public` upload cells, and manage only `public` management cells;
+- `priv` repositories may resolve both `public` and `private` download cells and publish/manage their own artifacts only through `private` upload/manage cells.
 
 Source-repository visibility is authoritative. Provider or execution inputs MAY validate the expected `pub`/`priv` value but MUST NOT change repository visibility.
 
-The initial built-in Java public download defaults preserve existing behaviour: Maven Central for release dependencies and the public Algites Cloudsmith repository for snapshot dependencies. Private downloads and all canonical uploads are supplied only from private governance.
+The initial public-governance defaults preserve the existing Java behaviour (Maven Central for release dependencies and the public Algites Cloudsmith repository for snapshot dependencies), define PyPI as the Python public release index, and contain explicit `dummy.invalid` placeholders for public cells whose current endpoint still needs confirmation. The defaults matrix covers every standard TechnologyKind (`java`, `python`, `mps`). Private downloads and all canonical upload/management endpoints are supplied only from private governance and likewise contain explicit placeholders where the current endpoint is not yet confirmed.
 
-Provider integrations SHOULD transfer only the required private-governance definition files, not clone the complete governance repository. The GitHub integration obtains the required files through authenticated GitHub Contents API requests. `PRIVATE_GOVERNANCE_GITHUB_APP_*` credentials are distinct from `GITHUB_APP_*`: the former authorize reading `priv.gov.Algites`, while the latter operate on the target repository and may refer to a different GitHub App.
+Provider integrations SHOULD transfer only the required private-governance definition files, not clone the complete governance repository. The GitHub integration obtains the required files through authenticated GitHub Contents API requests. `PRIVATE_GOVERNANCE_GITHUB_APP_*` credentials are distinct from target-repository GitHub App credentials and MAY refer to a different GitHub App.
+
+GitHub Actions workflows MUST NOT maintain TechnologyKind-specific or credential-type-specific secret mappings. The provider-independent profile/type/field contract is defined by Algites metadata and the universal credential document. GitHub-specific code is limited to the trusted bridge that materializes the preflight-selected subset of that document.
+
+Because GitHub does not expose Actions secret values through its REST API, `SECRET_CONTENT` references are resolved from the GitHub Actions `secrets` context supplied directly to the trusted first-party bridge. The bridge MUST NOT log credential values and MUST NOT forward profile/type pairs that are absent from the Gradle preflight plan.
+
+Publication and repository-management capability are centralized in `priv.gov.Algites`. Snapshot workers already run there, and release wrappers in target repositories MUST only dispatch a central private-governance release worker and wait for its result. Upload/manage endpoint overlays and their credential secrets therefore remain unavailable to ordinary target-repository builds. Private ordinary CI MAY receive private-download credentials because resolving private dependencies is a normal private-build capability; publication and management credentials are not.
 
 Publication workflows invoke the common `algitesPublish` orchestration task. Technology-specific publication remains adapter-specific (for example Java `publish`, Python `publishPython`); declaration of a TechnologyKind alone does not imply that its build/publication adapter already exists.
+
+After the complete release workflow succeeds, a final best-effort released-snapshot cleanup MAY run when the effective inherited `deleteSnapshotWhenReleased` value is `true` (the global default). Cleanup uses the `snapshot.manage` matrix cells, not upload endpoints. Management endpoints may use different URLs and credentials and require an implementation-supported `managementAdapter`; the generic lifecycle never assumes that the upload URL supports HTTP DELETE. Current management adapters include Cloudsmith and Repsy. Cleanup failure is non-fatal for the completed release and is reported for manual remediation.
 
 #### 2.1.8. Governed YAML Schema Resolution
 
@@ -459,7 +492,11 @@ Schemas for public Algites YAML configuration SHOULD be sourced from the governe
 
 ### 2.2. Specifics of the Integration With GitHub Actions facility
 
-(TBD)
+GitHub Actions is a provider adapter around the provider-independent Algites lifecycle. Canonical repository and credential semantics remain defined by Algites metadata and Gradle/bootstrap logic.
+
+For credentials, GitHub Actions uses the universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document. Reusable/private wrappers serialize their available `secrets` context into `ALGITES_CREDENTIAL_SECRETS_JSON` only for the trusted first-party credential bridge. The bridge consumes the Gradle preflight plan, resolves only the required profile/type pairs, materializes their fields according to the closed source enum, and exposes the resulting reduced `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document to subsequent processing. No workflow may infer credential fields independently from the profile/type contract, and the bridge MUST NOT log credential values.
+
+Release publication is centrally executed in `priv.gov.Algites`. Public/private target-repository wrappers authenticate only to private governance, dispatch the central worker with the immutable target repository/branch/SHA request, and wait for its conclusion. The central worker validates source-repository visibility, obtains visibility-specific repository overlays, binds canonical credential secrets, checks out the exact target revision, and invokes `algitesPublish`. Snapshot publication follows the same centralized credential and repository-default model.
 
 ---
 
@@ -554,12 +591,13 @@ The release operation MUST:
 1. validate lane/version-scope consistency,
 2. resolve and freeze the immutable release source revision,
 3. compute or validate the release identity/tag,
-4. obtain the governed private-download and upload repository-default overlays from private governance,
+4. obtain the governed private-download and visibility-specific upload repository-default overlays from private governance,
 5. execute construction and verification required by each selected TechnologyKind adapter,
 6. publish only the selected TechnologyKinds to the effective upload cells matching the source repository visibility and release stability,
-7. record which TechnologyKind-specific publications actually exist for the logical version.
+7. record which TechnologyKind-specific publications actually exist for the logical version,
+8. after all required release processing succeeds, perform best-effort cleanup of the corresponding snapshot packages through the visibility-specific `snapshot.manage` endpoints when the effective `deleteSnapshotWhenReleased` policy is `true`.
 
-Ordinary repository builds do not receive the upload-default overlay. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible only for deterministic repository-matrix resolution.
+Ordinary repository builds do not receive upload or management overlays. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. The release publication phase materializes only download/upload credentials; the final cleanup phase separately materializes only management credentials. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible for deterministic repository-matrix resolution.
 
 ##### 3.1.5.1 Release identity/tag naming
 

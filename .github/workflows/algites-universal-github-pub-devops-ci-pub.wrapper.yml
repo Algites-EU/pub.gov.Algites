@@ -15,6 +15,8 @@ on:
         required: true
       PUB_GITHUB_APP_INSTALLATION_ID:
         required: true
+      ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS:
+        required: false
 
 jobs:
   ci:
@@ -27,3 +29,5 @@ jobs:
       GITHUB_APP_ID: ${{ secrets.PUB_GITHUB_APP_ID }}
       GITHUB_APP_INSTALLATION_ID: ${{ secrets.PUB_GITHUB_APP_INSTALLATION_ID }}
       GITHUB_APP_PEM: ${{ secrets.PUB_GITHUB_APP_PEM }}
+      ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS: ${{ secrets.ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS }}
+      ALGITES_CREDENTIAL_SECRETS_JSON: ${{ toJSON(secrets) }}

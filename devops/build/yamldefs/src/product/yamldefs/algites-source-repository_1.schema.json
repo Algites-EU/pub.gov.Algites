@@ -41,6 +41,10 @@
     },
     "credentialProfiles": {
       "$ref": "algites-credential-profiles_1.schema.json"
+    },
+    "deleteSnapshotWhenReleased": {
+      "type": "boolean",
+      "default": true
     }
   },
   "required": [

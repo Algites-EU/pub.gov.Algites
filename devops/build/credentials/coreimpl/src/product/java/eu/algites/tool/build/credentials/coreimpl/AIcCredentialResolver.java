@@ -22,8 +22,7 @@ public final class AIcCredentialResolver {
     public static AIcCredentialResolver standard() {
         return new AIcCredentialResolver(
             List.of(
-                new AIcEnvironmentCredentialProvider(),
-                new AIcCredentialStoreProvider()
+                new AIcCredentialDocumentProvider()
             )
         );
     }
@@ -49,25 +48,7 @@ public final class AIcCredentialResolver {
             .append("Credential profile '").append(aProfile.getId()).append("' with type '")
             .append(aProfile.getType().getId()).append("' is not available.")
             .append(System.lineSeparator())
-            .append("Provide the required environment variables:");
-        for (String locVariable : AIcEnvironmentCredentialProvider.getRequiredEnvironmentVariables(aProfile)) {
-            locMessage.append(System.lineSeparator()).append("  ").append(locVariable);
-        }
-        List<String> locOptional = AIcEnvironmentCredentialProvider.getOptionalEnvironmentVariables(aProfile);
-        if (!locOptional.isEmpty()) {
-            locMessage.append(System.lineSeparator()).append("Optional variables:");
-            for (String locVariable : locOptional) {
-                locMessage.append(System.lineSeparator()).append("  ").append(locVariable);
-            }
-        }
-        locMessage.append(System.lineSeparator())
-            .append("Alternatively provision the profile with the Algites credential CLI into an available OS credential store.");
-        providers.stream()
-            .filter(AIcCredentialStoreProvider.class::isInstance)
-            .map(AIcCredentialStoreProvider.class::cast)
-            .findFirst()
-            .ifPresent(locStoreProvider -> locMessage.append(System.lineSeparator())
-                .append(locStoreProvider.buildUnavailableStoreMessage()));
+            .append("Provide the profile through the universal ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS document in the environment or in an available Algites OS credential store.");
         throw new AIxCredentialException(locMessage.toString());
     }
 }
