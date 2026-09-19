@@ -38,3 +38,9 @@ The Python package tree below `src/product/python.gen` is generated during the b
 ## Credential document schema
 
 `algites-credentials_1.schema.json` defines the provider-independent `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document, including the closed credential types, type-specific fields, and the `DIRECT_VALUE`, `FILE_CONTENT`, `SECRET_CONTENT`, and `ENVIRONMENT_VARIABLE_CONTENT` value-source contract.
+
+## Licensing schemas
+
+`algites-license-definitions_1.schema.json` defines canonical license definitions stored in `licensing/license-definitions.yml`.
+
+`algites-license-usage_1.schema.json` defines hierarchical `license-usage.yml` usage files with the `product` and `documentation` content kinds and explicit `enabled` state.

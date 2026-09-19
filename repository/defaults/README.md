@@ -7,3 +7,5 @@ This directory contains public repository-default governance data consumed by th
 The resolver implementation contains only repository-resolution mechanics; concrete public repository URLs are defined here. Explicit `dummy.invalid` URLs are intentional placeholders for cells whose current endpoint has not yet been confirmed. Replace them before using the corresponding TechnologyKind in production.
 
 CI exposes this file to the resolver through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`. A local build may point the same environment variable at a checkout/copy of this file.
+
+Private-governance automation may additionally supply `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` for the combined public upload/manage overlay, or `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` for the combined private download/upload/manage overlay. Public repository resolution never loads the private overlay.

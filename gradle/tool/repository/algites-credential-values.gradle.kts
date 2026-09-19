@@ -61,8 +61,8 @@ val locAlgitesCredentialDocument = AIcAlgitesParseCredentialJsonObject(
 )
 
 val locAlgitesCredentialSecretContext = AIcAlgitesParseCredentialJsonObject(
-    "ALGITES_CREDENTIAL_SECRETS_JSON",
-    System.getenv("ALGITES_CREDENTIAL_SECRETS_JSON")
+    "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON",
+    System.getenv("_TMP_ALGITES_CREDENTIAL_SECRETS_JSON")
 )
 
 val locAlgitesResolveCredentialValue = fun(

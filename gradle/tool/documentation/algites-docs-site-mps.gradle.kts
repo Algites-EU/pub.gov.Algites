@@ -19,12 +19,12 @@ apply(from = uri(locAlgitesDocsBaseScript))
 
 val locProjectRootDirectory = layout.projectDirectory.asFile
 
-data class AIcArtifactSetProject(
+data class AIcdArtifactSetProject(
     val locRelativePath: String,
     val locProjectDirectory: File
 ) : java.io.Serializable
 
-data class AIcDiscoveredMpsArtifact(
+data class AIcdDiscoveredMpsArtifact(
     val locArtifactSetProjectPath: String,
     val locDescriptorPath: String,
     val locModuleName: String,
@@ -35,7 +35,7 @@ data class AIcDiscoveredMpsArtifact(
     val locPublishable: Boolean
 ) : java.io.Serializable
 
-data class AIcMpsArtifactCandidate(
+data class AIcdMpsArtifactCandidate(
     val locArtifactSetProjectPath: String,
     val locDescriptorPath: String,
     val locModuleName: String,
@@ -99,7 +99,7 @@ fun AIcReadRepositoryId(): String {
     return locAlgitesDocsResolvedRepositoryId
 }
 
-fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
+fun AIcReadArtifactSetProjects(): List<AIcdArtifactSetProject> {
     val locMpsArtifactDirectories = locAlgitesDocsResolvedArtifactDirectories.filter { locArtifactDirectory ->
         locArtifactDirectory["technologyKinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
             (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
@@ -116,7 +116,7 @@ fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
         }
 
         return listOf(
-            AIcArtifactSetProject(
+            AIcdArtifactSetProject(
                 locRelativePath = ".",
                 locProjectDirectory = locProjectRootDirectory
             )
@@ -129,7 +129,7 @@ fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
         require(locProjectDirectory.isDirectory) {
             "Resolved MPS artifact directory does not exist: ${locProjectDirectory.absolutePath}"
         }
-        AIcArtifactSetProject(
+        AIcdArtifactSetProject(
             locRelativePath = locRelativePath,
             locProjectDirectory = locProjectDirectory
         )
@@ -220,7 +220,7 @@ fun AIcReadMpsModuleName(aDescriptorFile: File): String? {
         ?: aDescriptorFile.nameWithoutExtension
 }
 
-fun AIcResolveModulePathCollisions(aCandidates: List<AIcMpsArtifactCandidate>): List<Pair<AIcMpsArtifactCandidate, String>> {
+fun AIcResolveModulePathCollisions(aCandidates: List<AIcdMpsArtifactCandidate>): List<Pair<AIcdMpsArtifactCandidate, String>> {
     val locBasePathCounts = aCandidates.groupingBy { it.locBaseModulePath }.eachCount()
 
     val locResolvedCandidates = aCandidates.map { locCandidate ->
@@ -253,7 +253,7 @@ fun AIcResolveModulePathCollisions(aCandidates: List<AIcMpsArtifactCandidate>): 
     return locResolvedCandidates
 }
 
-fun AIcValidateDiscoveredMpsArtifactUniqueness(aArtifacts: List<AIcDiscoveredMpsArtifact>) {
+fun AIcValidateDiscoveredMpsArtifactUniqueness(aArtifacts: List<AIcdDiscoveredMpsArtifact>) {
     val locDuplicateModulePaths = aArtifacts.groupBy { it.locModulePath }.filterValues { it.size > 1 }
     val locDuplicateArtifactIds = aArtifacts.groupBy { it.locArtifactId }.filterValues { it.size > 1 }
     val locDuplicateDocumentationPaths = aArtifacts.groupBy { it.locDocumentationPath }.filterValues { it.size > 1 }
@@ -297,8 +297,8 @@ fun AIcValidateDiscoveredMpsArtifactUniqueness(aArtifacts: List<AIcDiscoveredMps
 
 fun AIcDiscoverMpsArtifacts(
     aRepositoryId: String,
-    aArtifactSetProjects: List<AIcArtifactSetProject>
-): List<AIcDiscoveredMpsArtifact> {
+    aArtifactSetProjects: List<AIcdArtifactSetProject>
+): List<AIcdDiscoveredMpsArtifact> {
     val locRepositoryRole = AIcReadRepositoryRole()
 
     val locCandidates = aArtifactSetProjects.flatMap { locArtifactSetProject ->
@@ -331,7 +331,7 @@ fun AIcDiscoverMpsArtifacts(
                 .toString()
                 .replace(File.separatorChar, '/')
 
-            AIcMpsArtifactCandidate(
+            AIcdMpsArtifactCandidate(
                 locArtifactSetProjectPath = locArtifactSetProject.locRelativePath,
                 locDescriptorPath = locDescriptorPath,
                 locModuleName = locModuleName,
@@ -348,7 +348,7 @@ fun AIcDiscoverMpsArtifacts(
         val locArtifactId = "${aRepositoryId}_${locModulePath}"
         val locDocumentationPath = locModulePath
 
-        AIcDiscoveredMpsArtifact(
+        AIcdDiscoveredMpsArtifact(
             locArtifactSetProjectPath = locCandidate.locArtifactSetProjectPath,
             locDescriptorPath = locCandidate.locDescriptorPath,
             locModuleName = locCandidate.locModuleName,
@@ -359,7 +359,7 @@ fun AIcDiscoverMpsArtifacts(
             locPublishable = locCandidate.locPublishable
         )
     }.sortedWith(
-        compareBy<AIcDiscoveredMpsArtifact> { it.locArtifactSetProjectPath }
+        compareBy<AIcdDiscoveredMpsArtifact> { it.locArtifactSetProjectPath }
             .thenBy { it.locModuleKind }
             .thenBy { it.locModulePath }
     )
@@ -376,7 +376,7 @@ class AIcMpsSupport(
     private val locResolvedArtifactDirectories: List<Map<String, String?>>
 ) : java.io.Serializable {
 
-    fun AIcReadArtifactSetProjects(): List<AIcArtifactSetProject> {
+    fun AIcReadArtifactSetProjects(): List<AIcdArtifactSetProject> {
         val locMpsArtifactDirectories = locResolvedArtifactDirectories.filter { locArtifactDirectory ->
             locArtifactDirectory["technologyKinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
             (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
@@ -393,7 +393,7 @@ class AIcMpsSupport(
             }
 
             return listOf(
-                AIcArtifactSetProject(
+                AIcdArtifactSetProject(
                     locRelativePath = ".",
                     locProjectDirectory = locProjectRootDirectory
                 )
@@ -406,14 +406,14 @@ class AIcMpsSupport(
             require(locProjectDirectory.isDirectory) {
                 "Resolved MPS artifact directory does not exist: ${locProjectDirectory.absolutePath}"
             }
-            AIcArtifactSetProject(
+            AIcdArtifactSetProject(
                 locRelativePath = locRelativePath,
                 locProjectDirectory = locProjectDirectory
             )
         }
     }
 
-    fun AIcDiscoverMpsArtifacts(aArtifactSetProjects: List<AIcArtifactSetProject>): List<AIcDiscoveredMpsArtifact> {
+    fun AIcDiscoverMpsArtifacts(aArtifactSetProjects: List<AIcdArtifactSetProject>): List<AIcdDiscoveredMpsArtifact> {
         val locRepositoryRole = AIcReadRepositoryRole()
 
         val locCandidates = aArtifactSetProjects.flatMap { locArtifactSetProject ->
@@ -444,7 +444,7 @@ class AIcMpsSupport(
                     .toString()
                     .replace(File.separatorChar, '/')
 
-                AIcMpsArtifactCandidate(
+                AIcdMpsArtifactCandidate(
                     locArtifactSetProjectPath = locArtifactSetProject.locRelativePath,
                     locDescriptorPath = locDescriptorPath,
                     locModuleName = locModuleName,
@@ -459,7 +459,7 @@ class AIcMpsSupport(
             val locArtifactId = "${locRepositoryId}_${locModulePath}"
             val locDocumentationPath = locModulePath
 
-            AIcDiscoveredMpsArtifact(
+            AIcdDiscoveredMpsArtifact(
                 locArtifactSetProjectPath = locCandidate.locArtifactSetProjectPath,
                 locDescriptorPath = locCandidate.locDescriptorPath,
                 locModuleName = locCandidate.locModuleName,
@@ -470,7 +470,7 @@ class AIcMpsSupport(
                 locPublishable = locCandidate.locPublishable
             )
         }.sortedWith(
-            compareBy<AIcDiscoveredMpsArtifact> { it.locArtifactSetProjectPath }
+            compareBy<AIcdDiscoveredMpsArtifact> { it.locArtifactSetProjectPath }
                 .thenBy { it.locModuleKind }
                 .thenBy { it.locModulePath }
         )
@@ -561,7 +561,7 @@ class AIcMpsSupport(
             ".test." in locModulePathLowercase)
     }
 
-    private fun AIcResolveModulePathCollisions(aCandidates: List<AIcMpsArtifactCandidate>): List<Pair<AIcMpsArtifactCandidate, String>> {
+    private fun AIcResolveModulePathCollisions(aCandidates: List<AIcdMpsArtifactCandidate>): List<Pair<AIcdMpsArtifactCandidate, String>> {
         val locBasePathCounts = aCandidates.groupingBy { it.locBaseModulePath }.eachCount()
 
         val locResolvedCandidates = aCandidates.map { locCandidate ->
@@ -594,7 +594,7 @@ class AIcMpsSupport(
         return locResolvedCandidates
     }
 
-    private fun AIcValidateDiscoveredMpsArtifactUniqueness(aArtifacts: List<AIcDiscoveredMpsArtifact>) {
+    private fun AIcValidateDiscoveredMpsArtifactUniqueness(aArtifacts: List<AIcdDiscoveredMpsArtifact>) {
         val locDuplicateModulePaths = aArtifacts.groupBy { it.locModulePath }.filterValues { it.size > 1 }
         val locDuplicateArtifactIds = aArtifacts.groupBy { it.locArtifactId }.filterValues { it.size > 1 }
         val locDuplicateDocumentationPaths = aArtifacts.groupBy { it.locDocumentationPath }.filterValues { it.size > 1 }

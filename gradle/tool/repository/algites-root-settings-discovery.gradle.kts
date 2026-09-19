@@ -27,7 +27,7 @@ if (locAlgitesCredentialValuesScript.isFile) {
 @Suppress("UNCHECKED_CAST")
 val locAlgitesResolveCredentialValue = extra["algitesResolveCredentialValue"] as (String, String, String, File) -> String?
 
-val locAlgitesCredentialPreflight = System.getenv("ALGITES_CREDENTIAL_PREFLIGHT")
+val locAlgitesCredentialPreflight = System.getenv("_TMP_ALGITES_CREDENTIAL_PREFLIGHT")
     ?.equals("true", ignoreCase = true) == true
 
 @Suppress("UNCHECKED_CAST")
@@ -70,22 +70,22 @@ val locAllowedDownloadVisibilities = when (locRepositoryVisibility) {
     else -> error("Unsupported Algites source repository visibility '$locRepositoryVisibility'.")
 }
 
-data class AIcSettingsCredentialProfile(
+data class AIcdSettingsCredentialProfile(
     val id: String,
     val type: String,
     val configuration: Map<String, String>
 )
 
-data class AIcSettingsRepositoryEndpoint(
+data class AIcdSettingsRepositoryEndpoint(
     val cell: String,
     val id: String,
     val url: String,
     val credentialProfile: String?,
-    val profiles: Map<String, AIcSettingsCredentialProfile>
+    val profiles: Map<String, AIcdSettingsCredentialProfile>
 )
 
 @Suppress("UNCHECKED_CAST")
-fun AIcSettingsCredentialProfiles(aValue: Any?): Map<String, AIcSettingsCredentialProfile> {
+fun AIcSettingsCredentialProfiles(aValue: Any?): Map<String, AIcdSettingsCredentialProfile> {
     val locProfiles = aValue as? Map<*, *> ?: return emptyMap()
     return locProfiles.entries.mapNotNull { locEntry ->
         val locId = locEntry.key?.toString() ?: return@mapNotNull null
@@ -95,7 +95,7 @@ fun AIcSettingsCredentialProfiles(aValue: Any?): Map<String, AIcSettingsCredenti
             ?.entries
             ?.associate { it.key.toString() to it.value.toString() }
             ?: emptyMap()
-        locId to AIcSettingsCredentialProfile(locId, locType, locConfiguration)
+        locId to AIcdSettingsCredentialProfile(locId, locType, locConfiguration)
     }.toMap()
 }
 
@@ -103,7 +103,7 @@ fun AIcSettingsCredentialProfiles(aValue: Any?): Map<String, AIcSettingsCredenti
 fun AIcCollectJavaDownloadRepositories(
     aRepositories: Any?,
     aCredentialProfiles: Any?,
-    aTarget: MutableMap<String, AIcSettingsRepositoryEndpoint>
+    aTarget: MutableMap<String, AIcdSettingsRepositoryEndpoint>
 ) {
     val locRepositories = aRepositories as? Map<*, *> ?: return
     val locProfiles = AIcSettingsCredentialProfiles(aCredentialProfiles)
@@ -118,7 +118,7 @@ fun AIcCollectJavaDownloadRepositories(
                 val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@forEach
                 val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@forEach
                 val locProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-                val locEndpoint = AIcSettingsRepositoryEndpoint(locCell, locId, locUrl, locProfile, locProfiles)
+                val locEndpoint = AIcdSettingsRepositoryEndpoint(locCell, locId, locUrl, locProfile, locProfiles)
                 val locPrevious = aTarget[locId]
                 if (locPrevious != null && locPrevious != locEndpoint) {
                     error("Repository endpoint '$locId' resolves inconsistently across the repository build.")
@@ -129,7 +129,7 @@ fun AIcCollectJavaDownloadRepositories(
     }
 }
 
-val locJavaDownloadRepositories = linkedMapOf<String, AIcSettingsRepositoryEndpoint>()
+val locJavaDownloadRepositories = linkedMapOf<String, AIcdSettingsRepositoryEndpoint>()
 AIcCollectJavaDownloadRepositories(
     locAlgitesRepositoryMetadata["repositories"],
     locAlgitesRepositoryMetadata["credentialProfiles"],

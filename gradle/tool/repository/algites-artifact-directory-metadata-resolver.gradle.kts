@@ -8,13 +8,13 @@
 
 import java.io.File
 
-data class AIcAlgitesVersionContext(
+data class AIcdAlgitesVersionContext(
     val lane: String? = null,
     val revision: String? = null,
     val qualifierKind: String? = null,
     val qualifierLabel: String? = null
 ) {
-    fun AIcMerge(aOther: AIcAlgitesVersionContext): AIcAlgitesVersionContext = AIcAlgitesVersionContext(
+    fun AIcMerge(aOther: AIcdAlgitesVersionContext): AIcdAlgitesVersionContext = AIcdAlgitesVersionContext(
         lane = aOther.lane ?: lane,
         revision = aOther.revision ?: revision,
         qualifierKind = aOther.qualifierKind ?: qualifierKind,
@@ -32,35 +32,35 @@ data class AIcAlgitesVersionContext(
     }
 }
 
-data class AIcAlgitesRepositoryEndpoint(
+data class AIcdAlgitesRepositoryEndpoint(
     val id: String,
     val url: String? = null,
     val credentialProfile: String? = null,
     val enabled: Boolean? = null,
-    val managementAdapter: String? = null
+    val usageProviderAdapter: String? = null
 ) {
-    fun AIcMerge(aOther: AIcAlgitesRepositoryEndpoint): AIcAlgitesRepositoryEndpoint {
+    fun AIcMerge(aOther: AIcdAlgitesRepositoryEndpoint): AIcdAlgitesRepositoryEndpoint {
         require(id == aOther.id) { "Cannot merge repository endpoints with different ids '$id' and '${aOther.id}'." }
-        return AIcAlgitesRepositoryEndpoint(
+        return AIcdAlgitesRepositoryEndpoint(
             id = id,
             url = aOther.url ?: url,
             credentialProfile = aOther.credentialProfile ?: credentialProfile,
             enabled = aOther.enabled ?: enabled,
-            managementAdapter = aOther.managementAdapter ?: managementAdapter
+            usageProviderAdapter = aOther.usageProviderAdapter ?: usageProviderAdapter
         )
     }
 
     fun AIcEffectiveEnabled(): Boolean = enabled ?: true
 }
 
-data class AIcAlgitesCredentialProfileDefinition(
+data class AIcdAlgitesCredentialProfileDefinition(
     val id: String,
     val type: String? = null,
     val configuration: Map<String, String> = emptyMap()
 ) {
-    fun AIcMerge(aOther: AIcAlgitesCredentialProfileDefinition): AIcAlgitesCredentialProfileDefinition {
+    fun AIcMerge(aOther: AIcdAlgitesCredentialProfileDefinition): AIcdAlgitesCredentialProfileDefinition {
         require(id == aOther.id) { "Cannot merge credential profiles with different ids '$id' and '${aOther.id}'." }
-        return AIcAlgitesCredentialProfileDefinition(
+        return AIcdAlgitesCredentialProfileDefinition(
             id = id,
             type = aOther.type ?: type,
             configuration = configuration + aOther.configuration
@@ -68,18 +68,18 @@ data class AIcAlgitesCredentialProfileDefinition(
     }
 }
 
-data class AIcAlgitesResolvedState(
+data class AIcdAlgitesResolvedState(
     val technologyKinds: List<String>? = null,
     val groupId: String? = null,
-    val repositories: Map<String, Map<String, AIcAlgitesRepositoryEndpoint>> = emptyMap(),
-    val credentialProfiles: Map<String, AIcAlgitesCredentialProfileDefinition> = emptyMap(),
-    val versionContext: AIcAlgitesVersionContext = AIcAlgitesVersionContext(),
+    val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>> = emptyMap(),
+    val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition> = emptyMap(),
+    val versionContext: AIcdAlgitesVersionContext = AIcdAlgitesVersionContext(),
     val deleteSnapshotWhenReleased: Boolean? = null
 ) {
-    fun AIcMerge(aOther: AIcAlgitesResolvedState): AIcAlgitesResolvedState {
-        val locRepositories = linkedMapOf<String, Map<String, AIcAlgitesRepositoryEndpoint>>()
+    fun AIcMerge(aOther: AIcdAlgitesResolvedState): AIcdAlgitesResolvedState {
+        val locRepositories = linkedMapOf<String, Map<String, AIcdAlgitesRepositoryEndpoint>>()
         (repositories.keys + aOther.repositories.keys).distinct().forEach { locCell ->
-            val locMerged = linkedMapOf<String, AIcAlgitesRepositoryEndpoint>()
+            val locMerged = linkedMapOf<String, AIcdAlgitesRepositoryEndpoint>()
             repositories[locCell]?.forEach { (locId, locEndpoint) -> locMerged[locId] = locEndpoint }
             aOther.repositories[locCell]?.forEach { (locId, locEndpoint) ->
                 locMerged[locId] = locMerged[locId]?.AIcMerge(locEndpoint) ?: locEndpoint
@@ -87,13 +87,13 @@ data class AIcAlgitesResolvedState(
             locRepositories[locCell] = locMerged
         }
 
-        val locProfiles = linkedMapOf<String, AIcAlgitesCredentialProfileDefinition>()
+        val locProfiles = linkedMapOf<String, AIcdAlgitesCredentialProfileDefinition>()
         credentialProfiles.forEach { (locId, locProfile) -> locProfiles[locId] = locProfile }
         aOther.credentialProfiles.forEach { (locId, locProfile) ->
             locProfiles[locId] = locProfiles[locId]?.AIcMerge(locProfile) ?: locProfile
         }
 
-        return AIcAlgitesResolvedState(
+        return AIcdAlgitesResolvedState(
             technologyKinds = aOther.technologyKinds ?: technologyKinds,
             groupId = aOther.groupId ?: groupId,
             repositories = locRepositories,
@@ -104,41 +104,41 @@ data class AIcAlgitesResolvedState(
     }
 }
 
-data class AIcAlgitesDirectoryConfig(
+data class AIcdAlgitesDirectoryConfig(
     val file: File,
     val structureKind: String,
     val values: Map<String, String>
 )
 
-data class AIcAlgitesArtifactDirectoryMetadata(
+data class AIcdAlgitesArtifactDirectoryMetadata(
     val path: String,
     val structureKind: String,
     val technologyKinds: List<String>,
     val name: String,
     val description: String,
     val groupId: String?,
-    val repositories: Map<String, Map<String, AIcAlgitesRepositoryEndpoint>>,
-    val credentialProfiles: Map<String, AIcAlgitesCredentialProfileDefinition>,
+    val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>>,
+    val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>,
     val contentsModel: String,
     val hasGradleBuild: Boolean,
     val gradleProjectPath: String,
-    val versionContext: AIcAlgitesVersionContext,
+    val versionContext: AIcdAlgitesVersionContext,
     val deleteSnapshotWhenReleased: Boolean
 )
 
-data class AIcAlgitesRepositoryMetadata(
+data class AIcdAlgitesRepositoryMetadata(
     val id: String,
     val name: String,
     val visibility: String,
     val groupId: String?,
-    val repositories: Map<String, Map<String, AIcAlgitesRepositoryEndpoint>>,
-    val credentialProfiles: Map<String, AIcAlgitesCredentialProfileDefinition>,
+    val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>>,
+    val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>,
     val deleteSnapshotWhenReleased: Boolean
 )
 
-data class AIcAlgitesResolutionResult(
-    val repository: AIcAlgitesRepositoryMetadata,
-    val artifactDirectories: List<AIcAlgitesArtifactDirectoryMetadata>
+data class AIcdAlgitesResolutionResult(
+    val repository: AIcdAlgitesRepositoryMetadata,
+    val artifactDirectories: List<AIcdAlgitesArtifactDirectoryMetadata>
 )
 
 val AIcAlgitesSupportedTechnologyKinds = linkedSetOf("java", "python", "mps")
@@ -146,26 +146,29 @@ val AIcAlgitesRepositoryVisibilities = linkedSetOf("public", "private")
 val AIcAlgitesRepositoryStabilities = linkedSetOf("release", "snapshot")
 val AIcAlgitesRepositoryUsages = linkedSetOf("download", "upload", "manage")
 val AIcAlgitesCredentialTypes = linkedSetOf("basic", "bearer", "api-key", "certificate")
-val AIcAlgitesManagementAdapters = linkedSetOf("cloudsmith", "repsy")
+val AIcAlgitesUsageProviderAdaptersByUsage = mapOf(
+    "download" to emptySet<String>(),
+    "upload" to emptySet<String>(),
+    "manage" to linkedSetOf("cloudsmith", "repsy")
+)
 
 val AIcAlgitesRootIgnoredDirectoryNames = setOf(
     ".git", ".gradle", ".idea", ".mps", "run", "build", "target", "out", "output",
     "docs-site", "documentation-branch", "gh-pages", "source_gen", "source_gen.caches", "classes_gen"
 )
 
-fun AIcAlgitesBuiltInState(): AIcAlgitesResolvedState = AIcAlgitesResolvedState(
+fun AIcAlgitesBuiltInState(): AIcdAlgitesResolvedState = AIcdAlgitesResolvedState(
     deleteSnapshotWhenReleased = true
 )
 
 val AIcAlgitesExternalRepositoryDefaultsEnvironmentVariables = listOf(
     "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE",
-    "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE",
-    "ALGITES_REPOSITORY_UPLOAD_DEFAULTS_FILE",
-    "ALGITES_REPOSITORY_MANAGE_DEFAULTS_FILE"
+    "ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE",
+    "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE"
 )
 
-fun AIcAlgitesExternalDefaultsState(): AIcAlgitesResolvedState {
-    var locState = AIcAlgitesResolvedState()
+fun AIcAlgitesExternalDefaultsState(): AIcdAlgitesResolvedState {
+    var locState = AIcdAlgitesResolvedState()
     AIcAlgitesExternalRepositoryDefaultsEnvironmentVariables.forEach { locVariableName ->
         val locPath = System.getenv(locVariableName)?.trim()?.takeIf { it.isNotBlank() } ?: return@forEach
         val locFile = File(locPath)
@@ -183,14 +186,14 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
     aResolutionKind: String?,
     aRepositoryNameOverride: String?,
     aRepositoryVisibilityOverride: String?
-): AIcAlgitesResolutionResult {
+): AIcdAlgitesResolutionResult {
     val locRepositoryBase = AIcResolveRepositoryMetadataBase(aRepositoryRoot, aRepositoryNameOverride, aRepositoryVisibilityOverride)
     val locInitialState = AIcAlgitesBuiltInState().AIcMerge(AIcAlgitesExternalDefaultsState())
     val locRootConfig = AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.takeIf { it.structureKind == "repository" }
     val locRootState = if (locRootConfig == null) locInitialState else locInitialState.AIcMerge(AIcResolvedStateFromConfig(locRootConfig))
     AIcValidateEffectiveState(locRootState, "repository '${locRepositoryBase.id}'")
 
-    val locRepository = AIcAlgitesRepositoryMetadata(
+    val locRepository = AIcdAlgitesRepositoryMetadata(
         id = locRepositoryBase.id,
         name = locRepositoryBase.name,
         visibility = locRepositoryBase.visibility,
@@ -212,14 +215,14 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
         AIcResolveArtifactDirectoryAndSubdirectories(aRepositoryRoot, locNormalizedPath ?: ".", locInitialState)
     }
 
-    return AIcAlgitesResolutionResult(locRepository, locArtifactDirectories)
+    return AIcdAlgitesResolutionResult(locRepository, locArtifactDirectories)
 }
 
 fun AIcResolveRepositoryMetadataBase(
     aRepositoryRoot: File,
     aRepositoryNameOverride: String?,
     aRepositoryVisibilityOverride: String?
-): AIcAlgitesRepositoryMetadata {
+): AIcdAlgitesRepositoryMetadata {
     val locRootConfig = AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.takeIf { it.structureKind == "repository" }
     val locRepositoryId = locRootConfig?.values?.let { AIcFirstValue(it, "sourceRepository.id", "repository.id", "id") }
         ?.takeIf { it.isNotBlank() } ?: aRepositoryRoot.name
@@ -230,7 +233,7 @@ fun AIcResolveRepositoryMetadataBase(
         ?: locRootConfig?.values?.let { AIcFirstValue(it, "sourceRepository.visibility", "repository.visibility", "visibility") }?.takeIf { it.isNotBlank() }
         ?: AIcInferVisibilityFromRepositoryName(locRepositoryId)
     val locGroupId = locRootConfig?.values?.let { AIcFirstValue(it, "groupId") }?.takeIf { it.isNotBlank() }
-    return AIcAlgitesRepositoryMetadata(locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyMap(), emptyMap(), true)
+    return AIcdAlgitesRepositoryMetadata(locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyMap(), emptyMap(), true)
 }
 
 fun AIcInferVisibilityFromRepositoryName(aRepositoryName: String): String = when {
@@ -242,14 +245,14 @@ fun AIcInferVisibilityFromRepositoryName(aRepositoryName: String): String = when
 fun AIcResolveArtifactDirectoryAndSubdirectories(
     aRepositoryRoot: File,
     aArtifactDirectoryPath: String,
-    aInitialState: AIcAlgitesResolvedState
-): List<AIcAlgitesArtifactDirectoryMetadata> {
+    aInitialState: AIcdAlgitesResolvedState
+): List<AIcdAlgitesArtifactDirectoryMetadata> {
     val locStartDirectory = if (aArtifactDirectoryPath == "." || aArtifactDirectoryPath.isBlank()) aRepositoryRoot else aRepositoryRoot.resolve(aArtifactDirectoryPath)
     if (!locStartDirectory.isDirectory) error("Artifact directory path '$aArtifactDirectoryPath' does not exist.")
     val locInheritedState = AIcResolveInheritedStateBeforeDirectory(aRepositoryRoot, aArtifactDirectoryPath, aInitialState)
-    val locResult = mutableListOf<AIcAlgitesArtifactDirectoryMetadata>()
+    val locResult = mutableListOf<AIcdAlgitesArtifactDirectoryMetadata>()
 
-    fun locScan(aDirectory: File, aInheritedState: AIcAlgitesResolvedState) {
+    fun locScan(aDirectory: File, aInheritedState: AIcdAlgitesResolvedState) {
         val locConfig = AIcFindAlgitesMetadataConfig(aDirectory, aRepositoryRoot)
         var locState = aInheritedState
         var locStop = false
@@ -281,8 +284,8 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
 fun AIcResolveInheritedStateBeforeDirectory(
     aRepositoryRoot: File,
     aArtifactDirectoryPath: String,
-    aInitialState: AIcAlgitesResolvedState
-): AIcAlgitesResolvedState {
+    aInitialState: AIcdAlgitesResolvedState
+): AIcdAlgitesResolvedState {
     val locSegments = AIcPathSegments(aArtifactDirectoryPath)
     if (locSegments.isEmpty()) return aInitialState
     var locDirectory = aRepositoryRoot
@@ -299,8 +302,8 @@ fun AIcResolveInheritedStateBeforeDirectory(
 fun AIcResolveSingleArtifactDirectory(
     aRepositoryRoot: File,
     aArtifactDirectoryPath: String,
-    aInitialState: AIcAlgitesResolvedState
-): AIcAlgitesArtifactDirectoryMetadata {
+    aInitialState: AIcdAlgitesResolvedState
+): AIcdAlgitesArtifactDirectoryMetadata {
     var locDirectory = aRepositoryRoot
     var locState = aInitialState
     AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it)) }
@@ -321,16 +324,16 @@ fun AIcResolveSingleArtifactDirectory(
 fun AIcArtifactDirectoryMetadataFromConfig(
     aRepositoryRoot: File,
     aDirectory: File,
-    aConfig: AIcAlgitesDirectoryConfig,
-    aState: AIcAlgitesResolvedState,
+    aConfig: AIcdAlgitesDirectoryConfig,
+    aState: AIcdAlgitesResolvedState,
     aContentsModel: String
-): AIcAlgitesArtifactDirectoryMetadata {
+): AIcdAlgitesArtifactDirectoryMetadata {
     val locPrefix = AIcStructureKindPrefix(aConfig.structureKind)
     val locPath = AIcRelativePath(aRepositoryRoot, aDirectory)
     val locName = AIcFirstValue(aConfig.values, "$locPrefix.name", "name", "$locPrefix.id", "id")
         ?.takeIf { it.isNotBlank() } ?: if (locPath == ".") aRepositoryRoot.name else aDirectory.name
     val locDescription = AIcFirstValue(aConfig.values, "$locPrefix.description", "description") ?: ""
-    return AIcAlgitesArtifactDirectoryMetadata(
+    return AIcdAlgitesArtifactDirectoryMetadata(
         path = locPath,
         structureKind = aConfig.structureKind,
         technologyKinds = aState.technologyKinds ?: emptyList(),
@@ -347,7 +350,7 @@ fun AIcArtifactDirectoryMetadataFromConfig(
     )
 }
 
-fun AIcFindAlgitesMetadataConfig(aDirectory: File, aRepositoryRoot: File): AIcAlgitesDirectoryConfig? {
+fun AIcFindAlgitesMetadataConfig(aDirectory: File, aRepositoryRoot: File): AIcdAlgitesDirectoryConfig? {
     val locCandidates = listOf(
         "algites-source-repository.yml" to "repository", "algites-source-repository.yaml" to "repository",
         "algites-artifact-set.yml" to "artifact-set", "algites-artifact-set.yaml" to "artifact-set",
@@ -360,10 +363,10 @@ fun AIcFindAlgitesMetadataConfig(aDirectory: File, aRepositoryRoot: File): AIcAl
     if (locCandidate.second == "repository" && aDirectory.canonicalFile != aRepositoryRoot.canonicalFile) {
         error("Repository metadata file '${locCandidate.first.name}' is allowed only in repository root. Found in '${AIcRelativePath(aRepositoryRoot, aDirectory)}'.")
     }
-    return AIcAlgitesDirectoryConfig(locCandidate.first, locCandidate.second, AIcReadSimpleYamlScalars(locCandidate.first))
+    return AIcdAlgitesDirectoryConfig(locCandidate.first, locCandidate.second, AIcReadSimpleYamlScalars(locCandidate.first))
 }
 
-fun AIcResolvedStateFromConfig(aConfig: AIcAlgitesDirectoryConfig): AIcAlgitesResolvedState {
+fun AIcResolvedStateFromConfig(aConfig: AIcdAlgitesDirectoryConfig): AIcdAlgitesResolvedState {
     val locPrefix = AIcStructureKindPrefix(aConfig.structureKind)
     val locBase = AIcResolvedStateFromRawValues(aConfig.values, locPrefix, aConfig.file)
     val locTechnologyKinds = when (aConfig.structureKind) {
@@ -376,15 +379,15 @@ fun AIcResolvedStateFromConfig(aConfig: AIcAlgitesDirectoryConfig): AIcAlgitesRe
     return locBase.copy(technologyKinds = locTechnologyKinds)
 }
 
-fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String, aFile: File): AIcAlgitesResolvedState {
+fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String, aFile: File): AIcdAlgitesResolvedState {
     val locGroupId = AIcFirstValue(aValues, "groupId")?.takeIf { it.isNotBlank() }
-    val locVersionContext = AIcAlgitesVersionContext(
+    val locVersionContext = AIcdAlgitesVersionContext(
         lane = AIcFirstValue(aValues, "$aPrefix.versionContext.lane", "$aPrefix.versionContext.releaseLine", "versionContext.lane", "versionContext.releaseLine")?.takeIf { it.isNotBlank() },
         revision = AIcFirstValue(aValues, "$aPrefix.versionContext.revision", "versionContext.revision")?.takeIf { it.isNotBlank() },
         qualifierKind = AIcFirstValue(aValues, "$aPrefix.versionContext.qualifierKind", "versionContext.qualifierKind")?.takeIf { it.isNotBlank() },
         qualifierLabel = AIcFirstValue(aValues, "$aPrefix.versionContext.qualifierLabel", "versionContext.qualifierLabel")?.takeIf { it.isNotBlank() }
     )
-    return AIcAlgitesResolvedState(
+    return AIcdAlgitesResolvedState(
         groupId = locGroupId,
         repositories = AIcRepositoryOverridesFromConfig(aValues, aPrefix, aFile),
         credentialProfiles = AIcCredentialProfilesFromConfig(aValues, aFile),
@@ -399,16 +402,16 @@ fun AIcRepositoryOverridesFromConfig(
     aValues: Map<String, String>,
     aPrefix: String,
     aFile: File
-): Map<String, Map<String, AIcAlgitesRepositoryEndpoint>> {
+): Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>> {
     val locPrefixes = listOf("$aPrefix.repositories.", "repositories.").filter { !it.startsWith(".repositories") }
-    data class AIcBuilder(
+    data class AIcdBuilder(
         var id: String? = null,
         var url: String? = null,
         var credentialProfile: String? = null,
         var enabled: Boolean? = null,
-        var managementAdapter: String? = null
+        var usageProviderAdapter: String? = null
     )
-    val locBuilders = linkedMapOf<Pair<String, String>, AIcBuilder>()
+    val locBuilders = linkedMapOf<Pair<String, String>, AIcdBuilder>()
 
     aValues.forEach { (locKey, locRawValue) ->
         val locPrefix = locPrefixes.firstOrNull { locKey.startsWith(it) } ?: return@forEach
@@ -423,28 +426,28 @@ fun AIcRepositoryOverridesFromConfig(
         if (locIndex.toIntOrNull() == null) return@forEach
         AIcValidateRepositoryCell(locTechnology, locVisibility, locStability, locUsage, locKey)
         val locCell = "$locTechnology.$locVisibility.$locStability.$locUsage"
-        val locBuilder = locBuilders.getOrPut(locCell to locIndex) { AIcBuilder() }
+        val locBuilder = locBuilders.getOrPut(locCell to locIndex) { AIcdBuilder() }
         when (locProperty) {
             "id" -> locBuilder.id = locRawValue.trim()
             "url" -> locBuilder.url = locRawValue.trim().takeIf { it.isNotBlank() }
             "credentialProfile" -> locBuilder.credentialProfile = locRawValue.trim().takeIf { it.isNotBlank() }
             "enabled" -> locBuilder.enabled = AIcParseBoolean(locRawValue, "repository endpoint enabled", aFile)
-            "managementAdapter" -> locBuilder.managementAdapter = locRawValue.trim().lowercase().takeIf { it.isNotBlank() }
+            "usageProviderAdapter" -> locBuilder.usageProviderAdapter = locRawValue.trim().lowercase().takeIf { it.isNotBlank() }
         }
     }
 
-    val locResult = linkedMapOf<String, MutableMap<String, AIcAlgitesRepositoryEndpoint>>()
+    val locResult = linkedMapOf<String, MutableMap<String, AIcdAlgitesRepositoryEndpoint>>()
     locBuilders.forEach { (locKey, locBuilder) ->
         val locCell = locKey.first
         val locId = locBuilder.id?.takeIf { it.isNotBlank() }
             ?: error("Repository endpoint in '${aFile.path}' cell '$locCell' is missing required id.")
         AIcValidateRepositoryEndpointId(locId, locCell, aFile)
-        locResult.getOrPut(locCell) { linkedMapOf() }[locId] = AIcAlgitesRepositoryEndpoint(
+        locResult.getOrPut(locCell) { linkedMapOf() }[locId] = AIcdAlgitesRepositoryEndpoint(
             id = locId,
             url = locBuilder.url,
             credentialProfile = locBuilder.credentialProfile,
             enabled = locBuilder.enabled,
-            managementAdapter = locBuilder.managementAdapter
+            usageProviderAdapter = locBuilder.usageProviderAdapter
         )
     }
     return locResult
@@ -453,15 +456,15 @@ fun AIcRepositoryOverridesFromConfig(
 fun AIcCredentialProfilesFromConfig(
     aValues: Map<String, String>,
     aFile: File
-): Map<String, AIcAlgitesCredentialProfileDefinition> {
-    data class AIcBuilder(var type: String? = null, val configuration: MutableMap<String, String> = linkedMapOf())
-    val locBuilders = linkedMapOf<String, AIcBuilder>()
+): Map<String, AIcdAlgitesCredentialProfileDefinition> {
+    data class AIcdBuilder(var type: String? = null, val configuration: MutableMap<String, String> = linkedMapOf())
+    val locBuilders = linkedMapOf<String, AIcdBuilder>()
     aValues.forEach { (locKey, locValue) ->
         if (!locKey.startsWith("credentialProfiles.")) return@forEach
         val locSegments = locKey.removePrefix("credentialProfiles.").split('.')
         if (locSegments.size < 2) return@forEach
         val locId = locSegments[0]
-        val locBuilder = locBuilders.getOrPut(locId) { AIcBuilder() }
+        val locBuilder = locBuilders.getOrPut(locId) { AIcdBuilder() }
         when {
             locSegments[1] == "type" -> {
                 val locType = locValue.trim().lowercase()
@@ -479,7 +482,7 @@ fun AIcCredentialProfilesFromConfig(
         if (!Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(locId)) {
             error("Credential profile id '$locId' in '${aFile.path}' must use canonical lowercase dash-separated form.")
         }
-        AIcAlgitesCredentialProfileDefinition(locId, locBuilder.type, locBuilder.configuration)
+        AIcdAlgitesCredentialProfileDefinition(locId, locBuilder.type, locBuilder.configuration)
     }
 }
 
@@ -500,21 +503,26 @@ fun AIcValidateRepositoryEndpointId(aId: String, aCell: String, aFile: File) {
     }
 }
 
-fun AIcValidateEffectiveState(aState: AIcAlgitesResolvedState, aContext: String) {
+fun AIcValidateEffectiveState(aState: AIcdAlgitesResolvedState, aContext: String) {
     aState.repositories.forEach { (locCell, locEndpoints) ->
         locEndpoints.values.forEach { locEndpoint ->
             if (locEndpoint.AIcEffectiveEnabled() && locEndpoint.url.isNullOrBlank()) {
                 error("Enabled repository endpoint '${locEndpoint.id}' in $aContext cell '$locCell' has no URL after inheritance.")
             }
             val locUsage = locCell.substringAfterLast('.')
-            if (locUsage == "manage" && locEndpoint.AIcEffectiveEnabled()) {
-                val locAdapter = locEndpoint.managementAdapter
-                    ?: error("Enabled manage endpoint '${locEndpoint.id}' in $aContext has no managementAdapter after inheritance.")
-                if (locAdapter !in AIcAlgitesManagementAdapters) {
-                    error("Manage endpoint '${locEndpoint.id}' in $aContext uses unsupported managementAdapter '$locAdapter'. Supported values: ${AIcAlgitesManagementAdapters.joinToString(", ")}.")
+            val locAdapter = locEndpoint.usageProviderAdapter
+            if (locUsage == "manage" && locEndpoint.AIcEffectiveEnabled() && locAdapter.isNullOrBlank()) {
+                error("Enabled manage endpoint '${locEndpoint.id}' in $aContext has no usageProviderAdapter after inheritance.")
+            }
+            if (!locAdapter.isNullOrBlank()) {
+                val locSupportedAdapters = AIcAlgitesUsageProviderAdaptersByUsage[locUsage].orEmpty()
+                if (locAdapter !in locSupportedAdapters) {
+                    val locSupportedText = if (locSupportedAdapters.isEmpty()) "none" else locSupportedAdapters.joinToString(", ")
+                    error(
+                        "Repository endpoint '${locEndpoint.id}' in $aContext cell '$locCell' uses unsupported " +
+                            "usageProviderAdapter '$locAdapter' for usage '$locUsage'. Supported provider adapters: $locSupportedText."
+                    )
                 }
-            } else if (locUsage != "manage" && !locEndpoint.managementAdapter.isNullOrBlank()) {
-                error("Repository endpoint '${locEndpoint.id}' in $aContext cell '$locCell' defines managementAdapter outside manage usage.")
             }
             val locProfileId = locEndpoint.credentialProfile
             if (!locProfileId.isNullOrBlank()) {
@@ -646,7 +654,7 @@ fun AIcYamlScalar(aValue: String?): String {
     return if (locNeeds) "\"" + aValue.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" else aValue
 }
 
-fun AIcRepositoryMapForOutput(aRepositories: Map<String, Map<String, AIcAlgitesRepositoryEndpoint>>): Map<String, Any?> =
+fun AIcRepositoryMapForOutput(aRepositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>>): Map<String, Any?> =
     aRepositories.toSortedMap().mapValues { (_, locEndpoints) ->
         locEndpoints.values.map { locEndpoint ->
             linkedMapOf<String, Any?>(
@@ -654,12 +662,12 @@ fun AIcRepositoryMapForOutput(aRepositories: Map<String, Map<String, AIcAlgitesR
                 "url" to locEndpoint.url,
                 "credentialProfile" to locEndpoint.credentialProfile,
                 "enabled" to locEndpoint.AIcEffectiveEnabled(),
-                "managementAdapter" to locEndpoint.managementAdapter
+                "usageProviderAdapter" to locEndpoint.usageProviderAdapter
             )
         }
     }
 
-fun AIcCredentialProfilesMapForOutput(aProfiles: Map<String, AIcAlgitesCredentialProfileDefinition>): Map<String, Any?> =
+fun AIcCredentialProfilesMapForOutput(aProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>): Map<String, Any?> =
     aProfiles.toSortedMap().mapValues { (_, locProfile) ->
         linkedMapOf<String, Any?>(
             "type" to locProfile.type,
@@ -667,7 +675,7 @@ fun AIcCredentialProfilesMapForOutput(aProfiles: Map<String, AIcAlgitesCredentia
         )
     }
 
-fun AIcToMap(aResult: AIcAlgitesResolutionResult): Map<String, Any?> = linkedMapOf(
+fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMapOf(
     "repository" to linkedMapOf(
         "id" to aResult.repository.id,
         "name" to aResult.repository.name,
@@ -702,7 +710,7 @@ fun AIcToMap(aResult: AIcAlgitesResolutionResult): Map<String, Any?> = linkedMap
     }
 )
 
-fun AIcToYaml(aResult: AIcAlgitesResolutionResult): String = buildString {
+fun AIcToYaml(aResult: AIcdAlgitesResolutionResult): String = buildString {
     appendLine("repository:")
     appendLine("  id: ${AIcYamlScalar(aResult.repository.id)}")
     appendLine("  name: ${AIcYamlScalar(aResult.repository.name)}")
@@ -748,7 +756,7 @@ fun AIcFlattenDottedProperties(aResultMap: Map<String, Any?>): Map<String, Strin
     return locResult
 }
 
-fun AIcFormatOutput(aResult: AIcAlgitesResolutionResult, aOutputKind: String): String = when (aOutputKind) {
+fun AIcFormatOutput(aResult: AIcdAlgitesResolutionResult, aOutputKind: String): String = when (aOutputKind) {
     "yml", "yaml" -> AIcToYaml(aResult)
     "dotted-properties" -> AIcFlattenDottedProperties(AIcToMap(aResult)).entries.joinToString("\n", postfix = "\n") { "${it.key}=${it.value}" }
     else -> error("Unsupported Algites artifact directory output kind '$aOutputKind'. Supported values are: yml, yaml, dotted-properties.")

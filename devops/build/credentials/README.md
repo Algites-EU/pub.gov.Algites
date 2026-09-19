@@ -73,7 +73,7 @@ The `_CONTENT` suffix describes the content obtained by materialization, not the
 
 Materialization does not introduce another credential format. It transforms the same document: selected fields are replaced with `{ "source": "DIRECT_VALUE", "value": "..." }` entries containing the resolved content.
 
-`ALGITES_CREDENTIAL_SECRETS_JSON` is an optional provider-context object used by bootstrap adapters that need exact-name `SECRET_CONTENT` lookup. It is not a credential document and does not define profiles or fields. The GitHub bridge receives the complete GitHub Actions `secrets` context in this form. Local/provider-specific launchers may supply an equivalent secret context when needed.
+`_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` is an optional provider-context object used by bootstrap adapters that need exact-name `SECRET_CONTENT` lookup. It is not a credential document and does not define profiles or fields. The GitHub bridge receives the complete GitHub Actions `secrets` context in this form. Local/provider-specific launchers may supply an equivalent secret context when needed.
 
 ## Local resolution and persistent storage
 
@@ -84,7 +84,7 @@ The universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document is also the
 
 The Gradle repository bootstrap runs before the credential Java modules of the current checkout can be built. When the environment override is absent, `algites-credential-values.gradle.kts` therefore asks an already installed `algites-credentials` CLI for the stored universal document. The executable is resolved from `ALGITES_CREDENTIAL_CLI` when that variable is set and otherwise from `algites-credentials` on `PATH`. This is a bootstrap adapter only; it does not introduce another credential schema.
 
-For `SECRET_CONTENT`, an explicitly supplied `ALGITES_CREDENTIAL_SECRETS_JSON` provider context is checked first. If the key is absent there, local Java resolution and the Gradle bootstrap resolve the named secret from the same Algites operating-system secure store. Consequently `ALGITES_CREDENTIAL_SECRETS_JSON` is normally unnecessary for a local build.
+For `SECRET_CONTENT`, an explicitly supplied `_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` provider context is checked first. If the key is absent there, local Java resolution and the Gradle bootstrap resolve the named secret from the same Algites operating-system secure store. Consequently `_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` is normally unnecessary for a local build.
 
 A local user therefore stores only the credential profiles and named secrets required by the operations they actually execute. Upload/signing credentials are not required for an ordinary download-only build. Because one document may contain multiple typed entries under one profile, a later profile-type change does not reinterpret or destroy the values retained for another type.
 
@@ -111,7 +111,7 @@ Gradle credential preflight
         -> actual Gradle processing
 ```
 
-The preflight task is `resolveAlgitesRequiredCredentials`. It runs with `ALGITES_CREDENTIAL_PREFLIGHT=true`, so repository metadata can be evaluated before repository authentication is required. Publication workflows request download and the appropriate upload contexts; post-release maintenance resolves `manage` credentials separately so deletion capability is not exposed to the publication phase. Ordinary CI requests download only.
+The preflight task is `resolveAlgitesRequiredCredentials`. It runs with `_TMP_ALGITES_CREDENTIAL_PREFLIGHT=true`, so repository metadata can be evaluated before repository authentication is required. Publication workflows request download and the appropriate upload contexts; post-release maintenance resolves `manage` credentials separately so deletion capability is not exposed to the publication phase. Ordinary CI requests download only.
 
 The trusted bridge may receive the complete GitHub `secrets` context because filtering is its purpose. Only the credential profiles required by the preflight plan are forwarded to the actual Gradle processing. Secret values are never logged.
 

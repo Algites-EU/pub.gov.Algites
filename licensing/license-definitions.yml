@@ -1,0 +1,9 @@
+licenses:
+  - id: Apache-2.0
+    name: Apache License 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+    text: texts/Apache-2.0.txt
+  - id: CC-BY-4.0
+    name: Creative Commons Attribution 4.0 International
+    url: https://creativecommons.org/licenses/by/4.0/
+    text: texts/CC-BY-4.0.txt

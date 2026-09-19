@@ -25,7 +25,7 @@ public final class AItcCredentialDocumentProviderTest {
                 "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
                 "{\"profile\":{\"basic\":{\"username\":{\"source\":\"DIRECT_VALUE\",\"value\":\"user\"}," +
                     "\"password\":{\"source\":\"SECRET_CONTENT\",\"value\":\"PASSWORD_SECRET\"}}}}",
-                "ALGITES_CREDENTIAL_SECRETS_JSON",
+                "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON",
                 "{\"PASSWORD_SECRET\":\"secret\"}"
             ),
             Path.of(".")

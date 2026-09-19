@@ -17,7 +17,7 @@ repositories:
       snapshot:
         download:
           - id: algites-java-public-snapshot-download
-            url: "https://dl.cloudsmith.io/public/algites/maven-snapshots-pub/maven/"
+            url: "https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/"
   python:
     public:
       release:
@@ -27,7 +27,7 @@ repositories:
       snapshot:
         download:
           - id: algites-python-public-snapshot-download
-            url: "https://dummy.invalid/algites/python/public/snapshot/download/"
+            url: "https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/"
   mps:
     public:
       release:

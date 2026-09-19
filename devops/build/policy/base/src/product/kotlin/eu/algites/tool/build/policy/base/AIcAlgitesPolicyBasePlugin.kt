@@ -159,7 +159,7 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         return locDirectories
     }
 
-    private fun readVersionContext(aMetadataFiles: List<File>): AIcVersionContext {
+    private fun readVersionContext(aMetadataFiles: List<File>): AIcdVersionContext {
 
         val locYamlValues = readMergedSimpleYamlValues(aMetadataFiles)
         val locMetadataFileNames = aMetadataFiles.joinToString(", ") { it.name }
@@ -189,14 +189,14 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
             "Algites governance error: versionContext.qualifierLabel contains invalid characters. Actual value: '$locQualifierLabel'."
         }
 
-        return AIcVersionContext(
+        return AIcdVersionContext(
             locLane,
             locRevision,
             locQualifierLabel
         )
     }
 
-    private fun computeVersion(aVersionContext: AIcVersionContext): String {
+    private fun computeVersion(aVersionContext: AIcdVersionContext): String {
 
         val locBaseVersion = "${aVersionContext.lane}.${aVersionContext.revision}"
 
@@ -309,7 +309,7 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         }
     }
 
-    private data class AIcVersionContext(
+    private data class AIcdVersionContext(
         val lane: String,
         val revision: String,
         val qualifierLabel: String

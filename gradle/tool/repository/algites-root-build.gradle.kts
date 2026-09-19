@@ -12,6 +12,7 @@ import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.credentials.HttpHeaderCredentials
 import org.gradle.authentication.http.HttpHeaderAuthentication
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
@@ -37,10 +38,20 @@ if (locAlgitesCredentialValuesScript.isFile) {
     apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-credential-values.gradle.kts"))
 }
 
+val locAlgitesLicensingScript = rootProject.file("gradle/tool/licensing/algites-licensing.gradle.kts")
+if (locAlgitesLicensingScript.isFile) {
+    apply(from = locAlgitesLicensingScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/licensing/algites-licensing.gradle.kts"))
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesLicensesForPathAndContentKind = rootProject.extra["algitesLicensesForPathAndContentKind"] as (String, String) -> List<Map<String, String?>>
+
 @Suppress("UNCHECKED_CAST")
 val locAlgitesResolveCredentialValue = extra["algitesResolveCredentialValue"] as (String, String, String, File) -> String?
 
-val algitesCredentialPreflight = System.getenv("ALGITES_CREDENTIAL_PREFLIGHT")
+val algitesCredentialPreflight = System.getenv("_TMP_ALGITES_CREDENTIAL_PREFLIGHT")
     ?.equals("true", ignoreCase = true) == true
 
 val locAlgitesDocsSiteScript = rootProject.file("gradle/tool/documentation/algites-docs-site.gradle.kts")
@@ -73,22 +84,22 @@ fun AIcAlgitesStringList(aValue: Any?): List<String> {
     }
 }
 
-data class AIcAlgitesRepositoryEndpoint(
+data class AIcdAlgitesRepositoryEndpoint(
     val cell: String,
     val id: String,
     val url: String,
     val credentialProfile: String?,
-    val managementAdapter: String?
+    val usageProviderAdapter: String?
 )
 
-data class AIcAlgitesCredentialProfile(
+data class AIcdAlgitesCredentialProfile(
     val id: String,
     val type: String,
     val configuration: Map<String, String>
 )
 
 @Suppress("UNCHECKED_CAST")
-fun AIcAlgitesRepositoryEndpoints(aValue: Any?, aCell: String): List<AIcAlgitesRepositoryEndpoint> {
+fun AIcAlgitesRepositoryEndpoints(aValue: Any?, aCell: String): List<AIcdAlgitesRepositoryEndpoint> {
     val locRepositories = aValue as? Map<*, *> ?: return emptyList()
     val locItems = locRepositories[aCell] as? List<*> ?: return emptyList()
     return locItems.mapNotNull { locItem ->
@@ -98,15 +109,15 @@ fun AIcAlgitesRepositoryEndpoints(aValue: Any?, aCell: String): List<AIcAlgitesR
         val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val locCredentialProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-        val locManagementAdapter = locMap["managementAdapter"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
-        AIcAlgitesRepositoryEndpoint(aCell, locId, locUrl, locCredentialProfile, locManagementAdapter)
+        val locUsageProviderAdapter = locMap["usageProviderAdapter"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
+        AIcdAlgitesRepositoryEndpoint(aCell, locId, locUrl, locCredentialProfile, locUsageProviderAdapter)
     }
 }
 
 @Suppress("UNCHECKED_CAST")
-fun AIcAlgitesCredentialProfiles(aValue: Any?): Map<String, AIcAlgitesCredentialProfile> {
+fun AIcAlgitesCredentialProfiles(aValue: Any?): Map<String, AIcdAlgitesCredentialProfile> {
     val locProfiles = aValue as? Map<*, *> ?: return emptyMap()
-    val locResult = linkedMapOf<String, AIcAlgitesCredentialProfile>()
+    val locResult = linkedMapOf<String, AIcdAlgitesCredentialProfile>()
     locProfiles.forEach { (locRawId, locRawDefinition) ->
         val locId = locRawId?.toString() ?: return@forEach
         val locDefinition = locRawDefinition as? Map<*, *> ?: return@forEach
@@ -115,15 +126,15 @@ fun AIcAlgitesCredentialProfiles(aValue: Any?): Map<String, AIcAlgitesCredential
             ?.entries
             ?.associate { locEntry -> locEntry.key.toString() to locEntry.value.toString() }
             ?: emptyMap()
-        locResult[locId] = AIcAlgitesCredentialProfile(locId, locType, locConfiguration)
+        locResult[locId] = AIcdAlgitesCredentialProfile(locId, locType, locConfiguration)
     }
     return locResult
 }
 
-fun AIcAlgitesCredentialValue(aProfile: AIcAlgitesCredentialProfile, aField: String): String? =
+fun AIcAlgitesCredentialValue(aProfile: AIcdAlgitesCredentialProfile, aField: String): String? =
     locAlgitesResolveCredentialValue(aProfile.id, aProfile.type, aField, rootProject.projectDir)
 
-fun AIcAlgitesRequireBasicCredential(aProfile: AIcAlgitesCredentialProfile): Pair<String, String> {
+fun AIcAlgitesRequireBasicCredential(aProfile: AIcdAlgitesCredentialProfile): Pair<String, String> {
     val locUsername = AIcAlgitesCredentialValue(aProfile, "username")
     val locPassword = AIcAlgitesCredentialValue(aProfile, "password")
     if (locUsername.isNullOrEmpty() || locPassword.isNullOrEmpty()) {
@@ -176,7 +187,7 @@ fun AIcAlgitesSnapshotVersionForTechnology(aReleaseVersion: String, aTechnology:
     else -> "$aReleaseVersion-SNAPSHOT"
 }
 
-fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcAlgitesRepositoryEndpoint, aProfiles: Map<String, AIcAlgitesCredentialProfile>): Map<String, String> {
+fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcdAlgitesRepositoryEndpoint, aProfiles: Map<String, AIcdAlgitesCredentialProfile>): Map<String, String> {
     val locProfileId = aEndpoint.credentialProfile
         ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id}' requires a credentialProfile.")
     val locProfile = aProfiles[locProfileId]
@@ -263,8 +274,8 @@ fun AIcAlgitesRepsyLoginUrl(aEndpointUrl: String): String {
 
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesRepsyHeaders(
-    aEndpoint: AIcAlgitesRepositoryEndpoint,
-    aProfiles: Map<String, AIcAlgitesCredentialProfile>
+    aEndpoint: AIcdAlgitesRepositoryEndpoint,
+    aProfiles: Map<String, AIcdAlgitesCredentialProfile>
 ): Map<String, String> {
     val locProfileId = aEndpoint.credentialProfile
         ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id}' requires a credentialProfile.")
@@ -301,8 +312,8 @@ fun AIcAlgitesRepsyHeaders(
 }
 
 fun AIcAlgitesDeleteRepsySnapshot(
-    aEndpoint: AIcAlgitesRepositoryEndpoint,
-    aProfiles: Map<String, AIcAlgitesCredentialProfile>,
+    aEndpoint: AIcdAlgitesRepositoryEndpoint,
+    aProfiles: Map<String, AIcdAlgitesCredentialProfile>,
     aPackageName: String,
     aVersion: String,
     aFormat: String,
@@ -346,8 +357,8 @@ fun AIcAlgitesDeleteRepsySnapshot(
 
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesDeleteCloudsmithSnapshot(
-    aEndpoint: AIcAlgitesRepositoryEndpoint,
-    aProfiles: Map<String, AIcAlgitesCredentialProfile>,
+    aEndpoint: AIcdAlgitesRepositoryEndpoint,
+    aProfiles: Map<String, AIcdAlgitesCredentialProfile>,
     aPackageName: String,
     aVersion: String,
     aFormat: String
@@ -648,6 +659,9 @@ subprojects {
     val locEffectiveRepositories = locAlgitesArtifactDirectory?.get("repositories")
     val locEffectiveCredentialProfiles = AIcAlgitesCredentialProfiles(locAlgitesArtifactDirectory?.get("credentialProfiles"))
 
+    val locAlgitesArtifactDirectoryPath = locAlgitesArtifactDirectory?.get("path")?.toString()?.takeIf { it.isNotBlank() } ?: "."
+    val locAlgitesProductLicenses = locAlgitesLicensesForPathAndContentKind(locAlgitesArtifactDirectoryPath, "product")
+
     plugins.withId("base") {
         extensions.configure<BasePluginExtension>("base") {
             archivesName.set(locAlgitesCanonicalArtifactId)
@@ -659,6 +673,20 @@ subprojects {
     }
 
     if ("java" in locAlgitesTechnologyKinds) {
+        plugins.withId("java") {
+            tasks.withType(Jar::class.java).configureEach {
+                dependsOn(rootProject.tasks.named("verifyAlgitesLicensing"))
+                locAlgitesProductLicenses.forEach { locLicense ->
+                    val locLicenseId = locLicense["id"] ?: return@forEach
+                    val locLicenseFile = locLicense["file"] ?: return@forEach
+                    from(rootProject.file(locLicenseFile)) {
+                        into("META-INF/LICENSES")
+                        rename { "$locLicenseId.txt" }
+                    }
+                }
+            }
+        }
+
         plugins.withId("maven-publish") {
             if (algitesIsPublishRequested) {
                 requireAlgitesGroupForPublish(project.path, project.group)
@@ -679,6 +707,17 @@ subprojects {
             extensions.configure<PublishingExtension>("publishing") {
                 publications.withType(MavenPublication::class.java).configureEach {
                     artifactId = locAlgitesCanonicalArtifactId
+                    pom {
+                        licenses {
+                            locAlgitesProductLicenses.forEach { locLicense ->
+                                license {
+                                    name.set(locLicense["name"] ?: locLicense["id"] ?: "Unknown license")
+                                    locLicense["url"]?.takeIf { it.isNotBlank() }?.let { locUrl -> url.set(locUrl) }
+                                    distribution.set("repo")
+                                }
+                            }
+                        }
+                    }
                 }
 
                 repositories {
@@ -757,6 +796,8 @@ subprojects {
         val locPythonDistributionName = AIcAlgitesPythonDistributionName(locAlgitesCanonicalArtifactId)
         val locPythonImportNamespace = AIcAlgitesPythonImportNamespace(rootProject.name, locAlgitesSubprojectPathDots)
 
+        val locPythonLicenseDirectory = project.layout.projectDirectory.dir("run/bld/algites-licensing/product")
+
         val locDeletePythonDevelopmentMetadata = tasks.register("deletePythonDevelopmentMetadata") {
             group = "algites"
             description = "Deletes generated Python development metadata for this artifact."
@@ -768,6 +809,7 @@ subprojects {
         val locGeneratePythonProjectMetadata = tasks.register("generatePythonProjectMetadata") {
             group = "algites"
             description = "Generates the effective pyproject.toml for this Algites Python artifact."
+            dependsOn(rootProject.tasks.named("verifyAlgitesLicensing"))
 
             inputs.file(project.file("algites-artifact.yml")).optional()
             inputs.file(project.file("algites-artifact.yaml")).optional()
@@ -776,9 +818,22 @@ subprojects {
             inputs.property("distributionName", locPythonDistributionName)
             inputs.property("importNamespace", locPythonImportNamespace)
             inputs.property("version", project.provider { project.version.toString() })
+            inputs.files(locAlgitesProductLicenses.mapNotNull { it["file"]?.let(rootProject::file) })
             outputs.file(locPythonProjectFile)
+            outputs.dir(locPythonLicenseDirectory)
 
             doLast {
+                val locLicenseDirectoryFile = locPythonLicenseDirectory.asFile
+                if (locLicenseDirectoryFile.exists()) locLicenseDirectoryFile.deleteRecursively()
+                if (locAlgitesProductLicenses.isNotEmpty()) {
+                    locLicenseDirectoryFile.mkdirs()
+                    locAlgitesProductLicenses.forEach { locLicense ->
+                        val locId = locLicense["id"] ?: return@forEach
+                        val locSource = locLicense["file"]?.let(rootProject::file) ?: return@forEach
+                        locSource.copyTo(File(locLicenseDirectoryFile, "$locId.txt"), overwrite = true)
+                    }
+                }
+
                 val locTemplateText = if (locPythonTemplateFile.asFile.isFile) {
                     locPythonTemplateFile.asFile.readText(Charsets.UTF_8)
                 } else {
@@ -805,6 +860,15 @@ subprojects {
                     appendLine("version = \"$locPythonVersion\"")
                     if (locDescription.isNotBlank()) {
                         appendLine("description = \"$locDescription\"")
+                    }
+                    if (locAlgitesProductLicenses.size == 1) {
+                        appendLine("license = \"${locAlgitesProductLicenses.single()["id"]}\"")
+                    }
+                    if (locAlgitesProductLicenses.isNotEmpty()) {
+                        val locLicensePaths = locAlgitesProductLicenses.joinToString(", ") { locLicense ->
+                            "\"run/bld/algites-licensing/product/${locLicense["id"]}.txt\""
+                        }
+                        appendLine("license-files = [$locLicensePaths]")
                     }
                     appendLine()
                     appendLine("[tool.setuptools.packages.find]")
@@ -973,7 +1037,7 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
 
                 locEndpoints.forEach { locEndpoint ->
                     locConfiguredTargets++
-                    val locDeleted = when (locEndpoint.managementAdapter) {
+                    val locDeleted = when (locEndpoint.usageProviderAdapter) {
                         "cloudsmith" -> AIcAlgitesDeleteCloudsmithSnapshot(
                             locEndpoint,
                             locProfiles,
@@ -989,9 +1053,9 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
                             locFormat,
                             locGroupId
                         )
-                        null -> throw GradleException("Manage endpoint '${locEndpoint.id}' has no managementAdapter.")
+                        null -> throw GradleException("Manage endpoint '${locEndpoint.id}' has no usageProviderAdapter.")
                         else -> throw GradleException(
-                            "Manage endpoint '${locEndpoint.id}' uses unsupported managementAdapter '${locEndpoint.managementAdapter}'."
+                            "Manage endpoint '${locEndpoint.id}' uses unsupported usageProviderAdapter '${locEndpoint.usageProviderAdapter}'."
                         )
                     }
                     locDeletedPackages += locDeleted

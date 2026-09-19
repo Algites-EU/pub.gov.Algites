@@ -55,7 +55,7 @@ permissions:
   id-token: write
 
 env:
-  ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
+  _TMP_ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
 
 concurrency:
   group: algites-docs-pages-${{ github.repository }}-${{ inputs.documentation-branch }}
@@ -78,7 +78,7 @@ jobs:
 
           locSourceRef="${{ inputs.source-ref }}"
           if [[ -z "${locSourceRef}" ]]; then
-            locSourceRef="${ALGITES_DOCS_DEFAULT_REF}"
+            locSourceRef="${_TMP_ALGITES_DOCS_DEFAULT_REF}"
           fi
 
           echo "source-ref=${locSourceRef}" >> "${GITHUB_OUTPUT}"
@@ -139,6 +139,18 @@ jobs:
             "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/repository/defaults/algites-repository-download-defaults-public.yml" \
             > "${locPublicDownloadFile}"
           echo "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE=${locPublicDownloadFile}" >> "${GITHUB_ENV}"
+
+      - name: Fetch Algites public licensing governance
+        shell: bash
+        run: |
+          set -euo pipefail
+          locGovernanceRoot="${RUNNER_TEMP}/algites-public-licensing-governance"
+          rm -rf "${locGovernanceRoot}"
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/Algites-EU/pub.gov.Algites.git \
+            "${locGovernanceRoot}"
+          git -C "${locGovernanceRoot}" sparse-checkout set licensing
+          echo "ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY=${locGovernanceRoot}/licensing" >> "${GITHUB_ENV}"
 
       - name: Show checked out source revision
         working-directory: source
@@ -221,7 +233,7 @@ jobs:
           cat > "${locResolverProjectDir}/build.gradle.kts" <<'KTS'
           import java.io.File
 
-          val locRepositoryDirectory = File(System.getenv("ALGITES_METADATA_REPOSITORY_DIR"))
+          val locRepositoryDirectory = File(System.getenv("_TMP_ALGITES_METADATA_REPOSITORY_DIR"))
           val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
 
           if (locResolverCoreScript.isFile) {
@@ -255,7 +267,7 @@ jobs:
                       providers.gradleProperty("repository.visibility").orNull
                   )
                   val locProperties = locFlattenMetadata(locMetadata)
-                  val locOutputFile = File(System.getenv("ALGITES_RESOLVED_PROPERTIES_FILE"))
+                  val locOutputFile = File(System.getenv("_TMP_ALGITES_RESOLVED_PROPERTIES_FILE"))
 
                   locOutputFile.parentFile.mkdirs()
                   locOutputFile.writeText(
@@ -270,7 +282,7 @@ jobs:
           }
           KTS
 
-          ALGITES_METADATA_REPOSITORY_DIR="${PWD}" ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" ./gradlew --no-daemon --quiet --project-dir "${locResolverProjectDir}" writeAlgitesResolvedArtifactMetadataProperties
+          _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" ./gradlew --no-daemon --quiet --project-dir "${locResolverProjectDir}" writeAlgitesResolvedArtifactMetadataProperties
 
           locResolvedVersion="$(grep -m 1 '^artifactDirectories\.0\.version\.resolvedValue=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
           locResolvedLane="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"

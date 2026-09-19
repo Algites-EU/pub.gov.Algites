@@ -1321,7 +1321,7 @@ repositories:
           - id: algites-java-private-release-manage
             url: https://manager.example.invalid/api/packages/private/releases/
             credentialProfile: algites-java-private-release-manage
-            managementAdapter: cloudsmith
+            usageProviderAdapter: cloudsmith
 ```
 
 `enabled` defaults to `true`. A descendant may therefore disable an inherited endpoint without restating its URL or credential profile:
@@ -1357,9 +1357,11 @@ Repository visibility is distinct from source-repository visibility, but source-
 
 This asymmetry allows private artifacts to depend on public artifacts while preventing public artifacts from acquiring a dependency on private infrastructure or private-only artifacts.
 
-The concrete protocol/client behaviour for `download` and `upload` is defined by the corresponding TechnologyKind adapter. `manage` is deliberately a separate usage because repository-management operations such as package deletion do not have a technology-wide Maven or Python standard. A manage endpoint therefore has its own URL and `credentialProfile`, and it declares a `managementAdapter` selecting an implementation-supported repository-manager API. Algites MUST NOT infer that a manage URL accepts a generic HTTP `DELETE`.
+The default protocol/client behaviour for each usage is defined by the corresponding TechnologyKind adapter. Any repository endpoint MAY additionally declare an optional `usageProviderAdapter` when that specific provider requires behaviour that cannot be expressed by the standard TechnologyKind/usage mechanism. Adapter identity is therefore attached to the individual `download`, `upload`, or `manage` endpoint rather than being a management-only concept. If `usageProviderAdapter` is absent, the standard TechnologyKind implementation is used. An adapter value is valid only when the implementation supports that adapter for the endpoint's usage.
 
-Supported management adapters are currently:
+`manage` is deliberately a separate usage because repository-management operations such as package deletion do not have a technology-wide Maven or Python standard. Consequently an enabled `manage` endpoint currently MUST declare a `usageProviderAdapter`; Algites MUST NOT infer that a manage URL accepts a generic HTTP `DELETE`. Provider-specific upload adapters (for example a future Maven Central Publisher API adapter) can be added without changing the repository matrix model. No provider-specific `download` or `upload` adapter is implemented by the current revision.
+
+Supported `manage` provider adapters are currently:
 
 - `cloudsmith`: `url` is the Cloudsmith package-management API collection URL, for example `https://api.cloudsmith.io/v1/packages/<owner>/<repository>/`. The adapter resolves the requested package/version through the Cloudsmith API before deleting the matching package records. Credential types `api-key` and `bearer` are supported.
 - `repsy`: `url` identifies the concrete Repsy management resource for the repository and TechnologyKind. For Java/Maven it MUST have the form `<api-base>/api/mvn/artifacts/<repoName>`; for Python/PyPI it MUST have the form `<api-base>/api/pypi/packages/<repoName>`. The adapter deletes the exact Maven artifact version or PyPI release through the Repsy management API. Credential type `basic` authenticates through `<api-base>/api/auth/login` and uses the returned JWT for the delete request; credential type `bearer` supplies an already obtained JWT directly.
@@ -1449,7 +1451,11 @@ A profile MAY retain entries for multiple credential types. The effective non-se
 
 Materialization always returns the same credential-document format. A resolved field is represented as `DIRECT_VALUE`; a bridge or launcher MAY also reduce the document to only the profile/type pairs required by the operation. There is no separate CI credential schema.
 
-`ALGITES_CREDENTIAL_SECRETS_JSON` is an optional provider secret context for exact-name `SECRET_CONTENT` resolution. It is not a credential document. In GitHub Actions it contains the GitHub `secrets` context supplied to the trusted bridge. For ordinary local processing it is normally absent; the installed Java resolver and Gradle bootstrap resolve a missing `SECRET_CONTENT` key from a named value in the Algites local secure store.
+`_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` is an optional provider secret context for exact-name `SECRET_CONTENT` resolution. It is not a credential document. In GitHub Actions it contains the GitHub `secrets` context supplied to the trusted bridge. For ordinary local processing it is normally absent; the installed Java resolver and Gradle bootstrap resolve a missing `SECRET_CONTENT` key from a named value in the Algites local secure store.
+
+Algites reserves the `_TMP_ALGITES_*` prefix for transient implementation transport between first-party workflows, actions, Gradle helpers, and subprocesses. Such variables are not a user configuration contract and MUST NOT be provisioned as GitHub repository/organization secrets. Stable externally configurable variables use the `ALGITES_*` prefix.
+
+Stable externally configurable build environment contracts currently include the universal credential document/helper (`ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, `ALGITES_CREDENTIAL_CLI`), repository/governance locations (`ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`, `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE`, `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE`, `ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY`, `ALGITES_LICENSING_PRIVATE_GOVERNANCE_DIRECTORY`), build-selection/runtime overrides (`ALGITES_VISIBILITY`, `ALGITES_TECHNOLOGY_KINDS`, `ALGITES_DOCS_PAGES_BRANCH`, `ALGITES_PYTHON_EXECUTABLE`), and optional credential-preflight/cleanup task overrides (`ALGITES_CREDENTIAL_USAGES`, `ALGITES_CREDENTIAL_DOWNLOAD_STABILITIES`, `ALGITES_CREDENTIAL_UPLOAD_STABILITIES`, `ALGITES_CREDENTIAL_MANAGE_STABILITIES`, `ALGITES_CREDENTIAL_OUTPUT`, `ALGITES_CLEANUP_RELEASE_VERSION`). Deterministic per-field `ALGITES_CREDENTIAL_*` names emitted by the credential CLI are also externally usable through `ENVIRONMENT_VARIABLE_CONTENT`.
 
 The universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document is also the canonical persistent local representation; complete profile/type credentials are not stored in a second format. A non-empty `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` environment variable overrides the persistent document for that process. Otherwise local Java resolution reads the document from the highest-priority available Algites operating-system secure store. Gradle Settings runs before the credential modules of the current checkout can be built, so its bootstrap adapter obtains the same stored document through an already installed `algites-credentials` helper; `ALGITES_CREDENTIAL_CLI` MAY specify a non-default helper path. OS backends are discovered through `ServiceLoader` and expose structured availability/remediation diagnostics. Linux desktop integration targets the Freedesktop Secret Service D-Bus API directly and does not require the `secret-tool` executable.
 
@@ -2152,3 +2158,116 @@ This section is intentionally placed at the end and is **temporary**.
 - Legacy repository configuration that assumes only Maven repositories should be normalized into the TechnologyKind x visibility x stability x usage repository matrix.
 
 [[/PROPOSAL]]
+
+## Hierarchical licensing governance and materialization
+
+Algites licensing is resolved independently from repository coordinates and credentials. The licensing model has two distinct concerns:
+
+- **license definitions** describe a canonical license id, human-readable name, optional public URL, and the authoritative license text;
+- **license usage** determines whether a known license is enabled in a repository subtree and for which content kinds it applies.
+
+The supported content kinds in the first schema version are `product` and `documentation`.
+
+Public repositories resolve licensing from:
+
+```text
+public governance licensing
++ repository-local licensing
++ nearer subtree licensing
+```
+
+Private repositories resolve licensing from:
+
+```text
+public governance licensing
++ private governance licensing
++ repository-local licensing
++ nearer subtree licensing
+```
+
+A public repository MUST NOT read or depend on private licensing governance.
+
+The governance directories are supplied to builds through:
+
+```text
+ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY
+ALGITES_LICENSING_PRIVATE_GOVERNANCE_DIRECTORY
+```
+
+The private variable is required only for private repositories. `pub.gov.Algites` and `priv.gov.Algites` may use their own root `licensing/` directory as their respective governance source.
+
+### License definitions
+
+A `licensing/` directory may exist in governance or at any repository subtree. Its canonical definition file is:
+
+```text
+licensing/license-definitions.yml
+```
+
+License text files are normally stored below `licensing/texts/` and referenced by the definition. Example:
+
+```yaml
+licenses:
+  - id: Apache-2.0
+    name: Apache License 2.0
+    url: https://www.apache.org/licenses/LICENSE-2.0
+    text: texts/Apache-2.0.txt
+```
+
+A locally defined license id that already exists in higher governance MUST be identical in name, URL, and license text. Silent redefinition of an existing license id is forbidden. A changed license requires a new id, normally a new `LicenseRef-*` id for an Algites-specific license.
+
+### License usage
+
+A `license-usage.yml` may exist at any repository directory outside the reserved `licensing/` definition directory. Its state is inherited by the complete subtree. Example:
+
+```yaml
+licenses:
+  - id: Apache-2.0
+    enabled: true
+    contentKinds:
+      - product
+  - id: CC-BY-4.0
+    enabled: true
+    contentKinds:
+      - documentation
+```
+
+`enabled` is mandatory. `contentKinds` may be omitted when an inherited license is only being enabled or disabled; inherited content kinds are retained. A license that is first enabled without any effective content kind is invalid.
+
+`enabled: false` acts as an explicit tombstone for an inherited usage and can be reversed again by a nearer `license-usage.yml`.
+
+The public governance default enables `Apache-2.0` for PRODUCT and `CC-BY-4.0` for DOCUMENTATION. Private governance explicitly disables those public defaults, so private repositories do not become open-source merely because public governance is the first catalog layer.
+
+### Root LICENSE and LICENSES
+
+The root `LICENSE` file and the complete root `LICENSES/` directory are managed outputs of the licensing model.
+
+`rebuildAlgitesLicensing`:
+
+- resolves the effective licensing tree;
+- rewrites the root `LICENSE` human-readable summary;
+- computes the union of every license that is enabled anywhere in the repository;
+- copies exactly those canonical license texts into `LICENSES/<license-id>.txt`;
+- removes stale license files that are no longer enabled anywhere.
+
+`checkAlgitesLicensing` performs the same resolution without modifying the repository and always fails when `LICENSE`, a required license text, or the managed `LICENSES/` contents differ from the effective model. `verifyAlgitesLicensing` provides the lifecycle-aware verification used by build and publication tasks. Its default `algites.licensing.validationMode=strict` behavior is identical to the strict check; the only alternative is `warn`, used explicitly by snapshot deployment to report inconsistencies without blocking a development snapshot. Normal builds and releases remain strict. Repository-local copies therefore cannot silently diverge from the authoritative governance text during normal/release processing.
+
+The root summary lists the effective root licensing and only subtree locations whose effective licensing differs from their parent context. The machine-readable source of truth remains the governance/local `license-definitions.yml` definitions and hierarchical `license-usage.yml` usage files.
+
+### Artifact packaging
+
+Technology adapters use the effective licensing of the artifact directory and the requested content kind.
+
+For Java PRODUCT artifacts, all effective product license texts are included under:
+
+```text
+META-INF/LICENSES/
+```
+
+and the corresponding Maven POM license metadata is generated.
+
+For Python PRODUCT artifacts, the selected license files are staged into generated build metadata and declared through PEP 639 `project.license-files`. If exactly one PRODUCT license is effective, its id is also emitted as the `project.license` SPDX expression. No logical `AND`/`OR` relationship is inferred automatically when multiple product licenses are active.
+
+The generated documentation site receives the union of all effective DOCUMENTATION licenses in its own `LICENSES/` directory together with a short generated license summary.
+
+MPS effective licensing is resolved by the same model. A concrete MPS distribution packager MUST include the resolved PRODUCT license texts when such a packager is defined; the current generic MPS support does not invent a distribution archive format solely for licensing.

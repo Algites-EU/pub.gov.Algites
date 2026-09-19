@@ -270,7 +270,7 @@ fun AIcRegisterAlgitesMpsDocumentationGeneratorTask(aTaskName: String, aProjectD
             val locProcessBuilder = ProcessBuilder(locGeneratorCommandParts)
             locProcessBuilder.directory(locProjectDirectory)
             locProcessBuilder.environment()["MPS_HOME"] = locMpsHome.absolutePath
-            locProcessBuilder.environment()["ALGITES_MPS_PROJECT_DIR"] = locProjectDirectory.absolutePath
+            locProcessBuilder.environment()["_TMP_ALGITES_MPS_PROJECT_DIR"] = locProjectDirectory.absolutePath
             locProcessBuilder.inheritIO()
 
             val locProcess = locProcessBuilder.start()

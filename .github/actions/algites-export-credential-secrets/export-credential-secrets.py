@@ -129,16 +129,16 @@ def write_github_env(name: str, value: str) -> None:
         target.write(f"{name}<<{delimiter}\n{value}\n{delimiter}\n")
 
 
-plan = load_plan(os.environ.get("ALGITES_REQUIRED_CREDENTIALS_FILE", ""))
+plan = load_plan(os.environ.get("_TMP_ALGITES_REQUIRED_CREDENTIALS_FILE", ""))
 required = plan.get("credentials", [])
 if not isinstance(required, list):
     fail("Required credential plan property 'credentials' must be an array.")
 
-raw_credentials = os.environ.get("ALGITES_CREDENTIALS_JSON", "")
+raw_credentials = os.environ.get("_TMP_ALGITES_CREDENTIALS_JSON", "")
 credentials = parse_json_object(raw_credentials, "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS", allow_empty=not required)
 secrets = parse_json_object(
-    os.environ.get("ALGITES_CREDENTIAL_SECRETS_JSON", ""),
-    "ALGITES_CREDENTIAL_SECRETS_JSON",
+    os.environ.get("_TMP_ALGITES_CREDENTIAL_SECRETS_JSON", ""),
+    "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON",
     allow_empty=True,
 )
 

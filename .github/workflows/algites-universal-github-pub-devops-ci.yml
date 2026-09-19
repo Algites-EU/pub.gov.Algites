@@ -35,7 +35,7 @@ on:
 
       private-repository-defaults-enabled:
         type: boolean
-        description: "Load the private Algites download-repository defaults overlay."
+        description: "Load the combined private Algites repository defaults overlay."
         required: false
         default: false
 
@@ -53,7 +53,7 @@ on:
       ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS:
         description: "Universal Algites credential document JSON. Only credential profiles required by the current operation are materialized and forwarded to Gradle."
         required: false
-      ALGITES_CREDENTIAL_SECRETS_JSON:
+      _TMP_ALGITES_CREDENTIAL_SECRETS_JSON:
         description: "Serialized GitHub secrets context used only by the trusted Algites credential bridge to resolve SECRET_CONTENT references."
         required: false
 
@@ -95,7 +95,7 @@ jobs:
           repositories: priv.gov.Algites
           permission-contents: read
 
-      - name: Fetch Algites private download repository defaults
+      - name: Fetch Algites private repository defaults
         if: ${{ inputs.private-repository-defaults-enabled }}
         shell: bash
         env:
@@ -103,43 +103,65 @@ jobs:
         run: |
           set -euo pipefail
           locDefaultsDir="${RUNNER_TEMP}/algites-governance-defaults"
-          locPrivateDownloadFile="${locDefaultsDir}/algites-repository-download-defaults-private.yml"
+          locPrivateFile="${locDefaultsDir}/algites-repository-defaults-private.yml"
           mkdir -p "${locDefaultsDir}"
 
           gh api \
             -H "Accept: application/vnd.github.raw+json" \
-            "repos/Algites-EU/priv.gov.Algites/contents/repository/defaults/algites-repository-download-defaults-private.yml?ref=main" \
-            > "${locPrivateDownloadFile}"
+            "repos/Algites-EU/priv.gov.Algites/contents/repository/defaults/algites-repository-defaults-private.yml?ref=main" \
+            > "${locPrivateFile}"
 
-          echo "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE=${locPrivateDownloadFile}" >> "${GITHUB_ENV}"
+          echo "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE=${locPrivateFile}" >> "${GITHUB_ENV}"
+
+      - name: Fetch Algites licensing governance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.governance_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          locPublicRoot="${RUNNER_TEMP}/algites-public-licensing-governance"
+          rm -rf "${locPublicRoot}"
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/Algites-EU/pub.gov.Algites.git \
+            "${locPublicRoot}"
+          git -C "${locPublicRoot}" sparse-checkout set licensing
+          echo "ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY=${locPublicRoot}/licensing" >> "${GITHUB_ENV}"
+
+          if [[ "${{ inputs.private-repository-defaults-enabled }}" == "true" ]]; then
+            locPrivateRoot="${RUNNER_TEMP}/algites-private-licensing-governance"
+            rm -rf "${locPrivateRoot}"
+            gh repo clone Algites-EU/priv.gov.Algites "${locPrivateRoot}" -- --depth 1 --filter=blob:none --sparse
+            git -C "${locPrivateRoot}" sparse-checkout set licensing
+            echo "ALGITES_LICENSING_PRIVATE_GOVERNANCE_DIRECTORY=${locPrivateRoot}/licensing" >> "${GITHUB_ENV}"
+          fi
 
       - name: Decide mode by branch
         id: mode
         shell: bash
         run: |
-          REF="${GITHUB_REF#refs/heads/}"
-          echo "Branch: $REF"
+          _TMP_ALGITES_REF="${GITHUB_REF#refs/heads/}"
+          echo "Branch: $_TMP_ALGITES_REF"
 
           # 1) Feature test runs: compile only (no tests, no publish/deploy/install)
-          if [[ "$REF" == *"/develop" || "$REF" == develop ]]; then
+          if [[ "$_TMP_ALGITES_REF" == *"/develop" || "$_TMP_ALGITES_REF" == develop ]]; then
             echo "mode=test" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # 2) Feature branches: compile only (no tests, no publish/deploy/install)
-          if [[ "$REF" == *"/feature/"* || "$REF" == feature/* ]]; then
+          if [[ "$_TMP_ALGITES_REF" == *"/feature/"* || "$_TMP_ALGITES_REF" == feature/* ]]; then
             echo "mode=compile" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # 3) Lane branches: verify (the lane rules are validated later)
-          if [[ "$REF" == *"/lane/"* || "$REF" == lane/* ]]; then
+          if [[ "$_TMP_ALGITES_REF" == *"/lane/"* || "$_TMP_ALGITES_REF" == lane/* ]]; then
             echo "mode=verify" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
           # 4) Verify branches: main/master/develop/hotfix and also */main, */master, */develop, */hotfix
-          if [[ "$REF" == "main" || "$REF" == "master" || "$REF" == "hotfix" || "$REF" == */main || "$REF" == */master || "$REF" == */hotfix ]]; then
+          if [[ "$_TMP_ALGITES_REF" == "main" || "$_TMP_ALGITES_REF" == "master" || "$_TMP_ALGITES_REF" == "hotfix" || "$_TMP_ALGITES_REF" == */main || "$_TMP_ALGITES_REF" == */master || "$_TMP_ALGITES_REF" == */hotfix ]]; then
             echo "mode=verify" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -197,31 +219,31 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          REF="${GITHUB_REF#refs/heads/}"
-          ORG="Algites-EU"
-          REPO="${GITHUB_REPOSITORY}"
+          _TMP_ALGITES_REF="${GITHUB_REF#refs/heads/}"
+          _TMP_ALGITES_ORG="Algites-EU"
+          _TMP_ALGITES_REPO="${GITHUB_REPOSITORY}"
 
           # Collect commit subjects (only subjects are used, not bodies)
           if [[ "${{ github.event_name }}" == "push" ]]; then
             BEFORE="${{ github.event.before }}"
             AFTER="${{ github.sha }}"
             if [[ -z "$BEFORE" || "$BEFORE" =~ ^0+$ ]]; then
-              MSGS="$(git log -1 --format=%s "$AFTER" || true)"
+              _TMP_ALGITES_MSGS="$(git log -1 --format=%s "$AFTER" || true)"
             else
-              MSGS="$(git log --format=%s "$BEFORE..$AFTER" || true)"
+              _TMP_ALGITES_MSGS="$(git log --format=%s "$BEFORE..$AFTER" || true)"
             fi
           else
-            MSGS="$(git log -1 --format=%s "${{ github.sha }}" || true)"
+            _TMP_ALGITES_MSGS="$(git log -1 --format=%s "${{ github.sha }}" || true)"
           fi
 
-          export REF ORG REPO MSGS
+          export _TMP_ALGITES_REF _TMP_ALGITES_ORG _TMP_ALGITES_REPO _TMP_ALGITES_MSGS
           python3 - <<'PY'
           import os, re
 
-          ref = os.environ.get("REF", "")
-          org = os.environ.get("ORG", "Algites-EU")
-          repo = os.environ.get("REPO", "")
-          msgs = os.environ.get("MSGS", "")
+          ref = os.environ.get("_TMP_ALGITES_REF", "")
+          org = os.environ.get("_TMP_ALGITES_ORG", "Algites-EU")
+          repo = os.environ.get("_TMP_ALGITES_REPO", "")
+          msgs = os.environ.get("_TMP_ALGITES_MSGS", "")
 
           # Branch conventions (recommended, strict):
           # .../feature/ID.123_some-text
@@ -332,7 +354,7 @@ jobs:
         if: ${{ steps.mode.outputs.mode != 'skip' }}
         shell: bash
         env:
-          ALGITES_CREDENTIAL_PREFLIGHT: "true"
+          _TMP_ALGITES_CREDENTIAL_PREFLIGHT: "true"
         run: |
           set -euo pipefail
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
@@ -350,7 +372,7 @@ jobs:
         with:
           credentials-json: ${{ secrets.ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS }}
           required-credentials-file: ${{ steps.algites-credential-plan.outputs.plan_file }}
-          secrets-json: ${{ secrets.ALGITES_CREDENTIAL_SECRETS_JSON }}
+          secrets-json: ${{ secrets._TMP_ALGITES_CREDENTIAL_SECRETS_JSON }}
 
       - name: Resolve Algites artifact metadata
         id: algites-metadata
@@ -387,7 +409,7 @@ jobs:
           cat > "${LOC_RESOLVER_PROJECT_DIR}/build.gradle.kts" <<'KTS'
           import java.io.File
 
-          val locRepositoryDirectory = File(System.getenv("ALGITES_METADATA_REPOSITORY_DIR"))
+          val locRepositoryDirectory = File(System.getenv("_TMP_ALGITES_METADATA_REPOSITORY_DIR"))
           val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
 
           if (locResolverCoreScript.isFile) {
@@ -448,21 +470,21 @@ jobs:
                       }
                   }
 
-                  println("ALGITES_CI_ARTIFACT_INDEX=${locRootArtifactDirectoryIndex}")
-                  println("ALGITES_CI_VERSION_LANE=${AIcRootProperty("version.lane")}")
-                  println("ALGITES_CI_VERSION_REVISION=${AIcRootProperty("version.revision")}")
-                  println("ALGITES_CI_VERSION_QUALIFIER_KIND=${AIcRootProperty("version.qualifierKind")}")
-                  println("ALGITES_CI_VERSION_QUALIFIER_LABEL=${AIcRootProperty("version.qualifierLabel")}")
-                  println("ALGITES_CI_VERSION_RESOLVED_VALUE=${AIcRootProperty("version.resolvedValue")}")
+                  println("_TMP_ALGITES_CI_ARTIFACT_INDEX=${locRootArtifactDirectoryIndex}")
+                  println("_TMP_ALGITES_CI_VERSION_LANE=${AIcRootProperty("version.lane")}")
+                  println("_TMP_ALGITES_CI_VERSION_REVISION=${AIcRootProperty("version.revision")}")
+                  println("_TMP_ALGITES_CI_VERSION_QUALIFIER_KIND=${AIcRootProperty("version.qualifierKind")}")
+                  println("_TMP_ALGITES_CI_VERSION_QUALIFIER_LABEL=${AIcRootProperty("version.qualifierLabel")}")
+                  println("_TMP_ALGITES_CI_VERSION_RESOLVED_VALUE=${AIcRootProperty("version.resolvedValue")}")
               }
           }
           KTS
 
-          RESOLVED_METADATA="$(ALGITES_METADATA_REPOSITORY_DIR="${GITHUB_WORKSPACE}" "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q --project-dir "${LOC_RESOLVER_PROJECT_DIR}" algitesCiResolveMetadata)"
+          RESOLVED_METADATA="$(_TMP_ALGITES_METADATA_REPOSITORY_DIR="${GITHUB_WORKSPACE}" "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q --project-dir "${LOC_RESOLVER_PROJECT_DIR}" algitesCiResolveMetadata)"
           printf '%s\n' "$RESOLVED_METADATA"
 
           algites_ci_get_value() {
-            printf '%s\n' "$RESOLVED_METADATA" | sed -n "s/^ALGITES_CI_$1=//p" | tail -n 1
+            printf '%s\n' "$RESOLVED_METADATA" | sed -n "s/^_TMP_ALGITES_CI_$1=//p" | tail -n 1
           }
 
           {
@@ -589,9 +611,9 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+          _TMP_ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
           EXTRA=""
-          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+          if [[ -n "$_TMP_ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$_TMP_ALGITES_VERSION"; fi
           echo "=== Gradle construction: compile (including test sources, without test execution) ==="
           "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
 
@@ -605,9 +627,9 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+          _TMP_ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
           EXTRA=""
-          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+          if [[ -n "$_TMP_ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$_TMP_ALGITES_VERSION"; fi
           echo "=== Gradle verification: test+integration test, no packaging ==="
           "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
 
@@ -621,9 +643,9 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
-          ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
+          _TMP_ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
           EXTRA=""
-          if [[ -n "$ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$ALGITES_VERSION"; fi
+          if [[ -n "$_TMP_ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$_TMP_ALGITES_VERSION"; fi
           echo "=== Gradle approval (test+integration test, with packaging) ==="
           "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
 

@@ -24,7 +24,7 @@ import java.util.Optional;
  */
 public final class AIcCredentialDocumentProvider implements AIiCredentialProvider {
     public static final String CREDENTIALS_VARIABLE = "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS";
-    public static final String SECRET_CONTEXT_VARIABLE = "ALGITES_CREDENTIAL_SECRETS_JSON";
+    public static final String SECRET_CONTEXT_VARIABLE = "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON";
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 

@@ -14,7 +14,7 @@ import org.gradle.api.Task
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 
-data class AIcJavaDocsSiteEntry(
+data class AIcdJavaDocsSiteEntry(
     val locModulePath: String,
     val locJavadocOutputDirectory: File,
     val locArtifactPublicationDirectory: File,
@@ -24,7 +24,7 @@ data class AIcJavaDocsSiteEntry(
 class AIcGenerateJavaDocsSiteAction(
     private val locRepositoryId: String,
     private val locArtifactDocsRootFile: File,
-    private val locJavaDocsSiteEntries: List<AIcJavaDocsSiteEntry>
+    private val locJavaDocsSiteEntries: List<AIcdJavaDocsSiteEntry>
 ) : Action<Task>, java.io.Serializable {
 
     override fun execute(aTask: Task) {
@@ -138,7 +138,7 @@ fun AIcBuildJavaArtifactMetadata(
     )
 }
 
-val locJavaDocsSiteEntries = mutableListOf<AIcJavaDocsSiteEntry>()
+val locJavaDocsSiteEntries = mutableListOf<AIcdJavaDocsSiteEntry>()
 
 val locGenerateJavaDocsSite = tasks.register("generateJavaDocsSite") {
     group = "algites"
@@ -182,7 +182,7 @@ subprojects.forEach { locSubproject ->
             )
 
             locJavaDocsSiteEntries.add(
-                AIcJavaDocsSiteEntry(
+                AIcdJavaDocsSiteEntry(
                     locModulePath = locModulePath,
                     locJavadocOutputDirectory = locJavadocOutputDirectory,
                     locArtifactPublicationDirectory = locArtifactPublicationDirectory,

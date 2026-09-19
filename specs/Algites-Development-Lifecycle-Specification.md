@@ -453,11 +453,13 @@ Local users need only the subset of profiles required by the operations they exe
 
 Provider adapters MAY materialize a credential document before invoking the final processing. Materialization MUST preserve the same schema: a resolved field becomes `DIRECT_VALUE` with the resolved content. A provider adapter MUST NOT invent a second credential format.
 
+Transient cross-process variables used only internally by Algites workflows/actions/scripts MUST use the `_TMP_ALGITES_*` prefix. They are implementation transport, are not supported local configuration variables, and MUST NOT be created as repository/organization secrets by users. Stable user-/DevOps-configurable environment contracts retain the `ALGITES_*` prefix.
+
 For GitHub Actions the resolution is deliberately two-phase. `resolveAlgitesRequiredCredentials` first evaluates the same inherited repository metadata in credential-preflight mode and returns the union of profile/type pairs referenced by enabled repository endpoints in the requested download/upload/manage context. The trusted GitHub credential bridge then receives the original `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, the GitHub secret context, environment, and runner filesystem; discards every profile/type pair not listed by the preflight plan; materializes all retained fields; and exposes only the reduced `DIRECT_VALUE` document to the subsequent Gradle processing.
 
-`ALGITES_CREDENTIAL_SECRETS_JSON` carries an optional provider secret context required for exact-name `SECRET_CONTENT` lookup. It is not a credential document and MUST NOT contain profile-selection semantics. GitHub wrappers populate it from the complete GitHub Actions `secrets` context for the trusted bridge. For local processing it is normally absent: the installed Java resolver and Gradle bootstrap resolve a missing `SECRET_CONTENT` key from a named value in the Algites local secure store. When `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` itself is not set in the environment, the Gradle bootstrap obtains the stored universal document through the installed `algites-credentials` helper (`ALGITES_CREDENTIAL_CLI` MAY override its executable path). This does not create another credential schema; the helper is only a secure-store bootstrap adapter.
+`_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` carries an optional provider secret context required for exact-name `SECRET_CONTENT` lookup. It is not a credential document and MUST NOT contain profile-selection semantics. GitHub wrappers populate it from the complete GitHub Actions `secrets` context for the trusted bridge. For local processing it is normally absent: the installed Java resolver and Gradle bootstrap resolve a missing `SECRET_CONTENT` key from a named value in the Algites local secure store. When `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` itself is not set in the environment, the Gradle bootstrap obtains the stored universal document through the installed `algites-credentials` helper (`ALGITES_CREDENTIAL_CLI` MAY override its executable path). This does not create another credential schema; the helper is only a secure-store bootstrap adapter.
 
-Concrete public download locations are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`; they are not hard-coded in the resolver. Private repository locations and all canonical upload and management locations remain private-governance data. All defaults files use `algites-repository-defaults_1.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies private-download defaults, `ALGITES_REPOSITORY_UPLOAD_DEFAULTS_FILE` supplies the visibility-specific publication defaults, and `ALGITES_REPOSITORY_MANAGE_DEFAULTS_FILE` supplies visibility-specific repository-management defaults.
+Concrete public download locations are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`; they are not hard-coded in the resolver. Governed public upload/manage locations and all private download/upload/manage locations remain private-governance data. All defaults files use `algites-repository-defaults_1.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` supplies the combined public upload/manage overlay and `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies the combined private download/upload/manage overlay.
 
 Repository visibility usage is constrained by source-repository visibility:
 
@@ -478,7 +480,7 @@ Publication and repository-management capability are centralized in `priv.gov.Al
 
 Publication workflows invoke the common `algitesPublish` orchestration task. Technology-specific publication remains adapter-specific (for example Java `publish`, Python `publishPython`); declaration of a TechnologyKind alone does not imply that its build/publication adapter already exists.
 
-After the complete release workflow succeeds, a final best-effort released-snapshot cleanup MAY run when the effective inherited `deleteSnapshotWhenReleased` value is `true` (the global default). Cleanup uses the `snapshot.manage` matrix cells, not upload endpoints. Management endpoints may use different URLs and credentials and require an implementation-supported `managementAdapter`; the generic lifecycle never assumes that the upload URL supports HTTP DELETE. Current management adapters include Cloudsmith and Repsy. Cleanup failure is non-fatal for the completed release and is reported for manual remediation.
+After the complete release workflow succeeds, a final best-effort released-snapshot cleanup MAY run when the effective inherited `deleteSnapshotWhenReleased` value is `true` (the global default). Cleanup uses the `snapshot.manage` matrix cells, not upload endpoints. Management endpoints may use different URLs and credentials and require an implementation-supported `usageProviderAdapter`; the generic lifecycle never assumes that the upload URL supports HTTP DELETE. Current management adapters include Cloudsmith and Repsy. Cleanup failure is non-fatal for the completed release and is reported for manual remediation.
 
 #### 2.1.8. Governed YAML Schema Resolution
 
@@ -494,7 +496,7 @@ Schemas for public Algites YAML configuration SHOULD be sourced from the governe
 
 GitHub Actions is a provider adapter around the provider-independent Algites lifecycle. Canonical repository and credential semantics remain defined by Algites metadata and Gradle/bootstrap logic.
 
-For credentials, GitHub Actions uses the universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document. Reusable/private wrappers serialize their available `secrets` context into `ALGITES_CREDENTIAL_SECRETS_JSON` only for the trusted first-party credential bridge. The bridge consumes the Gradle preflight plan, resolves only the required profile/type pairs, materializes their fields according to the closed source enum, and exposes the resulting reduced `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document to subsequent processing. No workflow may infer credential fields independently from the profile/type contract, and the bridge MUST NOT log credential values.
+For credentials, GitHub Actions uses the universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document. Reusable/private wrappers serialize their available `secrets` context into `_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` only for the trusted first-party credential bridge. The bridge consumes the Gradle preflight plan, resolves only the required profile/type pairs, materializes their fields according to the closed source enum, and exposes the resulting reduced `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document to subsequent processing. No workflow may infer credential fields independently from the profile/type contract, and the bridge MUST NOT log credential values.
 
 Release publication is centrally executed in `priv.gov.Algites`. Public/private target-repository wrappers authenticate only to private governance, dispatch the central worker with the immutable target repository/branch/SHA request, and wait for its conclusion. The central worker validates source-repository visibility, obtains visibility-specific repository overlays, binds canonical credential secrets, checks out the exact target revision, and invokes `algitesPublish`. Snapshot publication follows the same centralized credential and repository-default model.
 
@@ -688,3 +690,23 @@ GitHub Actions is currently the default provider adapter. Provider-specific work
 **© Algites**
 
 [[/PROPOSAL]]
+
+## Licensing lifecycle checks
+
+Repository licensing materialization is version-controlled but generated from the hierarchical Algites licensing model.
+
+After changing public/private governance licensing, a repository-local `licensing/license-definitions.yml`, or any subtree `license-usage.yml`, a maintainer runs:
+
+```bash
+./gradlew rebuildAlgitesLicensing
+```
+
+and commits the resulting root `LICENSE` and `LICENSES/` changes.
+
+Licensing validation is part of artifact lifecycle processing. `checkAlgitesLicensing` is always strict and is intended for an explicit repository consistency check. Lifecycle tasks use `verifyAlgitesLicensing`, whose default mode is also strict.
+
+Normal builds therefore fail when the managed root `LICENSE` or `LICENSES/` materialization is stale or differs from the effective hierarchical licensing model. Release processing explicitly uses `-Palgites.licensing.validationMode=strict` and performs this verification before creating the release tag; a release MUST NOT proceed with inconsistent licensing materialization.
+
+Snapshot deployment explicitly uses `-Palgites.licensing.validationMode=warn`. The same licensing resolution and comparison are executed, but inconsistencies are emitted as warnings and do not block snapshot build/publication. This keeps development snapshots available while making the repository inconsistency visible and actionable. `strict` and `warn` are the only supported lifecycle validation modes; `strict` is the default whenever the property is omitted.
+
+Public CI receives only public licensing governance. Private CI receives both public and private governance. This visibility boundary is mandatory and makes public builds independent of access to `priv.gov.Algites`.

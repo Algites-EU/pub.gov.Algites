@@ -741,7 +741,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
             }
             .toMap()
 
-        data class LocalArtifactPublication(
+        data class AIcdLocalArtifactPublication(
             val localArtifactId: String,
             val publicationKind: String,
             val publicationId: String,
@@ -794,7 +794,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
             }
         }
 
-        fun writeArtifactPublicationIndex(aPublication: LocalArtifactPublication) {
+        fun writeArtifactPublicationIndex(aPublication: AIcdLocalArtifactPublication) {
             val locMetadata = aPublication.metadata
             val locIndexFile = aPublication.directory.resolve("index.html")
             val locLocalArtifactId = aPublication.localArtifactId
@@ -902,7 +902,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                                 val locLocalArtifactId = locArtifactDirectory.name
                                 val locSidecarMetadata = readSidecar(locPublicationIdDirectory)
                                 val locBaseMetadata = locMetadataByLocalArtifactId[locLocalArtifactId] ?: emptyMap()
-                                LocalArtifactPublication(
+                                AIcdLocalArtifactPublication(
                                     localArtifactId = locLocalArtifactId,
                                     publicationKind = locPublicationKindDirectory.name,
                                     publicationId = locPublicationIdDirectory.name,
@@ -914,7 +914,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                     }
                     ?: emptyList()
             }
-            ?.sortedWith(compareBy<LocalArtifactPublication> { it.publicationKind }.thenBy { it.publicationId }.thenBy { it.localArtifactId })
+            ?.sortedWith(compareBy<AIcdLocalArtifactPublication> { it.publicationKind }.thenBy { it.publicationId }.thenBy { it.localArtifactId })
             ?: emptyList()
 
         locPublications.forEach { writeArtifactPublicationIndex(it) }

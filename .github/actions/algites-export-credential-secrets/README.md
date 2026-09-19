@@ -15,7 +15,7 @@ Supported value sources are:
 
 `FILE_CONTENT` is therefore intentionally named after the **result of resolution**. Its `value` member is still the path used to obtain that content. The same rule applies to `SECRET_CONTENT` and `ENVIRONMENT_VARIABLE_CONTENT`: `value` is the reference name, while the result is the referenced content.
 
-The bridge receives the serialized GitHub `secrets` context through `ALGITES_CREDENTIAL_SECRETS_JSON`. This is a trusted provider context, not a second credential-document format. It exists only so `SECRET_CONTENT` references can be resolved by exact secret name without enumerating or hard-coding credential profiles in workflow YAML.
+The bridge receives the serialized GitHub `secrets` context through `_TMP_ALGITES_CREDENTIAL_SECRETS_JSON`. This is a trusted provider context, not a second credential-document format. It exists only so `SECRET_CONTENT` references can be resolved by exact secret name without enumerating or hard-coding credential profiles in workflow YAML.
 
 The downstream Gradle process receives the same universal credential-document format through `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, but only for required profile/type pairs and with all retained fields replaced by `DIRECT_VALUE`.
 

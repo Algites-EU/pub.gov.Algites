@@ -5,6 +5,10 @@
 .gradle/
 **/.gradle/
 
+# Kotlin
+.kotlin/
+**/.kotlin/
+
 # Documentation
 docs-site/
 

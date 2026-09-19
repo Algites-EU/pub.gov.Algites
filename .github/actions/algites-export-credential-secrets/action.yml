@@ -18,9 +18,9 @@ runs:
     - name: Materialize Algites credentials
       shell: bash
       env:
-        ALGITES_CREDENTIALS_JSON: ${{ inputs.credentials-json }}
-        ALGITES_REQUIRED_CREDENTIALS_FILE: ${{ inputs.required-credentials-file }}
-        ALGITES_CREDENTIAL_SECRETS_JSON: ${{ inputs.secrets-json }}
+        _TMP_ALGITES_CREDENTIALS_JSON: ${{ inputs.credentials-json }}
+        _TMP_ALGITES_REQUIRED_CREDENTIALS_FILE: ${{ inputs.required-credentials-file }}
+        _TMP_ALGITES_CREDENTIAL_SECRETS_JSON: ${{ inputs.secrets-json }}
       run: |
         set -euo pipefail
         python3 "${GITHUB_ACTION_PATH}/export-credential-secrets.py"

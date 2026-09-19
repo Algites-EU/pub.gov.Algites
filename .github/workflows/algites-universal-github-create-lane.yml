@@ -81,6 +81,18 @@ jobs:
             > "${locPublicDownloadFile}"
           echo "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE=${locPublicDownloadFile}" >> "${GITHUB_ENV}"
 
+      - name: Fetch Algites public licensing governance
+        shell: bash
+        run: |
+          set -euo pipefail
+          locGovernanceRoot="${RUNNER_TEMP}/algites-public-licensing-governance"
+          rm -rf "${locGovernanceRoot}"
+          git clone --depth 1 --filter=blob:none --sparse \
+            https://github.com/Algites-EU/pub.gov.Algites.git \
+            "${locGovernanceRoot}"
+          git -C "${locGovernanceRoot}" sparse-checkout set licensing
+          echo "ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY=${locGovernanceRoot}/licensing" >> "${GITHUB_ENV}"
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
@@ -255,7 +267,7 @@ jobs:
             cat > "${LOC_RESOLVER_PROJECT_DIR}/build.gradle.kts" <<'KTS'
           import java.io.File
 
-          val locRepositoryDirectory = File(System.getenv("ALGITES_METADATA_REPOSITORY_DIR"))
+          val locRepositoryDirectory = File(System.getenv("_TMP_ALGITES_METADATA_REPOSITORY_DIR"))
           val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
 
           if (locResolverCoreScript.isFile) {
@@ -289,7 +301,7 @@ jobs:
                       providers.gradleProperty("repository.visibility").orNull
                   )
                   val locProperties = locFlattenMetadata(locMetadata)
-                  val locOutputFile = File(System.getenv("ALGITES_RESOLVED_PROPERTIES_FILE"))
+                  val locOutputFile = File(System.getenv("_TMP_ALGITES_RESOLVED_PROPERTIES_FILE"))
 
                   locOutputFile.parentFile.mkdirs()
                   locOutputFile.writeText(
@@ -304,7 +316,7 @@ jobs:
           }
           KTS
 
-            ALGITES_METADATA_REPOSITORY_DIR="${PWD}" ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" ./gradlew --no-daemon --quiet --project-dir "${LOC_RESOLVER_PROJECT_DIR}" writeAlgitesResolvedArtifactMetadataProperties
+            _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" ./gradlew --no-daemon --quiet --project-dir "${LOC_RESOLVER_PROJECT_DIR}" writeAlgitesResolvedArtifactMetadataProperties
 
             LOC_RESOLVED_LANE="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
             LOC_RESOLVED_QUALIFIER_KIND="$(grep -m 1 '^artifactDirectories\.0\.version\.qualifierKind=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
@@ -323,3 +335,4 @@ jobs:
 
             git switch -
             git branch -D "$TMP" || true
+          done
