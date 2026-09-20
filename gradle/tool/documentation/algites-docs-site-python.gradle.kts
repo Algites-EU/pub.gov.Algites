@@ -301,7 +301,7 @@ val locGeneratePythonDocsSite = tasks.register("generatePythonDocsSite") {
 
     locPythonDocsEntries.forEach { locEntry ->
         locEntry.locSourceDirectories.forEach { locSourceDirectory ->
-            inputs.dir(locSourceDirectory).optional()
+            inputs.files(project.fileTree(locSourceDirectory))
         }
     }
     inputs.property("pythonExecutable", locPythonExecutable)

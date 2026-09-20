@@ -900,9 +900,11 @@ subprojects {
             description = "Generates the effective pyproject.toml for this Algites Python artifact."
             dependsOn(rootProject.tasks.named("verifyAlgitesLicensing"))
 
-            inputs.file(project.file("algites-artifact.yml")).optional()
-            inputs.file(project.file("algites-artifact.yaml")).optional()
-            inputs.file(locPythonTemplateFile).optional()
+            inputs.files(
+                project.fileTree(project.projectDir) {
+                    include("algites-artifact.yml", "algites-artifact.yaml", "pyproject.toml.tpl")
+                }
+            )
             inputs.property("artifactCoordinateId", locAlgitesCanonicalArtifactId)
             inputs.property("distributionName", locPythonDistributionName)
             inputs.property("importNamespace", locPythonImportNamespace)
@@ -974,14 +976,15 @@ subprojects {
             }
         }
 
+        locGeneratePythonProjectMetadata.configure {
+            mustRunAfter(locDeletePythonDevelopmentMetadata)
+        }
+
         val locRefreshPythonDevelopment = tasks.register("refreshPythonDevelopment") {
             group = "algites"
             description = "Forces regeneration of Python development metadata for this artifact."
             dependsOn(locDeletePythonDevelopmentMetadata)
             dependsOn(locGeneratePythonProjectMetadata)
-            locGeneratePythonProjectMetadata.configure {
-                mustRunAfter(locDeletePythonDevelopmentMetadata)
-            }
         }
 
         val locPythonProjectPath = project.path
@@ -1002,8 +1005,8 @@ subprojects {
                 "--outdir",
                 locPythonDistDirectory.asFile.absolutePath
             )
-            inputs.dir(project.layout.projectDirectory.dir("src/product/python")).optional()
-            inputs.dir(project.layout.projectDirectory.dir("src/product/python.gen")).optional()
+            inputs.files(project.fileTree("src/product/python"))
+            inputs.files(project.fileTree("src/product/python.gen"))
             inputs.file(locPythonProjectFile)
             outputs.dir(locPythonDistDirectory)
         }
