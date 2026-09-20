@@ -442,7 +442,13 @@ Generated documentation for an artifact SHOULD use the following canonical struc
 ```text
 <docs-site-root>/generated/artifacts/<module.local.id>/<documentation-channel>/
 ```
-The channel directory contains the artifact-level `index.html`. Technology-specific documentation SHOULD be placed below that channel in a subdirectory identified by TechnologyKind when more than one technology is documented, for example `java/`, `python/`, or `mps/`. This allows one logical artifact/version to aggregate several technology-specific documentation outputs without inventing separate logical artifact identities.
+The channel directory contains the artifact-level `index.html`. Technology-specific documentation MUST always be placed below that channel in a subdirectory identified by TechnologyKind, for example `java/`, `python/`, or `mps/`, even when only one TechnologyKind is documented. The stable TechnologyKind directory keeps the canonical path unchanged when another technology is added later and allows one logical artifact/version to aggregate several technology-specific documentation outputs without inventing separate logical artifact identities.
+
+Documentation generation uses the same TechnologyKind selection semantics as construction and publication. The artifact metadata declares the supported `technologyKinds`; an optional requested TechnologyKind set selects the technologies for the current documentation build. The effective documentation set for an artifact is `declared ∩ requested`. If no requested set is supplied, all declared TechnologyKinds are requested. Only effective TechnologyKinds are emitted into the generated publication; previously generated TechnologyKind directories outside the current effective set MUST be removed from that publication so that the site represents the current documentation build rather than a union of historical partial builds.
+
+The artifact-level `index.html` MUST retain the logical artifact identity (`groupId`, `artifactId`, and logical version), list all declared TechnologyKinds, and separately list only the TechnologyKinds requested/effective for the documentation build. Technology-specific sections MAY additionally expose ecosystem-specific publication identities such as Maven coordinates, Python distribution/import names, MPS module identity, or resulting artifact filenames. Shared documentation provenance SHOULD include the requested source ref/branch, exact source commit, and generation date/time at the logical-artifact publication level; these values need not be duplicated into per-TechnologyKind metadata files.
+
+The standard Python documentation adapter uses Sphinx with Sphinx AutoAPI over Algites Python product source roots (`src/product/python` and `src/product/python.gen`). The adapter generates its static site below the canonical `python/` TechnologyKind directory without importing the documented project as part of API discovery.
 
 Also there is generated an additonal index with following publication agnostic generated path structure:
 
@@ -766,9 +772,9 @@ Inheritance rule (normative):
 - ContainerVersionContext **inherits only via container edges** (repo → container → contained artifacts).
 - Parent chain **does not** change controlled versions.
 
-Version is a property of the logical artifact/version context, not of a technology implementation. A build or release MAY select only a subset of the artifact's effective `technologyKinds`. Therefore a logical version MAY have a Java publication without a Python publication, or vice versa. A technology-specific publication that does not exist for a version is simply absent; it does not require a separate technology-specific version sequence.
+Version is a property of the logical artifact/version context, not of a technology implementation. Ordinary construction, snapshot publication, and documentation MAY select only a subset of the artifact's effective `technologyKinds`; an omitted TechnologyKind is simply absent from that operation and does not require a separate technology-specific version sequence.
 
-If multiple technologies are published with the same logical version, they MUST originate from the same immutable source revision/version context. A previously omitted technology MAY be published later for that version only from that same source revision; otherwise a new version is required.
+A release operation is stricter. By default, the selected TechnologyKinds MUST equal the complete declared TechnologyKind set for every released logical artifact. A provider may expose an explicit `allowIncompleteTechnologyKinds` / equivalent confirmation for exceptional incomplete releases. When such an incomplete release is explicitly allowed, only the selected TechnologyKinds are published, the logical release version is nevertheless considered final, and an omitted TechnologyKind MUST NOT be added later under that same release version. A subsequent publication that includes the omitted TechnologyKind therefore requires a new logical version.
 
 #### 3.4.2 Controlled vs Uncontrolled Version Resolution
 
@@ -1380,7 +1386,7 @@ deleteSnapshotWhenReleased: false
 
 When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `snapshot.manage` endpoints. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
 
-For example, release `1.4.0` targets only the corresponding `1.4.0-SNAPSHOT` package identity. It MUST NOT remove later snapshot lines such as `1.4.1-SNAPSHOT` or `1.5.0-SNAPSHOT`. A multi-TechnologyKind artifact is cleaned only after all release publication processing has completed.
+For example, release `1.4.0` targets only the corresponding `1.4.0-SNAPSHOT` package identity. It MUST NOT remove later snapshot lines such as `1.4.1-SNAPSHOT` or `1.5.0-SNAPSHOT`. A multi-TechnologyKind artifact is cleaned only after all release publication processing has completed, and only TechnologyKinds actually selected for that release are eligible for cleanup.
 
 #### 3.9.7 Credential profiles
 
@@ -1516,7 +1522,7 @@ A build operation has an effective set of selected TechnologyKinds:
 - with an explicit selection, only the intersection of requested technology kinds and supported technology kinds is built;
 - artifacts in a cascade that do not support a requested technology kind are skipped for that technology kind rather than treated as erroneous.
 
-Technology task graphs remain independent. A release, verification, or construction operation MAY therefore target only Java, only Python, or any supported subset without requiring the remaining TechnologyKinds to execute.
+Technology task graphs remain independent. Verification, construction, snapshot publication, and documentation MAY therefore target only Java, only Python, or any supported subset without requiring the remaining TechnologyKinds to execute. Release publication uses the same selection mechanism but requires the complete declared TechnologyKind set unless the explicit incomplete-release override is enabled.
 
 `algitesPublish` is the common orchestration entry point. Technology-specific adapters remain distinct tasks (for example Java `publish` and Python `publishPython`). MPS build/publication adapters are a separate TechnologyKind implementation concern and MUST NOT be implied merely by declaring `mps` as a supported metadata kind.
 

@@ -71,6 +71,11 @@ val locAlgitesDocsResolvedArtifactDirectories =
         .ifEmpty { AIcNormalizeResolvedArtifactDirectories(rootProject.extra.properties["algitesDocsResolvedArtifactDirectories"]) }
         .ifEmpty { AIcNormalizeResolvedArtifactDirectories(rootProject.extra.properties["algitesResolvedArtifactDirectories"]) }
 
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsPublicationMetadata =
+    (extra.properties["algitesDocsPublicationMetadata"] as? Map<String, String>)
+        ?: (rootProject.extra.properties["algitesDocsPublicationMetadata"] as? Map<String, String>)
+        ?: emptyMap()
 
 fun AIcReadMpsDocsRepositoryId(): String {
     return locAlgitesDocsResolvedRepositoryId
@@ -695,7 +700,8 @@ class AIcGenerateDummyMpsDocsAction(
     private val locArtifactDocsRootFile: File,
     private val locPublicationKind: String,
     private val locPublicationId: String,
-    private val locResolvedArtifactDirectories: List<Map<String, String?>>
+    private val locResolvedArtifactDirectories: List<Map<String, String?>>,
+    private val locPublicationMetadata: Map<String, String>
 ) : Action<Task>, java.io.Serializable {
     override fun execute(aTask: Task) {
         require(locDiscoveryFile.isFile) {
@@ -727,7 +733,7 @@ class AIcGenerateDummyMpsDocsAction(
                 locArtifactDocsRootFile,
                 "${locDocumentationPath}/${locPublicationKind}/${locPublicationId}"
             )
-            val locTargetDirectory = File(locArtifactPublicationDirectory, "mpsdoc")
+            val locTargetDirectory = File(locArtifactPublicationDirectory, "mps")
             locTargetDirectory.deleteRecursively()
             locTargetDirectory.mkdirs()
 
@@ -806,8 +812,10 @@ class AIcGenerateDummyMpsDocsAction(
             "version.lane" to (locArtifactSetMetadata["version.lane"] ?: ""),
             "version.revision" to (locArtifactSetMetadata["version.revision"] ?: ""),
             "version.qualifierKind" to (locArtifactSetMetadata["version.qualifierKind"] ?: ""),
-            "version.qualifierLabel" to (locArtifactSetMetadata["version.qualifierLabel"] ?: "")
-        )
+            "version.qualifierLabel" to (locArtifactSetMetadata["version.qualifierLabel"] ?: ""),
+            "mps.artifactId" to aArtifactId,
+            "mps.modulePath" to aModulePath
+        ) + locPublicationMetadata
     }
 
     private fun AIcWriteArtifactMetadataSidecar(
@@ -815,17 +823,28 @@ class AIcGenerateDummyMpsDocsAction(
         aArtifactMetadata: Map<String, String>
     ) {
         aArtifactPublicationDirectory.mkdirs()
+        val locSidecarFile = aArtifactPublicationDirectory.resolve(".algites-artifact-docs.properties")
+        val locExistingMetadata = if (locSidecarFile.isFile) {
+            locSidecarFile.readLines(Charsets.UTF_8)
+                .mapNotNull { locLine ->
+                    val locSeparatorIndex = locLine.indexOf('=')
+                    if (locSeparatorIndex < 0) null else
+                        locLine.substring(0, locSeparatorIndex) to locLine.substring(locSeparatorIndex + 1)
+                }
+                .toMap()
+        } else {
+            emptyMap()
+        }
+        val locMergedMetadata = locExistingMetadata + aArtifactMetadata.filterValues { it.isNotBlank() }
 
-        aArtifactPublicationDirectory
-            .resolve(".algites-artifact-docs.properties")
-            .writeText(
-                aArtifactMetadata.entries
-                    .sortedBy { it.key }
-                    .joinToString(System.lineSeparator()) { locEntry ->
-                        "${locEntry.key}=${locEntry.value.replace(System.lineSeparator(), " ")}"
-                    } + System.lineSeparator(),
-                Charsets.UTF_8
-            )
+        locSidecarFile.writeText(
+            locMergedMetadata.entries
+                .sortedBy { it.key }
+                .joinToString(System.lineSeparator()) { locEntry ->
+                    "${locEntry.key}=${locEntry.value.replace(System.lineSeparator(), " ")}"
+                } + System.lineSeparator(),
+            Charsets.UTF_8
+        )
     }
 
     private fun AIcToSha256Text(aText: String): String {
@@ -898,6 +917,7 @@ tasks.register("generateDummyMpsDocs") {
     group = "algites"
     description = "Generates dummy static documentation pages for discovered MPS artifacts."
 
+    dependsOn("prepareAlgitesDocsPublication")
     dependsOn("discoverMpsArtifacts")
     dependsOn("generateAlgitesDocsRootIndex")
 
@@ -911,10 +931,20 @@ tasks.register("generateDummyMpsDocs") {
             locArtifactDocsRoot.asFile,
             locPublicationKind,
             locPublicationId,
-            locAlgitesDocsResolvedArtifactDirectories
+            locAlgitesDocsResolvedArtifactDirectories,
+            locAlgitesDocsPublicationMetadata
         )
     )
 }
+
+tasks.named("generateDummyMpsDocs") {
+    tasks.findByName("generateJavaDocsSite")?.let { locJavaDocsTask -> mustRunAfter(locJavaDocsTask) }
+    tasks.findByName("generatePythonDocsSite")?.let { locPythonDocsTask -> mustRunAfter(locPythonDocsTask) }
+}
+
+@Suppress("UNCHECKED_CAST")
+(rootProject.extra.properties["algitesDocsTechnologyTaskNames"] as? MutableSet<String>)
+    ?.add("generateDummyMpsDocs")
 
 tasks.named("generateAlgitesDocsSite") {
     dependsOn("generateDummyMpsDocs")

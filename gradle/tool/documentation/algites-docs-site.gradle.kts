@@ -16,6 +16,9 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
 val locAlgitesDocsJavaScript = (findProperty("algites.docs.javaScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-java.gradle.kts"
 
+val locAlgitesDocsPythonScript = (findProperty("algites.docs.pythonScript") as String?)
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-python.gradle.kts"
+
 val locAlgitesDocsMpsScript = (findProperty("algites.docs.mpsScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-mps.gradle.kts"
 
@@ -25,15 +28,9 @@ apply(from = uri(locAlgitesDocsBaseScript))
 val locResolvedArtifactDirectories = extra.properties["algitesDocsResolvedArtifactDirectories"] as? List<Map<String, String?>>
     ?: emptyList()
 
-val locResolvedDocumentationKinds = locResolvedArtifactDirectories
-    .flatMap { locArtifactDirectory ->
-        locArtifactDirectory["technologyKinds"]
-            ?.split(',')
-            ?.map { locKind -> locKind.trim().lowercase() }
-            ?.filter { locKind -> locKind.isNotBlank() }
-            ?: emptyList()
-    }
-    .toSet()
+@Suppress("UNCHECKED_CAST")
+val locEffectiveDocumentationKinds = extra.properties["algitesDocsEffectiveTechnologyKinds"] as? Set<String>
+    ?: emptySet()
 
 logger.lifecycle("Algites documentation artifact directory resolution:")
 locResolvedArtifactDirectories.forEach { locArtifactDirectory ->
@@ -46,10 +43,14 @@ locResolvedArtifactDirectories.forEach { locArtifactDirectory ->
     )
 }
 
-if ("java" in locResolvedDocumentationKinds) {
+if ("java" in locEffectiveDocumentationKinds) {
     apply(from = uri(locAlgitesDocsJavaScript))
 }
 
-if ("mps" in locResolvedDocumentationKinds) {
+if ("python" in locEffectiveDocumentationKinds) {
+    apply(from = uri(locAlgitesDocsPythonScript))
+}
+
+if ("mps" in locEffectiveDocumentationKinds) {
     apply(from = uri(locAlgitesDocsMpsScript))
 }

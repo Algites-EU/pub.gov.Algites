@@ -18,6 +18,16 @@ on:
         required: false
         type: string
         default: "21"
+      python-version:
+        description: Python version used for Python documentation tooling.
+        required: false
+        type: string
+        default: "3.14"
+      technology-kinds:
+        description: "Optional comma-separated TechnologyKinds to document. Empty means all declared TechnologyKinds."
+        required: false
+        type: string
+        default: ""
       publication-kind:
         description: "Documentation publication kind: preview, snapshot, or release."
         required: false
@@ -153,14 +163,23 @@ jobs:
           echo "ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY=${locGovernanceRoot}/licensing" >> "${GITHUB_ENV}"
 
       - name: Show checked out source revision
+        id: source-revision
         working-directory: source
         shell: bash
         run: |
           set -euo pipefail
 
+          locSourceCommit="$(git rev-parse HEAD)"
+          locCheckedOutBranch="$(git branch --show-current || true)"
+          locGeneratedAt="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
           echo "Requested source ref: ${{ steps.source-parameters.outputs.source-ref }}"
-          echo "Checked out HEAD: $(git rev-parse HEAD)"
-          echo "Checked out branch: $(git branch --show-current || true)"
+          echo "Checked out HEAD: ${locSourceCommit}"
+          echo "Checked out branch: ${locCheckedOutBranch}"
+          echo "Documentation generated at: ${locGeneratedAt}"
+
+          echo "source-commit=${locSourceCommit}" >> "${GITHUB_OUTPUT}"
+          echo "generated-at=${locGeneratedAt}" >> "${GITHUB_OUTPUT}"
 
       - name: Prepare persistent documentation branch workspace
         shell: bash
@@ -296,6 +315,51 @@ jobs:
           echo "version-qualifier-label=${locResolvedQualifierLabel}" >> "${GITHUB_OUTPUT}"
           echo "version-resolved-value=${locResolvedVersion}" >> "${GITHUB_OUTPUT}"
 
+          locDeclaredKinds="$(
+            grep -E '^artifactDirectories\.[0-9]+\.technologyKinds=' "${locResolvedPropertiesFile}" \
+              | cut -d= -f2- \
+              | tr ',' '\n' \
+              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+              | tr '[:upper:]' '[:lower:]' \
+              | grep -v '^$' \
+              | sort -u \
+              | paste -sd, - || true
+          )"
+          locRequestedKinds="${{ inputs.technology-kinds }}"
+          locRequestedKinds="$(
+            printf '%s' "${locRequestedKinds}" \
+              | tr ',' '\n' \
+              | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' \
+              | tr '[:upper:]' '[:lower:]' \
+              | grep -v '^$' \
+              | sort -u \
+              | paste -sd, - || true
+          )"
+
+          if [[ -n "${locRequestedKinds}" ]]; then
+            while IFS= read -r locKind; do
+              [[ -z "${locKind}" ]] && continue
+              case "${locKind}" in
+                java|python|mps) ;;
+                *) echo "::error::Unsupported documentation TechnologyKind: ${locKind}"; exit 1 ;;
+              esac
+            done < <(tr ',' '\n' <<< "${locRequestedKinds}")
+
+            locEffectiveKinds="$(
+              comm -12 \
+                <(tr ',' '\n' <<< "${locDeclaredKinds}" | grep -v '^$' | sort -u) \
+                <(tr ',' '\n' <<< "${locRequestedKinds}" | grep -v '^$' | sort -u) \
+                | paste -sd, - || true
+            )"
+          else
+            locEffectiveKinds="${locDeclaredKinds}"
+          fi
+
+          echo "declared-technology-kinds=${locDeclaredKinds}" >> "${GITHUB_OUTPUT}"
+          echo "requested-technology-kinds=${locRequestedKinds}" >> "${GITHUB_OUTPUT}"
+          echo "documentation-technology-kinds=${locEffectiveKinds}" >> "${GITHUB_OUTPUT}"
+          echo "Documentation TechnologyKinds: declared=${locDeclaredKinds:-<none>} requested=${locRequestedKinds:-<all declared>} effective=${locEffectiveKinds:-<none>}"
+
       - name: Resolve effective documentation publication id
         id: effective-publication
         shell: bash
@@ -312,6 +376,21 @@ jobs:
 
           echo "publication-id=${locPublicationId}" >> "${GITHUB_OUTPUT}"
 
+      - name: Set up Python documentation toolchain
+        if: ${{ contains(format(',{0},', steps.algites-artifact-metadata.outputs.documentation-technology-kinds), ',python,') }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ inputs.python-version }}
+
+      - name: Install Python documentation tooling
+        if: ${{ contains(format(',{0},', steps.algites-artifact-metadata.outputs.documentation-technology-kinds), ',python,') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            "Sphinx==9.1.0" \
+            "sphinx-autoapi==3.8.0"
+
       - name: Generate documentation site into persistent documentation branch workspace
         working-directory: source
         shell: bash
@@ -323,6 +402,10 @@ jobs:
             -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Palgites.docs.publicationId="${{ steps.effective-publication.outputs.publication-id }}" \
+            -Palgites.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
+            -Palgites.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
+            -Palgites.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
+            -Palgites.technologyKinds="${{ inputs.technology-kinds }}" \
             ${{ inputs.gradle-arguments }}
 
       - name: Commit generated documentation to documentation branch

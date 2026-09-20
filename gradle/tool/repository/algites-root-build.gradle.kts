@@ -515,6 +515,59 @@ val algitesPublish = tasks.register("algitesPublish") {
     description = "Publishes all effective or explicitly selected Algites TechnologyKinds."
 }
 
+val algitesValidateReleaseTechnologyKinds = tasks.register("validateAlgitesReleaseTechnologyKinds") {
+    group = "algites"
+    description = "Validates that a release TechnologyKind selection is complete unless incomplete release was explicitly allowed."
+
+    doLast {
+        val locAllowIncomplete = (
+            algitesGradleOrEnvironmentValue("algites.release.allowIncompleteTechnologyKinds")
+                ?: System.getenv("ALGITES_RELEASE_ALLOW_INCOMPLETE_TECHNOLOGY_KINDS")
+                ?: "false"
+            ).toBooleanStrictOrNull()
+            ?: throw GradleException("algites.release.allowIncompleteTechnologyKinds must be true or false.")
+
+        val locIncompleteArtifacts = mutableListOf<String>()
+        algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locProjectPath, locMetadata) ->
+            val locDeclaredTechnologyKinds = AIcAlgitesStringList(locMetadata["technologyKinds"]).toSet()
+            if (locDeclaredTechnologyKinds.isEmpty()) return@forEach
+
+            val locSelectedTechnologyKinds = if (algitesRequestedTechnologyKinds.isEmpty()) {
+                locDeclaredTechnologyKinds
+            } else {
+                locDeclaredTechnologyKinds.intersect(algitesRequestedTechnologyKinds)
+            }
+            val locMissingTechnologyKinds = locDeclaredTechnologyKinds - locSelectedTechnologyKinds
+            if (locMissingTechnologyKinds.isNotEmpty()) {
+                locIncompleteArtifacts += buildString {
+                    append(locProjectPath)
+                    append(": declared=")
+                    append(locDeclaredTechnologyKinds.sorted().joinToString(","))
+                    append(" selected=")
+                    append(locSelectedTechnologyKinds.sorted().joinToString(",").ifBlank { "<none>" })
+                    append(" missing=")
+                    append(locMissingTechnologyKinds.sorted().joinToString(","))
+                }
+            }
+        }
+
+        if (locIncompleteArtifacts.isNotEmpty()) {
+            val locMessage = buildString {
+                appendLine("Incomplete TechnologyKind selection for release.")
+                locIncompleteArtifacts.forEach { locEntry -> appendLine(" - $locEntry") }
+                append("A release is complete by default. Explicitly allow an incomplete release only when the omitted TechnologyKinds are intentionally excluded from this release version.")
+            }
+            if (!locAllowIncomplete) {
+                throw GradleException(locMessage)
+            }
+            logger.warn(locMessage)
+            logger.warn("Incomplete release explicitly allowed; omitted TechnologyKinds cannot be added later under the same logical release version.")
+        } else {
+            logger.lifecycle("Release TechnologyKind selection is complete.")
+        }
+    }
+}
+
 
 val algitesResolveRequiredCredentials = tasks.register("resolveAlgitesRequiredCredentials") {
     group = "algites"
@@ -994,7 +1047,12 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
         var locConfiguredTargets = 0
         var locDeletedPackages = 0
         algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locProjectPath, locMetadata) ->
-            val locTechnologyKinds = AIcAlgitesStringList(locMetadata["technologyKinds"]).toSet()
+            val locDeclaredTechnologyKinds = AIcAlgitesStringList(locMetadata["technologyKinds"]).toSet()
+            val locTechnologyKinds = if (algitesRequestedTechnologyKinds.isEmpty()) {
+                locDeclaredTechnologyKinds
+            } else {
+                locDeclaredTechnologyKinds.intersect(algitesRequestedTechnologyKinds)
+            }
             if (locTechnologyKinds.isEmpty()) return@forEach
             val locDeleteEnabled = locMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() ?: true
             if (!locDeleteEnabled) {

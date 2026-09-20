@@ -18,6 +18,7 @@ import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import java.time.Instant
 
 apply(plugin = "base")
 
@@ -108,6 +109,102 @@ extra["algitesDocsResolvedRepositoryId"] = locAlgitesDocsResolvedRepositoryId
 extra["algitesDocsResolvedRepositoryName"] = locAlgitesDocsResolvedRepositoryName
 extra["algitesDocsResolvedRepositoryVisibility"] = locAlgitesDocsResolvedRepositoryVisibility
 
+fun AIcDocsTechnologyKinds(aValue: String?): Set<String> {
+    return aValue
+        ?.split(',')
+        ?.map { locValue -> locValue.trim().lowercase() }
+        ?.filter { locValue -> locValue.isNotBlank() }
+        ?.toSet()
+        ?: emptySet()
+}
+
+val locAlgitesDocsSupportedTechnologyKinds = setOf("java", "python", "mps")
+val locAlgitesDocsDeclaredTechnologyKinds = locAlgitesDocsResolvedArtifactDirectories
+    .flatMap { locArtifactDirectory -> AIcDocsTechnologyKinds(locArtifactDirectory["technologyKinds"]) }
+    .toSet()
+val locAlgitesDocsRequestedTechnologyKinds = (
+    (findProperty("algites.technologyKinds") as String?)
+        ?: System.getenv("ALGITES_TECHNOLOGY_KINDS")
+)
+    ?.let(::AIcDocsTechnologyKinds)
+    ?: emptySet()
+
+val locAlgitesDocsUnsupportedRequestedTechnologyKinds =
+    locAlgitesDocsRequestedTechnologyKinds - locAlgitesDocsSupportedTechnologyKinds
+require(locAlgitesDocsUnsupportedRequestedTechnologyKinds.isEmpty()) {
+    "Unsupported documentation TechnologyKind selection: ${locAlgitesDocsUnsupportedRequestedTechnologyKinds.sorted().joinToString(", ")}. " +
+        "Supported values: ${locAlgitesDocsSupportedTechnologyKinds.sorted().joinToString(", ")}."
+}
+
+val locAlgitesDocsEffectiveTechnologyKinds = if (locAlgitesDocsRequestedTechnologyKinds.isEmpty()) {
+    locAlgitesDocsDeclaredTechnologyKinds
+} else {
+    locAlgitesDocsDeclaredTechnologyKinds.intersect(locAlgitesDocsRequestedTechnologyKinds)
+}
+
+fun AIcDocsGitValue(vararg aArguments: String): String? {
+    return try {
+        val locProcess = ProcessBuilder(listOf("git") + aArguments)
+            .directory(rootProject.projectDir)
+            .redirectErrorStream(true)
+            .start()
+        val locOutput = locProcess.inputStream.bufferedReader(Charsets.UTF_8).readText().trim()
+        if (locProcess.waitFor() == 0) locOutput.takeIf { it.isNotBlank() } else null
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsExistingPublicationMetadata =
+    rootProject.extra.properties["algitesDocsPublicationMetadata"] as? Map<String, String>
+
+val locAlgitesDocsSourceRef = locAlgitesDocsExistingPublicationMetadata?.get("documentation.sourceRef")
+    ?: (findProperty("algites.docs.sourceRef") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    ?: System.getenv("ALGITES_DOCS_SOURCE_REF")?.trim()?.takeIf { it.isNotBlank() }
+    ?: System.getenv("GITHUB_REF_NAME")?.trim()?.takeIf { it.isNotBlank() }
+    ?: AIcDocsGitValue("branch", "--show-current")
+    ?: AIcDocsGitValue("rev-parse", "--abbrev-ref", "HEAD")
+    ?: "unknown"
+val locAlgitesDocsSourceCommit = locAlgitesDocsExistingPublicationMetadata?.get("documentation.sourceCommit")
+    ?: (findProperty("algites.docs.sourceCommit") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    ?: System.getenv("ALGITES_DOCS_SOURCE_COMMIT")?.trim()?.takeIf { it.isNotBlank() }
+    ?: System.getenv("GITHUB_SHA")?.trim()?.takeIf { it.isNotBlank() }
+    ?: AIcDocsGitValue("rev-parse", "HEAD")
+    ?: "unknown"
+val locAlgitesDocsGeneratedAt = locAlgitesDocsExistingPublicationMetadata?.get("documentation.generatedAt")
+    ?: (findProperty("algites.docs.generatedAt") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    ?: System.getenv("ALGITES_DOCS_GENERATED_AT")?.trim()?.takeIf { it.isNotBlank() }
+    ?: Instant.now().toString()
+
+val locAlgitesDocsPublicationMetadata = mapOf(
+    "documentation.sourceRef" to locAlgitesDocsSourceRef,
+    "documentation.sourceCommit" to locAlgitesDocsSourceCommit,
+    "documentation.generatedAt" to locAlgitesDocsGeneratedAt
+)
+
+extra["algitesDocsDeclaredTechnologyKinds"] = locAlgitesDocsDeclaredTechnologyKinds
+extra["algitesDocsRequestedTechnologyKinds"] = locAlgitesDocsRequestedTechnologyKinds
+extra["algitesDocsEffectiveTechnologyKinds"] = locAlgitesDocsEffectiveTechnologyKinds
+extra["algitesDocsPublicationMetadata"] = locAlgitesDocsPublicationMetadata
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsTechnologyTaskNames =
+    (rootProject.extra.properties["algitesDocsTechnologyTaskNames"] as? MutableSet<String>)
+        ?: linkedSetOf<String>().also { rootProject.extra["algitesDocsTechnologyTaskNames"] = it }
+
+logger.lifecycle(
+    "Algites documentation TechnologyKinds: declared=${locAlgitesDocsDeclaredTechnologyKinds.sorted()}, " +
+        "requested=${if (locAlgitesDocsRequestedTechnologyKinds.isEmpty()) "<all declared>" else locAlgitesDocsRequestedTechnologyKinds.sorted()}, " +
+        "effective=${locAlgitesDocsEffectiveTechnologyKinds.sorted()}"
+)
+
 
 val locDocsSiteRoot = layout.projectDirectory.dir(
     (findProperty("algites.docs.siteRoot") as String?) ?: "docs-site"
@@ -144,6 +241,37 @@ extra["algitesPublicationsDocsRootPath"] = locPublicationsDocsRoot.asFile.path
 extra["algitesPublicationDocsRootPath"] = locPublicationDocsRoot.asFile.path
 extra["algitesDocsPublicationKind"] = locPublicationKind
 extra["algitesDocsPublicationId"] = locPublicationId
+
+val locAlgitesDocsEffectivePublicationKind = locPublicationKind ?: "generated"
+val locAlgitesDocsEffectivePublicationId = locPublicationId ?: "current"
+
+if (tasks.findByName("prepareAlgitesDocsPublication") == null) {
+    tasks.register("prepareAlgitesDocsPublication") {
+        group = "algites"
+        description = "Clears the selected documentation publication before regenerating requested TechnologyKinds."
+
+        inputs.property("publicationKind", locAlgitesDocsEffectivePublicationKind)
+        inputs.property("publicationId", locAlgitesDocsEffectivePublicationId)
+        inputs.property("technologyKinds", locAlgitesDocsEffectiveTechnologyKinds.sorted().joinToString(","))
+
+        doLast {
+            val locArtifactRootFile = locArtifactDocsRoot.asFile
+            locArtifactRootFile.listFiles()
+                ?.filter { locArtifactDirectory -> locArtifactDirectory.isDirectory }
+                ?.forEach { locArtifactDirectory ->
+                    File(
+                        locArtifactDirectory,
+                        "${locAlgitesDocsEffectivePublicationKind}/${locAlgitesDocsEffectivePublicationId}"
+                    ).deleteRecursively()
+                }
+
+            File(
+                locPublicationsDocsRoot.asFile,
+                "${locAlgitesDocsEffectivePublicationKind}/${locAlgitesDocsEffectivePublicationId}"
+            ).deleteRecursively()
+        }
+    }
+}
 
 fun String.AIcDocsNormalizeYamlScalar(): String {
     return trim().removeSurrounding("\"").removeSurrounding("'")
@@ -805,12 +933,54 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
             )
             val locVersion = valueOrDash(locMetadata["version.resolvedValue"])
 
-            val locDocumentationLinks = listOf("javadoc" to "Javadoc", "mpsdoc" to "MPS documentation")
-                .filter { (locDirectoryName, _) -> aPublication.directory.resolve(locDirectoryName).isDirectory }
+            val locDocumentationKinds = listOf(
+                "java" to "Java API documentation",
+                "python" to "Python API documentation",
+                "mps" to "MPS documentation"
+            ).filter { (locDirectoryName, _) -> aPublication.directory.resolve(locDirectoryName).isDirectory }
+            val locDocumentationLinks = locDocumentationKinds
                 .joinToString("\n") { (locDirectoryName, locLabel) ->
                     """<li><a href="${html(locDirectoryName)}/index.html">${html(locLabel)}</a></li>"""
                 }
                 .ifBlank { "<li>No generated documentation output was found for this artifact publication yet.</li>" }
+            val locTechnologyDetails = locDocumentationKinds.joinToString("\n") { (locDirectoryName, locLabel) ->
+                val locDetails = when (locDirectoryName) {
+                    "java" -> listOf(
+                        "Maven group ID" to valueOrDash(locMetadata["java.maven.groupId"]),
+                        "Maven artifact ID" to valueOrDash(locMetadata["java.maven.artifactId"]),
+                        "Maven version" to valueOrDash(locMetadata["java.maven.version"])
+                    )
+                    "python" -> listOf(
+                        "Distribution" to valueOrDash(locMetadata["python.distributionName"]),
+                        "Import namespace" to valueOrDash(locMetadata["python.importNamespace"]),
+                        "Python version" to valueOrDash(locMetadata["python.version"])
+                    )
+                    "mps" -> listOf(
+                        "MPS artifact ID" to valueOrDash(locMetadata["mps.artifactId"]),
+                        "MPS module path" to valueOrDash(locMetadata["mps.modulePath"])
+                    )
+                    else -> emptyList()
+                }
+                val locDetailHtml = if (locDetails.isEmpty()) {
+                    ""
+                } else {
+                    "<dl class=\"metadata\">" + locDetails.joinToString("") { (locName, locValue) ->
+                        "<dt>${html(locName)}</dt><dd>${html(locValue)}</dd>"
+                    } + "</dl>"
+                }
+                """<div class="technology"><h3>${html(locDirectoryName.uppercase())}</h3><p><a href="${html(locDirectoryName)}/index.html">${html(locLabel)}</a></p>${locDetailHtml}</div>"""
+            }
+            val locDeclaredTechnologyKinds = locMetadata["technologyKinds"]
+                ?.split(',')
+                ?.map { it.trim().uppercase() }
+                ?.filter { it.isNotBlank() }
+                ?.joinToString(", ")
+                ?.takeIf { it.isNotBlank() }
+                ?: "—"
+            val locDocumentationTechnologyKinds = locDocumentationKinds
+                .map { (locDirectoryName, _) -> locDirectoryName.uppercase() }
+                .joinToString(", ")
+                .ifBlank { "—" }
 
             locIndexFile.writeText(
                 """
@@ -835,6 +1005,10 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                     .coordinates dt, .metadata dt { font-weight: 650; color: #374151; }
                     .coordinates dd, .metadata dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
                     .coordinates dd { font-weight: 650; }
+                    .technology { border-top: 1px solid #e5e7eb; padding-top: 0.6rem; margin-top: 0.6rem; }
+                    .technology:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+                    .technology h3 { margin: 0 0 0.25rem 0; font-size: 0.98rem; }
+                    .technology p { margin: 0 0 0.4rem 0; }
                     ul { margin: 0.25rem 0 0 1.2rem; padding: 0; }
                     li { margin: 0.2rem 0; }
                     a { color: #2563eb; }
@@ -856,11 +1030,26 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                           </dl>
                         </section>
                         <section class="card">
+                          <h2>Technology selection</h2>
+                          <dl class="coordinates">
+                            <dt>Declared technologies</dt><dd>${html(locDeclaredTechnologyKinds)}</dd>
+                            <dt>Documentation technologies</dt><dd>${html(locDocumentationTechnologyKinds)}</dd>
+                          </dl>
+                        </section>
+                        <section class="card">
                           <h2>Generated documentation</h2>
-                          <ul>${locDocumentationLinks}</ul>
+                          ${if (locTechnologyDetails.isBlank()) "<ul>${locDocumentationLinks}</ul>" else locTechnologyDetails}
                         </section>
                       </div>
                       <aside class="metadata-column">
+                        <section class="card">
+                          <h2>Source</h2>
+                          <dl class="metadata">
+                            <dt>Ref</dt><dd>${html(valueOrDash(locMetadata["documentation.sourceRef"]))}</dd>
+                            <dt>Commit</dt><dd>${html(valueOrDash(locMetadata["documentation.sourceCommit"]))}</dd>
+                            <dt>Generated</dt><dd>${html(valueOrDash(locMetadata["documentation.generatedAt"]))}</dd>
+                          </dl>
+                        </section>
                         <section class="card">
                           <h2>Metadata</h2>
                           <dl class="metadata">
@@ -868,7 +1057,6 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                             <dt>Name</dt><dd>${html(valueOrDash(locMetadata["name"]))}</dd>
                             <dt>Description</dt><dd>${html(valueOrDash(locMetadata["description"]))}</dd>
                             <dt>Structure kind</dt><dd>${html(valueOrDash(locMetadata["structureKind"]))}</dd>
-                            <dt>Technology kinds</dt><dd>${html(valueOrDash(locMetadata["technologyKinds"]))}</dd>
                             <dt>Contents model</dt><dd>${html(valueOrDash(locMetadata["contentsModel"]))}</dd>
                             <dt>Source path</dt><dd>${html(valueOrDash(locMetadata["path"]))}</dd>
                             <dt>Gradle project path</dt><dd>${html(valueOrDash(locMetadata["gradleProjectPath"]))}</dd>
@@ -1089,6 +1277,8 @@ if (tasks.findByName("generateAlgitesDocsPublicationGroupIndexes") == null) {
         group = "algites"
         description = "Generates index pages for Algites preview, snapshot, and release documentation groups."
 
+        dependsOn("generateAlgitesDocsArtifactPublicationIndexes")
+
         outputs.file(locPublicationsDocsRoot.file("preview/index.html"))
         outputs.file(locPublicationsDocsRoot.file("snapshot/index.html"))
         outputs.file(locPublicationsDocsRoot.file("release/index.html"))
@@ -1223,6 +1413,15 @@ fun AIcDocsArtifactMetadataEntryLine(aArtifactDirectory: Map<String, String?>): 
 
 val locAlgitesDocsArtifactMetadataEntryLines = locAlgitesDocsResolvedArtifactDirectories
     .filter { locArtifactDirectory -> locArtifactDirectory["structureKind"] != "repository" }
+    .filter { locArtifactDirectory ->
+        val locDeclaredKinds = AIcDocsTechnologyKinds(locArtifactDirectory["technologyKinds"])
+        val locEffectiveKinds = if (locAlgitesDocsRequestedTechnologyKinds.isEmpty()) {
+            locDeclaredKinds
+        } else {
+            locDeclaredKinds.intersect(locAlgitesDocsRequestedTechnologyKinds)
+        }
+        locEffectiveKinds.isNotEmpty()
+    }
     .map { locArtifactDirectory -> AIcDocsArtifactMetadataEntryLine(locArtifactDirectory) }
 
 if (tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes") == null) {
@@ -1245,6 +1444,7 @@ if (tasks.findByName("generateAlgitesDocsSite") == null) {
         group = "algites"
         description = "Generic aggregate task for repository documentation site generation."
 
+        dependsOn("prepareAlgitesDocsPublication")
         dependsOn("generateAlgitesDocsRootIndex")
         dependsOn("generateAlgitesDocsArtifactPublicationIndexes")
         dependsOn("generateAlgitesDocsPublicationGroupIndexes")
@@ -1258,7 +1458,7 @@ afterEvaluate {
     val locArtifactPublicationIndexesTask = tasks.findByName("generateAlgitesDocsArtifactPublicationIndexes")
     val locPublicationGroupIndexesTask = tasks.findByName("generateAlgitesDocsPublicationGroupIndexes")
 
-    listOf("generateJavaDocsSite", "generateDummyMpsDocs")
+    locAlgitesDocsTechnologyTaskNames
         .mapNotNull { locTaskName -> tasks.findByName(locTaskName) }
         .forEach { locDocumentationTask ->
             locArtifactPublicationIndexesTask?.mustRunAfter(locDocumentationTask)

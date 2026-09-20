@@ -362,7 +362,7 @@ If issue references are detected (from branch name and/or commit subjects), CI w
 - Prefer variant branching (`jvm17/*`, `jvm21/*`, `and21/*`, `mps2025.1/*`) to keep cross-variant feature migration explicit.
 - Use `feature-testrun/*` for safe CI experiments without publishing.
 - Use `feature/*` for normal development with fast compile feedback.
-- Keep publication/release actions explicit and constrained by branch/lane policy; publication MAY target only a selected subset of TechnologyKinds.
+- Keep publication/release actions explicit and constrained by branch/lane policy; snapshot publication MAY freely target a selected subset of TechnologyKinds, while an incomplete release requires the explicit incomplete-release override.
 - Use issue identification wherever practical to keep change traceability as transparent as possible.
 
 ---
@@ -570,13 +570,15 @@ Snapshot computation is performed per effective version scope. A snapshot versio
 
 ##### 3.1.3.2 TechnologyKind-specific publication presence
 
-A logical version does not imply that every declared TechnologyKind has been published. For example, version `1.4.1` may have a Java release publication while Python remains available only at `1.4.0`. No artificial Python `1.4.1` package is created.
+Snapshot and ordinary build operations MAY select any subset of the declared TechnologyKinds. Their effective set is the intersection of the artifact's declared TechnologyKinds and the requested TechnologyKinds; if no request is supplied, all declared TechnologyKinds are selected. A TechnologyKind omitted from a snapshot/build is simply not updated by that operation.
 
-If another TechnologyKind is later published under the same logical version, it MUST be built from the same immutable release source revision. If the source has changed, a new logical version is required.
+Release publication is complete by default: the selected TechnologyKinds MUST cover all declared TechnologyKinds of every released logical artifact. A provider MAY expose an explicit `allowIncompleteTechnologyKinds` confirmation for an exceptional incomplete release. If that override is used, no artificial package is created for an omitted TechnologyKind, but the release version is final: an omitted TechnologyKind MUST NOT later be published under the same logical release version. Publishing it requires a new logical version.
 
 #### 3.1.4. CI: when/what runs
 
 The common CI lifecycle resolves the effective version scope, selected TechnologyKinds, lifecycle mode, and then invokes the corresponding Gradle/TechnologyKind-adapter task graph.
+
+Documentation generation uses the same requested TechnologyKind selection contract as ordinary construction. A standalone documentation operation MAY therefore request a subset explicitly; if it does not, all declared TechnologyKinds are requested. For each logical artifact, only `declared ∩ requested` documentation outputs are generated. The documentation publication for that run MUST contain only those effective TechnologyKind directories; stale TechnologyKind documentation left by an earlier broader build is removed. The logical-artifact page retains all declared TechnologyKinds as metadata while showing generated sections only for the effective documentation set. It SHOULD also record the source ref/branch, exact source commit, and UTC generation date/time for the documentation build.
 
 
 #### 3.1.5. Release process (explicit action)
@@ -592,12 +594,13 @@ The release operation MUST:
 
 1. validate lane/version-scope consistency,
 2. resolve and freeze the immutable release source revision,
-3. compute or validate the release identity/tag,
-4. obtain the governed private-download and visibility-specific upload repository-default overlays from private governance,
-5. execute construction and verification required by each selected TechnologyKind adapter,
-6. publish only the selected TechnologyKinds to the effective upload cells matching the source repository visibility and release stability,
-7. record which TechnologyKind-specific publications actually exist for the logical version,
-8. after all required release processing succeeds, perform best-effort cleanup of the corresponding snapshot packages through the visibility-specific `snapshot.manage` endpoints when the effective `deleteSnapshotWhenReleased` policy is `true`.
+3. resolve the requested TechnologyKind set and reject an incomplete selection unless the explicit incomplete-release override is enabled,
+4. compute or validate the release identity/tag,
+5. obtain the governed private-download and visibility-specific upload repository-default overlays from private governance,
+6. execute construction and verification required by each selected TechnologyKind adapter,
+7. publish only the selected TechnologyKinds to the effective upload cells matching the source repository visibility and release stability,
+8. record which TechnologyKind-specific publications actually exist for the logical version; when an incomplete release was explicitly allowed, omitted TechnologyKinds remain permanently absent from that release version,
+9. after all required release processing succeeds, perform best-effort cleanup only for snapshot packages corresponding to TechnologyKinds that were actually selected/released, through the visibility-specific `snapshot.manage` endpoints when the effective `deleteSnapshotWhenReleased` policy is `true`.
 
 Ordinary repository builds do not receive upload or management overlays. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. The release publication phase materializes only download/upload credentials; the final cleanup phase separately materializes only management credentials. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible for deterministic repository-matrix resolution.
 
@@ -666,14 +669,14 @@ Use distinct `ContainerVersionContext` scopes. Artifacts do not need to be split
 
 ##### 3.1.8.3 “What if only one technology changed?”
 
-Release only the affected TechnologyKind(s). Other technologies remain at the latest version for which they were actually published. This keeps technology lifecycles operationally decoupled without introducing independent TechnologyKind-specific version counters inside one logical artifact.
+Ordinary construction, verification, snapshot publication, and documentation may select only the affected TechnologyKind. A release still selects all declared TechnologyKinds by default because the logical version belongs to the logical artifact, not to one technology. If an intentionally partial release is required, the incomplete-release override must be confirmed explicitly; omitted TechnologyKinds then remain permanently absent from that release version and can appear again only under a later logical version.
 
 ---
 
 #### 3.1.9. Counterpoints and trade-offs
 
 - Scoped version contexts reduce pressure to split repositories, but release tags/diagnostics must always make the version scope unambiguous.
-- Selective technology publication reduces cross-technology coupling, but consumers cannot assume that every logical version exists in every ecosystem; publication metadata and documentation must show actual availability.
+- Selective snapshot publication and explicitly incomplete releases reduce cross-technology coupling, but an incomplete release permanently leaves the omitted TechnologyKinds absent from that logical version; publication metadata and documentation should make the selected/available TechnologyKinds explicit.
 - Gradle orchestration across non-JVM ecosystems provides one lifecycle entry point, but each TechnologyKind adapter must accurately model native-tool inputs, outputs, and failure modes rather than hiding them behind Java assumptions.
 - Cherry-pick upmerge remains pragmatic, but conflicts require explicit review and resolution.
 
