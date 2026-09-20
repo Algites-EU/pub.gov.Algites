@@ -6,12 +6,19 @@
  * algites-artifact.yml files.
  */
 
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.plugins.BasePluginExtension
+import org.gradle.api.provider.Property
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.credentials.HttpHeaderCredentials
 import org.gradle.authentication.http.HttpHeaderAuthentication
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
 import groovy.json.JsonOutput
@@ -569,124 +576,152 @@ val algitesValidateReleaseTechnologyKinds = tasks.register("validateAlgitesRelea
 }
 
 
-val algitesResolveRequiredCredentials = tasks.register("resolveAlgitesRequiredCredentials") {
-    group = "algites"
-    description = "Resolves enabled repository endpoints and the credential profiles required by the selected repository context."
+abstract class AIcResolveAlgitesRequiredCredentialsTask : DefaultTask() {
+    @get:Input
+    abstract val planJson: Property<String>
 
-    doLast {
-        val locRequestedUsages = (
-            algitesGradleOrEnvironmentValue("algites.credential.usages")
-                ?: System.getenv("ALGITES_CREDENTIAL_USAGES")
-                ?: "download"
-            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
-        val locDownloadStabilities = (
-            algitesGradleOrEnvironmentValue("algites.credential.download.stabilities")
-                ?: System.getenv("ALGITES_CREDENTIAL_DOWNLOAD_STABILITIES")
-                ?: "release,snapshot"
-            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
-        val locUploadStabilities = (
-            algitesGradleOrEnvironmentValue("algites.credential.upload.stabilities")
-                ?: System.getenv("ALGITES_CREDENTIAL_UPLOAD_STABILITIES")
-                ?: "release,snapshot"
-            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
-        val locManageStabilities = (
-            algitesGradleOrEnvironmentValue("algites.credential.manage.stabilities")
-                ?: System.getenv("ALGITES_CREDENTIAL_MANAGE_STABILITIES")
-                ?: "release,snapshot"
-            ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+    @get:Input
+    abstract val credentialCount: Property<Int>
 
-        val locSupportedUsages = setOf("download", "upload", "manage")
-        val locSupportedStabilities = setOf("release", "snapshot")
-        if (!locSupportedUsages.containsAll(locRequestedUsages)) {
-            throw GradleException("Unsupported credential usage. Supported values: download, upload, manage.")
-        }
-        if (!locSupportedStabilities.containsAll(locDownloadStabilities + locUploadStabilities + locManageStabilities)) {
-            throw GradleException("Unsupported credential stability. Supported values: release, snapshot.")
+    @get:Optional
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    @TaskAction
+    fun resolve() {
+        val locJson = planJson.get()
+        if (!outputFile.isPresent) {
+            println(locJson)
+            return
         }
 
-        val locDownloadVisibilities = when (algitesRepositoryVisibility) {
-            "pub" -> setOf("public")
-            "priv" -> setOf("public", "private")
-            else -> throw GradleException("Unsupported Algites repository visibility '$algitesRepositoryVisibility'.")
-        }
-        val locUploadVisibilities = setOf(algitesPublicationRepositoryVisibility)
-        val locManageVisibilities = setOf(algitesPublicationRepositoryVisibility)
-        val locOperationTechnologyKinds = if (algitesRequestedTechnologyKinds.isNotEmpty()) {
-            algitesRequestedTechnologyKinds
-        } else {
-            algitesResolvedArtifactDirectoriesByGradleProjectPath.values
-                .flatMap { locMetadata -> AIcAlgitesStringList(locMetadata["technologyKinds"]) }
-                .toSet()
-        }
-        val locRepositories = linkedMapOf<String, Map<String, String?>>()
-        val locCredentials = linkedMapOf<String, Map<String, String>>()
+        val locOutputFile = outputFile.get().asFile
+        locOutputFile.parentFile?.mkdirs()
+        locOutputFile.writeText(locJson + System.lineSeparator(), Charsets.UTF_8)
+        println(
+            "Algites credential preflight wrote ${credentialCount.get()} required credential profile/type pair(s) " +
+                "to ${locOutputFile.path}."
+        )
+    }
+}
 
-        fun AIcCollect(aMetadata: Map<String, Any?>, aScope: String) {
-            val locScopeTechnologyKinds = AIcAlgitesStringList(aMetadata["technologyKinds"]).toSet()
-            val locRepositoryMap = aMetadata["repositories"] as? Map<*, *> ?: return
-            val locProfiles = AIcAlgitesCredentialProfiles(aMetadata["credentialProfiles"])
+val locAlgitesRequiredCredentialsPlan = run {
+    val locRequestedUsages = (
+        algitesGradleOrEnvironmentValue("algites.credential.usages")
+            ?: System.getenv("ALGITES_CREDENTIAL_USAGES")
+            ?: "download"
+        ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+    val locDownloadStabilities = (
+        algitesGradleOrEnvironmentValue("algites.credential.download.stabilities")
+            ?: System.getenv("ALGITES_CREDENTIAL_DOWNLOAD_STABILITIES")
+            ?: "release,snapshot"
+        ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+    val locUploadStabilities = (
+        algitesGradleOrEnvironmentValue("algites.credential.upload.stabilities")
+            ?: System.getenv("ALGITES_CREDENTIAL_UPLOAD_STABILITIES")
+            ?: "release,snapshot"
+        ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
+    val locManageStabilities = (
+        algitesGradleOrEnvironmentValue("algites.credential.manage.stabilities")
+            ?: System.getenv("ALGITES_CREDENTIAL_MANAGE_STABILITIES")
+            ?: "release,snapshot"
+        ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
 
-            locRepositoryMap.keys.mapNotNull { it?.toString() }.sorted().forEach { locCell ->
-                val locSegments = locCell.split('.')
-                if (locSegments.size != 4) return@forEach
-                val (locTechnology, locVisibility, locStability, locUsage) = locSegments
-                if (locUsage !in locRequestedUsages) return@forEach
-                if (locUsage == "download" && locVisibility !in locDownloadVisibilities) return@forEach
-                if (locUsage == "upload" && locVisibility !in locUploadVisibilities) return@forEach
-                if (locUsage == "manage" && locVisibility !in locManageVisibilities) return@forEach
-                if (locUsage == "download" && locStability !in locDownloadStabilities) return@forEach
-                if (locUsage == "upload" && locStability !in locUploadStabilities) return@forEach
-                if (locUsage == "manage" && locStability !in locManageStabilities) return@forEach
-                if (locUsage == "manage" && aScope == "repository") return@forEach
-                if (locUsage == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@forEach
-                if (locOperationTechnologyKinds.isNotEmpty() && locTechnology !in locOperationTechnologyKinds) return@forEach
-                if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@forEach
+    val locSupportedUsages = setOf("download", "upload", "manage")
+    val locSupportedStabilities = setOf("release", "snapshot")
+    if (!locSupportedUsages.containsAll(locRequestedUsages)) {
+        throw GradleException("Unsupported credential usage. Supported values: download, upload, manage.")
+    }
+    if (!locSupportedStabilities.containsAll(locDownloadStabilities + locUploadStabilities + locManageStabilities)) {
+        throw GradleException("Unsupported credential stability. Supported values: release, snapshot.")
+    }
 
-                AIcAlgitesRepositoryEndpoints(aMetadata["repositories"], locCell).forEach { locEndpoint ->
-                    val locProfileId = locEndpoint.credentialProfile
-                    val locProfile = if (locProfileId.isNullOrBlank()) null else locProfiles[locProfileId]
-                        ?: throw GradleException(
-                            "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
-                        )
-                    val locRepositoryKey = "$aScope|$locCell|${locEndpoint.id}"
-                    locRepositories[locRepositoryKey] = linkedMapOf(
-                        "scope" to aScope,
-                        "cell" to locCell,
-                        "id" to locEndpoint.id,
-                        "credentialProfile" to locProfileId,
-                        "credentialType" to locProfile?.type
+    val locDownloadVisibilities = when (algitesRepositoryVisibility) {
+        "pub" -> setOf("public")
+        "priv" -> setOf("public", "private")
+        else -> throw GradleException("Unsupported Algites repository visibility '$algitesRepositoryVisibility'.")
+    }
+    val locUploadVisibilities = setOf(algitesPublicationRepositoryVisibility)
+    val locManageVisibilities = setOf(algitesPublicationRepositoryVisibility)
+    val locOperationTechnologyKinds = if (algitesRequestedTechnologyKinds.isNotEmpty()) {
+        algitesRequestedTechnologyKinds
+    } else {
+        algitesResolvedArtifactDirectoriesByGradleProjectPath.values
+            .flatMap { locMetadata -> AIcAlgitesStringList(locMetadata["technologyKinds"]) }
+            .toSet()
+    }
+    val locRepositories = linkedMapOf<String, Map<String, String?>>()
+    val locCredentials = linkedMapOf<String, Map<String, String>>()
+
+    fun AIcCollect(aMetadata: Map<String, Any?>, aScope: String) {
+        val locScopeTechnologyKinds = AIcAlgitesStringList(aMetadata["technologyKinds"]).toSet()
+        val locRepositoryMap = aMetadata["repositories"] as? Map<*, *> ?: return
+        val locProfiles = AIcAlgitesCredentialProfiles(aMetadata["credentialProfiles"])
+
+        locRepositoryMap.keys.mapNotNull { it?.toString() }.sorted().forEach { locCell ->
+            val locSegments = locCell.split('.')
+            if (locSegments.size != 4) return@forEach
+            val (locTechnology, locVisibility, locStability, locUsage) = locSegments
+            if (locUsage !in locRequestedUsages) return@forEach
+            if (locUsage == "download" && locVisibility !in locDownloadVisibilities) return@forEach
+            if (locUsage == "upload" && locVisibility !in locUploadVisibilities) return@forEach
+            if (locUsage == "manage" && locVisibility !in locManageVisibilities) return@forEach
+            if (locUsage == "download" && locStability !in locDownloadStabilities) return@forEach
+            if (locUsage == "upload" && locStability !in locUploadStabilities) return@forEach
+            if (locUsage == "manage" && locStability !in locManageStabilities) return@forEach
+            if (locUsage == "manage" && aScope == "repository") return@forEach
+            if (locUsage == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@forEach
+            if (locOperationTechnologyKinds.isNotEmpty() && locTechnology !in locOperationTechnologyKinds) return@forEach
+            if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@forEach
+
+            AIcAlgitesRepositoryEndpoints(aMetadata["repositories"], locCell).forEach { locEndpoint ->
+                val locProfileId = locEndpoint.credentialProfile
+                val locProfile = if (locProfileId.isNullOrBlank()) null else locProfiles[locProfileId]
+                    ?: throw GradleException(
+                        "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
                     )
-                    if (locProfile != null) {
-                        val locCredentialKey = "${locProfile.id}|${locProfile.type}"
-                        locCredentials[locCredentialKey] = linkedMapOf(
-                            "profileId" to locProfile.id,
-                            "type" to locProfile.type
-                        )
-                    }
+                val locRepositoryKey = "$aScope|$locCell|${locEndpoint.id}"
+                locRepositories[locRepositoryKey] = linkedMapOf(
+                    "scope" to aScope,
+                    "cell" to locCell,
+                    "id" to locEndpoint.id,
+                    "credentialProfile" to locProfileId,
+                    "credentialType" to locProfile?.type
+                )
+                if (locProfile != null) {
+                    val locCredentialKey = "${locProfile.id}|${locProfile.type}"
+                    locCredentials[locCredentialKey] = linkedMapOf(
+                        "profileId" to locProfile.id,
+                        "type" to locProfile.type
+                    )
                 }
             }
         }
+    }
 
-        AIcCollect(algitesResolvedRepositoryMetadata, "repository")
-        algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locPath, locMetadata) ->
-            AIcCollect(locMetadata, "artifact:$locPath")
-        }
+    AIcCollect(algitesResolvedRepositoryMetadata, "repository")
+    algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locPath, locMetadata) ->
+        AIcCollect(locMetadata, "artifact:$locPath")
+    }
 
-        val locPlan = linkedMapOf<String, Any>(
-            "repositories" to locRepositories.values.toList(),
-            "credentials" to locCredentials.values.toList()
-        )
-        val locJson = JsonOutput.toJson(locPlan)
-        val locOutputPath = algitesGradleOrEnvironmentValue("algites.credential.output")
-            ?: System.getenv("ALGITES_CREDENTIAL_OUTPUT")
-        if (locOutputPath.isNullOrBlank()) {
-            println(locJson)
-        } else {
-            val locOutputFile = File(locOutputPath)
-            locOutputFile.parentFile?.mkdirs()
-            locOutputFile.writeText(locJson + System.lineSeparator(), Charsets.UTF_8)
-            println("Algites credential preflight wrote ${locCredentials.size} required credential profile/type pair(s) to ${locOutputFile.path}.")
-        }
+    val locPlan = linkedMapOf<String, Any>(
+        "repositories" to locRepositories.values.toList(),
+        "credentials" to locCredentials.values.toList()
+    )
+    JsonOutput.toJson(locPlan) to locCredentials.size
+}
+
+val algitesResolveRequiredCredentials = tasks.register<AIcResolveAlgitesRequiredCredentialsTask>("resolveAlgitesRequiredCredentials") {
+    group = "algites"
+    description = "Resolves enabled repository endpoints and the credential profiles required by the selected repository context."
+
+    planJson.set(locAlgitesRequiredCredentialsPlan.first)
+    credentialCount.set(locAlgitesRequiredCredentialsPlan.second)
+
+    val locOutputPath = algitesGradleOrEnvironmentValue("algites.credential.output")
+        ?: System.getenv("ALGITES_CREDENTIAL_OUTPUT")
+    if (!locOutputPath.isNullOrBlank()) {
+        outputFile.set(File(locOutputPath))
     }
 }
 
