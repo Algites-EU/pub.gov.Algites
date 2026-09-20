@@ -23,7 +23,7 @@ fun AIcAlgitesParseCredentialJsonObject(aName: String, aRaw: String?): Map<Strin
     return locMap.entries.associate { locEntry -> locEntry.key.toString() to locEntry.value }
 }
 
-val locAlgitesReadCredentialCliOutput = fun(vararg aArguments: String): String? {
+val locAlgitesReadCredentialCliOutput = fun(aArguments: List<String>): String? {
     val locExecutable = System.getenv("ALGITES_CREDENTIAL_CLI")
         ?.trim()
         ?.takeIf { it.isNotBlank() }
@@ -53,7 +53,7 @@ val locAlgitesReadCredentialCliOutput = fun(vararg aArguments: String): String? 
 
 val locAlgitesCredentialDocumentRaw = System.getenv("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS")
     ?.takeIf { it.isNotBlank() }
-    ?: locAlgitesReadCredentialCliOutput("bootstrap-document")
+    ?: locAlgitesReadCredentialCliOutput(listOf("bootstrap-document"))
 
 val locAlgitesCredentialDocument = AIcAlgitesParseCredentialJsonObject(
     "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
@@ -101,7 +101,7 @@ val locAlgitesResolveCredentialValue = fun(
             if (locContextValue != null) {
                 locContextValue.toString()
             } else {
-                locAlgitesReadCredentialCliOutput("bootstrap-secret", locReference)
+                locAlgitesReadCredentialCliOutput(listOf("bootstrap-secret", locReference))
                     ?: throw GradleException(
                         "Credential '$aProfileId/$aCredentialType/$aField' references unavailable secret '$locReference'."
                     )
