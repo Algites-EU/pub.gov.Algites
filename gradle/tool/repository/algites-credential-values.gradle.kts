@@ -36,15 +36,15 @@ val locAlgitesReadCredentialCliOutput = fun(vararg aArguments: String): String? 
             isIgnoreExitValue = true
         }
     } catch (_: Exception) {
-        return@fun null
+        return null
     }
     val locResult = try {
         locOutput.result.get()
     } catch (_: Exception) {
-        return@fun null
+        return null
     }
-    if (locResult.exitValue != 0) return@fun null
-    return@fun try {
+    if (locResult.exitValue != 0) return null
+    return try {
         locOutput.standardOutput.asText.get()
     } catch (_: Exception) {
         null
