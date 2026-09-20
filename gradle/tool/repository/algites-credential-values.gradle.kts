@@ -10,6 +10,9 @@ import groovy.json.JsonSlurper
 import java.io.File
 import org.gradle.api.GradleException
 
+val locAlgitesCredentialPreflight = System.getenv("_TMP_ALGITES_CREDENTIAL_PREFLIGHT")
+    ?.equals("true", ignoreCase = true) == true
+
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesParseCredentialJsonObject(aName: String, aRaw: String?): Map<String, Any?> {
     if (aRaw.isNullOrBlank()) return emptyMap()
@@ -53,7 +56,11 @@ val locAlgitesReadCredentialCliOutput = fun(aArguments: List<String>): String? {
 
 val locAlgitesCredentialDocumentRaw = System.getenv("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS")
     ?.takeIf { it.isNotBlank() }
-    ?: locAlgitesReadCredentialCliOutput(listOf("bootstrap-document"))
+    ?: if (locAlgitesCredentialPreflight) {
+        null
+    } else {
+        locAlgitesReadCredentialCliOutput(listOf("bootstrap-document"))
+    }
 
 val locAlgitesCredentialDocument = AIcAlgitesParseCredentialJsonObject(
     "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
@@ -100,6 +107,8 @@ val locAlgitesResolveCredentialValue = fun(
             val locContextValue = locAlgitesCredentialSecretContext[locReference]
             if (locContextValue != null) {
                 locContextValue.toString()
+            } else if (locAlgitesCredentialPreflight) {
+                null
             } else {
                 locAlgitesReadCredentialCliOutput(listOf("bootstrap-secret", locReference))
                     ?: throw GradleException(

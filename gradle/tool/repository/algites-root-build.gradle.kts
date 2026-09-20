@@ -708,6 +708,7 @@ subprojects {
     } else {
         "${rootProject.name}_${locAlgitesSubprojectPathDots}"
     }
+    val locAlgitesProjectVersion = project.version.toString()
 
     val locEffectiveRepositories = locAlgitesArtifactDirectory?.get("repositories")
     val locEffectiveCredentialProfiles = AIcAlgitesCredentialProfiles(locAlgitesArtifactDirectory?.get("credentialProfiles"))
@@ -774,7 +775,7 @@ subprojects {
                 }
 
                 repositories {
-                    val locIsSnapshot = project.version.toString().endsWith("SNAPSHOT", ignoreCase = true)
+                    val locIsSnapshot = locAlgitesProjectVersion.endsWith("SNAPSHOT", ignoreCase = true)
                     val locStability = if (locIsSnapshot) "snapshot" else "release"
                     val locCell = "java.$algitesPublicationRepositoryVisibility.$locStability.upload"
                     val locEndpoints = AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locCell)
@@ -948,15 +949,17 @@ subprojects {
             }
         }
 
+        val locPythonProjectPath = project.path
+        val locPythonProjectDirectory = project.projectDir
         val locPythonDistDirectory = rootProject.layout.projectDirectory.dir(
-            "run/bld/python/${project.path.removePrefix(":").replace(':', '/')}/dist"
+            "run/bld/python/${locPythonProjectPath.removePrefix(":").replace(':', '/')}/dist"
         )
 
         val locBuildPython = tasks.register<Exec>("buildPython") {
             group = "build"
             description = "Builds Python wheel and source distribution for this Algites artifact."
             dependsOn(locGeneratePythonProjectMetadata)
-            workingDir(project.projectDir)
+            workingDir(locPythonProjectDirectory)
             commandLine(
                 algitesGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3",
                 "-m",
@@ -976,13 +979,13 @@ subprojects {
             dependsOn(locBuildPython)
 
             doLast {
-                val locIsSnapshot = project.version.toString().endsWith("SNAPSHOT", ignoreCase = true)
+                val locIsSnapshot = locAlgitesProjectVersion.endsWith("SNAPSHOT", ignoreCase = true)
                 val locStability = if (locIsSnapshot) "snapshot" else "release"
                 val locCell = "python.$algitesPublicationRepositoryVisibility.$locStability.upload"
                 val locEndpoints = AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locCell)
                 if (locEndpoints.isEmpty()) {
                     throw GradleException(
-                        "No enabled Python $locStability upload repository endpoint is configured for project '${project.path}'. " +
+                        "No enabled Python $locStability upload repository endpoint is configured for project '$locPythonProjectPath'. " +
                             "Configure repositories.python.$algitesPublicationRepositoryVisibility.$locStability.upload in Algites metadata or its inherited defaults."
                     )
                 }
@@ -992,7 +995,7 @@ subprojects {
                     ?: emptyList()
 
                 if (locDistributionFiles.isEmpty()) {
-                    throw GradleException("No Python distribution files were produced for project '${project.path}'.")
+                    throw GradleException("No Python distribution files were produced for project '$locPythonProjectPath'.")
                 }
 
                 locEndpoints.forEach { locEndpoint ->
@@ -1022,8 +1025,15 @@ subprojects {
                         }
                     }
                     locCommand.addAll(locDistributionFiles.map { locFile -> locFile.absolutePath })
-                    project.exec {
-                        commandLine(locCommand)
+                    val locExitValue = ProcessBuilder(locCommand)
+                        .directory(locPythonProjectDirectory)
+                        .inheritIO()
+                        .start()
+                        .waitFor()
+                    if (locExitValue != 0) {
+                        throw GradleException(
+                            "Python upload command failed for endpoint '${locEndpoint.id}' with exit code $locExitValue."
+                        )
                     }
                 }
             }
