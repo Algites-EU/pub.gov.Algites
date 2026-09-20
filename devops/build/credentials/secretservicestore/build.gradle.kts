@@ -21,6 +21,6 @@ java {
 
 dependencies {
     implementation(project(":devops:build:credentials:coreintf"))
-    implementation("de.swiesend:secret-service:3.0.0-beta")
+    implementation("de.swiesend:secret-service:3.0.0-alpha")
     testImplementation("org.testng:testng:7.11.0")
 }

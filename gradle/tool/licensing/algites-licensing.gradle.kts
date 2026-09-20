@@ -7,6 +7,15 @@
  */
 
 import java.io.File
+import java.security.MessageDigest
+import org.gradle.api.DefaultTask
+import org.gradle.api.GradleException
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.MapProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.TaskAction
 
 
 data class AIcdAlgitesLicenseDefinition(
@@ -36,6 +45,83 @@ data class AIcdAlgitesLicensingContext(
     val definitions: LinkedHashMap<String, AIcdAlgitesLicenseDefinition>,
     val usages: LinkedHashMap<String, AIcdAlgitesLicenseUsage>
 )
+
+abstract class AIcVerifyAlgitesLicensingTask : DefaultTask() {
+    @get:Internal
+    abstract val repositoryDirectory: DirectoryProperty
+
+    @get:Input
+    abstract val expectedFileHashes: MapProperty<String, String>
+
+    @get:Input
+    abstract val validationMode: Property<String>
+
+    private fun AIcSha256(aBytes: ByteArray): String =
+        MessageDigest.getInstance("SHA-256")
+            .digest(aBytes)
+            .joinToString("") { locByte -> "%02x".format(locByte.toInt() and 0xff) }
+
+    @TaskAction
+    fun AIcVerify() {
+        val locRepositoryDirectory = repositoryDirectory.get().asFile
+        val locExpectedFileHashes = expectedFileHashes.get()
+        val locProblems = mutableListOf<String>()
+
+        locExpectedFileHashes.forEach { (locPath, locExpectedHash) ->
+            val locFile = File(locRepositoryDirectory, locPath)
+            when {
+                !locFile.isFile -> locProblems.add("Missing managed licensing file: $locPath")
+                AIcSha256(locFile.readBytes()) != locExpectedHash ->
+                    locProblems.add("Managed licensing file differs from effective licensing model: $locPath")
+            }
+        }
+
+        val locCurrentManagedFiles = linkedSetOf<String>()
+        val locRootLicense = File(locRepositoryDirectory, "LICENSE")
+        if (locRootLicense.isFile) {
+            locCurrentManagedFiles.add("LICENSE")
+        }
+        val locLicenseDirectory = File(locRepositoryDirectory, "LICENSES")
+        if (locLicenseDirectory.isDirectory) {
+            locLicenseDirectory.walkTopDown()
+                .filter { locFile -> locFile.isFile }
+                .forEach { locFile ->
+                    locCurrentManagedFiles.add(
+                        locRepositoryDirectory.toPath()
+                            .relativize(locFile.toPath())
+                            .toString()
+                            .replace(File.separatorChar, '/')
+                    )
+                }
+        }
+
+        val locUnexpected = locCurrentManagedFiles - locExpectedFileHashes.keys
+        locUnexpected.sorted().forEach { locPath ->
+            locProblems.add("Stale managed licensing file: $locPath")
+        }
+
+        if (locProblems.isEmpty()) {
+            println("Algites licensing materialization is consistent.")
+            return
+        }
+
+        val locMode = validationMode.get()
+        if (locMode == "warn") {
+            logger.warn("Algites licensing validation warning (snapshot processing continues):")
+            locProblems.forEach { locProblem -> logger.warn(" - $locProblem") }
+            logger.warn("Run './gradlew rebuildAlgitesLicensing' and commit the resulting LICENSE/LICENSES changes.")
+            return
+        }
+
+        throw GradleException(
+            buildString {
+                appendLine("Algites licensing materialization is out of date:")
+                locProblems.forEach { locProblem -> appendLine(" - $locProblem") }
+                append("Run './gradlew rebuildAlgitesLicensing' and commit the resulting LICENSE/LICENSES changes.")
+            }
+        )
+    }
+}
 
 val AIcAlgitesSupportedLicenseContentKinds = linkedSetOf("product", "documentation")
 val AIcAlgitesLicensingIgnoredDirectoryNames = setOf(
@@ -508,6 +594,14 @@ fun AIcLicensingExpectedFiles(): Map<String, ByteArray> {
     return locExpected
 }
 
+fun AIcLicensingSha256(aBytes: ByteArray): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest(aBytes)
+        .joinToString("") { locByte -> "%02x".format(locByte.toInt() and 0xff) }
+
+val AIcAlgitesLicensingExpectedFileHashes = AIcLicensingExpectedFiles()
+    .mapValues { (_, locBytes) -> AIcLicensingSha256(locBytes) }
+
 fun AIcLicensingCurrentManagedFiles(): Set<String> {
     val locFiles = linkedSetOf<String>()
     if (rootProject.file("LICENSE").isFile) locFiles.add("LICENSE")
@@ -589,26 +683,12 @@ val checkAlgitesLicensing = tasks.register("checkAlgitesLicensing") {
     }
 }
 
-val verifyAlgitesLicensing = tasks.register("verifyAlgitesLicensing") {
+val verifyAlgitesLicensing = tasks.register<AIcVerifyAlgitesLicensingTask>("verifyAlgitesLicensing") {
     group = "verification"
     description = "Checks Algites licensing for lifecycle processing; strict by default and warning-only when explicitly requested for snapshot processing."
-
-    doLast {
-        val locProblems = AIcLicensingCheckRepositoryMaterialization()
-        if (locProblems.isEmpty()) {
-            println("Algites licensing materialization is consistent.")
-            return@doLast
-        }
-
-        val locMessage = AIcLicensingProblemsMessage(locProblems)
-        if (AIcAlgitesLicensingValidationMode == "warn") {
-            logger.warn("Algites licensing validation warning (snapshot processing continues):")
-            locProblems.forEach { locProblem -> logger.warn(" - $locProblem") }
-            logger.warn("Run './gradlew rebuildAlgitesLicensing' and commit the resulting LICENSE/LICENSES changes.")
-        } else {
-            throw GradleException(locMessage)
-        }
-    }
+    repositoryDirectory.set(rootProject.layout.projectDirectory)
+    expectedFileHashes.set(AIcAlgitesLicensingExpectedFileHashes)
+    validationMode.set(AIcAlgitesLicensingValidationMode)
 }
 
 tasks.matching {
