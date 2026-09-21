@@ -9,6 +9,7 @@
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+import java.util.Base64
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.DirectoryProperty
@@ -102,6 +103,29 @@ data class AIcdAlgitesLicensingContext(
     val definitions: LinkedHashMap<String, AIcdAlgitesLicenseDefinition>,
     val usages: LinkedHashMap<String, AIcdAlgitesLicenseUsage>
 )
+
+abstract class AIcRebuildAlgitesLicensingTask : DefaultTask() {
+    @get:Internal
+    abstract val repositoryDirectory: DirectoryProperty
+
+    @get:Input
+    abstract val expectedFilesBase64: MapProperty<String, String>
+
+    @TaskAction
+    fun AIcRebuild() {
+        val locRepositoryDirectory = repositoryDirectory.get().asFile
+        val locExpectedFiles = expectedFilesBase64.get()
+        val locLicenseDirectory = File(locRepositoryDirectory, "LICENSES")
+        if (locLicenseDirectory.exists()) locLicenseDirectory.deleteRecursively()
+
+        locExpectedFiles.forEach { (locPath, locBase64) ->
+            val locFile = File(locRepositoryDirectory, locPath)
+            locFile.parentFile?.mkdirs()
+            locFile.writeBytes(Base64.getDecoder().decode(locBase64))
+        }
+        println("Rebuilt Algites licensing materialization with ${locExpectedFiles.keys.count { it.startsWith("LICENSES/") }} license text file(s).")
+    }
+}
 
 abstract class AIcVerifyAlgitesLicensingTask : DefaultTask() {
     @get:Internal
@@ -736,22 +760,13 @@ fun AIcLicensingCheckRepositoryMaterialization(): List<String> {
     return locProblems
 }
 
-val rebuildAlgitesLicensing = tasks.register("rebuildAlgitesLicensing") {
+val rebuildAlgitesLicensing = tasks.register<AIcRebuildAlgitesLicensingTask>("rebuildAlgitesLicensing") {
     group = "algites"
     description = "Rebuilds the root LICENSE summary and managed LICENSES/ directory from effective Algites licensing declarations."
-
-    doLast {
-        val locExpected = AIcLicensingExpectedFiles()
-        val locLicenseDirectory = rootProject.file("LICENSES")
-        if (locLicenseDirectory.exists()) locLicenseDirectory.deleteRecursively()
-
-        locExpected.forEach { (locPath, locBytes) ->
-            val locFile = rootProject.file(locPath)
-            locFile.parentFile?.mkdirs()
-            locFile.writeBytes(locBytes)
-        }
-        println("Rebuilt Algites licensing materialization with ${locExpected.keys.count { it.startsWith("LICENSES/") }} license text file(s).")
-    }
+    repositoryDirectory.set(rootProject.layout.projectDirectory)
+    expectedFilesBase64.set(
+        AIcLicensingExpectedFiles().mapValues { (_, locBytes) -> Base64.getEncoder().encodeToString(locBytes) }
+    )
 }
 
 fun AIcLicensingProblemsMessage(aProblems: List<String>): String =

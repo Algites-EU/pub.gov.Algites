@@ -189,12 +189,14 @@ val locAlgitesDocsEffectiveTechnologyKinds = if (locAlgitesDocsRequestedTechnolo
 
 fun AIcDocsGitValue(vararg aArguments: String): String? {
     return try {
-        val locProcess = ProcessBuilder(listOf("git") + aArguments)
-            .directory(rootProject.projectDir)
-            .redirectErrorStream(true)
-            .start()
-        val locOutput = locProcess.inputStream.bufferedReader(Charsets.UTF_8).readText().trim()
-        if (locProcess.waitFor() == 0) locOutput.takeIf { it.isNotBlank() } else null
+        val locExecOutput = providers.exec {
+            workingDir(rootProject.projectDir)
+            commandLine(listOf("git") + aArguments)
+            isIgnoreExitValue = true
+        }
+        val locResult = locExecOutput.result.get()
+        val locOutput = locExecOutput.standardOutput.asText.get().trim()
+        if (locResult.exitValue == 0) locOutput.takeIf { it.isNotBlank() } else null
     } catch (_: Exception) {
         null
     }
