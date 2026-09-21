@@ -11,12 +11,68 @@ import java.security.MessageDigest
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 
+
+abstract class AIcMaterializeAlgitesDocumentationLicensesTask : DefaultTask() {
+    @get:Input
+    abstract val licenseIds: ListProperty<String>
+
+    @get:InputDirectory
+    abstract val sourceLicenseDirectory: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val targetLicenseDirectory: DirectoryProperty
+
+    @get:OutputFile
+    abstract val summaryFile: RegularFileProperty
+
+    @TaskAction
+    fun AIcMaterialize() {
+        val locLicenseIds = licenseIds.get().sorted()
+        val locSourceDirectory = sourceLicenseDirectory.get().asFile
+        val locTargetDirectory = targetLicenseDirectory.get().asFile
+
+        if (locTargetDirectory.exists()) locTargetDirectory.deleteRecursively()
+        locTargetDirectory.mkdirs()
+
+        locLicenseIds.forEach { locId ->
+            val locSourceFile = File(locSourceDirectory, "$locId.txt")
+            if (!locSourceFile.isFile) {
+                throw GradleException("Missing materialized license text '${locSourceFile.path}'.")
+            }
+            locSourceFile.copyTo(File(locTargetDirectory, "$locId.txt"), overwrite = true)
+        }
+
+        val locSummaryFile = summaryFile.get().asFile
+        locSummaryFile.parentFile.mkdirs()
+        locSummaryFile.writeText(
+            buildString {
+                appendLine("Algites documentation licensing")
+                appendLine("===============================")
+                appendLine()
+                appendLine("The generated documentation site contains material under the following effective DOCUMENTATION licenses:")
+                if (locLicenseIds.isEmpty()) {
+                    appendLine("  (none)")
+                } else {
+                    locLicenseIds.forEach { locId -> appendLine("  - $locId") }
+                }
+                appendLine()
+                appendLine("Full license texts are available in LICENSES/.")
+            },
+            Charsets.UTF_8
+        )
+    }
+}
 
 data class AIcdAlgitesLicenseDefinition(
     val id: String,
@@ -697,46 +753,27 @@ tasks.matching {
     dependsOn(verifyAlgitesLicensing)
 }
 
-val materializeAlgitesDocumentationLicenses = tasks.register("materializeAlgitesDocumentationLicenses") {
+val locAlgitesDocumentationLicenseIds = linkedSetOf<String>().also { locLicenseIds ->
+    AIcLicensingRelevantPaths().forEach { locPath ->
+        AIcLicensingActiveIdsByContentKind(AIcLicensingContextForPath(locPath))["documentation"]
+            .orEmpty()
+            .forEach(locLicenseIds::add)
+    }
+}.toList().sorted()
+
+val locAlgitesDocumentationSiteRoot = rootProject.file(
+    (rootProject.findProperty("algites.docs.siteRoot") as String?) ?: "docs-site"
+)
+
+val materializeAlgitesDocumentationLicenses = tasks.register<AIcMaterializeAlgitesDocumentationLicensesTask>("materializeAlgitesDocumentationLicenses") {
     group = "documentation"
     description = "Materializes all effective DOCUMENTATION license texts into the generated documentation site."
     dependsOn(verifyAlgitesLicensing)
 
-    doLast {
-        val locLicenseIds = linkedSetOf<String>()
-        AIcLicensingRelevantPaths().forEach { locPath ->
-            AIcLicensingActiveIdsByContentKind(AIcLicensingContextForPath(locPath))["documentation"]
-                .orEmpty()
-                .forEach(locLicenseIds::add)
-        }
-        val locDocsSiteRoot = rootProject.file(
-            (rootProject.findProperty("algites.docs.siteRoot") as String?) ?: "docs-site"
-        )
-        val locTargetDirectory = File(locDocsSiteRoot, "LICENSES")
-        if (locTargetDirectory.exists()) locTargetDirectory.deleteRecursively()
-        if (locLicenseIds.isNotEmpty()) locTargetDirectory.mkdirs()
-        locLicenseIds.sorted().forEach { locId ->
-            rootProject.file("LICENSES/$locId.txt").copyTo(File(locTargetDirectory, "$locId.txt"), overwrite = true)
-        }
-        val locSummary = File(locDocsSiteRoot, "LICENSE")
-        locSummary.parentFile.mkdirs()
-        locSummary.writeText(
-            buildString {
-                appendLine("Algites documentation licensing")
-                appendLine("===============================")
-                appendLine()
-                appendLine("The generated documentation site contains material under the following effective DOCUMENTATION licenses:")
-                if (locLicenseIds.isEmpty()) {
-                    appendLine("  (none)")
-                } else {
-                    locLicenseIds.sorted().forEach { locId -> appendLine("  - $locId") }
-                }
-                appendLine()
-                appendLine("Full license texts are available in LICENSES/.")
-            },
-            Charsets.UTF_8
-        )
-    }
+    licenseIds.set(locAlgitesDocumentationLicenseIds)
+    sourceLicenseDirectory.set(rootProject.layout.projectDirectory.dir("LICENSES"))
+    targetLicenseDirectory.fileValue(File(locAlgitesDocumentationSiteRoot, "LICENSES"))
+    summaryFile.fileValue(File(locAlgitesDocumentationSiteRoot, "LICENSE"))
 }
 
 tasks.matching { it.name == "generateAlgitesDocsSite" }.configureEach {

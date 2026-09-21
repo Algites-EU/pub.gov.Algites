@@ -447,40 +447,70 @@ After changing licensing governance, rebuild and commit the materialized files.
 
 ## 14. Deterministic distributed artifact manifest
 
-Produced Java and Python artifacts carry an Algites manifest at the logical path:
+Every Java/Python distribution produced by the shared Algites adapters carries the deterministic logical-artifact manifest:
 
 ```text
-META-INF/algites/artifact.yml
+algites-artifact-manifest.yml
 ```
 
-The v1 manifest contains stable artifact identity/publication metadata plus SHA-256 hashes of the source descriptor hierarchy that contributed to the artifact.
+The governed v1 structure is defined by `algites-artifact-manifest_1.schema.json`.
 
-Conceptual example:
+For every Java JAR produced by the project, including any sources JAR when present, the manifest is embedded at:
+
+```text
+META-INF/algites/algites-artifact-manifest.yml
+```
+
+For Python distributions, the same TechnologyKind-neutral manifest is embedded in both distribution forms:
+
+- wheel: `<distribution>.dist-info/META-INF/algites/algites-artifact-manifest.yml`;
+- source distribution: `META-INF/algites/algites-artifact-manifest.yml` below the source-distribution root directory.
+
+The wheel location is intentionally scoped by the distribution's `.dist-info` directory so multiple installed Python distributions do not compete for one global `META-INF/algites` path. Future TechnologyKind adapters that define another distributable package format SHOULD embed the same logical-artifact manifest in that package using a format-appropriate metadata location.
+
+The manifest identifies the **logical Algites artifact**, not one TechnologyKind-specific representation. Therefore it intentionally does not contain `technologyKinds`, Java/Python/MPS-specific coordinates, build-tool details, or documentation-tool details. The same logical artifact manifest can be embedded in all TechnologyKind outputs of that artifact.
+
+Conceptual v1 example:
 
 ```yaml
 manifestVersion: 1
 artifact:
-  artifactCoordinateId: pub.lib.Example_api
-  technologyKind: java
+  repositoryId: pub.lib.Example
+  localArtifactId: api.core
+  artifactCoordinateId: pub.lib.Example_api.core
   groupId: eu.algites.lib.example
-  artifactId: pub.lib.Example_api
   version: 1.0-SNAPSHOT
+  sourcePath: api/core
+  structureKind: artifact
+  name: Example Core API
+  description: Shared API of the example library.
 sourceMetadata:
   descriptorHierarchy:
     - structureKind: repository
       path: algites-source-repository.yml
-      sha256: ...
+      sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     - structureKind: artifact-set
       path: api/algites-artifact-set.yml
-      sha256: ...
+      sha256: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0
     - structureKind: artifact
       path: api/core/algites-artifact.yml
-      sha256: ...
+      sha256: 23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01
 ```
 
-The embedded manifest is intentionally deterministic. It does not contain build timestamps, CI run identifiers, Git HEAD values, runner identity, or similar data that can change without a relevant source input change.
+Each `sha256` is calculated from the exact bytes of the corresponding source descriptor. The ordered `descriptorHierarchy` therefore records which repository/artifact-set/artifact descriptors governed the artifact and allows those source descriptors to be independently verified.
 
-The hashes allow the descriptor hierarchy used for the artifact to be verified independently without embedding the potentially broader governance files themselves.
+The manifest is deliberately **cache-stable with respect to unrelated build context**. It MUST NOT contain values such as:
+
+- generation/build timestamps;
+- Git commit IDs, branch names, tags, or dirty-working-tree state;
+- CI workflow/run/job IDs;
+- runner or workstation identity;
+- repository upload endpoint selection or credentials;
+- other data that can change while the relevant artifact sources and descriptor hierarchy remain unchanged.
+
+A change to a descriptor in the effective hierarchy changes its SHA-256 and therefore changes the manifest. A change only to unrelated CI/Git execution context does not.
+
+Generated artifact documentation also publishes a copy named `algites-artifact-manifest.yml` in the logical artifact publication directory and exposes the descriptor hierarchy and hashes in the artifact page header. Documentation-specific provenance such as source ref, Git commit, and generation time remains separate documentation metadata; it is not copied into the artifact manifest.
 
 ## 15. Common Gradle lifecycle
 

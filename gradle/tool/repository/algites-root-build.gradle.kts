@@ -9,6 +9,7 @@
 import org.gradle.api.DefaultTask
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.plugins.BasePluginExtension
+import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
@@ -28,6 +29,93 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+
+abstract class AIcGenerateAlgitesArtifactManifestTask : DefaultTask() {
+    @get:Input
+    abstract val repositoryId: Property<String>
+
+    @get:Input
+    abstract val localArtifactId: Property<String>
+
+    @get:Input
+    abstract val artifactCoordinateId: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val groupId: Property<String>
+
+    @get:Input
+    abstract val artifactVersion: Property<String>
+
+    @get:Input
+    abstract val sourcePath: Property<String>
+
+    @get:Input
+    abstract val structureKind: Property<String>
+
+    @get:Input
+    abstract val artifactName: Property<String>
+
+    @get:Input
+    abstract val artifactDescription: Property<String>
+
+    @get:Input
+    abstract val descriptorHierarchy: ListProperty<String>
+
+    @get:OutputFile
+    abstract val outputFile: RegularFileProperty
+
+    private fun AIcYamlScalar(aValue: String): String {
+        if (aValue.isBlank()) return "\"\""
+        val locPlain = Regex("^[A-Za-z0-9._/+:-]+$").matches(aValue) &&
+            aValue !in setOf("null", "true", "false") &&
+            aValue.toDoubleOrNull() == null
+        return if (locPlain) {
+            aValue
+        } else {
+            "\"" + aValue.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+        }
+    }
+
+    @TaskAction
+    fun AIcGenerate() {
+        val locOutputFile = outputFile.get().asFile
+        locOutputFile.parentFile.mkdirs()
+
+        val locDescriptorEntries = descriptorHierarchy.get().map { locEntry ->
+            val locParts = locEntry.split('\t')
+            require(locParts.size == 3) { "Invalid Algites descriptor hierarchy entry '$locEntry'." }
+            locParts
+        }
+        require(locDescriptorEntries.isNotEmpty()) { "Algites artifact manifest descriptor hierarchy must not be empty." }
+
+        locOutputFile.writeText(
+            buildString {
+                appendLine("manifestVersion: 1")
+                appendLine("artifact:")
+                appendLine("  repositoryId: ${AIcYamlScalar(repositoryId.get())}")
+                appendLine("  localArtifactId: ${AIcYamlScalar(localArtifactId.get())}")
+                appendLine("  artifactCoordinateId: ${AIcYamlScalar(artifactCoordinateId.get())}")
+                groupId.orNull?.takeIf { it.isNotBlank() }?.let { locGroupId ->
+                    appendLine("  groupId: ${AIcYamlScalar(locGroupId)}")
+                }
+                appendLine("  version: ${AIcYamlScalar(artifactVersion.get())}")
+                appendLine("  sourcePath: ${AIcYamlScalar(sourcePath.get())}")
+                appendLine("  structureKind: ${AIcYamlScalar(structureKind.get())}")
+                appendLine("  name: ${AIcYamlScalar(artifactName.get())}")
+                appendLine("  description: ${AIcYamlScalar(artifactDescription.get())}")
+                appendLine("sourceMetadata:")
+                appendLine("  descriptorHierarchy:")
+                locDescriptorEntries.forEach { locParts ->
+                    appendLine("    - structureKind: ${AIcYamlScalar(locParts[0])}")
+                    appendLine("      path: ${AIcYamlScalar(locParts[1])}")
+                    appendLine("      sha256: ${AIcYamlScalar(locParts[2])}")
+                }
+            },
+            Charsets.UTF_8
+        )
+    }
+}
 
 apply(plugin = "base")
 
@@ -751,6 +839,40 @@ subprojects {
     val locAlgitesArtifactDirectoryPath = locAlgitesArtifactDirectory?.get("path")?.toString()?.takeIf { it.isNotBlank() } ?: "."
     val locAlgitesProductLicenses = locAlgitesLicensesForPathAndContentKind(locAlgitesArtifactDirectoryPath, "product")
 
+    val locAlgitesLocalArtifactId = locAlgitesArtifactDirectoryPath
+        .trim()
+        .trim('/')
+        .replace('/', '.')
+        .takeIf { it.isNotBlank() && it != "." }
+        ?: "."
+    @Suppress("UNCHECKED_CAST")
+    val locAlgitesDescriptorHierarchy = (locAlgitesArtifactDirectory?.get("descriptorHierarchy") as? List<Map<String, Any?>>)
+        .orEmpty()
+        .map { locDescriptor ->
+            listOf(
+                locDescriptor["structureKind"]?.toString().orEmpty(),
+                locDescriptor["path"]?.toString().orEmpty(),
+                locDescriptor["sha256"]?.toString().orEmpty()
+            ).joinToString("\t")
+        }
+    val locAlgitesManifestOutputFile = layout.buildDirectory.file("algites/manifest/algites-artifact-manifest.yml")
+    val locGenerateAlgitesArtifactManifest = tasks.register<AIcGenerateAlgitesArtifactManifestTask>("generateAlgitesArtifactManifest") {
+        group = "algites"
+        description = "Generates the deterministic Algites artifact manifest for this logical artifact."
+
+        repositoryId.set(algitesResolvedRepositoryMetadata["id"]?.toString()?.takeIf { it.isNotBlank() } ?: rootProject.name)
+        localArtifactId.set(locAlgitesLocalArtifactId)
+        artifactCoordinateId.set(locAlgitesCanonicalArtifactId)
+        locAlgitesArtifactDirectory?.get("groupId")?.toString()?.takeIf { it.isNotBlank() && it != "null" }?.let { locGroupId -> groupId.set(locGroupId) }
+        artifactVersion.set(locAlgitesProjectVersion)
+        sourcePath.set(locAlgitesArtifactDirectoryPath)
+        structureKind.set(locAlgitesArtifactDirectory?.get("structureKind")?.toString() ?: "artifact")
+        artifactName.set(locAlgitesArtifactDirectory?.get("name")?.toString() ?: locAlgitesCanonicalArtifactId)
+        artifactDescription.set(locAlgitesArtifactDirectory?.get("description")?.toString() ?: "")
+        descriptorHierarchy.set(locAlgitesDescriptorHierarchy)
+        outputFile.set(locAlgitesManifestOutputFile)
+    }
+
     plugins.withId("base") {
         extensions.configure<BasePluginExtension>("base") {
             archivesName.set(locAlgitesCanonicalArtifactId)
@@ -765,6 +887,10 @@ subprojects {
         plugins.withId("java") {
             tasks.withType(Jar::class.java).configureEach {
                 dependsOn(rootProject.tasks.named("verifyAlgitesLicensing"))
+                dependsOn(locGenerateAlgitesArtifactManifest)
+                from(locGenerateAlgitesArtifactManifest.flatMap { it.outputFile }) {
+                    into("META-INF/algites")
+                }
                 locAlgitesProductLicenses.forEach { locLicense ->
                     val locLicenseId = locLicense["id"] ?: return@forEach
                     val locLicenseFile = locLicense["file"] ?: return@forEach
@@ -993,21 +1119,144 @@ subprojects {
             "run/bld/python/${locPythonProjectPath.removePrefix(":").replace(':', '/')}/dist"
         )
 
+        val locPythonBuildAndManifestScript = """
+            import base64
+            import gzip
+            import hashlib
+            import io
+            import os
+            import pathlib
+            import shutil
+            import subprocess
+            import sys
+            import tarfile
+            import tempfile
+            import zipfile
+
+            project_dir = pathlib.Path(sys.argv[1]).resolve()
+            output_dir = pathlib.Path(sys.argv[2]).resolve()
+            manifest_file = pathlib.Path(sys.argv[3]).resolve()
+            manifest_name = "algites-artifact-manifest.yml"
+            manifest_bytes = manifest_file.read_bytes()
+
+            if output_dir.exists():
+                shutil.rmtree(output_dir)
+            output_dir.mkdir(parents=True, exist_ok=True)
+
+            subprocess.run(
+                [sys.executable, "-m", "build", "--outdir", str(output_dir)],
+                cwd=project_dir,
+                check=True,
+            )
+
+            def inject_wheel(path):
+                with zipfile.ZipFile(path, "r") as source:
+                    infos = source.infolist()
+                    record_infos = [info for info in infos if info.filename.endswith(".dist-info/RECORD")]
+                    if len(record_infos) != 1:
+                        raise RuntimeError(f"Expected exactly one .dist-info/RECORD in {path.name}")
+                    record_info = record_infos[0]
+                    dist_info = record_info.filename.rsplit("/", 1)[0]
+                    archive_manifest = f"{dist_info}/META-INF/algites/{manifest_name}"
+                    original_record = source.read(record_info.filename).decode("utf-8")
+                    source_comment = source.comment
+
+                    digest = base64.urlsafe_b64encode(hashlib.sha256(manifest_bytes).digest()).rstrip(b"=").decode("ascii")
+                    record_lines = [
+                        line for line in original_record.splitlines()
+                        if line and not line.startswith(archive_manifest + ",")
+                    ]
+                    record_lines.append(f"{archive_manifest},sha256={digest},{len(manifest_bytes)}")
+                    new_record = ("\n".join(record_lines) + "\n").encode("utf-8")
+
+                    fd, temporary_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+                    os.close(fd)
+                    temporary = pathlib.Path(temporary_name)
+                    try:
+                        with zipfile.ZipFile(temporary, "w") as target:
+                            target.comment = source_comment
+                            for info in infos:
+                                if info.filename in {record_info.filename, archive_manifest}:
+                                    continue
+                                target.writestr(info, source.read(info.filename))
+
+                            manifest_info = zipfile.ZipInfo(archive_manifest, date_time=(1980, 1, 1, 0, 0, 0))
+                            manifest_info.compress_type = zipfile.ZIP_DEFLATED
+                            manifest_info.external_attr = 0o100644 << 16
+                            target.writestr(manifest_info, manifest_bytes)
+                            target.writestr(record_info, new_record)
+                        os.replace(temporary, path)
+                    finally:
+                        if temporary.exists():
+                            temporary.unlink()
+
+            def inject_sdist(path):
+                with tarfile.open(path, "r:gz") as source:
+                    members = source.getmembers()
+                    roots = {member.name.split("/", 1)[0] for member in members if member.name}
+                    if len(roots) != 1:
+                        raise RuntimeError(f"Expected exactly one source-distribution root directory in {path.name}")
+                    root = next(iter(roots))
+                    archive_manifest = f"{root}/META-INF/algites/{manifest_name}"
+
+                    fd, temporary_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=path.parent)
+                    os.close(fd)
+                    temporary = pathlib.Path(temporary_name)
+                    try:
+                        with open(temporary, "wb") as raw_target:
+                            with gzip.GzipFile(filename="", mode="wb", fileobj=raw_target, mtime=0) as gzip_target:
+                                with tarfile.open(fileobj=gzip_target, mode="w", format=tarfile.PAX_FORMAT) as target:
+                                    for member in members:
+                                        if member.name == archive_manifest:
+                                            continue
+                                        source_file = source.extractfile(member) if member.isfile() else None
+                                        target.addfile(member, source_file)
+
+                                    manifest_info = tarfile.TarInfo(archive_manifest)
+                                    manifest_info.size = len(manifest_bytes)
+                                    manifest_info.mode = 0o644
+                                    manifest_info.mtime = 0
+                                    manifest_info.uid = 0
+                                    manifest_info.gid = 0
+                                    manifest_info.uname = ""
+                                    manifest_info.gname = ""
+                                    target.addfile(manifest_info, io.BytesIO(manifest_bytes))
+                        os.replace(temporary, path)
+                    finally:
+                        if temporary.exists():
+                            temporary.unlink()
+
+            wheel_files = sorted(output_dir.glob("*.whl"))
+            sdist_files = sorted(output_dir.glob("*.tar.gz"))
+            if not wheel_files:
+                raise RuntimeError("Python build did not produce a wheel.")
+            if not sdist_files:
+                raise RuntimeError("Python build did not produce a .tar.gz source distribution.")
+
+            for wheel_file in wheel_files:
+                inject_wheel(wheel_file)
+            for sdist_file in sdist_files:
+                inject_sdist(sdist_file)
+        """.trimIndent()
+
         val locBuildPython = tasks.register<Exec>("buildPython") {
             group = "build"
-            description = "Builds Python wheel and source distribution for this Algites artifact."
+            description = "Builds Python wheel/source distribution and embeds the deterministic Algites artifact manifest."
             dependsOn(locGeneratePythonProjectMetadata)
+            dependsOn(locGenerateAlgitesArtifactManifest)
             workingDir(locPythonProjectDirectory)
             commandLine(
                 algitesGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3",
-                "-m",
-                "build",
-                "--outdir",
-                locPythonDistDirectory.asFile.absolutePath
+                "-c",
+                locPythonBuildAndManifestScript,
+                locPythonProjectDirectory.absolutePath,
+                locPythonDistDirectory.asFile.absolutePath,
+                locAlgitesManifestOutputFile.get().asFile.absolutePath
             )
             inputs.files(project.fileTree("src/product/python"))
             inputs.files(project.fileTree("src/product/python.gen"))
             inputs.file(locPythonProjectFile)
+            inputs.file(locAlgitesManifestOutputFile)
             outputs.dir(locPythonDistDirectory)
         }
 

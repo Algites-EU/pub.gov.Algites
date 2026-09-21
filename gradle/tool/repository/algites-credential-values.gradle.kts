@@ -12,6 +12,8 @@ import org.gradle.api.GradleException
 
 val locAlgitesCredentialPreflight = System.getenv("_TMP_ALGITES_CREDENTIAL_PREFLIGHT")
     ?.equals("true", ignoreCase = true) == true
+val locAlgitesCredentialCi = System.getenv("CI")
+    ?.equals("true", ignoreCase = true) == true
 
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesParseCredentialJsonObject(aName: String, aRaw: String?): Map<String, Any?> {
@@ -26,11 +28,44 @@ fun AIcAlgitesParseCredentialJsonObject(aName: String, aRaw: String?): Map<Strin
     return locMap.entries.associate { locEntry -> locEntry.key.toString() to locEntry.value }
 }
 
+fun AIcAlgitesFindExecutable(aExecutable: String): String? {
+    val locExecutable = aExecutable.trim()
+    if (locExecutable.isBlank()) return null
+
+    val locDirectFile = File(locExecutable)
+    if (locDirectFile.isAbsolute || locExecutable.contains('/') || locExecutable.contains('\\')) {
+        return locDirectFile.takeIf { it.isFile }?.absolutePath
+    }
+
+    val locPath = System.getenv("PATH")?.takeIf { it.isNotBlank() } ?: return null
+    val locIsWindows = System.getProperty("os.name").lowercase().contains("win")
+    val locExtensions = if (locIsWindows) {
+        val locPathExt = System.getenv("PATHEXT")
+            ?.split(';')
+            ?.map { it.trim() }
+            ?.filter { it.isNotBlank() }
+            .orEmpty()
+        listOf("") + locPathExt
+    } else {
+        listOf("")
+    }
+
+    locPath.split(File.pathSeparatorChar).forEach { locDirectory ->
+        if (locDirectory.isBlank()) return@forEach
+        locExtensions.forEach { locExtension ->
+            val locCandidate = File(locDirectory, locExecutable + locExtension)
+            if (locCandidate.isFile) return locCandidate.absolutePath
+        }
+    }
+    return null
+}
+
 val locAlgitesReadCredentialCliOutput = fun(aArguments: List<String>): String? {
-    val locExecutable = System.getenv("ALGITES_CREDENTIAL_CLI")
+    val locConfiguredExecutable = System.getenv("ALGITES_CREDENTIAL_CLI")
         ?.trim()
         ?.takeIf { it.isNotBlank() }
         ?: "algites-credentials"
+    val locExecutable = AIcAlgitesFindExecutable(locConfiguredExecutable) ?: return null
     val locCommand = mutableListOf(locExecutable)
     locCommand.addAll(aArguments.toList())
     val locOutput = try {
@@ -56,7 +91,7 @@ val locAlgitesReadCredentialCliOutput = fun(aArguments: List<String>): String? {
 
 val locAlgitesCredentialDocumentRaw = System.getenv("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS")
     ?.takeIf { it.isNotBlank() }
-    ?: if (locAlgitesCredentialPreflight) {
+    ?: if (locAlgitesCredentialPreflight || locAlgitesCredentialCi) {
         null
     } else {
         locAlgitesReadCredentialCliOutput(listOf("bootstrap-document"))

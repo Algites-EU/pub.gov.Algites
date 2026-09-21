@@ -7,6 +7,7 @@
  */
 
 import java.io.File
+import java.security.MessageDigest
 
 data class AIcdAlgitesVersionContext(
     val lane: String? = null,
@@ -110,6 +111,12 @@ data class AIcdAlgitesDirectoryConfig(
     val values: Map<String, String>
 )
 
+data class AIcdAlgitesDescriptorDigest(
+    val structureKind: String,
+    val path: String,
+    val sha256: String
+)
+
 data class AIcdAlgitesArtifactDirectoryMetadata(
     val path: String,
     val structureKind: String,
@@ -123,7 +130,8 @@ data class AIcdAlgitesArtifactDirectoryMetadata(
     val hasGradleBuild: Boolean,
     val gradleProjectPath: String,
     val versionContext: AIcdAlgitesVersionContext,
-    val deleteSnapshotWhenReleased: Boolean
+    val deleteSnapshotWhenReleased: Boolean,
+    val descriptorHierarchy: List<AIcdAlgitesDescriptorDigest>
 )
 
 data class AIcdAlgitesRepositoryMetadata(
@@ -321,6 +329,33 @@ fun AIcResolveSingleArtifactDirectory(
     )
 }
 
+fun AIcSha256(aFile: File): String =
+    MessageDigest.getInstance("SHA-256")
+        .digest(aFile.readBytes())
+        .joinToString("") { locByte -> "%02x".format(locByte.toInt() and 0xff) }
+
+fun AIcDescriptorHierarchy(aRepositoryRoot: File, aDirectory: File): List<AIcdAlgitesDescriptorDigest> {
+    val locRoot = aRepositoryRoot.canonicalFile
+    val locTarget = aDirectory.canonicalFile
+    val locRelativePath = locRoot.toPath().relativize(locTarget.toPath())
+    val locDirectories = mutableListOf(locRoot)
+    var locCurrent = locRoot
+    locRelativePath.forEach { locSegment ->
+        locCurrent = File(locCurrent, locSegment.toString())
+        locDirectories.add(locCurrent)
+    }
+
+    return locDirectories.mapNotNull { locDirectory ->
+        AIcFindAlgitesMetadataConfig(locDirectory, locRoot)?.let { locConfig ->
+            AIcdAlgitesDescriptorDigest(
+                structureKind = locConfig.structureKind,
+                path = AIcRelativePath(locRoot, locConfig.file),
+                sha256 = AIcSha256(locConfig.file)
+            )
+        }
+    }
+}
+
 fun AIcArtifactDirectoryMetadataFromConfig(
     aRepositoryRoot: File,
     aDirectory: File,
@@ -346,7 +381,8 @@ fun AIcArtifactDirectoryMetadataFromConfig(
         hasGradleBuild = AIcHasGradleBuild(aDirectory),
         gradleProjectPath = AIcGradleProjectPath(aRepositoryRoot, aDirectory),
         versionContext = aState.versionContext,
-        deleteSnapshotWhenReleased = aState.deleteSnapshotWhenReleased ?: true
+        deleteSnapshotWhenReleased = aState.deleteSnapshotWhenReleased ?: true,
+        descriptorHierarchy = AIcDescriptorHierarchy(aRepositoryRoot, aDirectory)
     )
 }
 
@@ -699,6 +735,13 @@ fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMa
             "contentsModel" to locDirectory.contentsModel,
             "hasGradleBuild" to locDirectory.hasGradleBuild,
             "gradleProjectPath" to locDirectory.gradleProjectPath,
+            "descriptorHierarchy" to locDirectory.descriptorHierarchy.map { locDescriptor ->
+                linkedMapOf<String, Any?>(
+                    "structureKind" to locDescriptor.structureKind,
+                    "path" to locDescriptor.path,
+                    "sha256" to locDescriptor.sha256
+                )
+            },
             "version" to linkedMapOf(
                 "lane" to locDirectory.versionContext.lane,
                 "revision" to locDirectory.versionContext.revision,
@@ -733,6 +776,12 @@ fun AIcToYaml(aResult: AIcdAlgitesResolutionResult): String = buildString {
         appendLine("    contentsModel: ${AIcYamlScalar(locDirectory.contentsModel)}")
         appendLine("    hasGradleBuild: ${locDirectory.hasGradleBuild}")
         appendLine("    gradleProjectPath: ${AIcYamlScalar(locDirectory.gradleProjectPath)}")
+        appendLine("    descriptorHierarchy:")
+        locDirectory.descriptorHierarchy.forEach { locDescriptor ->
+            appendLine("      - structureKind: ${AIcYamlScalar(locDescriptor.structureKind)}")
+            appendLine("        path: ${AIcYamlScalar(locDescriptor.path)}")
+            appendLine("        sha256: ${AIcYamlScalar(locDescriptor.sha256)}")
+        }
         appendLine("    version:")
         appendLine("      lane: ${AIcYamlScalar(locDirectory.versionContext.lane)}")
         appendLine("      revision: ${AIcYamlScalar(locDirectory.versionContext.revision)}")
@@ -747,7 +796,15 @@ fun AIcFlattenDottedProperties(aResultMap: Map<String, Any?>): Map<String, Strin
     fun locFlatten(aPrefix: String, aValue: Any?) {
         when (aValue) {
             is Map<*, *> -> aValue.forEach { (locKey, locValue) -> locFlatten(if (aPrefix.isBlank()) locKey.toString() else "$aPrefix.${locKey}", locValue) }
-            is List<*> -> aValue.forEachIndexed { locIndex, locValue -> locFlatten("$aPrefix.$locIndex", locValue) }
+            is List<*> -> {
+                if (aPrefix.isNotBlank()) {
+                    locResult["$aPrefix.count"] = aValue.size.toString()
+                    if (aValue.all { locValue -> locValue == null || locValue !is Map<*, *> && locValue !is List<*> }) {
+                        locResult[aPrefix] = aValue.joinToString(",") { locValue -> locValue?.toString() ?: "null" }
+                    }
+                }
+                aValue.forEachIndexed { locIndex, locValue -> locFlatten("$aPrefix.$locIndex", locValue) }
+            }
             null -> locResult[aPrefix] = "null"
             else -> locResult[aPrefix] = aValue.toString()
         }

@@ -16,9 +16,41 @@ import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
 import java.time.Instant
+
+abstract class AIcPrepareAlgitesDocsPublicationTask : DefaultTask() {
+    @get:Input
+    abstract val publicationKind: Property<String>
+
+    @get:Input
+    abstract val publicationId: Property<String>
+
+    @get:Input
+    abstract val technologyKinds: Property<String>
+
+    @get:Internal
+    abstract val artifactDocsRoot: DirectoryProperty
+
+    @get:Internal
+    abstract val publicationsDocsRoot: DirectoryProperty
+
+    @TaskAction
+    fun AIcPrepare() {
+        val locPublicationKind = publicationKind.get()
+        val locPublicationId = publicationId.get()
+
+        artifactDocsRoot.get().asFile.listFiles()
+            ?.filter { locArtifactDirectory -> locArtifactDirectory.isDirectory }
+            ?.forEach { locArtifactDirectory ->
+                File(locArtifactDirectory, "$locPublicationKind/$locPublicationId").deleteRecursively()
+            }
+
+        File(publicationsDocsRoot.get().asFile, "$locPublicationKind/$locPublicationId").deleteRecursively()
+    }
+}
 
 apply(plugin = "base")
 
@@ -74,6 +106,18 @@ fun AIcDocsReadDottedProperties(aText: String): Map<String, String?> {
         .toMap()
 }
 
+fun AIcDocsReadDescriptorHierarchy(aProperties: Map<String, String?>, aArtifactIndex: Int): String {
+    val locPrefix = "artifactDirectories.$aArtifactIndex.descriptorHierarchy"
+    val locCount = aProperties["$locPrefix.count"]?.toIntOrNull() ?: 0
+    return (0 until locCount).joinToString("\u001e") { locDescriptorIndex ->
+        listOf(
+            aProperties["$locPrefix.$locDescriptorIndex.structureKind"] ?: "",
+            aProperties["$locPrefix.$locDescriptorIndex.path"] ?: "",
+            aProperties["$locPrefix.$locDescriptorIndex.sha256"] ?: ""
+        ).joinToString("\u001f")
+    }
+}
+
 fun AIcDocsReadArtifactDirectories(aProperties: Map<String, String?>): List<Map<String, String?>> {
     val locCount = aProperties["artifactDirectories.count"]?.toIntOrNull() ?: 0
     return (0 until locCount).map { locIndex ->
@@ -87,6 +131,7 @@ fun AIcDocsReadArtifactDirectories(aProperties: Map<String, String?>): List<Map<
             "contentsModel" to aProperties["artifactDirectories.${locIndex}.contentsModel"],
             "hasGradleBuild" to aProperties["artifactDirectories.${locIndex}.hasGradleBuild"],
             "gradleProjectPath" to aProperties["artifactDirectories.${locIndex}.gradleProjectPath"],
+            "descriptorHierarchy" to AIcDocsReadDescriptorHierarchy(aProperties, locIndex),
             "version.lane" to aProperties["artifactDirectories.${locIndex}.version.lane"],
             "version.revision" to aProperties["artifactDirectories.${locIndex}.version.revision"],
             "version.qualifierKind" to aProperties["artifactDirectories.${locIndex}.version.qualifierKind"],
@@ -246,30 +291,15 @@ val locAlgitesDocsEffectivePublicationKind = locPublicationKind ?: "generated"
 val locAlgitesDocsEffectivePublicationId = locPublicationId ?: "current"
 
 if (tasks.findByName("prepareAlgitesDocsPublication") == null) {
-    tasks.register("prepareAlgitesDocsPublication") {
+    tasks.register<AIcPrepareAlgitesDocsPublicationTask>("prepareAlgitesDocsPublication") {
         group = "algites"
         description = "Clears the selected documentation publication before regenerating requested TechnologyKinds."
 
-        inputs.property("publicationKind", locAlgitesDocsEffectivePublicationKind)
-        inputs.property("publicationId", locAlgitesDocsEffectivePublicationId)
-        inputs.property("technologyKinds", locAlgitesDocsEffectiveTechnologyKinds.sorted().joinToString(","))
-
-        doLast {
-            val locArtifactRootFile = locArtifactDocsRoot.asFile
-            locArtifactRootFile.listFiles()
-                ?.filter { locArtifactDirectory -> locArtifactDirectory.isDirectory }
-                ?.forEach { locArtifactDirectory ->
-                    File(
-                        locArtifactDirectory,
-                        "${locAlgitesDocsEffectivePublicationKind}/${locAlgitesDocsEffectivePublicationId}"
-                    ).deleteRecursively()
-                }
-
-            File(
-                locPublicationsDocsRoot.asFile,
-                "${locAlgitesDocsEffectivePublicationKind}/${locAlgitesDocsEffectivePublicationId}"
-            ).deleteRecursively()
-        }
+        publicationKind.set(locAlgitesDocsEffectivePublicationKind)
+        publicationId.set(locAlgitesDocsEffectivePublicationId)
+        technologyKinds.set(locAlgitesDocsEffectiveTechnologyKinds.sorted().joinToString(","))
+        artifactDocsRoot.set(locArtifactDocsRoot)
+        publicationsDocsRoot.set(locPublicationsDocsRoot)
     }
 }
 
@@ -844,7 +874,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
         val locMetadataByLocalArtifactId = artifactMetadataEntries.get()
             .mapNotNull { locLine ->
                 val locParts = locLine.split('\t')
-                if (locParts.size < 15) {
+                if (locParts.size < 16) {
                     null
                 } else {
                     val locMap = mapOf(
@@ -862,7 +892,8 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                         "version.lane" to locParts[11],
                         "version.revision" to locParts[12],
                         "version.qualifierKind" to locParts[13],
-                        "version.qualifierLabel" to locParts[14]
+                        "version.qualifierLabel" to locParts[14],
+                        "descriptorHierarchy" to locParts[15]
                     )
                     locParts[0] to locMap
                 }
@@ -908,6 +939,56 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
 
         fun valueOrDash(aValue: String?): String = aValue?.takeIf { it.isNotBlank() } ?: "—"
 
+        fun yamlScalar(aValue: String): String {
+            if (aValue.isBlank()) return "\"\""
+            val locPlain = Regex("^[A-Za-z0-9._/+:-]+$").matches(aValue) &&
+                aValue !in setOf("null", "true", "false") &&
+                aValue.toDoubleOrNull() == null
+            return if (locPlain) {
+                aValue
+            } else {
+                "\"" + aValue.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+            }
+        }
+
+        fun descriptorHierarchy(aMetadata: Map<String, String>): List<List<String>> =
+            aMetadata["descriptorHierarchy"]
+                ?.takeIf { it.isNotBlank() }
+                ?.split("\u001e")
+                ?.map { locEntry -> locEntry.split("\u001f") }
+                ?.filter { locParts -> locParts.size == 3 }
+                ?: emptyList()
+
+        fun artifactManifest(aMetadata: Map<String, String>): String {
+            val locLocalArtifactId = aMetadata["localArtifactId"].orEmpty()
+            val locArtifactCoordinateId = aMetadata["artifactId"]
+                ?.takeIf { it.isNotBlank() }
+                ?: "${locRepositoryId}_${locLocalArtifactId}"
+            val locDescriptors = descriptorHierarchy(aMetadata)
+            return buildString {
+                appendLine("manifestVersion: 1")
+                appendLine("artifact:")
+                appendLine("  repositoryId: ${yamlScalar(locRepositoryId)}")
+                appendLine("  localArtifactId: ${yamlScalar(locLocalArtifactId)}")
+                appendLine("  artifactCoordinateId: ${yamlScalar(locArtifactCoordinateId)}")
+                aMetadata["groupId"]?.takeIf { it.isNotBlank() }?.let { locGroupId ->
+                    appendLine("  groupId: ${yamlScalar(locGroupId)}")
+                }
+                appendLine("  version: ${yamlScalar(aMetadata["version.resolvedValue"].orEmpty())}")
+                appendLine("  sourcePath: ${yamlScalar(aMetadata["path"].orEmpty())}")
+                appendLine("  structureKind: ${yamlScalar(aMetadata["structureKind"].orEmpty())}")
+                appendLine("  name: ${yamlScalar(aMetadata["name"].orEmpty())}")
+                appendLine("  description: ${yamlScalar(aMetadata["description"].orEmpty())}")
+                appendLine("sourceMetadata:")
+                appendLine("  descriptorHierarchy:")
+                locDescriptors.forEach { locParts ->
+                    appendLine("    - structureKind: ${yamlScalar(locParts[0])}")
+                    appendLine("      path: ${yamlScalar(locParts[1])}")
+                    appendLine("      sha256: ${yamlScalar(locParts[2])}")
+                }
+            }
+        }
+
         fun relativeHref(aBaseDirectory: File, aTargetDirectory: File): String {
             val locRelativePath = aBaseDirectory.toPath()
                 .relativize(aTargetDirectory.toPath())
@@ -932,6 +1013,12 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                     ?: "${locRepositoryId}_${locLocalArtifactId}"
             )
             val locVersion = valueOrDash(locMetadata["version.resolvedValue"])
+
+            val locManifestFile = aPublication.directory.resolve("algites-artifact-manifest.yml")
+            locManifestFile.writeText(artifactManifest(locMetadata), Charsets.UTF_8)
+            val locDescriptorRows = descriptorHierarchy(locMetadata).joinToString("\n") { locParts ->
+                """<tr><td>${html(locParts[0])}</td><td><code>${html(locParts[1])}</code></td><td><code>${html(locParts[2])}</code></td></tr>"""
+            }.ifBlank { "<tr><td colspan=\"3\">No descriptor hierarchy was resolved.</td></tr>" }
 
             val locDocumentationKinds = listOf(
                 "java" to "Java API documentation",
@@ -1009,6 +1096,10 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                     .technology:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
                     .technology h3 { margin: 0 0 0.25rem 0; font-size: 0.98rem; }
                     .technology p { margin: 0 0 0.4rem 0; }
+                    .manifest-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+                    .manifest-table th, .manifest-table td { text-align: left; vertical-align: top; padding: 0.3rem 0.4rem; border-top: 1px solid #e5e7eb; overflow-wrap: anywhere; }
+                    .manifest-table th { border-top: 0; color: #374151; }
+                    code { font-size: 0.8rem; }
                     ul { margin: 0.25rem 0 0 1.2rem; padding: 0; }
                     li { margin: 0.2rem 0; }
                     a { color: #2563eb; }
@@ -1019,6 +1110,14 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                   <main>
                     <h1>${html(locLocalArtifactId)}</h1>
                     <p class="muted">Publication: <strong>${html(aPublication.publicationKind)}/${html(aPublication.publicationId)}</strong></p>
+                    <section class="card">
+                      <h2>Algites artifact manifest</h2>
+                      <p><a href="algites-artifact-manifest.yml"><code>algites-artifact-manifest.yml</code></a> is the deterministic, TechnologyKind-neutral identity of this logical artifact.</p>
+                      <table class="manifest-table">
+                        <thead><tr><th>Descriptor kind</th><th>Source descriptor</th><th>SHA-256</th></tr></thead>
+                        <tbody>${locDescriptorRows}</tbody>
+                      </table>
+                    </section>
                     <div class="layout">
                       <div class="main-column">
                         <section class="card">
@@ -1407,7 +1506,8 @@ fun AIcDocsArtifactMetadataEntryLine(aArtifactDirectory: Map<String, String?>): 
         aArtifactDirectory["version.lane"] ?: "",
         aArtifactDirectory["version.revision"] ?: "",
         aArtifactDirectory["version.qualifierKind"] ?: "",
-        aArtifactDirectory["version.qualifierLabel"] ?: ""
+        aArtifactDirectory["version.qualifierLabel"] ?: "",
+        aArtifactDirectory["descriptorHierarchy"] ?: ""
     ).joinToString("\t") { it.replace('\t', ' ') }
 }
 
