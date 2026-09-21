@@ -407,7 +407,7 @@ fun AIcLicensingMergeUsages(
     }
 }
 
-const val AIcAlgitesPublicLicensingGovernanceBaseUrl =
+val AIcAlgitesPublicLicensingGovernanceBaseUrl =
     "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/licensing"
 
 fun AIcLicensingDownloadRemoteFile(aRelativePath: String, aTargetFile: File) {

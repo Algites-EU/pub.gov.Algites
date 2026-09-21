@@ -176,7 +176,7 @@ val AIcAlgitesExternalRepositoryDefaultsEnvironmentVariables = listOf(
     "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE"
 )
 
-const val AIcAlgitesPublicRepositoryDefaultsUrl =
+val AIcAlgitesPublicRepositoryDefaultsUrl =
     "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/repository/defaults/algites-repository-download-defaults-public.yml"
 
 fun AIcAlgitesDownloadPublicRepositoryDefaults(): File {
