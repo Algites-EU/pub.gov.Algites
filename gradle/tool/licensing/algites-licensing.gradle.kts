@@ -115,15 +115,55 @@ abstract class AIcRebuildAlgitesLicensingTask : DefaultTask() {
     fun AIcRebuild() {
         val locRepositoryDirectory = repositoryDirectory.get().asFile
         val locExpectedFiles = expectedFilesBase64.get()
+            .mapValues { (_, locBase64) -> Base64.getDecoder().decode(locBase64) }
+        val locCurrentManagedFiles = linkedSetOf<String>()
+        val locRootLicense = File(locRepositoryDirectory, "LICENSE")
+        if (locRootLicense.isFile) {
+            locCurrentManagedFiles.add("LICENSE")
+        }
         val locLicenseDirectory = File(locRepositoryDirectory, "LICENSES")
+        if (locLicenseDirectory.isDirectory) {
+            locLicenseDirectory.walkTopDown()
+                .filter { locFile -> locFile.isFile }
+                .forEach { locFile ->
+                    locCurrentManagedFiles.add(
+                        locRepositoryDirectory.toPath()
+                            .relativize(locFile.toPath())
+                            .toString()
+                            .replace(File.separatorChar, '/')
+                    )
+                }
+        }
+
+        val locAddedFiles = locExpectedFiles.keys
+            .filter { locPath -> !File(locRepositoryDirectory, locPath).isFile }
+            .sorted()
+        val locUpdatedFiles = locExpectedFiles
+            .filter { (locPath, locExpectedBytes) ->
+                val locFile = File(locRepositoryDirectory, locPath)
+                locFile.isFile && !locFile.readBytes().contentEquals(locExpectedBytes)
+            }
+            .keys
+            .sorted()
+        val locRemovedFiles = (locCurrentManagedFiles - locExpectedFiles.keys).sorted()
+
         if (locLicenseDirectory.exists()) locLicenseDirectory.deleteRecursively()
 
-        locExpectedFiles.forEach { (locPath, locBase64) ->
+        locExpectedFiles.forEach { (locPath, locBytes) ->
             val locFile = File(locRepositoryDirectory, locPath)
             locFile.parentFile?.mkdirs()
-            locFile.writeBytes(Base64.getDecoder().decode(locBase64))
+            locFile.writeBytes(locBytes)
         }
+
         println("Rebuilt Algites licensing materialization with ${locExpectedFiles.keys.count { it.startsWith("LICENSES/") }} license text file(s).")
+        if (locAddedFiles.isEmpty() && locUpdatedFiles.isEmpty() && locRemovedFiles.isEmpty()) {
+            println("No managed licensing files changed.")
+        } else {
+            println("Managed licensing files changed; include these paths in the VCS changeset:")
+            locAddedFiles.forEach { locPath -> println(" - ADDED: $locPath") }
+            locUpdatedFiles.forEach { locPath -> println(" - UPDATED: $locPath") }
+            locRemovedFiles.forEach { locPath -> println(" - REMOVED: $locPath") }
+        }
     }
 }
 
