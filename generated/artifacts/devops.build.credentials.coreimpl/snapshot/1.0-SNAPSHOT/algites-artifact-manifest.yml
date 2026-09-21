@@ -1,0 +1,25 @@
+manifestVersion: 1
+artifact:
+  repositoryId: pub.gov.Algites
+  localArtifactId: devops.build.credentials.coreimpl
+  artifactCoordinateId: pub.gov.Algites_devops.build.credentials.coreimpl
+  groupId: eu.algites.tool.build
+  version: 1.0-SNAPSHOT
+  sourcePath: devops/build/credentials/coreimpl
+  structureKind: artifact
+  name: "Algites credential core implementation"
+  description: "Provider-chain and secure-store resolution implementation for Algites credential profiles."
+sourceMetadata:
+  descriptorHierarchy:
+    - structureKind: repository
+      path: algites-source-repository.yml
+      sha256: 96d07bf763f1f694eb91cd8e611903827b9f216dda992c6d2dea3b6ac1cc302f
+    - structureKind: artifact-set
+      path: devops/build/algites-artifact-set.yml
+      sha256: 188f91a54a900e717b86f78e15a341e4368c500187c03a73771d12f975a0a088
+    - structureKind: artifact-set
+      path: devops/build/credentials/algites-artifact-set.yml
+      sha256: e035402bf84ce4dbd67ab65e93df8f88b15382b335b4745647c0831d731387fc
+    - structureKind: artifact
+      path: devops/build/credentials/coreimpl/algites-artifact.yml
+      sha256: ce596d6722d54949f994c5ac6b1e90f9d652bd97dde017a18755e02c26e674fd

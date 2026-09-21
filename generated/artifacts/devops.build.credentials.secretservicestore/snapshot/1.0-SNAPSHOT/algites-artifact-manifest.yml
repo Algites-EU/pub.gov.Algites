@@ -1,0 +1,25 @@
+manifestVersion: 1
+artifact:
+  repositoryId: pub.gov.Algites
+  localArtifactId: devops.build.credentials.secretservicestore
+  artifactCoordinateId: pub.gov.Algites_devops.build.credentials.secretservicestore
+  groupId: eu.algites.tool.build
+  version: 1.0-SNAPSHOT
+  sourcePath: devops/build/credentials/secretservicestore
+  structureKind: artifact
+  name: "Algites Secret Service credential store"
+  description: "Freedesktop Secret Service backend for Algites credential profiles on Linux desktops."
+sourceMetadata:
+  descriptorHierarchy:
+    - structureKind: repository
+      path: algites-source-repository.yml
+      sha256: 96d07bf763f1f694eb91cd8e611903827b9f216dda992c6d2dea3b6ac1cc302f
+    - structureKind: artifact-set
+      path: devops/build/algites-artifact-set.yml
+      sha256: 188f91a54a900e717b86f78e15a341e4368c500187c03a73771d12f975a0a088
+    - structureKind: artifact-set
+      path: devops/build/credentials/algites-artifact-set.yml
+      sha256: e035402bf84ce4dbd67ab65e93df8f88b15382b335b4745647c0831d731387fc
+    - structureKind: artifact
+      path: devops/build/credentials/secretservicestore/algites-artifact.yml
+      sha256: e5267fa7ce5042d6b18906eb5dce0d619411ffda9d53d00a7da7cf0f3b64b52d
