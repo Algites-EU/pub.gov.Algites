@@ -117,15 +117,16 @@ class AIcGeneratePythonDocsSiteAction(
                 """.trimIndent()
             }
 
+            val locSphinxConfiguration = buildString {
+                appendLine("project = '${AIcPythonString(locTitle)}'")
+                appendLine("author = 'Algites'")
+                appendLine(locAutoApiConfiguration)
+                appendLine("napoleon_google_docstring = True")
+                appendLine("napoleon_numpy_docstring = True")
+                appendLine("html_theme = 'alabaster'")
+            }
             locSphinxSourceDirectory.resolve("conf.py").writeText(
-                """
-                project = '${AIcPythonString(locTitle)}'
-                author = 'Algites'
-                $locAutoApiConfiguration
-                napoleon_google_docstring = True
-                napoleon_numpy_docstring = True
-                html_theme = 'alabaster'
-                """.trimIndent() + System.lineSeparator(),
+                locSphinxConfiguration,
                 Charsets.UTF_8
             )
 
