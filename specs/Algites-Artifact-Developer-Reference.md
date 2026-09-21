@@ -347,6 +347,17 @@ repositories:
 
 Public **download** defaults are maintained in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`. Upload/manage governance is intentionally not part of the ordinary public artifact-author configuration.
 
+### 11.2 Public governance resolution for local builds
+
+Normal local builds do not need a checkout-specific configuration for public repository defaults. When `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` is not set, the resolver loads the published defaults from `Algites-EU/pub.gov.Algites/main` on GitHub and materializes them under the Gradle user-home cache.
+
+Set `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` to a local file when developing governance itself, testing unpublished changes, or intentionally pinning the build to a locally materialized copy. CI may also set it explicitly to the governance material prepared by the workflow. Governed public upload/manage overlays and private defaults are never fetched through this public fallback; they remain explicit governance inputs.
+
+The precedence is therefore:
+
+1. explicit `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`;
+2. otherwise the published public GitHub defaults.
+
 ## 12. Credential profiles vs credential values
 
 Repository metadata never contains passwords, tokens, certificates, or other secret values.
@@ -391,11 +402,13 @@ Actual values are supplied through the universal `ALGITES_DEVOPS_BUILD_REPOSITOR
 
 The `_CONTENT` suffix describes what is obtained after resolution. For example, `FILE_CONTENT.value` is a path, not literal file content.
 
-For a normal public developer build, upload/manage credentials are not required. The framework resolves only credentials needed for the requested repository contexts.
+For a normal public developer build, upload/manage credentials are not required. The framework resolves only credentials needed for the requested repository contexts. Credential preflight is fail-fast when no effective declared `artifact.technologyKinds` remain after applying any optional TechnologyKind selection; an empty TechnologyKind set never means "all repository technologies".
 
 ## 13. Licensing
 
 Algites licensing is hierarchical and materialized into the repository root `LICENSE` and `LICENSES/` directory.
+
+For normal public local builds, central public licensing governance is available automatically. When `ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY` is not set, the licensing resolver loads `license-definitions.yml`, the default `license-usage.yml`, and the referenced license texts from `Algites-EU/pub.gov.Algites/main` on GitHub and materializes them under the Gradle user-home cache. Set `ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY` to a local `pub.gov.Algites/licensing` directory when developing governance, testing unpublished changes, working from a deliberately materialized copy, or otherwise overriding the published fallback. The `pub.gov.Algites` repository itself continues to use its local `licensing/` directory directly. Private licensing governance has no public remote fallback and remains an explicit input.
 
 ### 13.1 `license-usage.yml`
 
@@ -421,7 +434,7 @@ Fields:
 
 ### 13.2 `licensing/license-definitions.yml`
 
-This repository-local catalog maps license ids to display metadata and canonical text files.
+This optional repository-local catalog adds license definitions not already supplied by the effective governance. It maps license ids to display metadata and canonical text files. Common Algites public licenses are normally defined centrally and do not need to be copied into each repository.
 
 ```yaml
 licenses:
@@ -719,6 +732,10 @@ Check `artifact.technologyKinds` and make sure the shared infrastructure has an 
 ### Publication readiness blocks publish
 
 Read the blocking declaration(s) printed by the task. The error identifies descriptor paths and includes `author` and `cause` when present. Fix the underlying reason and raise/remove the limiting declaration; there is intentionally no readiness override.
+
+### Missing or unresolved TechnologyKind during credential preflight
+
+If `resolveAlgitesRequiredCredentials` reports that no TechnologyKinds were resolved, verify that each distributable artifact uses the current `artifact.technologyKinds` declaration. Legacy keys such as `artifact.type` are not a TechnologyKind declaration. An explicit TechnologyKind selection only narrows declared artifact technologies; it does not create missing declarations. An accidental empty resolution is rejected rather than expanded to all repository technologies.
 
 ### Missing repository credentials
 

@@ -7,6 +7,7 @@
  */
 
 import java.io.File
+import java.net.URI
 import java.security.MessageDigest
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
@@ -406,6 +407,56 @@ fun AIcLicensingMergeUsages(
     }
 }
 
+const val AIcAlgitesPublicLicensingGovernanceBaseUrl =
+    "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/licensing"
+
+fun AIcLicensingDownloadRemoteFile(aRelativePath: String, aTargetFile: File) {
+    val locUrl = "$AIcAlgitesPublicLicensingGovernanceBaseUrl/$aRelativePath"
+    aTargetFile.parentFile?.mkdirs()
+    try {
+        val locBytes = URI(locUrl).toURL().openStream().use { locInput -> locInput.readBytes() }
+        aTargetFile.writeBytes(locBytes)
+    } catch (locException: Exception) {
+        throw GradleException(
+            "Algites public licensing governance file '$locUrl' is unavailable. " +
+                "Set ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY to a local pub.gov.Algites/licensing directory to override the public GitHub fallback.",
+            locException
+        )
+    }
+}
+
+fun AIcLicensingRemotePublicGovernanceDirectory(): File {
+    val locGradleUserHome = System.getenv("GRADLE_USER_HOME")?.trim()?.takeIf { it.isNotBlank() }?.let(::File)
+        ?: File(System.getProperty("user.home"), ".gradle")
+    val locDirectory = locGradleUserHome.resolve("caches/algites/public-governance/licensing")
+    locDirectory.mkdirs()
+
+    val locDefinitionsFile = locDirectory.resolve("license-definitions.yml")
+    val locDefaultsFile = locDirectory.resolve("defaults/license-usage.yml")
+    AIcLicensingDownloadRemoteFile("license-definitions.yml", locDefinitionsFile)
+    AIcLicensingDownloadRemoteFile("defaults/license-usage.yml", locDefaultsFile)
+
+    val locDefinitionValues = AIcLicensingReadSimpleYamlScalars(locDefinitionsFile)
+    locDefinitionValues.keys
+        .mapNotNull { locKey -> Regex("^licenses\\.(\\d+)\\.text$").matchEntire(locKey)?.groupValues?.get(1)?.toIntOrNull() }
+        .distinct()
+        .sorted()
+        .forEach { locIndex ->
+            val locTextPath = locDefinitionValues["licenses.$locIndex.text"]?.trim()?.takeIf { it.isNotBlank() }
+                ?: throw GradleException("License definition #$locIndex in remote public governance has no text path.")
+            if (locTextPath.startsWith("/") || locTextPath.contains("..")) {
+                throw GradleException("Remote public governance license text path '$locTextPath' is not a safe relative path.")
+            }
+            val locTargetFile = locDirectory.resolve(locTextPath).canonicalFile
+            if (!locTargetFile.toPath().startsWith(locDirectory.canonicalFile.toPath())) {
+                throw GradleException("Remote public governance license text path '$locTextPath' escapes the governance directory.")
+            }
+            AIcLicensingDownloadRemoteFile(locTextPath, locTargetFile)
+        }
+
+    return locDirectory.canonicalFile
+}
+
 fun AIcLicensingGovernanceDirectory(aKind: String): File? {
     val locEnvironmentName = when (aKind) {
         "public" -> "ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY"
@@ -424,15 +475,13 @@ fun AIcLicensingGovernanceDirectory(aKind: String): File? {
     return when {
         aKind == "public" && AIcAlgitesLicensingRepositoryId == "pub.gov.Algites" && locLocalDirectory.resolve("license-definitions.yml").isFile -> locLocalDirectory.canonicalFile
         aKind == "private" && AIcAlgitesLicensingRepositoryId == "priv.gov.Algites" && locLocalDirectory.resolve("license-definitions.yml").isFile -> locLocalDirectory.canonicalFile
+        aKind == "public" -> AIcLicensingRemotePublicGovernanceDirectory()
         else -> null
     }
 }
 
 val AIcAlgitesPublicLicensingGovernanceDirectory = AIcLicensingGovernanceDirectory("public")
-    ?: throw GradleException(
-        "Algites public licensing governance is unavailable. Set ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY " +
-            "to the pub.gov.Algites/licensing directory."
-    )
+    ?: throw GradleException("Algites public licensing governance is unavailable.")
 val AIcAlgitesPrivateLicensingGovernanceDirectory = if (AIcAlgitesLicensingRepositoryVisibility == "priv") {
     AIcLicensingGovernanceDirectory("private")
         ?: throw GradleException(

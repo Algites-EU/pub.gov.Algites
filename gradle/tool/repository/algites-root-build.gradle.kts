@@ -671,12 +671,23 @@ abstract class AIcResolveAlgitesRequiredCredentialsTask : DefaultTask() {
     @get:Input
     abstract val credentialCount: Property<Int>
 
+    @get:Input
+    abstract val technologyKinds: ListProperty<String>
+
     @get:Optional
     @get:OutputFile
     abstract val outputFile: RegularFileProperty
 
     @TaskAction
     fun resolve() {
+        val locTechnologyKinds = technologyKinds.get().map { it.trim().lowercase() }.filter { it.isNotBlank() }.distinct().sorted()
+        if (locTechnologyKinds.isEmpty()) {
+            throw GradleException(
+                "Cannot resolve Algites repository credentials because no TechnologyKinds were resolved for this repository. " +
+                    "Declare artifact.technologyKinds in algites-artifact.yml or explicitly select a valid TechnologyKind."
+            )
+        }
+
         val locJson = planJson.get()
         if (!outputFile.isPresent) {
             println(locJson)
@@ -731,12 +742,13 @@ val locAlgitesRequiredCredentialsPlan = run {
     }
     val locUploadVisibilities = setOf(algitesPublicationRepositoryVisibility)
     val locManageVisibilities = setOf(algitesPublicationRepositoryVisibility)
+    val locDeclaredOperationTechnologyKinds = algitesResolvedArtifactDirectoriesByGradleProjectPath.values
+        .flatMap { locMetadata -> AIcAlgitesStringList(locMetadata["technologyKinds"]) }
+        .toSet()
     val locOperationTechnologyKinds = if (algitesRequestedTechnologyKinds.isNotEmpty()) {
-        algitesRequestedTechnologyKinds
+        locDeclaredOperationTechnologyKinds.intersect(algitesRequestedTechnologyKinds)
     } else {
-        algitesResolvedArtifactDirectoriesByGradleProjectPath.values
-            .flatMap { locMetadata -> AIcAlgitesStringList(locMetadata["technologyKinds"]) }
-            .toSet()
+        locDeclaredOperationTechnologyKinds
     }
     val locRepositories = linkedMapOf<String, Map<String, String?>>()
     val locCredentials = linkedMapOf<String, Map<String, String>>()
@@ -759,7 +771,7 @@ val locAlgitesRequiredCredentialsPlan = run {
             if (locUsage == "manage" && locStability !in locManageStabilities) return@forEach
             if (locUsage == "manage" && aScope == "repository") return@forEach
             if (locUsage == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@forEach
-            if (locOperationTechnologyKinds.isNotEmpty() && locTechnology !in locOperationTechnologyKinds) return@forEach
+            if (locTechnology !in locOperationTechnologyKinds) return@forEach
             if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@forEach
 
             AIcAlgitesRepositoryEndpoints(aMetadata["repositories"], locCell).forEach { locEndpoint ->
@@ -796,7 +808,7 @@ val locAlgitesRequiredCredentialsPlan = run {
         "repositories" to locRepositories.values.toList(),
         "credentials" to locCredentials.values.toList()
     )
-    JsonOutput.toJson(locPlan) to locCredentials.size
+    Triple(JsonOutput.toJson(locPlan), locCredentials.size, locOperationTechnologyKinds.sorted())
 }
 
 val algitesResolveRequiredCredentials = tasks.register<AIcResolveAlgitesRequiredCredentialsTask>("resolveAlgitesRequiredCredentials") {
@@ -805,6 +817,7 @@ val algitesResolveRequiredCredentials = tasks.register<AIcResolveAlgitesRequired
 
     planJson.set(locAlgitesRequiredCredentialsPlan.first)
     credentialCount.set(locAlgitesRequiredCredentialsPlan.second)
+    technologyKinds.set(locAlgitesRequiredCredentialsPlan.third)
 
     val locOutputPath = algitesGradleOrEnvironmentValue("algites.credential.output")
         ?: System.getenv("ALGITES_CREDENTIAL_OUTPUT")

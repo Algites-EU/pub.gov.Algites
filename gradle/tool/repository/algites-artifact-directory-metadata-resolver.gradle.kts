@@ -7,6 +7,7 @@
  */
 
 import java.io.File
+import java.net.URI
 import java.security.MessageDigest
 
 data class AIcdAlgitesVersionContext(
@@ -175,13 +176,43 @@ val AIcAlgitesExternalRepositoryDefaultsEnvironmentVariables = listOf(
     "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE"
 )
 
+const val AIcAlgitesPublicRepositoryDefaultsUrl =
+    "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/repository/defaults/algites-repository-download-defaults-public.yml"
+
+fun AIcAlgitesDownloadPublicRepositoryDefaults(): File {
+    val locGradleUserHome = System.getenv("GRADLE_USER_HOME")?.trim()?.takeIf { it.isNotBlank() }?.let(::File)
+        ?: File(System.getProperty("user.home"), ".gradle")
+    val locFile = locGradleUserHome.resolve(
+        "caches/algites/public-governance/repository/defaults/algites-repository-download-defaults-public.yml"
+    )
+    locFile.parentFile.mkdirs()
+    try {
+        val locBytes = URI(AIcAlgitesPublicRepositoryDefaultsUrl).toURL().openStream().use { locInput -> locInput.readBytes() }
+        locFile.writeBytes(locBytes)
+    } catch (locException: Exception) {
+        throw IllegalStateException(
+            "Algites public repository defaults are unavailable from '$AIcAlgitesPublicRepositoryDefaultsUrl'. " +
+                "Set ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE to a local defaults file to override the public GitHub fallback.",
+            locException
+        )
+    }
+    return locFile.canonicalFile
+}
+
 fun AIcAlgitesExternalDefaultsState(): AIcdAlgitesResolvedState {
     var locState = AIcdAlgitesResolvedState()
     AIcAlgitesExternalRepositoryDefaultsEnvironmentVariables.forEach { locVariableName ->
-        val locPath = System.getenv(locVariableName)?.trim()?.takeIf { it.isNotBlank() } ?: return@forEach
-        val locFile = File(locPath)
-        if (!locFile.isFile) {
-            error("Algites repository defaults file does not exist: '${locFile.path}'.")
+        val locPath = System.getenv(locVariableName)?.trim()?.takeIf { it.isNotBlank() }
+        val locFile = if (locPath != null) {
+            File(locPath).also { locCandidate ->
+                if (!locCandidate.isFile) {
+                    error("Algites repository defaults file does not exist: '${locCandidate.path}'.")
+                }
+            }
+        } else if (locVariableName == "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE") {
+            AIcAlgitesDownloadPublicRepositoryDefaults()
+        } else {
+            return@forEach
         }
         locState = locState.AIcMerge(AIcResolvedStateFromRawValues(AIcReadSimpleYamlScalars(locFile), "", locFile))
     }
