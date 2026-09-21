@@ -262,13 +262,32 @@ fun AIcAlgitesPythonImportNamespace(aRepositoryId: String, aModulePath: String):
         .joinToString(".")
 }
 
-fun AIcAlgitesPythonVersion(aVersion: String): String {
+fun AIcAlgitesSnapshotInstanceId(): String? {
+    val locValue = (providers.gradleProperty("algites.snapshot.instanceId").orNull
+        ?: providers.environmentVariable("ALGITES_SNAPSHOT_INSTANCE_ID").orNull)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+        ?: return null
+    if (!Regex("^[0-9]+$").matches(locValue)) {
+        throw GradleException(
+            "Algites snapshot instance id must contain decimal digits only, but got '$locValue'. " +
+                "Use -Palgites.snapshot.instanceId=<UTC timestamp> or ALGITES_SNAPSHOT_INSTANCE_ID."
+        )
+    }
+    return locValue
+}
+
+fun AIcAlgitesPythonVersion(aVersion: String, aSnapshotInstanceId: String? = null): String {
     val locSnapshotSuffix = "-SNAPSHOT"
     if (aVersion.endsWith(locSnapshotSuffix, ignoreCase = true)) {
-        return aVersion.dropLast(locSnapshotSuffix.length) + ".dev0"
+        val locInstanceId = aSnapshotInstanceId ?: "0"
+        return aVersion.dropLast(locSnapshotSuffix.length).replace('-', '.') + ".dev$locInstanceId"
     }
     return aVersion.replace('-', '.')
 }
+
+fun AIcAlgitesPythonSnapshotVersionPrefix(aReleaseVersion: String): String =
+    AIcAlgitesPythonVersion("$aReleaseVersion-SNAPSHOT", "0").dropLast(1)
 
 
 fun AIcAlgitesCanonicalArtifactId(aProjectPath: String): String {
@@ -278,7 +297,7 @@ fun AIcAlgitesCanonicalArtifactId(aProjectPath: String): String {
 
 fun AIcAlgitesSnapshotVersionForTechnology(aReleaseVersion: String, aTechnology: String): String = when (aTechnology) {
     "java" -> "$aReleaseVersion-SNAPSHOT"
-    "python" -> AIcAlgitesPythonVersion("$aReleaseVersion-SNAPSHOT")
+    "python" -> AIcAlgitesPythonSnapshotVersionPrefix(aReleaseVersion)
     else -> "$aReleaseVersion-SNAPSHOT"
 }
 
@@ -455,38 +474,53 @@ fun AIcAlgitesDeleteCloudsmithSnapshot(
     aEndpoint: AIcdAlgitesRepositoryEndpoint,
     aProfiles: Map<String, AIcdAlgitesCredentialProfile>,
     aPackageName: String,
-    aVersion: String,
+    aVersionSelector: String,
+    aVersionPrefix: Boolean,
     aFormat: String
 ): Int {
     val locBaseUrl = aEndpoint.url.trimEnd('/') + "/"
     val locHeaders = AIcAlgitesCloudsmithHeaders(aEndpoint, aProfiles)
-    val locQuery = "name:$aPackageName AND version:$aVersion AND format:$aFormat"
+    val locVersionQuery = if (aVersionPrefix) {
+        "version:^$aVersionSelector"
+    } else {
+        "version:^${aVersionSelector}\$"
+    }
+    val locQuery = "name:^${aPackageName}\$ AND $locVersionQuery AND format:$aFormat"
     val locEncodedQuery = URLEncoder.encode(locQuery, StandardCharsets.UTF_8.toString())
-    val locListUrl = "${locBaseUrl}?page_size=100&query=$locEncodedQuery"
-    val (locStatus, locBody) = AIcAlgitesHttpRequest("GET", locListUrl, locHeaders)
-    if (locStatus !in 200..299) {
-        throw GradleException("Cloudsmith package lookup failed for endpoint '${aEndpoint.id}' with HTTP $locStatus: $locBody")
+    val locMatches = mutableListOf<Map<*, *>>()
+    var locPage = 1
+    while (true) {
+        val locListUrl = "${locBaseUrl}?page_size=500&page=$locPage&query=$locEncodedQuery"
+        val (locStatus, locBody) = AIcAlgitesHttpRequest("GET", locListUrl, locHeaders)
+        if (locStatus !in 200..299) {
+            throw GradleException("Cloudsmith package lookup failed for endpoint '${aEndpoint.id}' with HTTP $locStatus: $locBody")
+        }
+        val locParsed = JsonSlurper().parseText(locBody)
+        val locItems = when (locParsed) {
+            is List<*> -> locParsed
+            is Map<*, *> -> (locParsed["results"] as? List<*>) ?: (locParsed["data"] as? List<*>) ?: emptyList<Any?>()
+            else -> emptyList<Any?>()
+        }
+        locMatches += locItems.mapNotNull { it as? Map<*, *> }.filter { locItem ->
+            val locVersion = locItem["version"]?.toString() ?: return@filter false
+            locItem["name"]?.toString() == aPackageName &&
+                (if (aVersionPrefix) locVersion.startsWith(aVersionSelector) else locVersion == aVersionSelector) &&
+                locItem["format"]?.toString()?.equals(aFormat, ignoreCase = true) == true
+        }
+        if (locItems.size < 500) break
+        locPage++
     }
-    val locParsed = JsonSlurper().parseText(locBody)
-    val locItems = when (locParsed) {
-        is List<*> -> locParsed
-        is Map<*, *> -> (locParsed["results"] as? List<*>) ?: (locParsed["data"] as? List<*>) ?: emptyList<Any?>()
-        else -> emptyList<Any?>()
-    }
-    val locMatches = locItems.mapNotNull { it as? Map<*, *> }.filter { locItem ->
-        locItem["name"]?.toString() == aPackageName &&
-            locItem["version"]?.toString() == aVersion &&
-            locItem["format"]?.toString()?.equals(aFormat, ignoreCase = true) == true
-    }
+
     var locDeleted = 0
     locMatches.forEach { locItem ->
+        val locVersion = locItem["version"]?.toString() ?: aVersionSelector
         val locIdentifier = locItem["slug_perm"]?.toString()?.takeIf { it.isNotBlank() }
             ?: locItem["identifier_perm"]?.toString()?.takeIf { it.isNotBlank() }
-            ?: throw GradleException("Cloudsmith package '$aPackageName/$aVersion' did not expose a permanent identifier.")
+            ?: throw GradleException("Cloudsmith package '$aPackageName/$locVersion' did not expose a permanent identifier.")
         val (locDeleteStatus, locDeleteBody) = AIcAlgitesHttpRequest("DELETE", "$locBaseUrl$locIdentifier/", locHeaders)
         if (locDeleteStatus !in setOf(204, 404)) {
             throw GradleException(
-                "Cloudsmith package deletion failed for '$aPackageName/$aVersion' at endpoint '${aEndpoint.id}' " +
+                "Cloudsmith package deletion failed for '$aPackageName/$locVersion' at endpoint '${aEndpoint.id}' " +
                     "with HTTP $locDeleteStatus: $locDeleteBody"
             )
         }
@@ -567,6 +601,8 @@ val algitesIsPublishRequested = algitesRequestedTasks.any { locTaskName ->
         locTaskName.startsWith("publish") ||
         locTaskName.contains("publish", ignoreCase = true)
 }
+
+val algitesSnapshotInstanceId = AIcAlgitesSnapshotInstanceId()
 
 allprojects {
     layout.buildDirectory.set(
@@ -1048,6 +1084,7 @@ subprojects {
             inputs.property("distributionName", locPythonDistributionName)
             inputs.property("importNamespace", locPythonImportNamespace)
             inputs.property("version", project.provider { project.version.toString() })
+            inputs.property("snapshotInstanceId", algitesSnapshotInstanceId ?: "")
             inputs.files(locAlgitesProductLicenses.mapNotNull { it["file"]?.let(rootProject::file) })
             outputs.file(locPythonProjectFile)
             outputs.dir(locPythonLicenseDirectory)
@@ -1077,7 +1114,7 @@ subprojects {
                     throw GradleException("pyproject.toml.tpl must not define [build-system]; the Algites Python adapter owns the effective build backend.")
                 }
 
-                val locPythonVersion = AIcAlgitesPythonVersion(project.version.toString())
+                val locPythonVersion = AIcAlgitesPythonVersion(project.version.toString(), algitesSnapshotInstanceId)
                 val locDescription = locAlgitesArtifactDirectory?.get("description")?.toString()?.replace("\"", "\\\"") ?: ""
                 val locGenerated = buildString {
                     appendLine("# Generated by Algites. Do not edit or commit this file.")
@@ -1280,6 +1317,13 @@ subprojects {
 
             doLast {
                 val locIsSnapshot = locAlgitesProjectVersion.endsWith("SNAPSHOT", ignoreCase = true)
+                if (locIsSnapshot && algitesSnapshotInstanceId == null) {
+                    throw GradleException(
+                        "Publishing a Python snapshot requires an immutable snapshot instance id. " +
+                            "Set -Palgites.snapshot.instanceId=<UTC timestamp> or ALGITES_SNAPSHOT_INSTANCE_ID. " +
+                            "Normal local builds may omit it and use .dev0 as development metadata only."
+                    )
+                }
                 val locStability = if (locIsSnapshot) "snapshot" else "release"
                 val locCell = "python.$algitesPublicationRepositoryVisibility.$locStability.upload"
                 val locEndpoints = AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locCell)
@@ -1390,6 +1434,7 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
                     return@forEach
                 }
                 val locSnapshotVersion = AIcAlgitesSnapshotVersionForTechnology(locReleaseVersion, locTechnology)
+                val locSnapshotVersionIsPrefix = locTechnology == "python"
                 val locPackageName = when (locTechnology) {
                     "java" -> locArtifactId
                     "python" -> AIcAlgitesPythonDistributionName(locArtifactId)
@@ -1411,16 +1456,28 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
                             locProfiles,
                             locPackageName,
                             locSnapshotVersion,
+                            locSnapshotVersionIsPrefix,
                             locFormat
                         )
-                        "repsy" -> AIcAlgitesDeleteRepsySnapshot(
-                            locEndpoint,
-                            locProfiles,
-                            locPackageName,
-                            locSnapshotVersion,
-                            locFormat,
-                            locGroupId
-                        )
+                        "repsy" -> {
+                            if (locSnapshotVersionIsPrefix) {
+                                logger.warn(
+                                    "Repsy released-snapshot cleanup currently supports exact versions only; " +
+                                        "timestamped Python snapshot series '$locSnapshotVersion*' for '$locProjectPath' must be cleaned manually " +
+                                        "until the Repsy adapter has a confirmed release-list API endpoint."
+                                )
+                                0
+                            } else {
+                                AIcAlgitesDeleteRepsySnapshot(
+                                    locEndpoint,
+                                    locProfiles,
+                                    locPackageName,
+                                    locSnapshotVersion,
+                                    locFormat,
+                                    locGroupId
+                                )
+                            }
+                        }
                         null -> throw GradleException("Manage endpoint '${locEndpoint.id}' has no usageProviderAdapter.")
                         else -> throw GradleException(
                             "Manage endpoint '${locEndpoint.id}' uses unsupported usageProviderAdapter '${locEndpoint.usageProviderAdapter}'."
@@ -1428,7 +1485,8 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
                     }
                     locDeletedPackages += locDeleted
                     logger.lifecycle(
-                        "Released-snapshot cleanup endpoint '${locEndpoint.id}': package=$locPackageName version=$locSnapshotVersion deleted=$locDeleted"
+                        "Released-snapshot cleanup endpoint '${locEndpoint.id}': package=$locPackageName " +
+                            "versionSelector=${locSnapshotVersion}${if (locSnapshotVersionIsPrefix) "*" else ""} deleted=$locDeleted"
                     )
                 }
             }

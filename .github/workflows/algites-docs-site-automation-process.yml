@@ -11,6 +11,16 @@ on:
         description: "Documentation publication id."
         required: true
         type: string
+      technology-kinds:
+        description: "Optional comma-separated TechnologyKinds. Empty means all declared TechnologyKinds."
+        required: false
+        default: ""
+        type: string
+      snapshot-instance-id:
+        description: "Optional immutable decimal snapshot instance id used by timestamped Python development versions."
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: write
@@ -53,6 +63,8 @@ jobs:
       java-version: "21"
       publication-kind: ${{ inputs['publication-kind'] }}
       publication-id: ${{ inputs['publication-id'] }}
+      technology-kinds: ${{ inputs['technology-kinds'] }}
+      snapshot-instance-id: ${{ inputs['snapshot-instance-id'] }}
       documentation-branch: documentation
       publication-target: ""
       gradle-arguments: "--warning-mode all"

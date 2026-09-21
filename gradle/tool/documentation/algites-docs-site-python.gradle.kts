@@ -30,6 +30,15 @@ val locPythonExecutable = (findProperty("algites.python.executable") as String?)
     ?.takeIf { it.isNotBlank() }
     ?: System.getenv("ALGITES_PYTHON_EXECUTABLE")?.trim()?.takeIf { it.isNotBlank() }
     ?: "python3"
+val locPythonDocsSnapshotInstanceId = (providers.gradleProperty("algites.snapshot.instanceId").orNull
+    ?: providers.environmentVariable("ALGITES_SNAPSHOT_INSTANCE_ID").orNull)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+    ?.also { locValue ->
+        if (!Regex("^[0-9]+$").matches(locValue)) {
+            throw GradleException("Algites snapshot instance id must contain decimal digits only, but got '$locValue'.")
+        }
+    }
 
 @Suppress("UNCHECKED_CAST")
 val locAlgitesDocsResolvedArtifactDirectories =
@@ -225,10 +234,11 @@ fun AIcPythonDocsImportNamespace(aLocalArtifactId: String): String {
         .joinToString(".")
 }
 
-fun AIcPythonDocsVersion(aVersion: String): String {
+fun AIcPythonDocsVersion(aVersion: String, aSnapshotInstanceId: String? = null): String {
     val locSnapshotSuffix = "-SNAPSHOT"
     if (aVersion.endsWith(locSnapshotSuffix, ignoreCase = true)) {
-        return aVersion.dropLast(locSnapshotSuffix.length) + ".dev0"
+        val locInstanceId = aSnapshotInstanceId ?: "0"
+        return aVersion.dropLast(locSnapshotSuffix.length).replace('-', '.') + ".dev$locInstanceId"
     }
     return aVersion.replace('-', '.')
 }
@@ -279,7 +289,7 @@ val locPythonDocsEntries = locAlgitesDocsResolvedArtifactDirectories
             "version.qualifierLabel" to (locArtifactDirectory["version.qualifierLabel"] ?: ""),
             "python.distributionName" to AIcPythonDocsDistributionName(locArtifactCoordinateId),
             "python.importNamespace" to AIcPythonDocsImportNamespace(locLocalArtifactId),
-            "python.version" to AIcPythonDocsVersion(locVersion)
+            "python.version" to AIcPythonDocsVersion(locVersion, locPythonDocsSnapshotInstanceId)
         ) + locAlgitesDocsPublicationMetadata
 
         AIcdPythonDocsSiteEntry(
@@ -306,6 +316,7 @@ val locGeneratePythonDocsSite = tasks.register("generatePythonDocsSite") {
         }
     }
     inputs.property("pythonExecutable", locPythonExecutable)
+    inputs.property("snapshotInstanceId", locPythonDocsSnapshotInstanceId ?: "")
     outputs.dir(locArtifactDocsRoot)
 
     doLast(

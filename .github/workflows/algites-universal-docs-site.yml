@@ -38,6 +38,11 @@ on:
         required: false
         type: string
         default: ""
+      snapshot-instance-id:
+        description: "Optional immutable decimal snapshot instance id used by timestamped Python development versions."
+        required: false
+        type: string
+        default: ""
       documentation-branch:
         description: Branch that stores the persistent generated documentation site.
         required: false
@@ -405,6 +410,7 @@ jobs:
             -Palgites.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
             -Palgites.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
             -Palgites.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
+            -Palgites.snapshot.instanceId="${{ inputs.snapshot-instance-id }}" \
             -Palgites.technologyKinds="${{ inputs.technology-kinds }}" \
             ${{ inputs.gradle-arguments }}
 

@@ -567,6 +567,21 @@ ALGITES_PYTHON_EXECUTABLE=python3
 
 Selects the interpreter used by Python packaging/documentation adapters. CI must ensure required Python tooling such as `build` or documentation generators is installed into that interpreter.
 
+For logical snapshot versions such as `1.0-SNAPSHOT`, normal local non-publication builds use Python development version `1.0.dev0`. Snapshot publication uses an immutable build instance version instead, for example:
+
+```text
+1.0.dev20260921100435123
+```
+
+The decimal suffix is one UTC snapshot-instance timestamp generated once by the centralized snapshot worker and shared by all Python packages and snapshot documentation in that worker run. A manual/local Python snapshot publication must provide the same kind of value through either:
+
+```text
+-Palgites.snapshot.instanceId=20260921100435123
+ALGITES_SNAPSHOT_INSTANCE_ID=20260921100435123
+```
+
+The value contains decimal digits only. It is build execution metadata, not logical artifact metadata, so it is intentionally absent from `algites-artifact-manifest.yml`.
+
 ### 16.3 Licensing validation
 
 ```text
@@ -632,10 +647,11 @@ Manual inputs:
 | `publication-kind` | `preview` | `preview`, `snapshot`, or `release`. |
 | `publication-id` | empty | Explicit publication id; empty lets the reusable workflow resolve it. |
 | `technology-kinds` | empty | Comma-separated subset; empty means all declared technologies. |
+| `snapshot-instance-id` | empty | Immutable decimal snapshot instance id propagated by centralized snapshot automation; normally not entered manually. |
 
 The wrapper invokes `.github/workflows/algites-universal-docs-site.yml`. The reusable workflow checks out the selected source ref, loads public download/licensing governance, installs Java/Python documentation toolchains, updates the persistent documentation branch, and for public repositories can publish GitHub Pages.
 
-The reusable workflow additionally supports inputs such as `source-ref`, `gradle-task`, `java-version`, `python-version`, `documentation-branch`, `publication-target`, `gradle-arguments`, and the compatibility `publish-pages` switch.
+The reusable workflow additionally supports inputs such as `source-ref`, `gradle-task`, `java-version`, `python-version`, `snapshot-instance-id`, `documentation-branch`, `publication-target`, `gradle-arguments`, and the compatibility `publish-pages` switch.
 
 ### 17.3 `Algites Universal Create Lane`
 
