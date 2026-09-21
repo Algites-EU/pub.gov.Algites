@@ -3,33 +3,15 @@ name: App automation documentation site
 on:
   workflow_dispatch:
     inputs:
-      publication-kind:
-        description: "Documentation publication kind."
+      request:
+        description: "Opaque Algites documentation automation request JSON. The request contract is owned by pub.gov.Algites and may evolve without changing this bridge."
         required: true
-        type: string
-      publication-id:
-        description: "Documentation publication id."
-        required: true
-        type: string
-      technology-kinds:
-        description: "Optional comma-separated TechnologyKinds. Empty means all declared TechnologyKinds."
-        required: false
-        default: ""
-        type: string
-      snapshot-instance-id:
-        description: "Optional immutable decimal snapshot instance id used by timestamped Python development versions."
-        required: false
-        default: ""
         type: string
 
 permissions:
   contents: write
   pages: write
   id-token: write
-
-concurrency:
-  group: docs-pages-automation-${{ github.ref }}-${{ inputs['publication-kind'] }}-${{ inputs['publication-id'] }}
-  cancel-in-progress: true
 
 jobs:
   verify-automation-actor:
@@ -59,13 +41,4 @@ jobs:
     needs: verify-automation-actor
     uses: Algites-EU/pub.gov.Algites/.github/workflows/algites-universal-docs-site.yml@main
     with:
-      gradle-task: generateAlgitesDocsSite
-      java-version: "21"
-      publication-kind: ${{ inputs['publication-kind'] }}
-      publication-id: ${{ inputs['publication-id'] }}
-      technology-kinds: ${{ inputs['technology-kinds'] }}
-      snapshot-instance-id: ${{ inputs['snapshot-instance-id'] }}
-      documentation-branch: documentation
-      publication-target: ""
-      gradle-arguments: "--warning-mode all"
-      publish-pages: true
+      automation-request: ${{ inputs.request }}

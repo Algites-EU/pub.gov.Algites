@@ -3,6 +3,11 @@ name: Generate and publish Algites documentation site
 on:
   workflow_call:
     inputs:
+      automation-request:
+        description: "Optional opaque JSON request from the stable per-repository automation bridge. When present, known request fields override the typed inputs below; unknown fields are ignored for forward compatibility."
+        required: false
+        type: string
+        default: ""
       source-ref:
         description: Branch, tag, or commit to check out. Defaults to the calling workflow ref.
         required: false
@@ -73,7 +78,7 @@ env:
   _TMP_ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
 
 concurrency:
-  group: algites-docs-pages-${{ github.repository }}-${{ inputs.documentation-branch }}
+  group: algites-docs-pages-${{ github.repository }}
   cancel-in-progress: false
 
 jobs:
@@ -85,13 +90,90 @@ jobs:
       url: ${{ steps.deploy-pages.outputs.page_url }}
 
     steps:
+      - name: Resolve documentation request
+        id: request
+        shell: bash
+        env:
+          AUTOMATION_REQUEST: ${{ inputs.automation-request }}
+          INPUT_SOURCE_REF: ${{ inputs.source-ref }}
+          INPUT_GRADLE_TASK: ${{ inputs.gradle-task }}
+          INPUT_JAVA_VERSION: ${{ inputs.java-version }}
+          INPUT_PYTHON_VERSION: ${{ inputs.python-version }}
+          INPUT_TECHNOLOGY_KINDS: ${{ inputs.technology-kinds }}
+          INPUT_PUBLICATION_KIND: ${{ inputs.publication-kind }}
+          INPUT_PUBLICATION_ID: ${{ inputs.publication-id }}
+          INPUT_SNAPSHOT_INSTANCE_ID: ${{ inputs.snapshot-instance-id }}
+          INPUT_DOCUMENTATION_BRANCH: ${{ inputs.documentation-branch }}
+          INPUT_PUBLICATION_TARGET: ${{ inputs.publication-target }}
+          INPUT_GRADLE_ARGUMENTS: ${{ inputs.gradle-arguments }}
+          INPUT_PUBLISH_PAGES: ${{ inputs.publish-pages }}
+        run: |
+          set -euo pipefail
+
+          locRequest="${AUTOMATION_REQUEST}"
+          if [[ -n "${locRequest}" ]]; then
+            if ! jq -e 'type == "object"' >/dev/null <<< "${locRequest}"; then
+              echo "::error::Algites documentation automation request must be a JSON object."
+              exit 1
+            fi
+          else
+            locRequest='{}'
+          fi
+
+          resolve_string() {
+            local locJsonKey="$1"
+            local locFallback="$2"
+            local locValue
+            locValue="$(jq -r --arg key "${locJsonKey}" '.[$key] // empty | if type == "string" then . else tostring end' <<< "${locRequest}")"
+            if [[ -z "${locValue}" ]]; then
+              locValue="${locFallback}"
+            fi
+            printf '%s' "${locValue}"
+          }
+
+          locSourceRef="$(resolve_string sourceRef "${INPUT_SOURCE_REF}")"
+          locGradleTask="$(resolve_string gradleTask "${INPUT_GRADLE_TASK}")"
+          locJavaVersion="$(resolve_string javaVersion "${INPUT_JAVA_VERSION}")"
+          locPythonVersion="$(resolve_string pythonVersion "${INPUT_PYTHON_VERSION}")"
+          locTechnologyKinds="$(resolve_string technologyKinds "${INPUT_TECHNOLOGY_KINDS}")"
+          locPublicationKind="$(resolve_string publicationKind "${INPUT_PUBLICATION_KIND}")"
+          locPublicationId="$(resolve_string publicationId "${INPUT_PUBLICATION_ID}")"
+          locSnapshotInstanceId="$(resolve_string snapshotInstanceId "${INPUT_SNAPSHOT_INSTANCE_ID}")"
+          locDocumentationBranch="$(resolve_string documentationBranch "${INPUT_DOCUMENTATION_BRANCH}")"
+          locPublicationTarget="$(resolve_string publicationTarget "${INPUT_PUBLICATION_TARGET}")"
+          locGradleArguments="$(resolve_string gradleArguments "${INPUT_GRADLE_ARGUMENTS}")"
+
+          locPublishPages="$(jq -r '.publishPages // empty | if type == "boolean" then tostring elif type == "string" then . else tostring end' <<< "${locRequest}")"
+          if [[ -z "${locPublishPages}" ]]; then
+            locPublishPages="${INPUT_PUBLISH_PAGES}"
+          fi
+          case "${locPublishPages,,}" in
+            true|false) ;;
+            *) echo "::error::publishPages must resolve to true or false, got '${locPublishPages}'."; exit 1 ;;
+          esac
+
+          {
+            echo "source-ref=${locSourceRef}"
+            echo "gradle-task=${locGradleTask}"
+            echo "java-version=${locJavaVersion}"
+            echo "python-version=${locPythonVersion}"
+            echo "technology-kinds=${locTechnologyKinds}"
+            echo "publication-kind=${locPublicationKind}"
+            echo "publication-id=${locPublicationId}"
+            echo "snapshot-instance-id=${locSnapshotInstanceId}"
+            echo "documentation-branch=${locDocumentationBranch}"
+            echo "publication-target=${locPublicationTarget}"
+            echo "gradle-arguments=${locGradleArguments}"
+            echo "publish-pages=${locPublishPages,,}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Resolve documentation source parameters
         id: source-parameters
         shell: bash
         run: |
           set -euo pipefail
 
-          locSourceRef="${{ inputs.source-ref }}"
+          locSourceRef="${{ steps.request.outputs.source-ref }}"
           if [[ -z "${locSourceRef}" ]]; then
             locSourceRef="${_TMP_ALGITES_DOCS_DEFAULT_REF}"
           fi
@@ -104,12 +186,12 @@ jobs:
         run: |
           set -euo pipefail
 
-          locDocumentationBranch="${{ inputs.documentation-branch }}"
+          locDocumentationBranch="${{ steps.request.outputs.documentation-branch }}"
           if [[ -z "${locDocumentationBranch}" ]]; then
             locDocumentationBranch="documentation"
           fi
 
-          locPublicationTarget="${{ inputs.publication-target }}"
+          locPublicationTarget="${{ steps.request.outputs.publication-target }}"
           if [[ -z "${locPublicationTarget}" ]]; then
             locRepositoryName="${GITHUB_REPOSITORY#*/}"
             if [[ "${locRepositoryName}" == pub.* ]]; then
@@ -120,7 +202,7 @@ jobs:
           fi
 
           locPublishGitHubPages="false"
-          if [[ "${{ inputs.publish-pages }}" == "true" ]]; then
+          if [[ "${{ steps.request.outputs.publish-pages }}" == "true" ]]; then
             IFS=',' read -ra locPublicationTargets <<< "${locPublicationTarget}"
             for locSinglePublicationTarget in "${locPublicationTargets[@]}"; do
               locSinglePublicationTarget="$(echo "${locSinglePublicationTarget}" | xargs)"
@@ -130,7 +212,7 @@ jobs:
             done
           fi
 
-          echo "publication-kind=${{ inputs.publication-kind }}" >> "${GITHUB_OUTPUT}"
+          echo "publication-kind=${{ steps.request.outputs.publication-kind }}" >> "${GITHUB_OUTPUT}"
           echo "documentation-branch=${locDocumentationBranch}" >> "${GITHUB_OUTPUT}"
           echo "publication-target=${locPublicationTarget}" >> "${GITHUB_OUTPUT}"
           echo "publish-github-pages=${locPublishGitHubPages}" >> "${GITHUB_OUTPUT}"
@@ -216,7 +298,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: ${{ inputs.java-version }}
+          java-version: ${{ steps.request.outputs.java-version }}
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -330,7 +412,7 @@ jobs:
               | sort -u \
               | paste -sd, - || true
           )"
-          locRequestedKinds="${{ inputs.technology-kinds }}"
+          locRequestedKinds="${{ steps.request.outputs.technology-kinds }}"
           locRequestedKinds="$(
             printf '%s' "${locRequestedKinds}" \
               | tr ',' '\n' \
@@ -371,7 +453,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          locPublicationId="${{ inputs.publication-id }}"
+          locPublicationId="${{ steps.request.outputs.publication-id }}"
           if [[ -z "${locPublicationId}" ]]; then
             locPublicationId="${{ steps.algites-artifact-metadata.outputs.version-resolved-value }}"
           fi
@@ -385,7 +467,7 @@ jobs:
         if: ${{ contains(format(',{0},', steps.algites-artifact-metadata.outputs.documentation-technology-kinds), ',python,') }}
         uses: actions/setup-python@v5
         with:
-          python-version: ${{ inputs.python-version }}
+          python-version: ${{ steps.request.outputs.python-version }}
 
       - name: Install Python documentation tooling
         if: ${{ contains(format(',{0},', steps.algites-artifact-metadata.outputs.documentation-technology-kinds), ',python,') }}
@@ -403,16 +485,16 @@ jobs:
           set -euo pipefail
 
           ./gradlew --no-daemon \
-            ${{ inputs.gradle-task }} \
+            ${{ steps.request.outputs.gradle-task }} \
             -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Palgites.docs.publicationId="${{ steps.effective-publication.outputs.publication-id }}" \
             -Palgites.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
             -Palgites.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
             -Palgites.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
-            -Palgites.snapshot.instanceId="${{ inputs.snapshot-instance-id }}" \
-            -Palgites.technologyKinds="${{ inputs.technology-kinds }}" \
-            ${{ inputs.gradle-arguments }}
+            -Palgites.snapshot.instanceId="${{ steps.request.outputs.snapshot-instance-id }}" \
+            -Palgites.technologyKinds="${{ steps.request.outputs.technology-kinds }}" \
+            ${{ steps.request.outputs.gradle-arguments }}
 
       - name: Commit generated documentation to documentation branch
         working-directory: documentation-branch

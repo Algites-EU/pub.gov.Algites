@@ -100,11 +100,7 @@ class AIcGeneratePythonDocsSiteAction(
                 $locTitle
                 $locUnderline
 
-                .. toctree::
-                   :maxdepth: 2
-                   :caption: API reference
-
-                   autoapi/index
+                Python API reference generated from the artifact source tree.
                 """.trimIndent() + System.lineSeparator()
             }
             locSphinxSourceDirectory.resolve("index.rst").writeText(locIndexText, Charsets.UTF_8)
@@ -120,8 +116,8 @@ class AIcGeneratePythonDocsSiteAction(
                 autoapi_type = 'python'
                 autoapi_dirs = [$locSourceList]
                 autoapi_root = 'autoapi'
-                autoapi_add_toctree_entry = False
-                autoapi_keep_files = False
+                autoapi_add_toctree_entry = True
+                autoapi_keep_files = True
                 autoapi_options = ['members', 'undoc-members', 'show-inheritance', 'show-module-summary']
                 """.trimIndent()
             }
@@ -160,6 +156,23 @@ class AIcGeneratePythonDocsSiteAction(
             check(locExitCode == 0) {
                 "Python documentation generation failed for '${locEntry.locLocalArtifactId}' with exit code $locExitCode. " +
                     "Ensure Sphinx and sphinx-autoapi are installed for '$locPythonExecutable'."
+            }
+
+            if (locPythonSourceDirectories.isNotEmpty()) {
+                val locAutoApiIndexFile = File(locTargetDirectory, "autoapi/index.html")
+                check(locAutoApiIndexFile.isFile) {
+                    "Python documentation generation for '${locEntry.locLocalArtifactId}' completed without producing " +
+                        "the expected AutoAPI index '${locAutoApiIndexFile.absolutePath}'. " +
+                        "Check the Sphinx AutoAPI source discovery/configuration instead of publishing an empty API site."
+                }
+                val locGeneratedAutoApiSources = File(locSphinxSourceDirectory, "autoapi")
+                    .walkTopDown()
+                    .filter { locFile -> locFile.isFile && locFile.extension.equals("rst", ignoreCase = true) }
+                    .toList()
+                check(locGeneratedAutoApiSources.any { locFile -> locFile.name != "index.rst" }) {
+                    "Python documentation generation for '${locEntry.locLocalArtifactId}' produced an AutoAPI index " +
+                        "but no module/package API pages. Check whether the Python source layout is discoverable by Sphinx AutoAPI."
+                }
             }
 
             AIcWriteArtifactMetadataSidecar(locEntry.locArtifactPublicationDirectory, locEntry.locArtifactMetadata)
@@ -237,8 +250,10 @@ fun AIcPythonDocsImportNamespace(aLocalArtifactId: String): String {
 fun AIcPythonDocsVersion(aVersion: String, aSnapshotInstanceId: String? = null): String {
     val locSnapshotSuffix = "-SNAPSHOT"
     if (aVersion.endsWith(locSnapshotSuffix, ignoreCase = true)) {
-        val locInstanceId = aSnapshotInstanceId ?: "0"
-        return aVersion.dropLast(locSnapshotSuffix.length).replace('-', '.') + ".dev$locInstanceId"
+        if (aSnapshotInstanceId == null) {
+            return "not tied to a concrete package build"
+        }
+        return aVersion.dropLast(locSnapshotSuffix.length).replace('-', '.') + ".dev$aSnapshotInstanceId"
     }
     return aVersion.replace('-', '.')
 }

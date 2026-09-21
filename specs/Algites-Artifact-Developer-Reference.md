@@ -582,6 +582,8 @@ ALGITES_SNAPSHOT_INSTANCE_ID=20260921100435123
 
 The value contains decimal digits only. It is build execution metadata, not logical artifact metadata, so it is intentionally absent from `algites-artifact-manifest.yml`.
 
+When documentation is generated as part of that centralized snapshot worker run, the same snapshot-instance id is propagated into the documentation and the concrete Python package version is shown there. A standalone/manual documentation run has no concrete package build to identify; in that case the documentation explicitly reports that the Python package version is not tied to a concrete package build instead of inventing `*.dev0`.
+
 ### 16.3 Licensing validation
 
 ```text
@@ -640,18 +642,19 @@ The shared CI implementation exposes optional task overrides for approval, verif
 
 File: `.github/workflows/algites-docs-site-automation-process.yml`
 
-Manual inputs:
+This file is a deliberately stable per-repository automation bridge. It has exactly one automation input:
 
-| Input | Default | Meaning |
-| --- | --- | --- |
-| `publication-kind` | `preview` | `preview`, `snapshot`, or `release`. |
-| `publication-id` | empty | Explicit publication id; empty lets the reusable workflow resolve it. |
-| `technology-kinds` | empty | Comma-separated subset; empty means all declared technologies. |
-| `snapshot-instance-id` | empty | Immutable decimal snapshot instance id propagated by centralized snapshot automation; normally not entered manually. |
+| Input | Meaning |
+| --- | --- |
+| `request` | Opaque JSON request produced by centralized Algites DevOps automation and passed unchanged to the reusable documentation workflow. |
 
-The wrapper invokes `.github/workflows/algites-universal-docs-site.yml`. The reusable workflow checks out the selected source ref, loads public download/licensing governance, installs Java/Python documentation toolchains, updates the persistent documentation branch, and for public repositories can publish GitHub Pages.
+The bridge does not declare publication, TechnologyKind, snapshot-instance, toolchain, or other operational fields individually. The request contract is owned by `pub.gov.Algites`; central automation may add request fields without requiring this file to be changed in every artifact repository. After a repository has adopted this generic bridge, normal documentation protocol evolution must not require bridge synchronization.
 
-The reusable workflow additionally supports inputs such as `source-ref`, `gradle-task`, `java-version`, `python-version`, `snapshot-instance-id`, `documentation-branch`, `publication-target`, `gradle-arguments`, and the compatibility `publish-pages` switch.
+The bridge verifies that the caller is Algites GitHub App automation and delegates the opaque request to `.github/workflows/algites-universal-docs-site.yml`. The reusable workflow interprets the fields it knows and ignores unknown request fields for forward compatibility. It checks out the selected source ref, loads public download/licensing governance, installs Java/Python documentation toolchains, updates the persistent documentation branch, and for public repositories can publish GitHub Pages.
+
+Manual preview generation is intentionally separate in `.github/workflows/algites-docs-site-manual-preview.yml`; artifact developers therefore do not need to construct the automation JSON request manually.
+
+The reusable workflow continues to expose typed `workflow_call` inputs for direct/manual infrastructure callers. The generic automation request overrides the corresponding typed values when present.
 
 ### 17.3 `Algites Universal Create Lane`
 

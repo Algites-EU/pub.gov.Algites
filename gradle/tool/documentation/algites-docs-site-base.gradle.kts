@@ -1042,7 +1042,7 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                     "python" -> listOf(
                         "Distribution" to valueOrDash(locMetadata["python.distributionName"]),
                         "Import namespace" to valueOrDash(locMetadata["python.importNamespace"]),
-                        "Python version" to valueOrDash(locMetadata["python.version"])
+                        "Python package version" to valueOrDash(locMetadata["python.version"])
                     )
                     "mps" -> listOf(
                         "MPS artifact ID" to valueOrDash(locMetadata["mps.artifactId"]),
