@@ -30,6 +30,10 @@ val generatePythonYamlDefinitionsPackage = tasks.register<Sync>("generatePythonY
     }
 }
 
+tasks.named("preparePythonBuildProject") {
+    dependsOn(generatePythonYamlDefinitionsPackage)
+}
+
 tasks.named("buildPython") {
     dependsOn(generatePythonYamlDefinitionsPackage)
 }
