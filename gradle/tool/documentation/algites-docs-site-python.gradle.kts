@@ -20,7 +20,7 @@ apply(from = uri(locAlgitesDocsBaseScript))
 val locArtifactDocsRoot = layout.projectDirectory.dir(
     (extra.properties["algitesArtifactDocsRootPath"] as String?)
         ?: (findProperty("algites.docs.artifactRoot") as String?)
-        ?: "docs-site/generated/artifacts"
+        ?: "build/run/bld/algites-docs/site/generated/artifacts"
 )
 val locPublicationKind = (extra.properties["algitesDocsPublicationKind"] as String?) ?: "generated"
 val locPublicationId = (extra.properties["algitesDocsPublicationId"] as String?) ?: "current"
@@ -289,8 +289,12 @@ val locPythonDocsEntries = locAlgitesDocsResolvedArtifactDirectories
             locArtifactDocsRoot.asFile,
             "${locLocalArtifactId}/${locPublicationKind}/${locPublicationId}"
         )
-        val locSafeWorkingName = locLocalArtifactId.replace(Regex("[^A-Za-z0-9._-]"), "_")
-        val locWorkingDirectory = File(rootProject.projectDir, "run/bld/algites-docs/python/$locSafeWorkingName")
+        val locArtifactRunRelativePath = if (locRelativePath.isBlank() || locRelativePath == ".") {
+            "build/run"
+        } else {
+            "build/run/$locRelativePath/run"
+        }
+        val locWorkingDirectory = File(rootProject.projectDir, "$locArtifactRunRelativePath/bld/algites-docs/python")
         val locSourceDirectories = listOf(
             File(locArtifactDirectoryFile, "src/product/python"),
             File(locArtifactDirectoryFile, "src/product/python.gen")

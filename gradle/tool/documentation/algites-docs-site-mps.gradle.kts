@@ -84,7 +84,7 @@ fun AIcReadMpsDocsRepositoryId(): String {
 val locArtifactDocsRoot = layout.projectDirectory.dir(
     (extra.properties["algitesArtifactDocsRootPath"] as String?)
         ?: (findProperty("algites.docs.artifactRoot") as String?)
-        ?: "docs-site/generated/artifacts"
+        ?: "build/run/bld/algites-docs/site/generated/artifacts"
 )
 val locPublicationKind = (extra.properties["algitesDocsPublicationKind"] as String?) ?: "generated"
 val locPublicationId = (extra.properties["algitesDocsPublicationId"] as String?) ?: "current"

@@ -487,10 +487,10 @@ pub.lib.Mps_common.base.mpslang
 pub.lib.Mps_common.base.mpssol
 ```
 
-the generated documentation may be placed as:
+the generated documentation may be placed below the selected documentation site root as:
 
 ```text
-docs-site/
+<docs-site-root>/
   generated/
     artifacts/
       lang.common.base/
@@ -523,10 +523,10 @@ and artifact:
 pub.lib.Java_build.parent
 ```
 
-the generated documentation may be placed as:
+the generated documentation may be placed below the selected documentation site root as:
 
 ```text
-docs-site/
+<docs-site-root>/
   generated/
     artifacts/
       build.parent/
@@ -546,13 +546,13 @@ The repository identity prefix MUST NOT be repeated in the documentation path wh
 Therefore, this is preferred:
 
 ```text
-docs-site/generated/artifacts/common.base.mpslang/
+<docs-site-root>/generated/artifacts/common.base.mpslang/
 ```
 
 over:
 
 ```text
-docs-site/generated/artifacts/pub.lib.Mps_common.base.mpslang/
+<docs-site-root>/generated/artifacts/pub.lib.Mps_common.base.mpslang/
 ```
 
 The full `artifactCoordinateId` remains available as metadata inside the generated documentation, together with any technology-specific publication coordinates.
@@ -1237,17 +1237,31 @@ Unknown technology kinds MUST fail validation.
 
 ##### Source-repository discovery traversal
 
-Source-repository discovery is structural rather than based on a global blacklist of directory names. Only children directly below the source-repository root are filtered by the repository-root infrastructure ignore set (for example `.git`, `.gradle`, `.idea`, `.mps`, `run`, and root-level `build`). The same directory names MUST NOT be generically ignored below container or artifact-set nodes because they may be legitimate parts of the Algites artifact hierarchy (for example `devops/build`).
+Source-repository discovery is structural rather than based on a global blacklist of directory names. Only children directly below the source-repository root are filtered by the repository-root infrastructure ignore set (for example `.git`, `.gradle`, `.idea`, `.mps`, legacy root `run`, and root-level `build`). The same directory names MUST NOT be generically ignored below container or artifact-set nodes because they may be legitimate parts of the Algites artifact hierarchy (for example `devops/build`).
 
 Once discovery reaches a self-contained `artifact`, traversal MUST stop at that node. Internal artifact directories are not candidate Algites structural nodes and therefore need no generic recursive ignore rules. This gives the following semantics:
 
 ```text
-/sourceRepositoryRoot/build            ignored as root infrastructure
+/sourceRepositoryRoot/build            ignored as root infrastructure and used for derived build state
 /sourceRepositoryRoot/devops/build     discoverable structural path
 /.../artifact/run                      not traversed because discovery stopped at artifact
 ```
 
 Root-only ignore rules MUST be evaluated against repository-relative structural position, not merely against a directory basename at arbitrary depth.
+
+##### Build/runtime workspace
+
+Normal Algites build/runtime outputs MUST be materialized below the source-repository root `build/run` workspace and MUST NOT be written to `run` directories inside artifact source trees.
+
+The workspace mirrors the artifact's repository-relative source path and then preserves the artifact-local `run` namespace:
+
+```text
+<repository>/build/run/<artifact-relative-path>/run/...
+```
+
+For repository-level generated state, `<repository>/build/run/...` is used directly. For example, artifact `aac/coreintf` uses `build/run/aac/coreintf/run/...` while its source and documentation inputs remain below `aac/coreintf/src` and `aac/coreintf/doc`.
+
+The repository-level `build/` tree is disposable derived state. Generated SourceTypes such as `src/product/java.gen` or `src/product/python.gen` are intentionally excluded from this relocation because they remain source roots for compilers and development tools.
 
 #### 3.9.4 Inherited `groupId` metadata
 

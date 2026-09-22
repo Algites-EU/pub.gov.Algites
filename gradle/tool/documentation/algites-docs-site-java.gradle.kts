@@ -88,7 +88,7 @@ apply(from = uri(locAlgitesDocsBaseScript))
 val locArtifactDocsRoot = layout.projectDirectory.dir(
     (extra.properties["algitesArtifactDocsRootPath"] as String?)
         ?: (findProperty("algites.docs.artifactRoot") as String?)
-        ?: "docs-site/generated/artifacts"
+        ?: "build/run/bld/algites-docs/site/generated/artifacts"
 )
 val locArtifactDocsRootFile = locArtifactDocsRoot.asFile
 val locPublicationKind = (extra.properties["algitesDocsPublicationKind"] as String?) ?: "generated"

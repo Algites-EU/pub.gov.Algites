@@ -254,7 +254,7 @@ logger.lifecycle(
 
 
 val locDocsSiteRoot = layout.projectDirectory.dir(
-    (findProperty("algites.docs.siteRoot") as String?) ?: "docs-site"
+    (findProperty("algites.docs.siteRoot") as String?) ?: "build/run/bld/algites-docs/site"
 )
 
 /*

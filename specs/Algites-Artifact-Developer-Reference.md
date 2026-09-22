@@ -26,11 +26,14 @@ repository root
 │   ├── <artifact>/
 │   │   ├── algites-artifact.yml
 │   │   ├── build.gradle.kts
-│   │   └── src/
+│   │   ├── src/
+│   │   │   ├── product/
+│   │   │   │   └── <source-type>[.gen|.extgen]
+│   │   │   └── develop/
+│   │   │       └── <source-type>[.gen|.extgen]
+│   │   └── doc/
 │   │       ├── product/
-│   │       │   └── <source-type>[.gen|.extgen]
 │   │       └── develop/
-│   │           └── <source-type>[.gen|.extgen]
 │   └── <nested-container>/
 │       └── algites-artifact-set.yml
 └── ...
@@ -38,7 +41,15 @@ repository root
 
 Discovery is structural. Once an `algites-artifact.yml` is found, discovery stops below that artifact. Directories inside the artifact are implementation details, not candidate artifact-set nodes.
 
-Root infrastructure directories such as `.git`, `.gradle`, `.idea`, `run`, and root-level `build` are ignored only at the repository root. The same names may legitimately occur deeper in the structural hierarchy, for example `devops/build`.
+Root infrastructure directories such as `.git`, `.gradle`, `.idea`, legacy root `run`, and root-level `build` are ignored only at the repository root. The same names may legitimately occur deeper in the structural hierarchy, for example `devops/build`.
+
+Normal Algites build/runtime outputs are materialized below the repository-level `build/run` workspace rather than inside artifact source directories. For an artifact at `aac/coreintf`, its derived runtime/build workspace is:
+
+```text
+build/run/aac/coreintf/run/...
+```
+
+Repository-level derived outputs use `build/run/...` directly. Normal build tasks MUST NOT create `<artifact>/run` directories in the source hierarchy. The entire root `build/` directory is disposable build state and is not committed.
 
 ## 3. Metadata files and schemas
 
@@ -206,6 +217,33 @@ src/develop/python.gen
 ```
 
 A multi-technology artifact does not have to contain handwritten source directories for every output. `pub.gov.Algites/devops/build/yamldefs` is an example: common YAML-definition sources are transformed into a generated Python package while the same logical artifact is also published for Java.
+
+
+### 7.3 Build/runtime workspace
+
+Generated source directories remain physically below `src` because they are source roots consumed by compilers and development tools. Their generated nature does not make them ordinary build output.
+
+Ordinary compiled/package/documentation working output uses a separate repository-level workspace:
+
+```text
+build/run/
+├── bld/                                  repository-level build/runtime state
+└── <artifact-relative-path>/
+    └── run/
+        └── bld/                          artifact-local build/runtime state
+```
+
+For example:
+
+```text
+aac/coreintf/src/product/python/...
+aac/coreintf/src/product/python.gen/...
+build/run/aac/coreintf/run/bld/gradle/...
+build/run/aac/coreintf/run/bld/python/...
+build/run/aac/coreintf/run/bld/algites-docs/...
+```
+
+This preserves the artifact-relative `run/...` convention while keeping it outside the source hierarchy. The repository root project uses `build/run/...` without an additional mirrored artifact path. A normal `./gradlew clean` removes the Algites run workspace. Derived development metadata intentionally maintained for IDE use, such as generated `pyproject.toml`, remains governed by the development lifecycle rather than by this build-output relocation.
 
 ## 8. Inheritance and effective metadata
 

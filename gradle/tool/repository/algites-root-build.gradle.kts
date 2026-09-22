@@ -7,6 +7,7 @@
  */
 
 import org.gradle.api.DefaultTask
+import org.gradle.api.tasks.Delete
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.provider.ListProperty
@@ -19,6 +20,7 @@ import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
+import org.gradle.api.tasks.Sync
 import org.gradle.api.tasks.TaskAction
 import org.gradle.api.tasks.bundling.Jar
 import org.gradle.api.tasks.testing.Test
@@ -170,6 +172,26 @@ fun algitesGradleOrEnvironmentValue(aName: String): String? =
         ?: providers.environmentVariable(aName).orNull)
         ?.trim()
         ?.takeIf { it.isNotBlank() }
+
+fun AIcAlgitesRunDirectoryRelativePath(aProjectDirectory: File): String {
+    val locRepositoryRootPath = rootProject.projectDir.toPath().toAbsolutePath().normalize()
+    val locProjectPath = aProjectDirectory.toPath().toAbsolutePath().normalize()
+    require(locProjectPath.startsWith(locRepositoryRootPath)) {
+        "Algites project directory '$aProjectDirectory' is outside repository root '${rootProject.projectDir}'."
+    }
+
+    val locRelativePath = locRepositoryRootPath
+        .relativize(locProjectPath)
+        .toString()
+        .replace(File.separatorChar, '/')
+        .trim('/')
+
+    return if (locRelativePath.isBlank()) {
+        "build/run"
+    } else {
+        "build/run/$locRelativePath/run"
+    }
+}
 
 fun AIcAlgitesStringList(aValue: Any?): List<String> {
     return when (aValue) {
@@ -605,8 +627,10 @@ val algitesIsPublishRequested = algitesRequestedTasks.any { locTaskName ->
 val algitesSnapshotInstanceId = AIcAlgitesSnapshotInstanceId()
 
 allprojects {
+    val locAlgitesRunDirectoryRelativePath = AIcAlgitesRunDirectoryRelativePath(project.projectDir)
+    extra["algitesRunDirectoryRelativePath"] = locAlgitesRunDirectoryRelativePath
     layout.buildDirectory.set(
-        rootProject.layout.projectDirectory.dir("run/bld/gradle/${project.path.removePrefix(":").replace(':', '/')}")
+        rootProject.layout.projectDirectory.dir("$locAlgitesRunDirectoryRelativePath/bld/gradle")
     )
 
     val locAlgitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
@@ -620,6 +644,12 @@ allprojects {
     version = algitesResolvedVersionValue(locAlgitesArtifactDirectory)
         ?: algitesResolvedVersionValue(algitesResolvedArtifactDirectoryForProject(":"))
         ?: "0.0.1-SNAPSHOT"
+
+    plugins.withId("base") {
+        tasks.named<Delete>("clean").configure {
+            delete(rootProject.layout.projectDirectory.dir(locAlgitesRunDirectoryRelativePath))
+        }
+    }
 
     tasks.withType<Test>().configureEach {
         useTestNG()
@@ -1060,7 +1090,10 @@ subprojects {
         val locPythonDistributionName = AIcAlgitesPythonDistributionName(locAlgitesCanonicalArtifactId)
         val locPythonImportNamespace = AIcAlgitesPythonImportNamespace(rootProject.name, locAlgitesSubprojectPathDots)
 
-        val locPythonLicenseDirectory = project.layout.projectDirectory.dir("run/bld/algites-licensing/product")
+        val locAlgitesProjectRunDirectory = rootProject.layout.projectDirectory.dir(
+            AIcAlgitesRunDirectoryRelativePath(project.projectDir)
+        )
+        val locPythonBuildProjectDirectory = locAlgitesProjectRunDirectory.dir("bld/python/project")
 
         val locDeletePythonDevelopmentMetadata = tasks.register("deletePythonDevelopmentMetadata") {
             group = "algites"
@@ -1087,20 +1120,8 @@ subprojects {
             inputs.property("snapshotInstanceId", algitesSnapshotInstanceId ?: "")
             inputs.files(locAlgitesProductLicenses.mapNotNull { it["file"]?.let(rootProject::file) })
             outputs.file(locPythonProjectFile)
-            outputs.dir(locPythonLicenseDirectory)
 
             doLast {
-                val locLicenseDirectoryFile = locPythonLicenseDirectory.asFile
-                if (locLicenseDirectoryFile.exists()) locLicenseDirectoryFile.deleteRecursively()
-                if (locAlgitesProductLicenses.isNotEmpty()) {
-                    locLicenseDirectoryFile.mkdirs()
-                    locAlgitesProductLicenses.forEach { locLicense ->
-                        val locId = locLicense["id"] ?: return@forEach
-                        val locSource = locLicense["file"]?.let(rootProject::file) ?: return@forEach
-                        locSource.copyTo(File(locLicenseDirectoryFile, "$locId.txt"), overwrite = true)
-                    }
-                }
-
                 val locTemplateText = if (locPythonTemplateFile.asFile.isFile) {
                     locPythonTemplateFile.asFile.readText(Charsets.UTF_8)
                 } else {
@@ -1133,7 +1154,7 @@ subprojects {
                     }
                     if (locAlgitesProductLicenses.isNotEmpty()) {
                         val locLicensePaths = locAlgitesProductLicenses.joinToString(", ") { locLicense ->
-                            "\"run/bld/algites-licensing/product/${locLicense["id"]}.txt\""
+                            "\"LICENSES/${locLicense["id"]}.txt\""
                         }
                         appendLine("license-files = [$locLicensePaths]")
                     }
@@ -1165,9 +1186,26 @@ subprojects {
 
         val locPythonProjectPath = project.path
         val locPythonProjectDirectory = project.projectDir
-        val locPythonDistDirectory = rootProject.layout.projectDirectory.dir(
-            "run/bld/python/${locPythonProjectPath.removePrefix(":").replace(':', '/')}/dist"
-        )
+        val locPythonDistDirectory = locAlgitesProjectRunDirectory.dir("bld/python/dist")
+
+        val locPreparePythonBuildProject = tasks.register<Sync>("preparePythonBuildProject") {
+            group = "build"
+            description = "Stages the Python package project in the repository build workspace."
+            dependsOn(locGeneratePythonProjectMetadata)
+
+            into(locPythonBuildProjectDirectory)
+            from(project.layout.projectDirectory) {
+                exclude("run/**", "build/**", ".gradle/**", ".kotlin/**")
+            }
+            locAlgitesProductLicenses.forEach { locLicense ->
+                val locLicenseId = locLicense["id"] ?: return@forEach
+                val locLicenseFile = locLicense["file"]?.let(rootProject::file) ?: return@forEach
+                from(locLicenseFile) {
+                    into("LICENSES")
+                    rename { "$locLicenseId.txt" }
+                }
+            }
+        }
 
         val locPythonBuildAndManifestScript = """
             import base64
@@ -1292,20 +1330,18 @@ subprojects {
         val locBuildPython = tasks.register<Exec>("buildPython") {
             group = "build"
             description = "Builds Python wheel/source distribution and embeds the deterministic Algites artifact manifest."
-            dependsOn(locGeneratePythonProjectMetadata)
+            dependsOn(locPreparePythonBuildProject)
             dependsOn(locGenerateAlgitesArtifactManifest)
-            workingDir(locPythonProjectDirectory)
+            workingDir(locPythonBuildProjectDirectory)
             commandLine(
                 algitesGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3",
                 "-c",
                 locPythonBuildAndManifestScript,
-                locPythonProjectDirectory.absolutePath,
+                locPythonBuildProjectDirectory.asFile.absolutePath,
                 locPythonDistDirectory.asFile.absolutePath,
                 locAlgitesManifestOutputFile.get().asFile.absolutePath
             )
-            inputs.files(project.fileTree("src/product/python"))
-            inputs.files(project.fileTree("src/product/python.gen"))
-            inputs.file(locPythonProjectFile)
+            inputs.dir(locPythonBuildProjectDirectory)
             inputs.file(locAlgitesManifestOutputFile)
             outputs.dir(locPythonDistDirectory)
         }

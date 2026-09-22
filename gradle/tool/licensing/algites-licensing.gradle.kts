@@ -866,7 +866,7 @@ val locAlgitesDocumentationLicenseIds = linkedSetOf<String>().also { locLicenseI
 }.toList().sorted()
 
 val locAlgitesDocumentationSiteRoot = rootProject.file(
-    (rootProject.findProperty("algites.docs.siteRoot") as String?) ?: "docs-site"
+    (rootProject.findProperty("algites.docs.siteRoot") as String?) ?: "build/run/bld/algites-docs/site"
 )
 
 val materializeAlgitesDocumentationLicenses = tasks.register<AIcMaterializeAlgitesDocumentationLicensesTask>("materializeAlgitesDocumentationLicenses") {

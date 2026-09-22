@@ -293,7 +293,7 @@ Generated development descriptors remain derived data and MUST NOT become indepe
 
 ###### 2.1.5.4.3 Relationship to `clean`
 
-The standard `clean` lifecycle remains primarily destructive for build/generated-source outputs. It SHOULD remove normal build outputs and reproducible `src/{product|develop}/*.gen` directories.
+The standard `clean` lifecycle remains primarily destructive for build/generated-source outputs. Normal build/runtime outputs are centralized below the repository-level `build/run` workspace; `clean` MUST remove the applicable Algites run workspace and SHOULD remove reproducible `src/{product|develop}/*.gen` directories according to their technology/source-generation lifecycle.
 
 Derived working metadata needed by IDEs, such as generated `pyproject.toml`, SHOULD remain present across ordinary `clean` operations. This avoids destabilizing an open IDE project and avoids giving `clean` the surprising behavior of deleting and immediately regenerating development descriptors.
 
