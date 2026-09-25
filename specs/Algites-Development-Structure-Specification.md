@@ -1144,6 +1144,12 @@ Maven `<optional>` remains mapping-only and MUST NOT become a semantic source of
 
 The `python` TechnologyKind adapter defines Python source discovery, build/test task mapping, distribution naming, wheel/sdist outputs, dependency metadata mapping, and publication to Python-compatible repositories. These operations are orchestrated from Gradle but MAY delegate execution to Python-native tooling.
 
+A Python distribution MAY combine Python code with technology-neutral product resources from `jsondefs`, `yamldefs`, `xmldefs`, and `config`. The adapter stages those roots into the Python build project while preserving their business-relative path, so `src/product/jsondefs/eu/algites/.../x.json` is packaged as `eu/algites/.../x.json`; the `jsondefs` source-root name is not part of the runtime resource path. The same rule applies to `.gen` and `.extgen` variants when present.
+
+Separate Python distributions MAY populate a common business package prefix only as a PEP 420 namespace. Two usable distributions MUST NOT provide the same final Python module/resource path, and a distribution MUST NOT place `__init__.py` in a package prefix that is also populated by another distribution. Repository validation MUST detect these collisions before a wheel is built or published.
+
+For Python product code, each main public Algites `AI*` type MUST be declared in its own deterministic snake_case module named from that type (for example `AIcDisplayText` in `aic_display_text.py`). Private or implementation helper types MAY remain in the same module. Repository validation MUST reject a product module that declares multiple main public `AI*` types or whose filename does not match its public type.
+
 #### 3.8.4 MPS and additional types
 
 The `mps` adapter and any future TechnologyKind MUST define equivalent source, build, validation, output, coordinate, repository, and publication contracts before the TechnologyKind can be activated.
@@ -1172,12 +1178,15 @@ The initial general-purpose SourceTypes are:
 - `python`
 - `xmldefs`
 - `yamldefs`
+- `jsondefs`
 - `config`
 - `resources`
 
 Technology adapters MAY define additional source types when required by the ecosystem. Generic logical grouping names such as `tools` or `test-models` SHOULD NOT be introduced merely to organize a project; they are appropriate only when they identify a real source type with technology/build semantics.
 
-`schema` SHOULD NOT be used as a catch-all for XML and YAML definitions. `xmldefs` is used for XML-family definitions such as XSD or WSDL; `yamldefs` is used for definitions represented in YAML. `schema` MAY be used only where the source is genuinely format-neutral and has a defined adapter contract.
+`schema` is not a canonical Algites SourceType and MUST NOT be used as a catch-all. `xmldefs` is used for XML-family definitions such as XSD or WSDL, `yamldefs` for YAML definitions, and `jsondefs` for JSON definitions such as JSON Schema. Concrete configuration instances belong in `config` regardless of whether their serialization is YAML, JSON, XML, properties, or another supported format. Source placement is determined by semantic role, not merely by filename extension.
+
+The SourceType is a source-root concern and MUST NOT be repeated inside the business-relative path. For example, a JSON definition owned by `eu.algites.example.contracts` belongs under `src/product/jsondefs/eu/algites/example/contracts/...`, not under an additional `jsondefs/` package segment.
 
 #### 3.9.2 Generated and externally generated sources
 
@@ -1205,6 +1214,8 @@ src/product/java.extgen
 src/product/python
 src/product/xmldefs
 src/product/yamldefs.extgen
+src/product/jsondefs
+src/product/config
 src/develop/java
 src/develop/python.gen
 ```

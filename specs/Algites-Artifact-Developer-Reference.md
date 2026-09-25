@@ -187,6 +187,7 @@ The general-purpose SourceTypes currently include:
 - `python`
 - `xmldefs`
 - `yamldefs`
+- `jsondefs`
 - `config`
 - `resources`
 
@@ -212,11 +213,19 @@ src/product/java
 src/product/java.gen
 src/product/python
 src/product/yamldefs
+src/product/jsondefs
+src/product/config
 src/develop/java
 src/develop/python.gen
 ```
 
 A multi-technology artifact does not have to contain handwritten source directories for every output. `pub.gov.Algites/devops/build/yamldefs` is an example: common YAML-definition sources are transformed into a generated Python package while the same logical artifact is also published for Java.
+
+`schema` is not a canonical SourceType. Use `jsondefs`, `yamldefs`, or `xmldefs` for definitions according to their semantic representation, and use `config` for concrete configuration instances regardless of serialization format. The source-root name is not repeated inside the business-relative path.
+
+For Python artifacts, the Algites adapter stages `jsondefs`, `yamldefs`, `xmldefs`, and `config` product roots into the wheel/sdist build tree while preserving the path below the source root. Multiple distributions may therefore share a package prefix only through PEP 420 namespace packages. Exact module/resource path collisions are build errors, and a shared cross-distribution prefix must not contain `__init__.py` in any contributing distribution.
+
+For Python product code, each main public Algites `AI*` type MUST be declared in its own deterministic snake_case module named from that type (for example `AIcDisplayText` in `aic_display_text.py`). Private or implementation helper types MAY remain in the same module. Repository validation MUST reject a product module that declares multiple main public `AI*` types or whose filename does not match its public type.
 
 
 ### 7.3 Build/runtime workspace

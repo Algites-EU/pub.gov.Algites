@@ -8,6 +8,7 @@
 
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Delete
+import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.provider.ListProperty
@@ -671,6 +672,170 @@ val algitesBuild = tasks.register("algitesBuild") {
     description = "Builds all effective or explicitly selected Algites TechnologyKinds."
 }
 
+val validateAlgitesPythonDistributionPaths = tasks.register("validateAlgitesPythonDistributionPaths") {
+    group = "verification"
+    description = "Validates Python product source roots, package-resource paths, and shared PEP 420 namespaces across distributions."
+
+    doLast {
+        val locPackageSourceKinds = setOf("python", "jsondefs", "yamldefs", "xmldefs", "config")
+        val locForbiddenPythonResourceSuffixes = setOf(
+            "json", "yaml", "yml", "xml", "xsd", "wsdl", "properties", "ini", "cfg", "conf"
+        )
+        val locPathOwners = linkedMapOf<String, MutableList<Pair<String, String>>>()
+        val locArtifactFiles = linkedMapOf<String, MutableSet<String>>()
+        val locProblems = mutableListOf<String>()
+
+        fun AIcSourceKindBase(aName: String): String = aName.substringBefore('.')
+        fun AIcPythonTypeModuleName(aTypeName: String): String {
+            val locMatch = Regex("^(AI[a-z]+)(.*)$").matchEntire(aTypeName)
+                ?: throw GradleException("Unsupported Algites public Python type name '$aTypeName'")
+            val locPrefix = locMatch.groupValues[1].lowercase()
+            val locRemainder = locMatch.groupValues[2]
+                .replace(Regex("(.)([A-Z][a-z]+)"), "$1_$2")
+                .replace(Regex("([a-z0-9])([A-Z])"), "$1_$2")
+                .lowercase()
+            return if (locRemainder.isBlank()) locPrefix else "${locPrefix}_${locRemainder}"
+        }
+        fun AIcIsCanonicalSourceRootName(aName: String): Boolean {
+            val locBase = AIcSourceKindBase(aName)
+            return locBase in locPackageSourceKinds &&
+                (aName == locBase || aName == "$locBase.gen" || aName == "$locBase.extgen")
+        }
+
+        algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locProjectPath, locMetadata) ->
+            if ("python" !in AIcAlgitesStringList(locMetadata["technologyKinds"])) return@forEach
+            val locProject = rootProject.findProject(locProjectPath) ?: return@forEach
+            val locArtifactName = locProject.projectDir.toPath().let { locPath ->
+                rootProject.projectDir.toPath().relativize(locPath).toString().replace(File.separatorChar, '/').ifBlank { "." }
+            }
+            val locProductSourceDirectory = File(locProject.projectDir, "src/product")
+            val locLocalOwners = linkedMapOf<String, MutableList<String>>()
+            if (locProductSourceDirectory.isDirectory) {
+                locProductSourceDirectory.listFiles()
+                    ?.filter { locDirectory -> locDirectory.isDirectory && AIcIsCanonicalSourceRootName(locDirectory.name) }
+                    ?.sortedBy { locDirectory -> locDirectory.name }
+                    ?.forEach { locSourceRoot ->
+                        locSourceRoot.walkTopDown()
+                            .filter { locFile ->
+                                locFile.isFile &&
+                                    "__pycache__" !in locFile.toPath().map { it.toString() } &&
+                                    locFile.extension.lowercase() !in setOf("pyc", "pyo")
+                            }
+                            .forEach { locFile ->
+                                val locRelativePath = locSourceRoot.toPath().relativize(locFile.toPath())
+                                    .toString().replace(File.separatorChar, '/')
+                                locLocalOwners.getOrPut(locRelativePath) { mutableListOf() }.add(locSourceRoot.name)
+                                locPathOwners.getOrPut(locRelativePath) { mutableListOf() }.add(locArtifactName to locSourceRoot.name)
+                                locArtifactFiles.getOrPut(locArtifactName) { linkedSetOf() }.add(locRelativePath)
+                            }
+                    }
+            }
+
+            locLocalOwners.toSortedMap().forEach { (locRelativePath, locRoots) ->
+                if (locRoots.size > 1) {
+                    locProblems.add(
+                        "$locArtifactName: target Python module/resource path '$locRelativePath' is provided by multiple product source roots: " +
+                            locRoots.sorted().joinToString(", ")
+                    )
+                }
+            }
+
+            listOf("product", "develop").forEach { locScope ->
+                val locScopeDirectory = File(locProject.projectDir, "src/$locScope")
+                if (!locScopeDirectory.isDirectory) return@forEach
+                locScopeDirectory.listFiles()?.filter(File::isDirectory)?.forEach { locSourceRoot ->
+                    if (AIcSourceKindBase(locSourceRoot.name) == "schema") {
+                        locProblems.add(
+                            "$locArtifactName/src/$locScope/${locSourceRoot.name}: source kind 'schema' is not allowed; " +
+                                "use jsondefs, yamldefs, xmldefs, or config according to semantic role"
+                        )
+                    }
+                    if (AIcSourceKindBase(locSourceRoot.name) == "python") {
+                        locSourceRoot.walkTopDown()
+                            .filter(File::isFile)
+                            .filter { locFile -> locFile.extension.lowercase() in locForbiddenPythonResourceSuffixes }
+                            .forEach { locFile ->
+                                val locRelativeFile = rootProject.projectDir.toPath().relativize(locFile.toPath())
+                                    .toString().replace(File.separatorChar, '/')
+                                locProblems.add(
+                                    "$locRelativeFile: definition/configuration resource must be moved from the Python source root " +
+                                        "to jsondefs, yamldefs, xmldefs, or config"
+                                )
+                            }
+                        if (locScope == "product") {
+                            val locPublicTypePattern = Regex("(?m)^class\\s+(AI[a-z]+[A-Z][A-Za-z0-9_]*)\\b")
+                            locSourceRoot.walkTopDown()
+                                .filter { locFile -> locFile.isFile && locFile.extension.lowercase() == "py" }
+                                .forEach { locFile ->
+                                    val locPublicTypes = locPublicTypePattern.findAll(locFile.readText())
+                                        .map { locMatch -> locMatch.groupValues[1] }
+                                        .toList()
+                                    val locRelativeFile = rootProject.projectDir.toPath().relativize(locFile.toPath())
+                                        .toString().replace(File.separatorChar, '/')
+                                    if (locPublicTypes.size > 1) {
+                                        locProblems.add(
+                                            "$locRelativeFile: defines multiple main public Algites Python types: " +
+                                                locPublicTypes.joinToString(", ")
+                                        )
+                                    } else if (locPublicTypes.size == 1) {
+                                        val locExpectedFileName = "${AIcPythonTypeModuleName(locPublicTypes.single())}.py"
+                                        if (locFile.name != locExpectedFileName) {
+                                            locProblems.add(
+                                                "$locRelativeFile: public Algites Python type ${locPublicTypes.single()} must be in " +
+                                                    "deterministic module '$locExpectedFileName'"
+                                            )
+                                        }
+                                    }
+                                }
+                        }
+                    }
+                }
+            }
+        }
+
+        locPathOwners.toSortedMap().forEach { (locRelativePath, locOwners) ->
+            val locArtifacts = locOwners.map { it.first }.distinct().sorted()
+            if (locArtifacts.size > 1) {
+                val locRenderedOwners = locOwners.sortedWith(compareBy({ it.first }, { it.second }))
+                    .joinToString(", ") { (locArtifact, locSourceRoot) -> "$locArtifact ($locSourceRoot)" }
+                locProblems.add("Python distribution path collision for '$locRelativePath': $locRenderedOwners")
+            }
+        }
+
+        locArtifactFiles.toSortedMap().forEach { (locArtifact, locFiles) ->
+            locFiles.filter { it.endsWith("/__init__.py") }.sorted().forEach { locInitPath ->
+                val locPackageDirectory = locInitPath.removeSuffix("/__init__.py")
+                val locPrefix = "$locPackageDirectory/"
+                val locOtherArtifacts = locArtifactFiles
+                    .filterKeys { it != locArtifact }
+                    .filterValues { locOtherFiles -> locOtherFiles.any { it.startsWith(locPrefix) } }
+                    .keys.sorted()
+                if (locOtherArtifacts.isNotEmpty()) {
+                    locProblems.add(
+                        "$locArtifact: '$locInitPath' turns shared package '${locPackageDirectory.replace('/', '.')}' into a regular package " +
+                            "although it is also populated by ${locOtherArtifacts.joinToString(", ")}; shared cross-distribution package prefixes " +
+                            "must remain PEP 420 namespace packages"
+                    )
+                }
+            }
+        }
+
+        if (locProblems.isNotEmpty()) {
+            throw GradleException(
+                buildString {
+                    appendLine("Algites Python distribution/source-layout validation failed:")
+                    locProblems.distinct().sorted().forEach { locProblem -> appendLine(" - $locProblem") }
+                }.trimEnd()
+            )
+        }
+        println("Algites Python distribution/source-layout validation passed.")
+    }
+}
+
+algitesBuild.configure {
+    dependsOn(validateAlgitesPythonDistributionPaths)
+}
+
 val algitesPublish = tasks.register("algitesPublish") {
     group = "publishing"
     description = "Publishes all effective or explicitly selected Algites TechnologyKinds."
@@ -1162,6 +1327,9 @@ subprojects {
                     appendLine("[tool.setuptools.packages.find]")
                     appendLine("where = [\"src/product/python\", \"src/product/python.gen\"]")
                     appendLine("namespaces = true")
+                    appendLine()
+                    appendLine("[tool.setuptools.package-data]")
+                    appendLine("\"*\" = [\"**/*\"]")
                     if (locTemplateText.isNotBlank()) {
                         appendLine()
                         appendLine(locTemplateText.trim())
@@ -1193,9 +1361,22 @@ subprojects {
             description = "Stages the Python package project in the repository build workspace."
             dependsOn(locGeneratePythonProjectMetadata)
 
+            duplicatesStrategy = DuplicatesStrategy.FAIL
             into(locPythonBuildProjectDirectory)
             from(project.layout.projectDirectory) {
-                exclude("run/**", "build/**", ".gradle/**", ".kotlin/**")
+                exclude("run/**", "build/**", ".gradle/**", ".kotlin/**", "**/__pycache__/**", "**/*.pyc", "**/*.pyo")
+            }
+            listOf("jsondefs", "yamldefs", "xmldefs", "config").forEach { locSourceKind ->
+                listOf("", ".gen", ".extgen").forEach { locGenerationSuffix ->
+                    val locSourceDirectory = project.layout.projectDirectory.dir(
+                        "src/product/$locSourceKind$locGenerationSuffix"
+                    )
+                    if (locSourceDirectory.asFile.isDirectory) {
+                        from(locSourceDirectory) {
+                            into("src/product/python")
+                        }
+                    }
+                }
             }
             locAlgitesProductLicenses.forEach { locLicense ->
                 val locLicenseId = locLicense["id"] ?: return@forEach
@@ -1421,6 +1602,9 @@ subprojects {
 
         algitesPrepareDevelopment.configure { dependsOn(locGeneratePythonProjectMetadata) }
         algitesRefreshDevelopment.configure { dependsOn(locRefreshPythonDevelopment) }
+        locBuildPython.configure {
+            dependsOn(rootProject.tasks.named("validateAlgitesPythonDistributionPaths"))
+        }
         if ("python" in locEffectiveTechnologyKinds) {
             algitesBuild.configure { dependsOn(locBuildPython) }
             algitesPublish.configure { dependsOn(locPublishPython) }
