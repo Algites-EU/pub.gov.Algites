@@ -332,11 +332,17 @@ abstract class AIcPublishPythonTask : DefaultTask() {
             ?: AIcCommandOutput(listOf("bootstrap-document")) ?: return null
         val locDocument = AIcParseJsonObject(locRawDocument)
         val locProfile = locDocument[aProfileId] as? Map<*, *> ?: return null
-        val locType = (locProfile[aCredentialType] ?: locProfile[aCredentialType.replace('_', '-')] ?: locProfile[aCredentialType.replaceFirstChar { it.uppercase() }]) as? Map<*, *> ?: return null
-        val locLowerField = aField.replaceFirstChar { it.lowercase() }
-        val locField = (locType[aField] ?: locType[locLowerField]) as? Map<*, *> ?: return null
-        val locSource = (locField["Source"] ?: locField["source"])?.toString()?.lowercase() ?: return null
-        val locReference = (locField["Value"] ?: locField["value"])?.toString() ?: return null
+        val locTypeProperty = when (aCredentialType) {
+            "basic" -> "Basic"
+            "bearer" -> "Bearer"
+            "api_key" -> "ApiKey"
+            "certificate" -> "Certificate"
+            else -> return null
+        }
+        val locType = locProfile[locTypeProperty] as? Map<*, *> ?: return null
+        val locField = locType[aField] as? Map<*, *> ?: return null
+        val locSource = locField["Source"]?.toString()?.lowercase() ?: return null
+        val locReference = locField["Value"]?.toString() ?: return null
         return when (locSource) {
             "direct_value" -> locReference
             "file_content" -> {

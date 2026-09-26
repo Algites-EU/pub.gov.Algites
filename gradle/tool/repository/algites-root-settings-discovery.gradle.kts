@@ -159,8 +159,8 @@ dependencyResolutionManagement.repositories {
                     ?: error("Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'.")
                 when (locProfile.type) {
                     "basic" -> {
-                        val locUsername = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "username", rootDir)
-                        val locPassword = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "password", rootDir)
+                        val locUsername = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "Username", rootDir)
+                        val locPassword = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "Password", rootDir)
                         if (locUsername.isNullOrEmpty() || locPassword.isNullOrEmpty()) {
                             error(
                                 "Credential profile '${locProfile.id}' type 'basic' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
@@ -172,7 +172,7 @@ dependencyResolutionManagement.repositories {
                         }
                     }
                     "bearer" -> {
-                        val locToken = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "token", rootDir)
+                        val locToken = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "Token", rootDir)
                             ?: error(
                                 "Credential profile '${locProfile.id}' type 'bearer' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                             )
@@ -183,7 +183,7 @@ dependencyResolutionManagement.repositories {
                         authentication { create<HttpHeaderAuthentication>("header") }
                     }
                     "api_key" -> {
-                        val locApiKey = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "apiKey", rootDir)
+                        val locApiKey = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "ApiKey", rootDir)
                             ?: error(
                                 "Credential profile '${locProfile.id}' type 'api_key' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                             )

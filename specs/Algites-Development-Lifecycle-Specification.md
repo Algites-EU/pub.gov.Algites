@@ -406,44 +406,44 @@ Canonical Algites endpoint ids encode all four dimensions. External/custom targe
 Credential profiles are independent inherited metadata. A profile may be defined or overridden at repository, artifact-set, or artifact level:
 
 ```yaml
-credentialProfiles:
+CredentialProfiles:
   algites-java-private-release-download:
-    type: basic
+    Type: basic
 ```
 
 Supported profile types are the closed set `basic`, `bearer`, `api_key`, and `certificate`. Their canonical fields are:
 
 | type | required fields | optional fields |
 | --- | --- | --- |
-| `basic` | `username`, `password` | — |
-| `bearer` | `token` | — |
-| `api_key` | `apiKey` | — |
-| `certificate` | `certificate` | `privateKey`, `privateKeyPassword` |
+| `basic` | `Username`, `Password` | — |
+| `bearer` | `Token` | — |
+| `api_key` | `ApiKey` | — |
+| `certificate` | `Certificate` | `PrivateKey`, `PrivateKeyPassword` |
 
 Core support for a credential type does not imply that every TechnologyKind repository adapter can apply that authentication mechanism. Unsupported endpoint/type combinations MUST fail rather than silently fall back to another authentication mechanism.
 
-Secret values use one provider-independent credential document supplied as `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` and governed by `algites-credentials_1.schema.json`. Every credential field has exactly the properties `source` and `value`. The closed value-source enum is:
+Secret values use one provider-independent credential document supplied as `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` and governed by `algites-credentials_1.schema.json`. Every credential field has exactly the properties `Source` and `Value`. The closed value-source enum is:
 
-| source | interpretation of `value` |
+| `Source` | interpretation of `Value` |
 | --- | --- |
-| `direct_value` | `value` is the credential content itself |
-| `file_content` | `value` is a file path; the file content is the credential content |
-| `secret_content` | `value` is a secret name/key in the current secret-provider context |
-| `environment_variable_content` | `value` is an environment-variable name |
+| `direct_value` | `Value` is the credential content itself |
+| `file_content` | `Value` is a file path; the file content is the credential content |
+| `secret_content` | `Value` is a secret name/key in the current secret-provider context |
+| `environment_variable_content` | `Value` is an environment-variable name |
 
-The `_CONTENT` suffix identifies the content produced by resolution, not the literal content of `value`. In particular, `file_content.value` is a path and `secret_content.value` is a secret identifier.
+The `_CONTENT` suffix identifies the content produced by resolution, not the literal content of `Value`. In particular, `file_content` uses `Value` as a path and `secret_content` uses `Value` as a secret identifier.
 
 The document is keyed first by credential profile id and then by credential type. A profile MAY retain multiple typed values even though its effective non-secret profile declaration selects exactly one type for a particular endpoint. Example:
 
 ```json
 {
   "algites-java-private-release-download": {
-    "basic": {
-      "username": { "source": "direct_value", "value": "algites-user" },
-      "password": { "source": "secret_content", "value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
+    "Basic": {
+      "Username": { "Source": "direct_value", "Value": "algites-user" },
+      "Password": { "Source": "secret_content", "Value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
     },
-    "bearer": {
-      "token": { "source": "environment_variable_content", "value": "ALGITES_JAVA_PRIVATE_TOKEN" }
+    "Bearer": {
+      "Token": { "Source": "environment_variable_content", "Value": "ALGITES_JAVA_PRIVATE_TOKEN" }
     }
   }
 }
@@ -451,7 +451,7 @@ The document is keyed first by credential profile id and then by credential type
 
 Local users need only the subset of profiles required by the operations they execute. The universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document is also the canonical persistent local representation; there is no second profile/type credential format. A non-empty `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` environment variable is an explicit per-process override. Otherwise the installed local credential bootstrap reads the same document from the highest-priority available Algites operating-system secure store. Because one document may retain multiple typed entries under a profile, a later type override does not reinterpret or destroy values retained for another type.
 
-Provider adapters MAY materialize a credential document before invoking the final processing. Materialization MUST preserve the same schema: a resolved field becomes `direct_value` with the resolved content. A provider adapter MUST NOT invent a second credential format.
+Provider adapters MAY materialize a credential document before invoking the final processing. Materialization MUST preserve the same schema: a resolved field becomes `{ "Source": "direct_value", "Value": "..." }` with the resolved content. A provider adapter MUST NOT invent a second credential format.
 
 Transient cross-process variables used only internally by Algites workflows/actions/scripts MUST use the `_TMP_ALGITES_*` prefix. They are implementation transport, are not supported local configuration variables, and MUST NOT be created as repository/organization secrets by users. Stable user-/DevOps-configurable environment contracts retain the `ALGITES_*` prefix.
 

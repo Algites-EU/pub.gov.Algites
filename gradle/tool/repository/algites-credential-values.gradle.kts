@@ -2,7 +2,7 @@
  * Algites universal credential value resolver.
  *
  * ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS contains the provider-independent credential document.
- * Each field is represented by { "source": <enum>, "value": <string> }.
+ * Each field is represented by { "Source": <enum>, "Value": <string> }.
  * The source determines how the value string is interpreted.
  */
 
@@ -114,15 +114,22 @@ val locAlgitesResolveCredentialValue = fun(
     aBaseDirectory: File
 ): String? {
     val locProfile = locAlgitesCredentialDocument[aProfileId] as? Map<*, *> ?: return null
-    val locType = locProfile[aCredentialType] as? Map<*, *> ?: return null
+    val locTypeProperty = when (aCredentialType) {
+        "basic" -> "Basic"
+        "bearer" -> "Bearer"
+        "api_key" -> "ApiKey"
+        "certificate" -> "Certificate"
+        else -> return null
+    }
+    val locType = locProfile[locTypeProperty] as? Map<*, *> ?: return null
     val locField = locType[aField] as? Map<*, *> ?: return null
-    val locSource = locField["source"]?.toString()
+    val locSource = locField["Source"]?.toString()
         ?: throw GradleException(
-            "Credential '$aProfileId/$aCredentialType/$aField' is missing required property 'source'."
+            "Credential '$aProfileId/$aCredentialType/$aField' is missing required property 'Source'."
         )
-    val locReference = locField["value"]?.toString()
+    val locReference = locField["Value"]?.toString()
         ?: throw GradleException(
-            "Credential '$aProfileId/$aCredentialType/$aField' is missing required property 'value'."
+            "Credential '$aProfileId/$aCredentialType/$aField' is missing required property 'Value'."
         )
 
     return when (locSource) {

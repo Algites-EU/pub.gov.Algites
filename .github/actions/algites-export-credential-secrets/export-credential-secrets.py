@@ -7,20 +7,24 @@ import uuid
 
 CREDENTIAL_TYPES = {
     "basic": {
-        "required": ("username", "password"),
+        "property": "Basic",
+        "required": ("Username", "Password"),
         "optional": (),
     },
     "bearer": {
-        "required": ("token",),
+        "property": "Bearer",
+        "required": ("Token",),
         "optional": (),
     },
     "api_key": {
-        "required": ("apiKey",),
+        "property": "ApiKey",
+        "required": ("ApiKey",),
         "optional": (),
     },
     "certificate": {
-        "required": ("certificate",),
-        "optional": ("privateKey", "privateKeyPassword"),
+        "property": "Certificate",
+        "required": ("Certificate",),
+        "optional": ("PrivateKey", "PrivateKeyPassword"),
     },
 }
 
@@ -69,15 +73,15 @@ def load_plan(path_value: str) -> dict:
 def materialize_value(profile_id: str, credential_type: str, field: str, item: object, secrets: dict) -> str:
     if not isinstance(item, dict):
         fail(f"Credential '{profile_id}/{credential_type}/{field}' must be an object.")
-    source = item.get("source")
-    reference = item.get("value")
+    source = item.get("Source")
+    reference = item.get("Value")
     if source not in VALUE_SOURCES:
         fail(
             f"Credential '{profile_id}/{credential_type}/{field}' uses unsupported source '{source}'. "
             f"Supported sources: {', '.join(sorted(VALUE_SOURCES))}."
         )
     if not isinstance(reference, str):
-        fail(f"Credential '{profile_id}/{credential_type}/{field}' property 'value' must be a string.")
+        fail(f"Credential '{profile_id}/{credential_type}/{field}' property 'Value' must be a string.")
 
     if source == "direct_value":
         return reference
@@ -156,12 +160,16 @@ for requirement in required:
     profile = credentials.get(profile_id)
     if not isinstance(profile, dict):
         fail(f"Required credential profile '{profile_id}' is not present in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS.")
-    typed_values = profile.get(credential_type)
-    if not isinstance(typed_values, dict):
-        fail(f"Required credential profile '{profile_id}' does not contain type '{credential_type}'.")
-
     contract = CREDENTIAL_TYPES[credential_type]
-    supported_fields = set(contract["required"]) | set(contract["optional"])
+    type_property = contract["property"]
+    typed_values = profile.get(type_property)
+    if not isinstance(typed_values, dict):
+        fail(
+            f"Required credential profile '{profile_id}' does not contain type property "
+            f"'{type_property}' for type '{credential_type}'."
+        )
+
+    supported_fields = set(contract["required"] + contract["optional"])
     unsupported_fields = set(typed_values) - supported_fields
     if unsupported_fields:
         fail(
@@ -170,25 +178,30 @@ for requirement in required:
         )
 
     output_fields = {}
-    for field in contract["required"]:
-        if field not in typed_values:
-            fail(f"Credential profile '{profile_id}' type '{credential_type}' is missing required field '{field}'.")
-        value = materialize_value(profile_id, credential_type, field, typed_values[field], secrets)
+    for canonical_field in contract["required"]:
+        item = typed_values.get(canonical_field)
+        if item is None:
+            fail(
+                f"Credential profile '{profile_id}' type '{credential_type}' is missing required field "
+                f"'{canonical_field}'."
+            )
+        value = materialize_value(profile_id, credential_type, canonical_field, item, secrets)
         mask_github_value(value)
-        output_fields[field] = {
-            "source": "direct_value",
-            "value": value,
+        output_fields[canonical_field] = {
+            "Source": "direct_value",
+            "Value": value,
         }
-    for field in contract["optional"]:
-        if field in typed_values:
-            value = materialize_value(profile_id, credential_type, field, typed_values[field], secrets)
+    for canonical_field in contract["optional"]:
+        item = typed_values.get(canonical_field)
+        if item is not None:
+            value = materialize_value(profile_id, credential_type, canonical_field, item, secrets)
             mask_github_value(value)
-            output_fields[field] = {
-                "source": "direct_value",
-                "value": value,
+            output_fields[canonical_field] = {
+                "Source": "direct_value",
+                "Value": value,
             }
 
-    materialized.setdefault(profile_id, {})[credential_type] = output_fields
+    materialized.setdefault(profile_id, {})[type_property] = output_fields
 
 output = json.dumps(materialized, separators=(",", ":"), ensure_ascii=False)
 write_github_env("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS", output)

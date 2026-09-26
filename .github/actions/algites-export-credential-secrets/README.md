@@ -6,17 +6,17 @@ The persistent/provider-independent credential document is supplied through `ALG
 
 Supported value sources are:
 
-| source | `value` contains | materialized result |
+| `Source` | `Value` contains | materialized result |
 | --- | --- | --- |
 | `direct_value` | the credential content itself | the same content |
 | `file_content` | a filesystem path | UTF-8 file content |
 | `secret_content` | a GitHub Actions secret name | that secret's content |
 | `environment_variable_content` | an environment-variable name | that variable's content |
 
-`file_content` is therefore intentionally named after the **result of resolution**. Its `value` member is still the path used to obtain that content. The same rule applies to `secret_content` and `environment_variable_content`: `value` is the reference name, while the result is the referenced content.
+`file_content` is therefore intentionally named after the **result of resolution**. Its `Value` member is still the path used to obtain that content. The same rule applies to `secret_content` and `environment_variable_content`: `Value` is the reference name, while the result is the referenced content.
 
 The bridge receives the serialized GitHub `secrets` context through `_TMP_ALGITES_CREDENTIAL_SECRETS_JSON`. This is a trusted provider context, not a second credential-document format. It exists only so `secret_content` references can be resolved by exact secret name without enumerating or hard-coding credential profiles in workflow YAML.
 
-The downstream Gradle process receives the same universal credential-document format through `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, but only for required profile/type pairs and with all retained fields replaced by `direct_value`.
+The downstream Gradle process receives the canonical universal credential-document format through `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, but only for required profile/type pairs and with all retained fields materialized as `{ "Source": "direct_value", "Value": "..." }`.
 
 The action MUST NOT log credential contents. Materialized values are additionally registered with GitHub log masking before the reduced document is exported to subsequent steps.
