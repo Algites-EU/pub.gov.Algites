@@ -230,6 +230,8 @@ The supported Python build entry point is the Algites Gradle lifecycle. The Pyth
 
 For Python product code, each main public Algites `AI*` type MUST be declared in its own deterministic snake_case module named from that type (for example `AIcDisplayText` in `aic_display_text.py`). Private or implementation helper types MAY remain in the same module. Repository validation MUST reject a product module that declares multiple main public `AI*` types or whose filename does not match its public type.
 
+Python distribution names use an owner prefix derived from the effective `groupId`, not a hard-coded Algites prefix. Take the first at most two non-empty dot-separated `groupId` components and join them with `-`; the selected `groupId` dot is therefore converted to a hyphen for Python packaging. Append the normalized `ArtifactCoordinateId` with `-` only when both parts are non-empty. Examples: `eu.algites.product` produces owner prefix `eu-algites`; `com` produces `com`; an absent/empty `groupId` produces no owner prefix and no leading hyphen.
+
 
 ### 7.3 Build/runtime workspace
 

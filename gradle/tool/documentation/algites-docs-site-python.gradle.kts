@@ -234,12 +234,24 @@ fun AIcPythonDocsArtifactCoordinateId(aLocalArtifactId: String): String {
     return if (aLocalArtifactId == ".") locPythonDocsRepositoryId else "${locPythonDocsRepositoryId}_${aLocalArtifactId}"
 }
 
-fun AIcPythonDocsDistributionName(aArtifactCoordinateId: String): String {
-    val locNormalized = aArtifactCoordinateId
+fun AIcPythonDocsDistributionName(aGroupId: String?, aArtifactCoordinateId: String): String {
+    val locOwnerPrefix = aGroupId
+        ?.split('.')
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?.take(2)
+        ?.joinToString("-")
+        ?.lowercase()
+        ?.replace(Regex("[._-]+"), "-")
+        ?.trim('-')
+        .orEmpty()
+    val locNormalizedArtifactCoordinateId = aArtifactCoordinateId
         .lowercase()
         .replace(Regex("[._-]+"), "-")
         .trim('-')
-    return "eu-algites-$locNormalized"
+    return listOf(locOwnerPrefix, locNormalizedArtifactCoordinateId)
+        .filter(String::isNotEmpty)
+        .joinToString("-")
 }
 
 fun AIcPythonDocsIdentifierSegment(aValue: String): String {
@@ -314,7 +326,7 @@ val locPythonDocsEntries = locAlgitesDocsResolvedArtifactDirectories
             "version.lane" to (locArtifactDirectory["version.lane"] ?: ""),
             "version.revision" to (locArtifactDirectory["version.revision"] ?: ""),
             "version.qualifierKind" to (locArtifactDirectory["version.qualifierKind"] ?: ""),
-            "python.distributionName" to AIcPythonDocsDistributionName(locArtifactCoordinateId),
+            "python.distributionName" to AIcPythonDocsDistributionName(locArtifactDirectory["groupId"]?.toString(), locArtifactCoordinateId),
             "python.importNamespace" to AIcPythonDocsImportNamespace(locLocalArtifactId),
             "python.version" to AIcPythonDocsVersion(locVersion, locPythonDocsSnapshotInstanceId)
         ) + locAlgitesDocsPublicationMetadata

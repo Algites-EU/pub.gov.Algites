@@ -328,12 +328,16 @@ The Java/Maven `GroupId` is derived independently according to section 2.5.
 
 #### 2.9.2 Python distribution/project naming
 
-Python uses one distribution/project name rather than a Maven-style `GroupId` + `artifactId` pair. Algites therefore derives a globally Algites-namespaced Python distribution name directly from `ArtifactCoordinateId`.
+Python uses one distribution/project name rather than a Maven-style `GroupId` + `artifactId` pair. Algites therefore derives the Python distribution name from the effective `groupId` and `ArtifactCoordinateId`.
+
+The owner prefix is formed from at most the first two non-empty dot-separated components of the effective `groupId`. Those components are joined with `-` and normalized as a Python project-name fragment. If the `groupId` contains only one component, that one component is used. If the effective `groupId` is absent or empty, no owner prefix and no separator before the artifact portion are emitted.
 
 The normative mapping is:
 
 ```text
-pythonDistributionName = "eu-algites-" + normalizePythonProjectName(artifactCoordinateId)
+ownerPrefix = normalizePythonProjectName(join("-", firstTwoNonEmpty(groupId.split("."))))
+artifactPart = normalizePythonProjectName(artifactCoordinateId)
+pythonDistributionName = joinNonEmpty("-", ownerPrefix, artifactPart)
 ```
 
 where `normalizePythonProjectName`:
@@ -341,11 +345,14 @@ where `normalizePythonProjectName`:
 1. converts ASCII letters to lowercase, and
 2. replaces every contiguous run of `.`, `_`, or `-` with one `-`.
 
-The generated Algites Python distribution name MUST already be in this canonical normalized form and MUST be used consistently for Python project metadata and repository lookup. No separate Python equivalent of Maven `GroupId` is defined.
+Consequently, the dot separating the selected `groupId` components is represented as `-` in the Python distribution name. The generated Python distribution name MUST already be in this canonical normalized form and MUST be used consistently for Python project metadata, documentation, repository lookup, publication, and snapshot cleanup.
 
 Example:
 
 ```text
+groupId:
+eu.algites.customers
+
 ArtifactCoordinateId:
 priv.lib.Customers.common_aaa.blfacadeintf-tests
 
@@ -353,7 +360,7 @@ Python distribution/project name:
 eu-algites-priv-lib-customers-common-aaa-blfacadeintf-tests
 ```
 
-The `eu-algites-` prefix is the canonical Algites ecosystem namespace prefix for Python distribution names. It is derived from the Algites namespace but is not a separate Python equivalent of Maven `GroupId`; the Maven `eu.algites...` groupId is not prepended independently beyond this canonical prefix.
+For `groupId = com`, the owner prefix is `com`. For an absent or empty `groupId`, the distribution name consists only of the normalized `ArtifactCoordinateId` and MUST NOT begin with `-`.
 
 #### 2.9.3 Python import namespace
 

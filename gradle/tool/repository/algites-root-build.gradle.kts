@@ -549,12 +549,24 @@ fun AIcAlgitesRequireBasicCredential(aProfile: AIcdAlgitesCredentialProfile): Pa
     return locUsername to locPassword
 }
 
-fun AIcAlgitesPythonDistributionName(aArtifactCoordinateId: String): String {
-    val locNormalized = aArtifactCoordinateId
+fun AIcAlgitesPythonDistributionName(aGroupId: String?, aArtifactCoordinateId: String): String {
+    val locOwnerPrefix = aGroupId
+        ?.split('.')
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?.take(2)
+        ?.joinToString("-")
+        ?.lowercase()
+        ?.replace(Regex("[._-]+"), "-")
+        ?.trim('-')
+        .orEmpty()
+    val locNormalizedArtifactCoordinateId = aArtifactCoordinateId
         .lowercase()
         .replace(Regex("[._-]+"), "-")
         .trim('-')
-    return "eu-algites-$locNormalized"
+    return listOf(locOwnerPrefix, locNormalizedArtifactCoordinateId)
+        .filter(String::isNotEmpty)
+        .joinToString("-")
 }
 
 fun AIcAlgitesPythonIdentifierSegment(aValue: String): String {
@@ -1404,7 +1416,7 @@ subprojects {
     if ("python" in locAlgitesTechnologyKinds) {
         val locPythonTemplateFile = layout.projectDirectory.file("pyproject.toml.tpl")
         val locPythonProjectFile = layout.projectDirectory.file("pyproject.toml")
-        val locPythonDistributionName = AIcAlgitesPythonDistributionName(locAlgitesCanonicalArtifactId)
+        val locPythonDistributionName = AIcAlgitesPythonDistributionName(locAlgitesResolvedProjectGroup, locAlgitesCanonicalArtifactId)
         val locPythonImportNamespace = AIcAlgitesPythonImportNamespace(rootProject.name, locAlgitesSubprojectPathDots)
 
         val locAlgitesProjectRunDirectory = rootProject.layout.projectDirectory.dir(
@@ -1707,7 +1719,7 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
                 val locSnapshotVersionIsPrefix = locTechnology == "python"
                 val locPackageName = when (locTechnology) {
                     "java" -> locArtifactId
-                    "python" -> AIcAlgitesPythonDistributionName(locArtifactId)
+                    "python" -> AIcAlgitesPythonDistributionName(locGroupId, locArtifactId)
                     else -> throw GradleException(
                         "Released-snapshot cleanup for TechnologyKind '$locTechnology' has no management package-coordinate adapter yet."
                     )
