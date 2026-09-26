@@ -14,7 +14,7 @@ CREDENTIAL_TYPES = {
         "required": ("token",),
         "optional": (),
     },
-    "api-key": {
+    "api_key": {
         "required": ("apiKey",),
         "optional": (),
     },
@@ -25,10 +25,10 @@ CREDENTIAL_TYPES = {
 }
 
 VALUE_SOURCES = {
-    "DIRECT_VALUE",
-    "FILE_CONTENT",
-    "SECRET_CONTENT",
-    "ENVIRONMENT_VARIABLE_CONTENT",
+    "direct_value",
+    "file_content",
+    "secret_content",
+    "environment_variable_content",
 }
 
 
@@ -79,11 +79,11 @@ def materialize_value(profile_id: str, credential_type: str, field: str, item: o
     if not isinstance(reference, str):
         fail(f"Credential '{profile_id}/{credential_type}/{field}' property 'value' must be a string.")
 
-    if source == "DIRECT_VALUE":
+    if source == "direct_value":
         return reference
     if not reference:
         fail(f"Credential '{profile_id}/{credential_type}/{field}' reference must not be empty for source '{source}'.")
-    if source == "FILE_CONTENT":
+    if source == "file_content":
         path = Path(reference)
         if not path.is_absolute():
             path = Path(os.environ.get("GITHUB_WORKSPACE", os.getcwd())) / path
@@ -93,14 +93,14 @@ def materialize_value(profile_id: str, credential_type: str, field: str, item: o
             return path.read_text(encoding="utf-8")
         except OSError as exc:
             fail(f"Cannot read credential file '{path}': {exc}")
-    if source == "SECRET_CONTENT":
+    if source == "secret_content":
         if reference not in secrets:
             fail(f"Credential '{profile_id}/{credential_type}/{field}' references unavailable GitHub secret '{reference}'.")
         value = secrets[reference]
         if value is None:
             fail(f"Credential '{profile_id}/{credential_type}/{field}' references empty GitHub secret '{reference}'.")
         return str(value)
-    if source == "ENVIRONMENT_VARIABLE_CONTENT":
+    if source == "environment_variable_content":
         value = os.environ.get(reference)
         if value is None:
             fail(
@@ -176,7 +176,7 @@ for requirement in required:
         value = materialize_value(profile_id, credential_type, field, typed_values[field], secrets)
         mask_github_value(value)
         output_fields[field] = {
-            "source": "DIRECT_VALUE",
+            "source": "direct_value",
             "value": value,
         }
     for field in contract["optional"]:
@@ -184,7 +184,7 @@ for requirement in required:
             value = materialize_value(profile_id, credential_type, field, typed_values[field], secrets)
             mask_github_value(value)
             output_fields[field] = {
-                "source": "DIRECT_VALUE",
+                "source": "direct_value",
                 "value": value,
             }
 

@@ -970,9 +970,16 @@ algitesBuild.configure {
     dependsOn(validateAlgitesPythonDistributionPaths)
 }
 
+val algitesPublicationBuildGate = tasks.register("algitesPublicationBuildGate") {
+    group = "publishing"
+    description = "Requires all effective or explicitly selected Algites TechnologyKinds to build successfully before any publication task may start."
+    dependsOn(algitesBuild)
+}
+
 val algitesPublish = tasks.register("algitesPublish") {
     group = "publishing"
-    description = "Publishes all effective or explicitly selected Algites TechnologyKinds."
+    description = "Publishes all effective or explicitly selected Algites TechnologyKinds after the common publication build gate succeeds."
+    dependsOn(algitesPublicationBuildGate)
 }
 
 val algitesValidateReleaseTechnologyKinds = tasks.register("validateAlgitesReleaseTechnologyKinds") {
@@ -1378,6 +1385,7 @@ subprojects {
         if ("java" in locEffectiveTechnologyKinds) {
             plugins.withId("maven-publish") {
                 val locJavaPublishTask = tasks.named("publish")
+                locJavaPublishTask.configure { dependsOn(algitesPublicationBuildGate) }
                 algitesPublish.configure { dependsOn(locJavaPublishTask) }
             }
         }
@@ -1619,6 +1627,7 @@ subprojects {
         val locPublishPython = tasks.register<AIcPublishPythonTask>("publishPython") {
             group = "publishing"
             description = "Publishes Python distributions for this Algites artifact."
+            dependsOn(algitesPublicationBuildGate)
             dependsOn(locBuildPython)
             pythonExecutable.set(algitesGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3")
             projectPathValue.set(locPythonProjectPath)

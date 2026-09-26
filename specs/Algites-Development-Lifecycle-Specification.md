@@ -411,13 +411,13 @@ credentialProfiles:
     type: basic
 ```
 
-Supported profile types are the closed set `basic`, `bearer`, `api-key`, and `certificate`. Their canonical fields are:
+Supported profile types are the closed set `basic`, `bearer`, `api_key`, and `certificate`. Their canonical fields are:
 
 | type | required fields | optional fields |
 | --- | --- | --- |
 | `basic` | `username`, `password` | — |
 | `bearer` | `token` | — |
-| `api-key` | `apiKey` | — |
+| `api_key` | `apiKey` | — |
 | `certificate` | `certificate` | `privateKey`, `privateKeyPassword` |
 
 Core support for a credential type does not imply that every TechnologyKind repository adapter can apply that authentication mechanism. Unsupported endpoint/type combinations MUST fail rather than silently fall back to another authentication mechanism.
@@ -426,12 +426,12 @@ Secret values use one provider-independent credential document supplied as `ALGI
 
 | source | interpretation of `value` |
 | --- | --- |
-| `DIRECT_VALUE` | `value` is the credential content itself |
-| `FILE_CONTENT` | `value` is a file path; the file content is the credential content |
-| `SECRET_CONTENT` | `value` is a secret name/key in the current secret-provider context |
-| `ENVIRONMENT_VARIABLE_CONTENT` | `value` is an environment-variable name |
+| `direct_value` | `value` is the credential content itself |
+| `file_content` | `value` is a file path; the file content is the credential content |
+| `secret_content` | `value` is a secret name/key in the current secret-provider context |
+| `environment_variable_content` | `value` is an environment-variable name |
 
-The `_CONTENT` suffix identifies the content produced by resolution, not the literal content of `value`. In particular, `FILE_CONTENT.value` is a path and `SECRET_CONTENT.value` is a secret identifier.
+The `_CONTENT` suffix identifies the content produced by resolution, not the literal content of `value`. In particular, `file_content.value` is a path and `secret_content.value` is a secret identifier.
 
 The document is keyed first by credential profile id and then by credential type. A profile MAY retain multiple typed values even though its effective non-secret profile declaration selects exactly one type for a particular endpoint. Example:
 
@@ -439,11 +439,11 @@ The document is keyed first by credential profile id and then by credential type
 {
   "algites-java-private-release-download": {
     "basic": {
-      "username": { "source": "DIRECT_VALUE", "value": "algites-user" },
-      "password": { "source": "SECRET_CONTENT", "value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
+      "username": { "source": "direct_value", "value": "algites-user" },
+      "password": { "source": "secret_content", "value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
     },
     "bearer": {
-      "token": { "source": "ENVIRONMENT_VARIABLE_CONTENT", "value": "ALGITES_JAVA_PRIVATE_TOKEN" }
+      "token": { "source": "environment_variable_content", "value": "ALGITES_JAVA_PRIVATE_TOKEN" }
     }
   }
 }
@@ -451,13 +451,13 @@ The document is keyed first by credential profile id and then by credential type
 
 Local users need only the subset of profiles required by the operations they execute. The universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document is also the canonical persistent local representation; there is no second profile/type credential format. A non-empty `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` environment variable is an explicit per-process override. Otherwise the installed local credential bootstrap reads the same document from the highest-priority available Algites operating-system secure store. Because one document may retain multiple typed entries under a profile, a later type override does not reinterpret or destroy values retained for another type.
 
-Provider adapters MAY materialize a credential document before invoking the final processing. Materialization MUST preserve the same schema: a resolved field becomes `DIRECT_VALUE` with the resolved content. A provider adapter MUST NOT invent a second credential format.
+Provider adapters MAY materialize a credential document before invoking the final processing. Materialization MUST preserve the same schema: a resolved field becomes `direct_value` with the resolved content. A provider adapter MUST NOT invent a second credential format.
 
 Transient cross-process variables used only internally by Algites workflows/actions/scripts MUST use the `_TMP_ALGITES_*` prefix. They are implementation transport, are not supported local configuration variables, and MUST NOT be created as repository/organization secrets by users. Stable user-/DevOps-configurable environment contracts retain the `ALGITES_*` prefix.
 
-For GitHub Actions the resolution is deliberately two-phase. `resolveAlgitesRequiredCredentials` first evaluates the same inherited repository metadata in credential-preflight mode and returns the union of profile/type pairs referenced by enabled repository endpoints in the requested download/upload/manage context. The trusted GitHub credential bridge then receives the original `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, the GitHub secret context, environment, and runner filesystem; discards every profile/type pair not listed by the preflight plan; materializes all retained fields; and exposes only the reduced `DIRECT_VALUE` document to the subsequent Gradle processing.
+For GitHub Actions the resolution is deliberately two-phase. `resolveAlgitesRequiredCredentials` first evaluates the same inherited repository metadata in credential-preflight mode and returns the union of profile/type pairs referenced by enabled repository endpoints in the requested download/upload/manage context. The trusted GitHub credential bridge then receives the original `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, the GitHub secret context, environment, and runner filesystem; discards every profile/type pair not listed by the preflight plan; materializes all retained fields; and exposes only the reduced `direct_value` document to the subsequent Gradle processing.
 
-`_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` carries an optional provider secret context required for exact-name `SECRET_CONTENT` lookup. It is not a credential document and MUST NOT contain profile-selection semantics. GitHub wrappers populate it from the complete GitHub Actions `secrets` context for the trusted bridge. For local processing it is normally absent: the installed Java resolver and Gradle bootstrap resolve a missing `SECRET_CONTENT` key from a named value in the Algites local secure store. When `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` itself is not set in the environment, the Gradle bootstrap obtains the stored universal document through the installed `algites-credentials` helper (`ALGITES_CREDENTIAL_CLI` MAY override its executable path). This does not create another credential schema; the helper is only a secure-store bootstrap adapter.
+`_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` carries an optional provider secret context required for exact-name `secret_content` lookup. It is not a credential document and MUST NOT contain profile-selection semantics. GitHub wrappers populate it from the complete GitHub Actions `secrets` context for the trusted bridge. For local processing it is normally absent: the installed Java resolver and Gradle bootstrap resolve a missing `secret_content` key from a named value in the Algites local secure store. When `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` itself is not set in the environment, the Gradle bootstrap obtains the stored universal document through the installed `algites-credentials` helper (`ALGITES_CREDENTIAL_CLI` MAY override its executable path). This does not create another credential schema; the helper is only a secure-store bootstrap adapter.
 
 Concrete public download locations are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`; they are not hard-coded in the resolver. Governed public upload/manage locations and all private download/upload/manage locations remain private-governance data. All defaults files use `algites-repository-defaults_1.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` supplies the combined public upload/manage overlay and `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies the combined private download/upload/manage overlay.
 
@@ -474,7 +474,7 @@ Provider integrations SHOULD transfer only the required private-governance defin
 
 GitHub Actions workflows MUST NOT maintain TechnologyKind-specific or credential-type-specific secret mappings. The provider-independent profile/type/field contract is defined by Algites metadata and the universal credential document. GitHub-specific code is limited to the trusted bridge that materializes the preflight-selected subset of that document.
 
-Because GitHub does not expose Actions secret values through its REST API, `SECRET_CONTENT` references are resolved from the GitHub Actions `secrets` context supplied directly to the trusted first-party bridge. The bridge MUST NOT log credential values and MUST NOT forward profile/type pairs that are absent from the Gradle preflight plan.
+Because GitHub does not expose Actions secret values through its REST API, `secret_content` references are resolved from the GitHub Actions `secrets` context supplied directly to the trusted first-party bridge. The bridge MUST NOT log credential values and MUST NOT forward profile/type pairs that are absent from the Gradle preflight plan.
 
 Publication and repository-management capability are centralized in `priv.gov.Algites`. Snapshot workers already run there, and release wrappers in target repositories MUST only dispatch a central private-governance release worker and wait for its result. Upload/manage endpoint overlays and their credential secrets therefore remain unavailable to ordinary target-repository builds. Private ordinary CI MAY receive private-download credentials because resolving private dependencies is a normal private-build capability; publication and management credentials are not.
 

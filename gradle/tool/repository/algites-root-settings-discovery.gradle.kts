@@ -182,14 +182,14 @@ dependencyResolutionManagement.repositories {
                         }
                         authentication { create<HttpHeaderAuthentication>("header") }
                     }
-                    "api-key" -> {
+                    "api_key" -> {
                         val locApiKey = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "apiKey", rootDir)
                             ?: error(
-                                "Credential profile '${locProfile.id}' type 'api-key' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
+                                "Credential profile '${locProfile.id}' type 'api_key' is required by '${locEndpoint.id}' but is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                             )
                         val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() }
                             ?: error(
-                                "Credential profile '${locProfile.id}' type 'api-key' requires configuration.headerName for Java/Maven repository access."
+                                "Credential profile '${locProfile.id}' type 'api_key' requires configuration.headerName for Java/Maven repository access."
                             )
                         credentials(HttpHeaderCredentials::class) {
                             name = locHeaderName
@@ -199,7 +199,7 @@ dependencyResolutionManagement.repositories {
                     }
                     else -> error(
                         "Java/Maven download endpoint '${locEndpoint.id}' uses credential type '${locProfile.type}', " +
-                            "which is not supported by the Java/Maven repository adapter. Supported types: basic, bearer, api-key."
+                            "which is not supported by the Java/Maven repository adapter. Supported types: basic, bearer, api_key."
                     )
                 }
             }

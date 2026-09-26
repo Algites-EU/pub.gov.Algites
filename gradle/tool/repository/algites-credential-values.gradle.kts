@@ -126,8 +126,8 @@ val locAlgitesResolveCredentialValue = fun(
         )
 
     return when (locSource) {
-        "DIRECT_VALUE" -> locReference
-        "FILE_CONTENT" -> {
+        "direct_value" -> locReference
+        "file_content" -> {
             val locFile = File(locReference).let { locCandidate ->
                 if (locCandidate.isAbsolute) locCandidate else File(aBaseDirectory, locReference)
             }
@@ -138,7 +138,7 @@ val locAlgitesResolveCredentialValue = fun(
             }
             locFile.readText(Charsets.UTF_8)
         }
-        "SECRET_CONTENT" -> {
+        "secret_content" -> {
             val locContextValue = locAlgitesCredentialSecretContext[locReference]
             if (locContextValue != null) {
                 locContextValue.toString()
@@ -151,13 +151,13 @@ val locAlgitesResolveCredentialValue = fun(
                     )
             }
         }
-        "ENVIRONMENT_VARIABLE_CONTENT" -> System.getenv(locReference)
+        "environment_variable_content" -> System.getenv(locReference)
             ?: throw GradleException(
                 "Credential '$aProfileId/$aCredentialType/$aField' references unavailable environment variable '$locReference'."
             )
         else -> throw GradleException(
             "Credential '$aProfileId/$aCredentialType/$aField' uses unsupported source '$locSource'. " +
-                "Supported sources: DIRECT_VALUE, FILE_CONTENT, SECRET_CONTENT, ENVIRONMENT_VARIABLE_CONTENT."
+                "Supported sources: direct_value, file_content, secret_content, environment_variable_content."
         )
     }
 }
