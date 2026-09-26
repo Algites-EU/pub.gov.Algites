@@ -7,34 +7,34 @@
 #
 # Schema: algites-repository-defaults_1.schema.json
 
-repositories:
+Repositories:
   java:
     public:
       release:
         download:
           - id: algites-java-public-release-download
-            url: "https://repo1.maven.org/maven2"
+            Url: "https://repo1.maven.org/maven2"
       snapshot:
         download:
           - id: algites-java-public-snapshot-download
-            url: "https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/"
+            Url: "https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/"
   python:
     public:
       release:
         download:
           - id: algites-python-public-release-download
-            url: "https://pypi.org/simple/"
+            Url: "https://pypi.org/simple/"
       snapshot:
         download:
           - id: algites-python-public-snapshot-download
-            url: "https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/"
+            Url: "https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/"
   mps:
     public:
       release:
         download:
           - id: algites-mps-public-release-download
-            url: "https://dummy.invalid/algites/mps/public/release/download/"
+            Url: "https://dummy.invalid/algites/mps/public/release/download/"
       snapshot:
         download:
           - id: algites-mps-public-snapshot-download
-            url: "https://dummy.invalid/algites/mps/public/snapshot/download/"
+            Url: "https://dummy.invalid/algites/mps/public/snapshot/download/"
