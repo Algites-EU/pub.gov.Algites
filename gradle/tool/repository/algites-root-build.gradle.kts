@@ -244,6 +244,10 @@ abstract class AIcValidatePythonDistributionPathsTask : DefaultTask() {
                 val locScopeDirectory = File(locProjectDirectory, "src/$locScope")
                 if (!locScopeDirectory.isDirectory) return@forEach
                 locScopeDirectory.listFiles()?.filter(File::isDirectory)?.forEach { locSourceRoot ->
+                    val locIsManuallyMaintainedSourceRoot =
+                        !locSourceRoot.name.endsWith(".gen") && !locSourceRoot.name.endsWith(".extgen")
+                    if (!locIsManuallyMaintainedSourceRoot) return@forEach
+
                     if (AIcSourceKindBase(locSourceRoot.name) == "schema") {
                         locProblems.add("$locArtifactName/src/$locScope/${locSourceRoot.name}: source kind 'schema' is not allowed; use jsondefs, yamldefs, xmldefs, or config according to semantic role")
                     }
