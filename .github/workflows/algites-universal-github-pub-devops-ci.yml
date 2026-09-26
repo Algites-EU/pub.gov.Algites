@@ -54,7 +54,7 @@ on:
         description: "Universal Algites credential document JSON. Only credential profiles required by the current operation are materialized and forwarded to Gradle."
         required: false
       _TMP_ALGITES_CREDENTIAL_SECRETS_JSON:
-        description: "Serialized GitHub secrets context used only by the trusted Algites credential bridge to resolve SECRET_CONTENT references."
+        description: "Serialized GitHub secrets context used only by the trusted Algites credential bridge to resolve secret_content references."
         required: false
 
 jobs:
@@ -474,7 +474,6 @@ jobs:
                   println("_TMP_ALGITES_CI_VERSION_LANE=${AIcRootProperty("version.lane")}")
                   println("_TMP_ALGITES_CI_VERSION_REVISION=${AIcRootProperty("version.revision")}")
                   println("_TMP_ALGITES_CI_VERSION_QUALIFIER_KIND=${AIcRootProperty("version.qualifierKind")}")
-                  println("_TMP_ALGITES_CI_VERSION_QUALIFIER_LABEL=${AIcRootProperty("version.qualifierLabel")}")
                   println("_TMP_ALGITES_CI_VERSION_RESOLVED_VALUE=${AIcRootProperty("version.resolvedValue")}")
               }
           }
@@ -492,7 +491,6 @@ jobs:
             echo "version_lane=$(algites_ci_get_value VERSION_LANE)"
             echo "version_revision=$(algites_ci_get_value VERSION_REVISION)"
             echo "version_qualifier_kind=$(algites_ci_get_value VERSION_QUALIFIER_KIND)"
-            echo "version_qualifier_label=$(algites_ci_get_value VERSION_QUALIFIER_LABEL)"
             echo "version_resolved_value=$(algites_ci_get_value VERSION_RESOLVED_VALUE)"
           } >> "$GITHUB_OUTPUT"
 
@@ -535,7 +533,6 @@ jobs:
           REPO_LANE="${{ steps.algites-metadata.outputs.version_lane }}"
           REPO_REVISION="${{ steps.algites-metadata.outputs.version_revision }}"
           REPO_QUALIFIER_KIND="${{ steps.algites-metadata.outputs.version_qualifier_kind }}"
-          REPO_QUALIFIER_LABEL="${{ steps.algites-metadata.outputs.version_qualifier_label }}"
           RESOLVED_VERSION="${{ steps.algites-metadata.outputs.version_resolved_value }}"
 
           if [[ -z "$REPO_LANE" ]]; then
@@ -572,8 +569,7 @@ jobs:
             VERSION_BASE="${REPO_LANE}.${REPO_REVISION}"
             REPO_QUALIFIER_KIND_UPPER="$(echo "${REPO_QUALIFIER_KIND:-}" | tr '[:lower:]' '[:upper:]')"
             if [[ "$REPO_QUALIFIER_KIND_UPPER" == "SNAPSHOT" ]]; then
-              SNAPSHOT_LABEL="${REPO_QUALIFIER_LABEL:-SNAPSHOT}"
-              SNAPSHOT_VERSION="${VERSION_BASE}-${SNAPSHOT_LABEL}"
+              SNAPSHOT_VERSION="${VERSION_BASE}-SNAPSHOT"
             else
               SNAPSHOT_VERSION="${VERSION_BASE}"
             fi

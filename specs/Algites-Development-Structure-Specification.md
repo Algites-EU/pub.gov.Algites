@@ -45,9 +45,24 @@ The goals are:
 - **Variant** – a suffix identifying a specialized flavor of a module (e.g., `tests`).
 - **Artifact** – a logical, modeled buildable unit. One artifact MAY support multiple build technologies and MAY produce multiple technology-specific outputs.
 - **ArtifactCoordinateId** – the stable Algites identity of a logical artifact. It is independent of ecosystem-specific publication coordinates such as Maven GAV or a Python distribution name.
-- **StructureKind** – the structural role of a resolved metadata node: `repository`, `artifact-set`, or `artifact`. It describes where the node belongs in the source-repository structure and is independent of build technology.
+- **StructureKind** – the structural role of a resolved metadata node: `repository`, `artifact_set`, or `artifact`. It describes where the node belongs in the source-repository structure and is independent of build technology.
 - **TechnologyKind** – a supported build/publication technology (for example `java`, `python`, or `mps`). Technology kinds are registry-/enum-like, deliberately few, and not arbitrary free-form strings. The name describes the technology/build nature of the artifact and is distinct from artifact roles such as Core, Aggregator, Policy, or BOM.
 - **SourceType** – a semantic type of source directory below `src/product` or `src/develop` (for example `java`, `python`, `xmldefs`, `yamldefs`, `config`, or `resources`). Source types are a broader classification than technology kinds and do not automatically select a build/publication technology.
+
+#### 2.2.1 Structured-data wire naming convention
+
+Algites-controlled structured-data formats MUST use one common wire naming convention across YAML definitions (`yamldefs`), JSON definitions (`jsondefs`), and XML definitions (`xmldefs`):
+
+- schema-defined Algites properties, XML elements, and XML attributes use **UpperCamelCase**, for example `TechnologyKinds`, `ArtifactId`, `ReleaseLine`, and `ContentKinds`;
+- Algites symbolic/enum values use **lower_snake_case**, for example `release_candidate`, `self_contained`, `api_key`, and `snapshot`; single-word symbolic values remain lowercase, for example `java`, `python`, and `count`;
+- environment variables and system-level constant identifiers use **UPPER_SNAKE_CASE**, for example `ALGITES_TECHNOLOGY_KINDS`;
+- controlled file and directory names use **lower-kebab-case** unless another established external syntax requires otherwise, for example `license-usage.yml` and `algites-artifact-manifest.yml`;
+- keywords owned by an external schema/meta-language keep that language's spelling, for example JSON Schema `allOf`, `oneOf`, `additionalProperties`, and XML Schema `complexType`/`minOccurs`;
+- map keys that represent dynamic identifiers or symbolic dimensions are values rather than field names and therefore keep their identifier/value convention. Examples are credential profile IDs and repository-matrix keys such as `java`, `public`, `release`, and `download`.
+
+The convention applies to the serialized wire representation. Language bindings SHOULD use the idiomatic naming of their target language; for example wire `ArtifactId` maps naturally to Java/Kotlin `artifactId` and Python `artifact_id`. Acronyms in UpperCamelCase field names are treated as words (`ArtifactId`, `GroupId`, `Url`, `ApiKey`, `Sha256`) so conversion is deterministic.
+
+This convention is semantic, not cosmetic: the casing visibly distinguishes domain fields (`Count`) from symbolic values (`count`) and from environment/system identifiers (`COUNT` or `ALGITES_*`).
 
 ---
 
@@ -86,11 +101,11 @@ priv.tool.Java
 
 ---
 
-### 2.4. Logical Artifact Naming (`artifactCoordinateId`)
+### 2.4. Logical Artifact Naming (`ArtifactCoordinateId`)
 
 #### 2.4.1 Canonical Form
 
-Each logical `artifactCoordinateId` MUST be composed of:
+Each logical `ArtifactCoordinateId` MUST be composed of:
 
 ```
 <vis>.<role>.<BusinessName[.reposubname]>_<module.path>[-<variant>]
@@ -108,7 +123,7 @@ Where:
 
 - `<vis>`, `<role>`, `<reposubname>`, all module path folders, module root, and `<variant>` MUST be lowercase.
 - `<BusinessName>` MUST preserve PascalCase from the repository name.
-- The underscore `_` MUST be used exactly once in the `artifactCoordinateId`.
+- The underscore `_` MUST be used exactly once in the `ArtifactCoordinateId`.
 - The variant suffix, if present, MUST be appended using `-`.
 
 #### 2.4.3 Examples
@@ -160,11 +175,11 @@ priv.tool.Java_tools.profiler
 
 ---
 
-### 2.5. Java/Maven `groupId` Mapping
+### 2.5. Java/Maven `GroupId` Mapping
 
 #### 2.5.1 Canonical Form
 
-For the Java/Maven publication mapping, `groupId` MUST follow:
+For the Java/Maven publication mapping, `GroupId` MUST follow:
 
 ```
 eu.algites.<role>.<businessname-lc>[.<reposubname>]
@@ -270,7 +285,7 @@ Artifact root becomes:
 <vis>.<role>.<BusinessName>[.<reposubname>]
 ```
 
-and the `artifactCoordinateId` is completed by appending:
+and the `ArtifactCoordinateId` is completed by appending:
 
 ```
 _<module.path>[-<variant>]
@@ -290,11 +305,11 @@ Java -> java
 
 ### 2.9. Technology-Specific Publication Naming
 
-The logical `artifactCoordinateId` is technology-neutral. Each TechnologyKind maps that logical identity to the native coordinates and package names of its ecosystem. The mapping MUST be deterministic and defined by the corresponding TechnologyKind adapter. Ecosystem-specific identities that are deterministically derivable MUST NOT become independent sources of truth in Algites metadata.
+The logical `ArtifactCoordinateId` is technology-neutral. Each TechnologyKind maps that logical identity to the native coordinates and package names of its ecosystem. The mapping MUST be deterministic and defined by the corresponding TechnologyKind adapter. Ecosystem-specific identities that are deterministically derivable MUST NOT become independent sources of truth in Algites metadata.
 
 #### 2.9.1 Java/Maven publication naming
 
-For Java/Maven publications, the Maven `artifactId` is the logical `artifactCoordinateId` unless a documented output-specific mapping requires an additional suffix or classifier. The resulting JAR file name follows Maven convention:
+For Java/Maven publications, the Maven `artifactId` is the logical `ArtifactCoordinateId` unless a documented output-specific mapping requires an additional suffix or classifier. The resulting JAR file name follows Maven convention:
 
 ```text
 <artifactCoordinateId>-<version>.jar
@@ -309,11 +324,11 @@ priv.lib.Customers.common_bai.blfacadeintf-tests-1.0.0.jar
 pub.tool.Java_build.parent-1.4.0.jar
 ```
 
-The Java/Maven `groupId` is derived independently according to section 2.5.
+The Java/Maven `GroupId` is derived independently according to section 2.5.
 
 #### 2.9.2 Python distribution/project naming
 
-Python uses one distribution/project name rather than a Maven-style `groupId` + `artifactId` pair. Algites therefore derives a globally Algites-namespaced Python distribution name directly from `artifactCoordinateId`.
+Python uses one distribution/project name rather than a Maven-style `GroupId` + `artifactId` pair. Algites therefore derives a globally Algites-namespaced Python distribution name directly from `ArtifactCoordinateId`.
 
 The normative mapping is:
 
@@ -326,12 +341,12 @@ where `normalizePythonProjectName`:
 1. converts ASCII letters to lowercase, and
 2. replaces every contiguous run of `.`, `_`, or `-` with one `-`.
 
-The generated Algites Python distribution name MUST already be in this canonical normalized form and MUST be used consistently for Python project metadata and repository lookup. No separate Python equivalent of Maven `groupId` is defined.
+The generated Algites Python distribution name MUST already be in this canonical normalized form and MUST be used consistently for Python project metadata and repository lookup. No separate Python equivalent of Maven `GroupId` is defined.
 
 Example:
 
 ```text
-artifactCoordinateId:
+ArtifactCoordinateId:
 priv.lib.Customers.common_aaa.blfacadeintf-tests
 
 Python distribution/project name:
@@ -362,7 +377,7 @@ Rules:
 Examples:
 
 ```text
-artifactCoordinateId:
+ArtifactCoordinateId:
 priv.lib.Customers.common_aaa.blfacadeintf
 
 Python import namespace:
@@ -370,7 +385,7 @@ algites.priv.lib.customers.common.aaa.blfacadeintf
 ```
 
 ```text
-artifactCoordinateId:
+ArtifactCoordinateId:
 priv.lib.Customers.common_aaa.blfacadeintf-tests
 
 Python import namespace:
@@ -425,7 +440,7 @@ The generated descriptor is a working/development artifact, not an independent s
 
 #### 2.9.6 Other TechnologyKinds
 
-Every additional TechnologyKind MUST define its own deterministic publication-coordinate mapping before it can be declared in `technologyKinds`. Unknown or unsupported TechnologyKinds are validation errors.
+Every additional TechnologyKind MUST define its own deterministic publication-coordinate mapping before it can be declared in `TechnologyKinds`. Unknown or unsupported TechnologyKinds are validation errors.
 
 ### 2.10. Generated Documentation Location
 
@@ -444,9 +459,9 @@ Generated documentation for an artifact SHOULD use the following canonical struc
 ```
 The channel directory contains the artifact-level `index.html`. Technology-specific documentation MUST always be placed below that channel in a subdirectory identified by TechnologyKind, for example `java/`, `python/`, or `mps/`, even when only one TechnologyKind is documented. The stable TechnologyKind directory keeps the canonical path unchanged when another technology is added later and allows one logical artifact/version to aggregate several technology-specific documentation outputs without inventing separate logical artifact identities.
 
-Documentation generation uses the same TechnologyKind selection semantics as construction and publication. The artifact metadata declares the supported `technologyKinds`; an optional requested TechnologyKind set selects the technologies for the current documentation build. The effective documentation set for an artifact is `declared ∩ requested`. If no requested set is supplied, all declared TechnologyKinds are requested. Only effective TechnologyKinds are emitted into the generated publication; previously generated TechnologyKind directories outside the current effective set MUST be removed from that publication so that the site represents the current documentation build rather than a union of historical partial builds.
+Documentation generation uses the same TechnologyKind selection semantics as construction and publication. The artifact metadata declares the supported `TechnologyKinds`; an optional requested TechnologyKind set selects the technologies for the current documentation build. The effective documentation set for an artifact is `declared ∩ requested`. If no requested set is supplied, all declared TechnologyKinds are requested. Only effective TechnologyKinds are emitted into the generated publication; previously generated TechnologyKind directories outside the current effective set MUST be removed from that publication so that the site represents the current documentation build rather than a union of historical partial builds.
 
-The artifact-level `index.html` MUST retain the logical artifact identity (`groupId`, `artifactId`, and logical version), list all declared TechnologyKinds, and separately list only the TechnologyKinds requested/effective for the documentation build. Technology-specific sections MAY additionally expose ecosystem-specific publication identities such as Maven coordinates, Python distribution/import names, MPS module identity, or resulting artifact filenames. Shared documentation provenance SHOULD include the requested source ref/branch, exact source commit, and generation date/time at the logical-artifact publication level; these values need not be duplicated into per-TechnologyKind metadata files.
+The artifact-level `index.html` MUST retain the logical artifact identity (`GroupId`, `artifactId`, and logical version), list all declared TechnologyKinds, and separately list only the TechnologyKinds requested/effective for the documentation build. Technology-specific sections MAY additionally expose ecosystem-specific publication identities such as Maven coordinates, Python distribution/import names, MPS module identity, or resulting artifact filenames. Shared documentation provenance SHOULD include the requested source ref/branch, exact source commit, and generation date/time at the logical-artifact publication level; these values need not be duplicated into per-TechnologyKind metadata files.
 
 The standard Python documentation adapter uses Sphinx with Sphinx AutoAPI over Algites Python product source roots (`src/product/python` and `src/product/python.gen`). The adapter generates its static site below the canonical `python/` TechnologyKind directory without importing the documented project as part of API discovery.
 
@@ -460,7 +475,7 @@ Meaning of the fields is:
 
 - `<docs-site-root>` is the repository-local root directory for generated documentation site content,
 - `generated` is the root of generated documentation, which can be potentially removed and regenerated without impacting the manually created documentation. This folder should never contain manually created documentation.
-- `<module.local.id>` is the same local module id used in the `artifactCoordinateId` after the mandatory `_` repository separator,
+- `<module.local.id>` is the same local module id used in the `ArtifactCoordinateId` after the mandatory `_` repository separator,
 - `<documentation-channel>` identifies the published documentation view. it consists from <publication-kind>/<publication-id>
 - `<docs-site-root>/generated/publications/<documentation-channel>/index.html` - contains the index generated dynamically to point the unique page in the canonical structure
 
@@ -555,7 +570,7 @@ over:
 <docs-site-root>/generated/artifacts/pub.lib.Mps_common.base.mpslang/
 ```
 
-The full `artifactCoordinateId` remains available as metadata inside the generated documentation, together with any technology-specific publication coordinates.
+The full `ArtifactCoordinateId` remains available as metadata inside the generated documentation, together with any technology-specific publication coordinates.
 
 #### 2.10.5 Module Path Reuse
 
@@ -623,13 +638,13 @@ New roles MAY be introduced but MUST be lowercase and documented.
 Build and publication automation MUST:
 
 - infer visibility from the repository name prefix (`pub.` vs `priv.`),
-- enforce that `artifactCoordinateId` starts with the same visibility prefix and follows the `_` separator rule,
+- enforce that `ArtifactCoordinateId` starts with the same visibility prefix and follows the `_` separator rule,
 - enforce variant rules, including the terminal nature of `-tests`,
 - validate every declared TechnologyKind against the supported TechnologyKind registry,
 - resolve the effective publication repository matrix for the selected TechnologyKinds,
 - publish each technology-specific output only to a target permitted by repository visibility and the effective publication configuration.
 
-Java/Maven `groupId` remains identical for public and private variants within the same domain. Other TechnologyKinds MUST define equivalent visibility-safe publication mappings in their TechnologyKind adapters.
+Java/Maven `GroupId` remains identical for public and private variants within the same domain. Other TechnologyKinds MUST define equivalent visibility-safe publication mappings in their TechnologyKind adapters.
 
 ---
 
@@ -674,8 +689,8 @@ while extending them with explicit visibility and repository/module separation s
 - `<module.path>` is composed of optional path folders and a mandatory module root.
 - Optional variant suffixes (e.g., `-tests`) express specialized flavors of the module root.
 - `-tests` is terminal and MUST NOT be nested.
-- Java/Maven `groupId` expresses **organizational and domain namespace only**.
-- Visibility is part of the logical artifact identity, but not of the Java/Maven `groupId`.
+- Java/Maven `GroupId` expresses **organizational and domain namespace only**.
+- Visibility is part of the logical artifact identity, but not of the Java/Maven `GroupId`.
 - BusinessName remains PascalCase across repos and artifacts.
 - The `_` separator cleanly delineates repository identity from module identity.
 
@@ -772,7 +787,7 @@ Inheritance rule (normative):
 - ContainerVersionContext **inherits only via container edges** (repo → container → contained artifacts).
 - Parent chain **does not** change controlled versions.
 
-Version is a property of the logical artifact/version context, not of a technology implementation. Ordinary construction, snapshot publication, and documentation MAY select only a subset of the artifact's effective `technologyKinds`; an omitted TechnologyKind is simply absent from that operation and does not require a separate technology-specific version sequence.
+Version is a property of the logical artifact/version context, not of a technology implementation. Ordinary construction, snapshot publication, and documentation MAY select only a subset of the artifact's effective `TechnologyKinds`; an omitted TechnologyKind is simply absent from that operation and does not require a separate technology-specific version sequence.
 
 A release operation is stricter. By default, the selected TechnologyKinds MUST equal the complete declared TechnologyKind set for every released logical artifact. A provider may expose an explicit `allowIncompleteTechnologyKinds` / equivalent confirmation for exceptional incomplete releases. When such an incomplete release is explicitly allowed, only the selected TechnologyKinds are published, the logical release version is nevertheless considered final, and an omitted TechnologyKind MUST NOT be added later under that same release version. A subsequent publication that includes the omitted TechnologyKind therefore requires a new logical version.
 
@@ -1222,17 +1237,17 @@ src/develop/python.gen
 
 #### 3.9.3 TechnologyKind declaration
 
-An artifact declares one or more supported build/publication technologies using `technologyKinds`. Examples:
+An artifact declares one or more supported build/publication technologies using `TechnologyKinds`. Examples:
 
 ```yaml
-technologyKinds: [java]
+TechnologyKinds: [java]
 ```
 
 ```yaml
-technologyKinds: [java, python]
+TechnologyKinds: [java, python]
 ```
 
-`technologyKinds` is the normative technology declaration in the current model.
+`TechnologyKinds` is the normative technology declaration in the current model.
 
 TechnologyKinds are registry-/enum-like. Supporting a technology kind requires an Algites adapter defining at least:
 
@@ -1250,7 +1265,7 @@ Unknown technology kinds MUST fail validation.
 
 Source-repository discovery is structural rather than based on a global blacklist of directory names. Only children directly below the source-repository root are filtered by the repository-root infrastructure ignore set (for example `.git`, `.gradle`, `.idea`, `.mps`, legacy root `run`, and root-level `build`). The same directory names MUST NOT be generically ignored below container or artifact-set nodes because they may be legitimate parts of the Algites artifact hierarchy (for example `devops/build`).
 
-Once discovery reaches a self-contained `artifact`, traversal MUST stop at that node. Internal artifact directories are not candidate Algites structural nodes and therefore need no generic recursive ignore rules. This gives the following semantics:
+Once discovery reaches a self_contained `artifact`, traversal MUST stop at that node. Internal artifact directories are not candidate Algites structural nodes and therefore need no generic recursive ignore rules. This gives the following semantics:
 
 ```text
 /sourceRepositoryRoot/build            ignored as root infrastructure and used for derived build state
@@ -1274,40 +1289,40 @@ For repository-level generated state, `<repository>/build/run/...` is used direc
 
 The repository-level `build/` tree is disposable derived state. Generated SourceTypes such as `src/product/java.gen` or `src/product/python.gen` are intentionally excluded from this relocation because they remain source roots for compilers and development tools.
 
-#### 3.9.4 Inherited `groupId` metadata
+#### 3.9.4 Inherited `GroupId` metadata
 
-The Java/Maven `groupId` is an independent container-scoped metadata value. It MUST NOT be nested inside `sourceRepository`, `artifactSet`, or `artifact`; it is declared as a top-level sibling of the structural section in any Algites metadata file.
+The Java/Maven `GroupId` is an independent container-scoped metadata value. It MUST NOT be nested inside `SourceRepository`, `ArtifactSet`, or `artifact`; it is declared as a top-level sibling of the structural section in any Algites metadata file.
 
 Repository-level example:
 
 ```yaml
-sourceRepository:
-  id: pub.lib.Mps
-  name: Algites public MPS libraries repository
+SourceRepository:
+  Id: pub.lib.Mps
+  Name: Algites public MPS libraries repository
 
-groupId: eu.algites.lib.mps
+GroupId: eu.algites.lib.mps
 ```
 
 Artifact-set override example:
 
 ```yaml
-artifactSet:
-  name: Specialized artifact family
+ArtifactSet:
+  Name: Specialized artifact family
 
-groupId: eu.algites.lib.specialized
+GroupId: eu.algites.lib.specialized
 ```
 
 Artifact override example:
 
 ```yaml
-artifact:
-  technologyKinds: [java]
-  name: Specialized Java artifact
+Artifact:
+  TechnologyKinds: [java]
+  Name: Specialized Java artifact
 
-groupId: eu.algites.lib.specialized.api
+GroupId: eu.algites.lib.specialized.api
 ```
 
-`groupId` inherits through the structural container hierarchy independently of `structureKind`:
+`GroupId` inherits through the structural container hierarchy independently of `StructureKind`:
 
 ```text
 repository top-level groupId
@@ -1315,7 +1330,7 @@ repository top-level groupId
         -> descendant artifact
 ```
 
-If a descendant metadata file declares its own top-level `groupId`, that value replaces the inherited value for that node and all descendants until another override is encountered. An artifact that does not declare `groupId` therefore receives the nearest ancestor value. This inheritance is independent of `sourceRepository`, `artifactSet`, and `artifact` fields and independent of `technologyKinds`, repository configuration, and version context.
+If a descendant metadata file declares its own top-level `GroupId`, that value replaces the inherited value for that node and all descendants until another override is encountered. An artifact that does not declare `GroupId` therefore receives the nearest ancestor value. This inheritance is independent of `SourceRepository`, `ArtifactSet`, and `artifact` fields and independent of `TechnologyKinds`, repository configuration, and version context.
 
 #### 3.9.5 Publication repository matrix
 
@@ -1329,42 +1344,42 @@ Artifact repositories are resolved on four independent axes:
 A matrix cell contains an ordered list of repository endpoints rather than a single URL. Each endpoint has a stable `id` so inherited endpoints can be amended, disabled, re-enabled, or supplemented without identifying them by URL.
 
 ```yaml
-repositories:
+Repositories:
   java:
     private:
       release:
         download:
-          - id: algites-java-private-release-download
-            url: https://example.invalid/maven/private/releases/
-            credentialProfile: algites-java-private-release-download
+          - Id: algites-java-private-release-download
+            Url: https://example.invalid/maven/private/releases/
+            CredentialProfile: algites-java-private-release-download
 
-          - id: algites-acme-java-private-release-download
-            url: https://acme.example.invalid/maven/
-            credentialProfile: algites-acme-java-private-release-download
-            enabled: true
+          - Id: algites-acme-java-private-release-download
+            Url: https://acme.example.invalid/maven/
+            CredentialProfile: algites-acme-java-private-release-download
+            Enabled: true
 
         upload:
-          - id: algites-java-private-release-upload
-            url: https://example.invalid/maven/private/releases/upload/
-            credentialProfile: algites-java-private-release-upload
+          - Id: algites-java-private-release-upload
+            Url: https://example.invalid/maven/private/releases/upload/
+            CredentialProfile: algites-java-private-release-upload
 
         manage:
-          - id: algites-java-private-release-manage
-            url: https://manager.example.invalid/api/packages/private/releases/
-            credentialProfile: algites-java-private-release-manage
-            usageProviderAdapter: cloudsmith
+          - Id: algites-java-private-release-manage
+            Url: https://manager.example.invalid/api/packages/private/releases/
+            CredentialProfile: algites-java-private-release-manage
+            UsageProviderAdapter: cloudsmith
 ```
 
-`enabled` defaults to `true`. A descendant may therefore disable an inherited endpoint without restating its URL or credential profile:
+`Enabled` defaults to `true`. A descendant may therefore disable an inherited endpoint without restating its URL or credential profile:
 
 ```yaml
-repositories:
+Repositories:
   java:
     private:
       release:
         download:
-          - id: algites-java-private-release-download
-            enabled: false
+          - Id: algites-java-private-release-download
+            Enabled: false
 ```
 
 Repository endpoint inheritance is a merge by endpoint `id` within the same four-dimensional matrix cell. Properties omitted by the lower level remain inherited. New endpoint ids append additional repository targets.
@@ -1388,25 +1403,25 @@ Repository visibility is distinct from source-repository visibility, but source-
 
 This asymmetry allows private artifacts to depend on public artifacts while preventing public artifacts from acquiring a dependency on private infrastructure or private-only artifacts.
 
-The default protocol/client behaviour for each usage is defined by the corresponding TechnologyKind adapter. Any repository endpoint MAY additionally declare an optional `usageProviderAdapter` when that specific provider requires behaviour that cannot be expressed by the standard TechnologyKind/usage mechanism. Adapter identity is therefore attached to the individual `download`, `upload`, or `manage` endpoint rather than being a management-only concept. If `usageProviderAdapter` is absent, the standard TechnologyKind implementation is used. An adapter value is valid only when the implementation supports that adapter for the endpoint's usage.
+The default protocol/client behaviour for each usage is defined by the corresponding TechnologyKind adapter. Any repository endpoint MAY additionally declare an optional `UsageProviderAdapter` when that specific provider requires behaviour that cannot be expressed by the standard TechnologyKind/usage mechanism. Adapter identity is therefore attached to the individual `download`, `upload`, or `manage` endpoint rather than being a management-only concept. If `UsageProviderAdapter` is absent, the standard TechnologyKind implementation is used. An adapter value is valid only when the implementation supports that adapter for the endpoint's usage.
 
-`manage` is deliberately a separate usage because repository-management operations such as package deletion do not have a technology-wide Maven or Python standard. Consequently an enabled `manage` endpoint currently MUST declare a `usageProviderAdapter`; Algites MUST NOT infer that a manage URL accepts a generic HTTP `DELETE`. Provider-specific upload adapters (for example a future Maven Central Publisher API adapter) can be added without changing the repository matrix model. No provider-specific `download` or `upload` adapter is implemented by the current revision.
+`manage` is deliberately a separate usage because repository-management operations such as package deletion do not have a technology-wide Maven or Python standard. Consequently an enabled `manage` endpoint currently MUST declare a `UsageProviderAdapter`; Algites MUST NOT infer that a manage URL accepts a generic HTTP `DELETE`. Provider-specific upload adapters (for example a future Maven Central Publisher API adapter) can be added without changing the repository matrix model. No provider-specific `download` or `upload` adapter is implemented by the current revision.
 
 Supported `manage` provider adapters are currently:
 
-- `cloudsmith`: `url` is the Cloudsmith package-management API collection URL, for example `https://api.cloudsmith.io/v1/packages/<owner>/<repository>/`. The adapter resolves the requested package/version through the Cloudsmith API before deleting the matching package records. It supports both an exact version selector and a version-prefix selector used for timestamped Python snapshot series. Credential types `api-key` and `bearer` are supported.
+- `cloudsmith`: `url` is the Cloudsmith package-management API collection URL, for example `https://api.cloudsmith.io/v1/packages/<owner>/<repository>/`. The adapter resolves the requested package/version through the Cloudsmith API before deleting the matching package records. It supports both an exact version selector and a version-prefix selector used for timestamped Python snapshot series. Credential types `api_key` and `bearer` are supported.
 - `repsy`: `url` identifies the concrete Repsy management resource for the repository and TechnologyKind. For Java/Maven it MUST have the form `<api-base>/api/mvn/artifacts/<repoName>`; for Python/PyPI it MUST have the form `<api-base>/api/pypi/packages/<repoName>`. The current adapter deletes an exact Maven artifact version or PyPI release through the Repsy management API. Credential type `basic` authenticates through `<api-base>/api/auth/login` and uses the returned JWT for the delete request; credential type `bearer` supplies an already obtained JWT directly. Until a Repsy release-list API endpoint is confirmed and implemented, timestamp-series Python cleanup is reported for manual remediation rather than guessed from an undocumented API.
 
 For Repsy, the management API URL is deliberately distinct from the package-consumption/deployment URL such as `https://repo.repsy.io/mvn/<owner>/<repoName>`. Hosted and self-hosted Repsy deployments MAY expose their backend API on different hosts, so the actual management API base is always configured explicitly in the `manage.url` value rather than inferred from download/upload URLs.
 
-A repository MAY configure targets for TechnologyKinds that are not currently produced by any artifact; `technologyKinds` controls what an artifact builds, while the repository matrix controls where a selected technology kind resolves, publishes, or is managed.
+A repository MAY configure targets for TechnologyKinds that are not currently produced by any artifact; `TechnologyKinds` controls what an artifact builds, while the repository matrix controls where a selected technology kind resolves, publishes, or is managed.
 
 #### 3.9.6 Released snapshot lifecycle
 
-`deleteSnapshotWhenReleased` is an independent top-level inherited boolean metadata value, analogous to `groupId`. Its global Algites default is `true`. It MAY be declared in `algites-source-repository.yml`, `algites-artifact-set.yml`, or `algites-artifact.yml`; the nearest descendant declaration overrides the inherited value.
+`DeleteSnapshotWhenReleased` is an independent top-level inherited boolean metadata value, analogous to `GroupId`. Its global Algites default is `true`. It MAY be declared in `algites-source-repository.yml`, `algites-artifact-set.yml`, or `algites-artifact.yml`; the nearest descendant declaration overrides the inherited value.
 
 ```yaml
-deleteSnapshotWhenReleased: false
+DeleteSnapshotWhenReleased: false
 ```
 
 When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `snapshot.manage` endpoints. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
@@ -1415,24 +1430,24 @@ For example, release `1.4.0` targets only the corresponding snapshot line. For J
 
 #### 3.9.7 Credential profiles
 
-Repository endpoints never contain secret credential values. An endpoint MAY instead reference a named `credentialProfile`:
+Repository endpoints never contain secret credential values. An endpoint MAY instead reference a named `CredentialProfile`:
 
 ```yaml
-credentialProfiles:
+CredentialProfiles:
   algites-java-private-release-download:
-    type: basic
+    Type: basic
 
-repositories:
+Repositories:
   java:
     private:
       release:
         download:
-          - id: algites-java-private-release-download
-            url: https://example.invalid/maven/private/releases/
-            credentialProfile: algites-java-private-release-download
+          - Id: algites-java-private-release-download
+            Url: https://example.invalid/maven/private/releases/
+            CredentialProfile: algites-java-private-release-download
 ```
 
-`credentialProfiles` is an independent top-level inherited metadata map, like `groupId`. It MAY be declared in `algites-source-repository.yml`, `algites-artifact-set.yml`, and `algites-artifact.yml`. Profiles merge by profile id through the structural hierarchy:
+`CredentialProfiles` is an independent top-level inherited metadata map, like `GroupId`. It MAY be declared in `algites-source-repository.yml`, `algites-artifact-set.yml`, and `algites-artifact.yml`. Profiles merge by profile id through the structural hierarchy:
 
 ```text
 built-in / governance profiles
@@ -1447,23 +1462,23 @@ Credential type is a closed, implementation-supported enum because each type def
 
 | Type | Required fields | Optional fields |
 |---|---|---|
-| `basic` | `username`, `password` | — |
-| `bearer` | `token` | — |
-| `api-key` | `apiKey` | — |
-| `certificate` | `certificate` | `privateKey`, `privateKeyPassword` |
+| `basic` | `Username`, `Password` | — |
+| `bearer` | `Token` | — |
+| `api_key` | `ApiKey` | — |
+| `certificate` | `certificate` | `PrivateKey`, `PrivateKeyPassword` |
 
 The canonical implementation constants are `AInCredentialType` and `AInCredentialField`. A field that is valid for one type is not implicitly valid for another type.
 
-Credential values use the single provider-independent document `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, governed by `algites-credentials_1.schema.json`. The document is keyed by profile id and credential type. Each field has the same `{ source, value }` shape. `source` is the closed `AInCredentialValueSource` enum:
+Credential values use the single provider-independent document `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, governed by `algites-credentials_1.schema.json`. The document is keyed by profile id and credential type. Each field has the same `{ source, value }` shape. `Source` is the closed `AInCredentialValueSource` enum:
 
-| Source | Meaning of `value` | Materialized result |
+| Source | Meaning of `Value` | Materialized result |
 |---|---|---|
-| `DIRECT_VALUE` | direct credential content | the same content |
-| `FILE_CONTENT` | file path | file content |
-| `SECRET_CONTENT` | secret name/key in the current provider context | secret content |
-| `ENVIRONMENT_VARIABLE_CONTENT` | environment-variable name | variable content |
+| `direct_value` | direct credential content | the same content |
+| `file_content` | file path | file content |
+| `secret_content` | secret name/key in the current provider context | secret content |
+| `environment_variable_content` | environment-variable name | variable content |
 
-The `_CONTENT` suffix states what is obtained from the source. It does not mean that the `value` property itself already contains that content. Therefore `FILE_CONTENT.value` is a path, `SECRET_CONTENT.value` is a secret identifier, and `ENVIRONMENT_VARIABLE_CONTENT.value` is a variable name.
+The `_CONTENT` suffix states what is obtained from the source. It does not mean that the `Value` property itself already contains that content. Therefore `file_content.Value` is a path, `secret_content.Value` is a secret identifier, and `environment_variable_content.Value` is a variable name.
 
 Example:
 
@@ -1471,22 +1486,22 @@ Example:
 {
   "algites-java-private-release-download": {
     "basic": {
-      "username": { "source": "DIRECT_VALUE", "value": "algites-user" },
-      "password": { "source": "SECRET_CONTENT", "value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
+      "Username": { "Source": "direct_value", "Value": "algites-user" },
+      "Password": { "Source": "secret_content", "Value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
     }
   }
 }
 ```
 
-A profile MAY retain entries for multiple credential types. The effective non-secret `credentialProfiles.<id>.type` selects which typed entry is required by an endpoint. This allows a type override without destroying or reinterpreting values retained for an older type.
+A profile MAY retain entries for multiple credential types. The effective non-secret `CredentialProfiles.<profile-id>.Type` selects which typed entry is required by an endpoint. This allows a type override without destroying or reinterpreting values retained for an older type.
 
-Materialization always returns the same credential-document format. A resolved field is represented as `DIRECT_VALUE`; a bridge or launcher MAY also reduce the document to only the profile/type pairs required by the operation. There is no separate CI credential schema.
+Materialization always returns the same credential-document format. A resolved field is represented as `direct_value`; a bridge or launcher MAY also reduce the document to only the profile/type pairs required by the operation. There is no separate CI credential schema.
 
-`_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` is an optional provider secret context for exact-name `SECRET_CONTENT` resolution. It is not a credential document. In GitHub Actions it contains the GitHub `secrets` context supplied to the trusted bridge. For ordinary local processing it is normally absent; the installed Java resolver and Gradle bootstrap resolve a missing `SECRET_CONTENT` key from a named value in the Algites local secure store.
+`_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` is an optional provider secret context for exact-name `secret_content` resolution. It is not a credential document. In GitHub Actions it contains the GitHub `secrets` context supplied to the trusted bridge. For ordinary local processing it is normally absent; the installed Java resolver and Gradle bootstrap resolve a missing `secret_content` key from a named value in the Algites local secure store.
 
 Algites reserves the `_TMP_ALGITES_*` prefix for transient implementation transport between first-party workflows, actions, Gradle helpers, and subprocesses. Such variables are not a user configuration contract and MUST NOT be provisioned as GitHub repository/organization secrets. Stable externally configurable variables use the `ALGITES_*` prefix.
 
-Stable externally configurable build environment contracts currently include the universal credential document/helper (`ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, `ALGITES_CREDENTIAL_CLI`), repository/governance locations (`ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`, `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE`, `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE`, `ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY`, `ALGITES_LICENSING_PRIVATE_GOVERNANCE_DIRECTORY`), build-selection/runtime overrides (`ALGITES_VISIBILITY`, `ALGITES_TECHNOLOGY_KINDS`, `ALGITES_DOCS_PAGES_BRANCH`, `ALGITES_PYTHON_EXECUTABLE`), and optional credential-preflight/cleanup task overrides (`ALGITES_CREDENTIAL_USAGES`, `ALGITES_CREDENTIAL_DOWNLOAD_STABILITIES`, `ALGITES_CREDENTIAL_UPLOAD_STABILITIES`, `ALGITES_CREDENTIAL_MANAGE_STABILITIES`, `ALGITES_CREDENTIAL_OUTPUT`, `ALGITES_CLEANUP_RELEASE_VERSION`). Deterministic per-field `ALGITES_CREDENTIAL_*` names emitted by the credential CLI are also externally usable through `ENVIRONMENT_VARIABLE_CONTENT`.
+Stable externally configurable build environment contracts currently include the universal credential document/helper (`ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, `ALGITES_CREDENTIAL_CLI`), repository/governance locations (`ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`, `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE`, `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE`, `ALGITES_LICENSING_PUBLIC_GOVERNANCE_DIRECTORY`, `ALGITES_LICENSING_PRIVATE_GOVERNANCE_DIRECTORY`), build-selection/runtime overrides (`ALGITES_VISIBILITY`, `ALGITES_TECHNOLOGY_KINDS`, `ALGITES_DOCS_PAGES_BRANCH`, `ALGITES_PYTHON_EXECUTABLE`), and optional credential-preflight/cleanup task overrides (`ALGITES_CREDENTIAL_USAGES`, `ALGITES_CREDENTIAL_DOWNLOAD_STABILITIES`, `ALGITES_CREDENTIAL_UPLOAD_STABILITIES`, `ALGITES_CREDENTIAL_MANAGE_STABILITIES`, `ALGITES_CREDENTIAL_OUTPUT`, `ALGITES_CLEANUP_RELEASE_VERSION`). Deterministic per-field `ALGITES_CREDENTIAL_*` names emitted by the credential CLI are also externally usable through `environment_variable_content`.
 
 The universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document is also the canonical persistent local representation; complete profile/type credentials are not stored in a second format. A non-empty `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` environment variable overrides the persistent document for that process. Otherwise local Java resolution reads the document from the highest-priority available Algites operating-system secure store. Gradle Settings runs before the credential modules of the current checkout can be built, so its bootstrap adapter obtains the same stored document through an already installed `algites-credentials` helper; `ALGITES_CREDENTIAL_CLI` MAY specify a non-default helper path. OS backends are discovered through `ServiceLoader` and expose structured availability/remediation diagnostics. Linux desktop integration targets the Freedesktop Secret Service D-Bus API directly and does not require the `secret-tool` executable.
 
@@ -1496,13 +1511,13 @@ Credential-type support in `coreintf` is distinct from authentication support in
 
 | Adapter operation | Supported credential types | Notes |
 |---|---|---|
-| Java/Maven download | `basic`, `bearer`, `api-key` | `api-key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
-| Java/Maven upload | `basic`, `bearer`, `api-key` | `api-key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
+| Java/Maven download | `basic`, `bearer`, `api_key` | `api_key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
+| Java/Maven upload | `basic`, `bearer`, `api_key` | `api_key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
 | Python/Twine upload | `basic` | additional authentication types require explicit Python repository-adapter support |
 | Python download | not yet implemented | Python dependency repository consumption adapter remains to be defined |
 | MPS repository access | not yet implemented | declaration of `mps` alone does not provide a repository adapter |
 
-GitHub Actions performs credential selection in two phases. The Gradle task `resolveAlgitesRequiredCredentials` evaluates enabled repository endpoints for the requested technology/visibility/stability/usage context without requiring their secret values. The trusted bridge then filters `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` to the union of profile/type pairs returned by that plan and materializes all retained fields to `DIRECT_VALUE` before the actual Gradle processing starts.
+GitHub Actions performs credential selection in two phases. The Gradle task `resolveAlgitesRequiredCredentials` evaluates enabled repository endpoints for the requested technology/visibility/stability/usage context without requiring their secret values. The trusted bridge then filters `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` to the union of profile/type pairs returned by that plan and materializes all retained fields to `direct_value` before the actual Gradle processing starts.
 
 The bridge is intentionally trusted with the complete GitHub secret context: its purpose is to select and materialize the minimum credential subset passed downstream. The final build/publish processing therefore does not receive unrelated credentials.
 
@@ -1522,8 +1537,8 @@ Public governance MUST contain only repository information safe to expose public
 
 Private-governance overlay files use `algites-repository-defaults_1.schema.json` and MAY contain both:
 
-- `repositories` — endpoint-list overrides for selected matrix cells;
-- `credentialProfiles` — non-secret profile definitions referenced by those endpoints.
+- `Repositories` — endpoint-list overrides for selected matrix cells;
+- `CredentialProfiles` — non-secret profile definitions referenced by those endpoints.
 
 Actual credential values MUST NOT be stored in governance YAML. Upload credential values likewise MUST NOT be made available to ordinary target-repository builds. Provider implementations SHOULD keep publication workers in the private-governance execution context and pass only non-secret target identity/revision information from target repositories.
 
@@ -1543,7 +1558,7 @@ Resolution MUST be deterministic and diagnostics SHOULD identify the effective e
 
 A build operation has an effective set of selected TechnologyKinds:
 
-- without an explicit selection, all effective `technologyKinds` of the targeted artifact/cascade are selected;
+- without an explicit selection, all effective `TechnologyKinds` of the targeted artifact/cascade are selected;
 - with an explicit selection, only the intersection of requested technology kinds and supported technology kinds is built;
 - artifacts in a cascade that do not support a requested technology kind are skipped for that technology kind rather than treated as erroneous.
 
@@ -2238,11 +2253,11 @@ licensing/license-definitions.yml
 License text files are normally stored below `licensing/texts/` and referenced by the definition. Example:
 
 ```yaml
-licenses:
-  - id: Apache-2.0
-    name: Apache License 2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
-    text: texts/Apache-2.0.txt
+Licenses:
+  - Id: Apache-2.0
+    Name: Apache License 2.0
+    Url: https://www.apache.org/licenses/LICENSE-2.0
+    Text: texts/Apache-2.0.txt
 ```
 
 A locally defined license id that already exists in higher governance MUST be identical in name, URL, and license text. Silent redefinition of an existing license id is forbidden. A changed license requires a new id, normally a new `LicenseRef-*` id for an Algites-specific license.
@@ -2252,18 +2267,18 @@ A locally defined license id that already exists in higher governance MUST be id
 A `license-usage.yml` may exist at any repository directory outside the reserved `licensing/` definition directory. Its state is inherited by the complete subtree. Example:
 
 ```yaml
-licenses:
-  - id: Apache-2.0
-    enabled: true
-    contentKinds:
+Licenses:
+  - Id: Apache-2.0
+    Enabled: true
+    ContentKinds:
       - product
-  - id: CC-BY-4.0
-    enabled: true
-    contentKinds:
+  - Id: CC-BY-4.0
+    Enabled: true
+    ContentKinds:
       - documentation
 ```
 
-`enabled` is mandatory. `contentKinds` may be omitted when an inherited license is only being enabled or disabled; inherited content kinds are retained. A license that is first enabled without any effective content kind is invalid.
+`Enabled` is mandatory. `ContentKinds` may be omitted when an inherited license is only being enabled or disabled; inherited content kinds are retained. A license that is first enabled without any effective content kind is invalid.
 
 `enabled: false` acts as an explicit tombstone for an inherited usage and can be reversed again by a nearer `license-usage.yml`.
 

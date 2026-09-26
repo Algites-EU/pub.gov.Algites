@@ -314,7 +314,6 @@ val locPythonDocsEntries = locAlgitesDocsResolvedArtifactDirectories
             "version.lane" to (locArtifactDirectory["version.lane"] ?: ""),
             "version.revision" to (locArtifactDirectory["version.revision"] ?: ""),
             "version.qualifierKind" to (locArtifactDirectory["version.qualifierKind"] ?: ""),
-            "version.qualifierLabel" to (locArtifactDirectory["version.qualifierLabel"] ?: ""),
             "python.distributionName" to AIcPythonDocsDistributionName(locArtifactCoordinateId),
             "python.importNamespace" to AIcPythonDocsImportNamespace(locLocalArtifactId),
             "python.version" to AIcPythonDocsVersion(locVersion, locPythonDocsSnapshotInstanceId)

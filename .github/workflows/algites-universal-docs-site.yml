@@ -394,12 +394,10 @@ jobs:
           locResolvedLane="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
           locResolvedRevision="$(grep -m 1 '^artifactDirectories\.0\.version\.revision=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
           locResolvedQualifierKind="$(grep -m 1 '^artifactDirectories\.0\.version\.qualifierKind=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
-          locResolvedQualifierLabel="$(grep -m 1 '^artifactDirectories\.0\.version\.qualifierLabel=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
 
           echo "version-lane=${locResolvedLane}" >> "${GITHUB_OUTPUT}"
           echo "version-revision=${locResolvedRevision}" >> "${GITHUB_OUTPUT}"
           echo "version-qualifier-kind=${locResolvedQualifierKind}" >> "${GITHUB_OUTPUT}"
-          echo "version-qualifier-label=${locResolvedQualifierLabel}" >> "${GITHUB_OUTPUT}"
           echo "version-resolved-value=${locResolvedVersion}" >> "${GITHUB_OUTPUT}"
 
           locDeclaredKinds="$(

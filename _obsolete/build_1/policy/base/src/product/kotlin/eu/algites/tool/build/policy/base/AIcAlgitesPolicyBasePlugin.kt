@@ -13,10 +13,12 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         /*
          * Build directory redirection.
          */
+        val locRootPath = aProject.rootProject.projectDir.toPath().toAbsolutePath().normalize()
+        val locProjectPath = aProject.projectDir.toPath().toAbsolutePath().normalize()
+        val locRelativePath = locRootPath.relativize(locProjectPath).toString().replace(File.separatorChar, '/').trim('/')
+        val locRunPath = if (locRelativePath.isBlank()) "build/run" else "build/run/$locRelativePath/run"
         aProject.layout.buildDirectory.set(
-            aProject.rootProject.layout.projectDirectory.dir(
-                "run/bld/gradle/${aProject.name}"
-            )
+            aProject.rootProject.layout.projectDirectory.dir("$locRunPath/bld/gradle")
         )
 
         /*
@@ -30,8 +32,8 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         }
 
         val locMetadataFiles = findAlgitesMetadataFiles(aProject)
-        val locVersionContext = readVersionContext(locMetadataFiles)
-        val locComputedVersion = computeVersion(locVersionContext)
+        val locVersion = readVersion(locMetadataFiles)
+        val locComputedVersion = computeVersion(locVersion)
 
         if (aProject.version != Project.DEFAULT_VERSION &&
             aProject.version.toString() != locComputedVersion
@@ -41,7 +43,7 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
                 Algites governance violation:
                 Project version is explicitly set to '${aProject.version}'
                 but Algites policy requires version '$locComputedVersion'
-                from Algites YAML versionContext.
+                from Algites YAML Version.
                 Metadata files: ${locMetadataFiles.joinToString(", ") { it.name }}.
                 """.trimIndent()
             )
@@ -159,51 +161,47 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         return locDirectories
     }
 
-    private fun readVersionContext(aMetadataFiles: List<File>): AIcdVersionContext {
+    private fun readVersion(aMetadataFiles: List<File>): AIcdVersion {
 
         val locYamlValues = readMergedSimpleYamlValues(aMetadataFiles)
         val locMetadataFileNames = aMetadataFiles.joinToString(", ") { it.name }
 
-        val locLane = locYamlValues["versionContext.lane"]
-            ?: error("Missing YAML value: versionContext.lane in merged Algites metadata: $locMetadataFileNames")
+        val locLane = locYamlValues["Version.Lane"] ?: locYamlValues["Version.ReleaseLine"]
+            ?: error("Missing YAML value: Version.Lane or Version.ReleaseLine in merged Algites metadata: $locMetadataFileNames")
 
-        val locRevision = locYamlValues["versionContext.revision"]
-            ?: error("Missing YAML value: versionContext.revision in merged Algites metadata: $locMetadataFileNames")
+        val locRevision = locYamlValues["Version.Revision"]
+            ?: error("Missing YAML value: Version.Revision in merged Algites metadata: $locMetadataFileNames")
 
-        val locQualifierLabel = locYamlValues["versionContext.qualifierLabel"]
+        val locQualifierKind = locYamlValues["Version.QualifierKind"]
             ?: ""
 
         require(!locLane.endsWith(".x")) {
-            "Algites governance error: versionContext.lane must use the new lane format, for example '1.1', not '$locLane'."
+            "Algites governance error: Version.Lane must use the new lane format, for example '1.1', not '$locLane'."
         }
 
         require(locLane.matches(Regex("^[0-9]+\\.[0-9]+$"))) {
-            "Algites governance error: versionContext.lane must have format '<major>.<minor>', for example '1.1'. Actual value: '$locLane'."
+            "Algites governance error: Version.Lane must have format '<major>.<minor>', for example '1.1'. Actual value: '$locLane'."
         }
 
         require(locRevision.matches(Regex("^[0-9]+$"))) {
-            "Algites governance error: versionContext.revision must be a non-negative integer. Actual value: '$locRevision'."
+            "Algites governance error: Version.Revision must be a non-negative integer. Actual value: '$locRevision'."
         }
 
-        require(locQualifierLabel.isEmpty() || locQualifierLabel.matches(Regex("^[A-Za-z0-9][A-Za-z0-9._-]*$"))) {
-            "Algites governance error: versionContext.qualifierLabel contains invalid characters. Actual value: '$locQualifierLabel'."
-        }
-
-        return AIcdVersionContext(
+        return AIcdVersion(
             locLane,
             locRevision,
-            locQualifierLabel
+            locQualifierKind
         )
     }
 
-    private fun computeVersion(aVersionContext: AIcdVersionContext): String {
+    private fun computeVersion(aVersion: AIcdVersion): String {
 
-        val locBaseVersion = "${aVersionContext.lane}.${aVersionContext.revision}"
+        val locBaseVersion = "${aVersion.lane}.${aVersion.revision}"
 
-        return if (aVersionContext.qualifierLabel.isBlank()) {
-            locBaseVersion
+        return if (aVersion.qualifierKind.equals("snapshot", ignoreCase = true)) {
+            "$locBaseVersion-SNAPSHOT"
         } else {
-            "$locBaseVersion-${aVersionContext.qualifierLabel}"
+            locBaseVersion
         }
     }
 
@@ -309,9 +307,9 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         }
     }
 
-    private data class AIcdVersionContext(
+    private data class AIcdVersion(
         val lane: String,
         val revision: String,
-        val qualifierLabel: String
+        val qualifierKind: String
     )
 }

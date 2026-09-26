@@ -135,7 +135,6 @@ fun AIcDocsReadArtifactDirectories(aProperties: Map<String, String?>): List<Map<
             "version.lane" to aProperties["artifactDirectories.${locIndex}.version.lane"],
             "version.revision" to aProperties["artifactDirectories.${locIndex}.version.revision"],
             "version.qualifierKind" to aProperties["artifactDirectories.${locIndex}.version.qualifierKind"],
-            "version.qualifierLabel" to aProperties["artifactDirectories.${locIndex}.version.qualifierLabel"],
             "version.resolvedValue" to aProperties["artifactDirectories.${locIndex}.version.resolvedValue"]
         )
     }
@@ -894,7 +893,6 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                         "version.lane" to locParts[11],
                         "version.revision" to locParts[12],
                         "version.qualifierKind" to locParts[13],
-                        "version.qualifierLabel" to locParts[14],
                         "descriptorHierarchy" to locParts[15]
                     )
                     locParts[0] to locMap
@@ -968,25 +966,25 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                 ?: "${locRepositoryId}_${locLocalArtifactId}"
             val locDescriptors = descriptorHierarchy(aMetadata)
             return buildString {
-                appendLine("manifestVersion: 1")
-                appendLine("artifact:")
-                appendLine("  repositoryId: ${yamlScalar(locRepositoryId)}")
-                appendLine("  localArtifactId: ${yamlScalar(locLocalArtifactId)}")
-                appendLine("  artifactCoordinateId: ${yamlScalar(locArtifactCoordinateId)}")
+                appendLine("ManifestVersion: 1")
+                appendLine("Artifact:")
+                appendLine("  RepositoryId: ${yamlScalar(locRepositoryId)}")
+                appendLine("  LocalArtifactId: ${yamlScalar(locLocalArtifactId)}")
+                appendLine("  ArtifactCoordinateId: ${yamlScalar(locArtifactCoordinateId)}")
                 aMetadata["groupId"]?.takeIf { it.isNotBlank() }?.let { locGroupId ->
-                    appendLine("  groupId: ${yamlScalar(locGroupId)}")
+                    appendLine("  GroupId: ${yamlScalar(locGroupId)}")
                 }
-                appendLine("  version: ${yamlScalar(aMetadata["version.resolvedValue"].orEmpty())}")
-                appendLine("  sourcePath: ${yamlScalar(aMetadata["path"].orEmpty())}")
-                appendLine("  structureKind: ${yamlScalar(aMetadata["structureKind"].orEmpty())}")
-                appendLine("  name: ${yamlScalar(aMetadata["name"].orEmpty())}")
-                appendLine("  description: ${yamlScalar(aMetadata["description"].orEmpty())}")
-                appendLine("sourceMetadata:")
-                appendLine("  descriptorHierarchy:")
+                appendLine("  Version: ${yamlScalar(aMetadata["version.resolvedValue"].orEmpty())}")
+                appendLine("  SourcePath: ${yamlScalar(aMetadata["path"].orEmpty())}")
+                appendLine("  StructureKind: ${yamlScalar(aMetadata["structureKind"].orEmpty().replace('-', '_'))}")
+                appendLine("  Name: ${yamlScalar(aMetadata["name"].orEmpty())}")
+                appendLine("  Description: ${yamlScalar(aMetadata["description"].orEmpty())}")
+                appendLine("SourceMetadata:")
+                appendLine("  DescriptorHierarchy:")
                 locDescriptors.forEach { locParts ->
-                    appendLine("    - structureKind: ${yamlScalar(locParts[0])}")
-                    appendLine("      path: ${yamlScalar(locParts[1])}")
-                    appendLine("      sha256: ${yamlScalar(locParts[2])}")
+                    appendLine("    - StructureKind: ${yamlScalar(locParts[0].replace('-', '_'))}")
+                    appendLine("      Path: ${yamlScalar(locParts[1])}")
+                    appendLine("      Sha256: ${yamlScalar(locParts[2])}")
                 }
             }
         }
@@ -1164,7 +1162,6 @@ abstract class AIcGenerateAlgitesDocsArtifactPublicationIndexesTask : DefaultTas
                             <dt>Version lane</dt><dd>${html(valueOrDash(locMetadata["version.lane"]))}</dd>
                             <dt>Version revision</dt><dd>${html(valueOrDash(locMetadata["version.revision"]))}</dd>
                             <dt>Qualifier kind</dt><dd>${html(valueOrDash(locMetadata["version.qualifierKind"]))}</dd>
-                            <dt>Qualifier label</dt><dd>${html(valueOrDash(locMetadata["version.qualifierLabel"]))}</dd>
                           </dl>
                         </section>
                       </aside>
@@ -1508,7 +1505,6 @@ fun AIcDocsArtifactMetadataEntryLine(aArtifactDirectory: Map<String, String?>): 
         aArtifactDirectory["version.lane"] ?: "",
         aArtifactDirectory["version.revision"] ?: "",
         aArtifactDirectory["version.qualifierKind"] ?: "",
-        aArtifactDirectory["version.qualifierLabel"] ?: "",
         aArtifactDirectory["descriptorHierarchy"] ?: ""
     ).joinToString("\t") { it.replace('\t', ' ') }
 }

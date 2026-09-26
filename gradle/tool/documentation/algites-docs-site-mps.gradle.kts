@@ -812,7 +812,6 @@ class AIcGenerateDummyMpsDocsAction(
             "version.lane" to (locArtifactSetMetadata["version.lane"] ?: ""),
             "version.revision" to (locArtifactSetMetadata["version.revision"] ?: ""),
             "version.qualifierKind" to (locArtifactSetMetadata["version.qualifierKind"] ?: ""),
-            "version.qualifierLabel" to (locArtifactSetMetadata["version.qualifierLabel"] ?: ""),
             "mps.artifactId" to aArtifactId,
             "mps.modulePath" to aModulePath
         ) + locPublicationMetadata

@@ -1,4 +1,5 @@
 import java.io.File
+import groovy.json.JsonSlurper
 import org.gradle.api.DefaultTask
 import org.gradle.api.GradleException
 import org.gradle.api.file.DirectoryProperty
@@ -55,6 +56,79 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
                 }
             }
 
+        /*
+         * Algites structured-data wire naming.
+         *
+         * JSON Schema keywords retain their external spelling. Keys below a
+         * "properties" object are Algites wire names, except for the explicit
+         * symbolic map dimensions listed here. String enum values use the
+         * lower_snake_case symbolic-value convention.
+         */
+        val locUpperCamelPattern = Regex("^[A-Z][A-Za-z0-9]*$")
+        val locLowerSnakePattern = Regex("^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
+        val locSymbolicPropertyNames = setOf(
+            "basic", "bearer", "api_key", "certificate",
+            "java", "python", "mps",
+            "public", "private",
+            "release", "snapshot",
+            "download", "upload", "manage"
+        )
+        val locSchemaDirectory = File(
+            locRepositoryDirectory,
+            "devops/build/yamldefs/src/product/yamldefs"
+        )
+        if (locSchemaDirectory.isDirectory) {
+            locSchemaDirectory.listFiles()
+                ?.filter { locFile -> locFile.isFile && locFile.name.endsWith(".schema.json") }
+                ?.sortedBy { locFile -> locFile.name }
+                ?.forEach { locFile ->
+                    val locRoot = JsonSlurper().parse(locFile)
+
+                    fun AIcVisitJson(aValue: Any?, aPath: String) {
+                        when (aValue) {
+                            is Map<*, *> -> {
+                                val locProperties = aValue["properties"]
+                                if (locProperties is Map<*, *>) {
+                                    locProperties.keys.filterIsInstance<String>().forEach { locPropertyName ->
+                                        if (
+                                            !locUpperCamelPattern.matches(locPropertyName) &&
+                                            locPropertyName !in locSymbolicPropertyNames
+                                        ) {
+                                            locProblems.add(
+                                                "${locRepositoryDirectory.toPath().relativize(locFile.toPath()).toString().replace(File.separatorChar, '/')}: " +
+                                                    "schema property '$locPropertyName' at $aPath.properties must use UpperCamelCase " +
+                                                    "or be an explicitly governed symbolic map key."
+                                            )
+                                        }
+                                    }
+                                }
+
+                                val locEnum = aValue["enum"]
+                                if (locEnum is List<*>) {
+                                    locEnum.filterIsInstance<String>().forEach { locEnumValue ->
+                                        if (!locLowerSnakePattern.matches(locEnumValue)) {
+                                            locProblems.add(
+                                                "${locRepositoryDirectory.toPath().relativize(locFile.toPath()).toString().replace(File.separatorChar, '/')}: " +
+                                                    "enum value '$locEnumValue' at $aPath.enum must use lower_snake_case."
+                                            )
+                                        }
+                                    }
+                                }
+
+                                aValue.forEach { (locKey, locChild) ->
+                                    AIcVisitJson(locChild, "$aPath.${locKey ?: "?"}")
+                                }
+                            }
+                            is List<*> -> aValue.forEachIndexed { locIndex, locChild ->
+                                AIcVisitJson(locChild, "$aPath[$locIndex]")
+                            }
+                        }
+                    }
+
+                    AIcVisitJson(locRoot, "\$")
+                }
+        }
+
         val locTempDefinitionPattern = Regex(
             "(?m)(?:\\b(_TMP_ALGITES_([A-Z0-9_]+))\\s*=|^\\s*(_TMP_ALGITES_([A-Z0-9_]+))\\s*:)"
         )
@@ -106,7 +180,7 @@ val checkAlgitesGovernanceConventions = tasks.register<AIcCheckAlgitesGovernance
     "checkAlgitesGovernanceConventions"
 ) {
     group = "verification"
-    description = "Checks Algites governance Kotlin data-class naming and internal _TMP_ALGITES_* transport references."
+    description = "Checks Algites governance source conventions, structured-data wire names, and internal _TMP_ALGITES_* transport references."
     repositoryDirectory.set(rootProject.layout.projectDirectory)
     ignoredDirectoryNames.set(AIcGovernanceConventionIgnoredDirectoryNames)
 }

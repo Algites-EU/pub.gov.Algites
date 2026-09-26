@@ -33,8 +33,8 @@ public final class AItcCredentialProfileTest {
             AInCredentialType.CERTIFICATE.getOptionalFields(),
             List.of(AInCredentialField.PRIVATE_KEY, AInCredentialField.PRIVATE_KEY_PASSWORD)
         );
-        Assert.assertEquals(AInCredentialField.PRIVATE_KEY.getId(), "privateKey");
-        Assert.assertEquals(AInCredentialValueSource.SECRET_CONTENT.name(), "SECRET_CONTENT");
+        Assert.assertEquals(AInCredentialField.PRIVATE_KEY.getId(), "PrivateKey");
+        Assert.assertEquals(AInCredentialValueSource.SECRET_CONTENT.getId(), "secret_content");
     }
 
     @Test

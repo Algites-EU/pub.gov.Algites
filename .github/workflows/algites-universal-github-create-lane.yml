@@ -207,32 +207,28 @@ jobs:
           locPath = Path("algites-source-repository.yml")
           locText = locPath.read_text(encoding="utf-8")
 
-          locMatch = re.search(r"(?m)^versionContext:\s*$", locText)
+          locMatch = re.search(r"(?m)^Version:\s*$", locText)
           if not locMatch:
-              locText = locText.rstrip() + "\n\nversionContext:\n  lane: \"%s\"\n  revision: 0\n  qualifierKind: SNAPSHOT\n  qualifierLabel: SNAPSHOT\n" % locNewLane
+              locText = locText.rstrip() + "\n\nVersion:\n  Lane: \"%s\"\n  Revision: 0\n  QualifierKind: snapshot\n" % locNewLane
           else:
               locStart = locMatch.end()
               locNext = re.search(r"(?m)^[A-Za-z0-9_-]+:\s*$", locText[locStart:])
               locEnd = locStart + locNext.start() if locNext else len(locText)
               locBlock = locText[locStart:locEnd]
-              if re.search(r"(?m)^\s+lane:\s*", locBlock):
-                  locBlock = re.sub(r"(?m)^(\s+lane:\s*).*$", r"\1\"%s\"" % locNewLane, locBlock, count=1)
-              elif re.search(r"(?m)^\s+releaseLine:\s*", locBlock):
-                  locBlock = re.sub(r"(?m)^(\s+)releaseLine:\s*.*$", r"\1lane: \"%s\"" % locNewLane, locBlock, count=1)
+              if re.search(r"(?m)^\s+Lane:\s*", locBlock):
+                  locBlock = re.sub(r"(?m)^(\s+Lane:\s*).*$", r"\1\"%s\"" % locNewLane, locBlock, count=1)
+              elif re.search(r"(?m)^\s+ReleaseLine:\s*", locBlock):
+                  locBlock = re.sub(r"(?m)^(\s+)ReleaseLine:\s*.*$", r"\1Lane: \"%s\"" % locNewLane, locBlock, count=1)
               else:
-                  locBlock = "\n  lane: \"%s\"" % locNewLane + locBlock
-              if re.search(r"(?m)^\s+revision:\s*", locBlock):
-                  locBlock = re.sub(r"(?m)^(\s+revision:\s*).*$", r"\g<1>0", locBlock, count=1)
+                  locBlock = "\n  Lane: \"%s\"" % locNewLane + locBlock
+              if re.search(r"(?m)^\s+Revision:\s*", locBlock):
+                  locBlock = re.sub(r"(?m)^(\s+Revision:\s*).*$", r"\g<1>0", locBlock, count=1)
               else:
-                  locBlock += "  revision: 0\n"
-              if re.search(r"(?m)^\s+qualifierKind:\s*", locBlock):
-                  locBlock = re.sub(r"(?m)^(\s+qualifierKind:\s*).*$", r"\g<1>SNAPSHOT", locBlock, count=1)
+                  locBlock += "  Revision: 0\n"
+              if re.search(r"(?m)^\s+QualifierKind:\s*", locBlock):
+                  locBlock = re.sub(r"(?m)^(\s+QualifierKind:\s*).*$", r"\g<1>snapshot", locBlock, count=1)
               else:
-                  locBlock += "  qualifierKind: SNAPSHOT\n"
-              if re.search(r"(?m)^\s+qualifierLabel:\s*", locBlock):
-                  locBlock = re.sub(r"(?m)^(\s+qualifierLabel:\s*).*$", r"\g<1>SNAPSHOT", locBlock, count=1)
-              else:
-                  locBlock += "  qualifierLabel: SNAPSHOT\n"
+                  locBlock += "  QualifierKind: snapshot\n"
               locText = locText[:locStart] + locBlock + locText[locEnd:]
 
           locPath.write_text(locText, encoding="utf-8")
@@ -324,8 +320,8 @@ jobs:
               echo "ERROR: Resolved lane '${LOC_RESOLVED_LANE}' does not match requested new lane '${NEW}' on ${TO}." >&2
               exit 1
             fi
-            if [[ "${LOC_RESOLVED_QUALIFIER_KIND}" != "SNAPSHOT" ]]; then
-              echo "ERROR: Resolved qualifier kind '${LOC_RESOLVED_QUALIFIER_KIND}' does not match expected SNAPSHOT on ${TO}." >&2
+            if [[ "${LOC_RESOLVED_QUALIFIER_KIND}" != "snapshot" ]]; then
+              echo "ERROR: Resolved qualifier kind '${LOC_RESOLVED_QUALIFIER_KIND}' does not match expected snapshot on ${TO}." >&2
               exit 1
             fi
 

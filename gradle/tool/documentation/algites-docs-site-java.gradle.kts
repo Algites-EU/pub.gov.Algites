@@ -151,7 +151,6 @@ fun AIcBuildJavaArtifactMetadata(
         "version.lane" to (locResolvedMetadata["version.lane"] ?: ""),
         "version.revision" to (locResolvedMetadata["version.revision"] ?: ""),
         "version.qualifierKind" to (locResolvedMetadata["version.qualifierKind"] ?: ""),
-        "version.qualifierLabel" to (locResolvedMetadata["version.qualifierLabel"] ?: ""),
         "java.maven.groupId" to (locResolvedMetadata["groupId"] ?: ""),
         "java.maven.artifactId" to locArtifactId,
         "java.maven.version" to (locResolvedMetadata["version.resolvedValue"] ?: "")

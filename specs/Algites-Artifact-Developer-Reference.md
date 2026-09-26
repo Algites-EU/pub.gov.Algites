@@ -65,7 +65,7 @@ The standard source metadata files are:
 
 Supporting reusable schemas include:
 
-- `algites-version-context_1.schema.json`
+- `algites-version_1.schema.json`
 - `algites-repository-matrix_1.schema.json`
 - `algites-repository-defaults_1.schema.json`
 - `algites-credential-profiles_1.schema.json`
@@ -82,69 +82,70 @@ A source repository begins with a root descriptor.
 Minimal example:
 
 ```yaml
-sourceRepository:
-  id: pub.lib.Example
-  name: Algites example public library repository
+SourceRepository:
+  Id: pub.lib.Example
+  Name: Algites example public library repository
 
-groupId: eu.algites.lib.example
+GroupId: eu.algites.lib.example
 
-versionContext:
-  releaseLine: "1"
-  revision: 0
-  qualifierKind: SNAPSHOT
-  qualifierLabel: SNAPSHOT
+Version:
+  ReleaseLine: "1"
+  Revision: 0
+  QualifierKind: snapshot
 ```
 
-### 4.1 `sourceRepository`
+### 4.1 `SourceRepository`
 
 | Attribute | Required | Meaning |
 | --- | ---: | --- |
-| `sourceRepository.id` | yes | Canonical source repository identity. |
-| `sourceRepository.name` | no | Human-readable repository name. |
-| `sourceRepository.visibility` | no | Explicit `pub` or `priv` visibility when needed. Normally repository identity/naming and governance determine visibility. |
-| `sourceRepository.repositories` | no | Repository matrix declared at repository scope. |
+| `SourceRepository.Id` | yes | Canonical source repository identity. |
+| `SourceRepository.Name` | no | Human-readable repository name. |
+| `SourceRepository.Visibility` | no | Explicit `pub` or `priv` visibility when needed. Normally repository identity/naming and governance determine visibility. |
+| `SourceRepository.Repositories` | no | Repository matrix declared at repository scope. |
+
+Wire names in all examples below follow the Algites structured-data naming convention from the Development Structure Specification: Algites fields use `UpperCamelCase` and symbolic values use `lower_snake_case`.
 
 The repository descriptor may also contain these top-level inheritable properties:
 
-- `groupId`
-- `versionContext`
-- `credentialProfiles`
-- `publicationReadiness`
-- `deleteSnapshotWhenReleased`
+- `GroupId`
+- `Version`
+- `CredentialProfiles`
+- `PublicationReadiness`
+- `DeleteSnapshotWhenReleased`
 
-These are top-level siblings of `sourceRepository`; do not nest them inside the `sourceRepository` object unless the schema explicitly defines a field there.
+These are top-level siblings of `SourceRepository`; do not nest them inside the `SourceRepository` object unless the schema explicitly defines a field there.
 
 ## 5. `algites-artifact-set.yml`
 
 An artifact set groups descendant artifacts and can contribute inherited defaults.
 
 ```yaml
-artifactSet:
-  name: Example component family
-  description: Shared metadata for the example component family.
-  technologyKinds: [java]
+ArtifactSet:
+  Name: Example component family
+  Description: Shared metadata for the example component family.
+  TechnologyKinds: [java]
 
-groupId: eu.algites.example.component
+GroupId: eu.algites.example.component
 
-publicationReadiness:
-  level: snapshot
-  cause: |
+PublicationReadiness:
+  Level: snapshot
+  Cause: |
     Public API is still being stabilized.
     Snapshot publication is allowed for integration testing.
-  author: Example Maintainer
+  Author: Example Maintainer
 ```
 
-### 5.1 `artifactSet` attributes
+### 5.1 `ArtifactSet` attributes
 
 | Attribute | Required | Meaning |
 | --- | ---: | --- |
-| `artifactSet.name` | no | Human-readable set name. |
-| `artifactSet.description` | no | Free-form description. |
-| `artifactSet.technologyKinds` | no | TechnologyKinds made available to descendants as structural metadata. Allowed values currently include `java`, `python`, and `mps`. |
-| `artifactSet.repositories` | no | Repository matrix contribution at this container. |
-| `artifactSet.versionContext` | no | Version-context contribution at this container. |
+| `ArtifactSet.Name` | no | Human-readable set name. |
+| `ArtifactSet.Description` | no | Free-form description. |
+| `ArtifactSet.TechnologyKinds` | no | TechnologyKinds made available to descendants as structural metadata. Allowed values currently include `java`, `python`, and `mps`. |
+| `ArtifactSet.Repositories` | no | Repository matrix contribution at this container. |
+| `ArtifactSet.Version` | no | Version-context contribution at this container. |
 
-Top-level `groupId`, `versionContext`, `credentialProfiles`, `publicationReadiness`, and `deleteSnapshotWhenReleased` are also allowed.
+Top-level `GroupId`, `Version`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
 
 Artifact sets may be nested. Inheritance follows the actual structural path from repository root through every containing artifact set to the artifact.
 
@@ -153,25 +154,25 @@ Artifact sets may be nested. Inheritance follows the actual structural path from
 Every artifact leaf has an artifact descriptor.
 
 ```yaml
-artifact:
-  technologyKinds: [java, python]
-  name: Example definitions
-  description: Shared definitions published for both Java and Python consumers.
+Artifact:
+  TechnologyKinds: [java, python]
+  Name: Example definitions
+  Description: Shared definitions published for both Java and Python consumers.
 ```
 
 ### 6.1 `artifact` attributes
 
 | Attribute | Required | Meaning |
 | --- | ---: | --- |
-| `artifact.technologyKinds` | yes | Technologies actually produced/published by the artifact. Current values: `java`, `python`, `mps`. |
-| `artifact.name` | no | Human-readable artifact name. |
-| `artifact.description` | no | Free-form description. |
-| `artifact.repositories` | no | Repository matrix contribution for this artifact. |
-| `artifact.versionContext` | no | Version-context contribution for this artifact. |
+| `Artifact.TechnologyKinds` | yes | Technologies actually produced/published by the artifact. Current values: `java`, `python`, `mps`. |
+| `Artifact.Name` | no | Human-readable artifact name. |
+| `Artifact.Description` | no | Free-form description. |
+| `Artifact.Repositories` | no | Repository matrix contribution for this artifact. |
+| `Artifact.Version` | no | Version-context contribution for this artifact. |
 
-Top-level `groupId`, `versionContext`, `credentialProfiles`, `publicationReadiness`, and `deleteSnapshotWhenReleased` are also allowed.
+Top-level `GroupId`, `Version`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
 
-`technologyKinds` is the normative declaration of build/publication technologies. Source directory names alone do not select a TechnologyKind.
+`TechnologyKinds` is the normative declaration of build/publication technologies. Source directory names alone do not select a TechnologyKind.
 
 ## 7. Source layout
 
@@ -225,6 +226,8 @@ A multi-technology artifact does not have to contain handwritten source director
 
 For Python artifacts, the Algites adapter stages `jsondefs`, `yamldefs`, `xmldefs`, and `config` product roots into the wheel/sdist build tree while preserving the path below the source root. Multiple distributions may therefore share a package prefix only through PEP 420 namespace packages. Exact module/resource path collisions are build errors, and a shared cross-distribution prefix must not contain `__init__.py` in any contributing distribution.
 
+The supported Python build entry point is the Algites Gradle lifecycle. The Python adapter prepares the staging project before invoking Python packaging tools, so an artifact MUST NOT introduce artifact-local `setup.py` or `MANIFEST.in` workarounds merely to copy or include `jsondefs`, `yamldefs`, `xmldefs`, or `config` product sources. A `pyproject.toml` may still describe Python distribution metadata, but direct `python -m build` execution against the unstaged repository source tree is not a supported Algites build mode. Only the Gradle adapter can coordinate the complete multi-TechnologyKind build and validate cross-distribution path collisions.
+
 For Python product code, each main public Algites `AI*` type MUST be declared in its own deterministic snake_case module named from that type (for example `AIcDisplayText` in `aic_display_text.py`). Private or implementation helper types MAY remain in the same module. Repository validation MUST reject a product module that declares multiple main public `AI*` types or whose filename does not match its public type.
 
 
@@ -267,18 +270,18 @@ source repository
 
 Different properties use different merge semantics. Do not assume every field follows nearest-value override.
 
-### 8.1 `groupId`
+### 8.1 `GroupId`
 
-`groupId` is an independent top-level inherited value. The nearest descendant declaration replaces the inherited value for that node and its descendants.
+`GroupId` is an independent top-level inherited value. The nearest descendant declaration replaces the inherited value for that node and its descendants.
 
 ```yaml
 # repository
- groupId: eu.algites.lib
+ GroupId: eu.algites.lib
 ```
 
 ```yaml
 # descendant artifact set
- groupId: eu.algites.lib.specialized
+ GroupId: eu.algites.lib.specialized
 ```
 
 ### 8.2 Repository endpoint lists
@@ -286,17 +289,17 @@ Different properties use different merge semantics. Do not assume every field fo
 Repository endpoints merge by stable endpoint `id` within the same matrix cell. A descendant can modify or disable an inherited endpoint without repeating every property.
 
 ```yaml
-artifact:
-  repositories:
+Artifact:
+  Repositories:
     java:
       public:
         snapshot:
           download:
-            - id: algites-java-public-snapshot-download
-              enabled: false
+            - Id: algites-java-public-snapshot-download
+              Enabled: false
 ```
 
-### 8.3 `publicationReadiness` is a cap
+### 8.3 `PublicationReadiness` is a cap
 
 Publication readiness is intentionally not ordinary child override inheritance. The effective level is the minimum level declared anywhere on the structural path.
 
@@ -308,22 +311,22 @@ A descendant cannot relax an ancestor restriction.
 
 ## 9. Publication readiness
 
-`publicationReadiness` protects the publication lifecycle without preventing normal development builds.
+`PublicationReadiness` protects the publication lifecycle without preventing normal development builds.
 
 ```yaml
-publicationReadiness:
-  level: none
-  cause: |
+PublicationReadiness:
+  Level: none
+  Cause: |
     Migration compatibility is incomplete.
     Publication is blocked until the compatibility suite passes.
-  author: Example Maintainer
+  Author: Example Maintainer
 ```
 
 | Field | Required | Meaning |
 | --- | ---: | --- |
-| `level` | yes when object is present | `none`, `snapshot`, or `release`. |
-| `cause` | no | Free-form explanation; multiline YAML is supported. |
-| `author` | no | Informational author/owner string. It is not an authorization identity. |
+| `Level` | yes when object is present | `none`, `snapshot`, or `release`. |
+| `Cause` | no | Free-form explanation; multiline YAML is supported. |
+| `Author` | no | Informational author/owner string. It is not an authorization identity. |
 
 If the object is absent, the implicit level is `release`.
 
@@ -335,23 +338,24 @@ If the object is absent, the implicit level is `release`.
 
 Readiness does **not** remove an artifact from discovery and does **not** prevent compilation/testing. A local project dependency may still cause tasks of a `none` artifact to run when another local artifact needs it.
 
-Publication is different. Before `algitesPublish`, the framework validates the selected controlled publication closure. If a selected artifact depends on a local controlled artifact whose effective readiness is too low, publication stops before upload. Diagnostics include the blocking descriptor path and, when supplied, `cause` and `author`.
+Publication is different. Before `algitesPublish`, the framework validates the selected controlled publication closure. If a selected artifact depends on a local controlled artifact whose effective readiness is too low, publication stops before upload. Diagnostics include the blocking descriptor path and, when supplied, `Cause` and `Author`.
 
-## 10. Version context
+## 10. Version
 
-`versionContext` uses `algites-version-context_1.schema.json`.
+`Version` uses `algites-version_1.schema.json`.
 
 Supported fields are:
 
 | Field | Meaning |
 | --- | --- |
-| `lane` | lifecycle lane identity when used by the repository/version model |
-| `releaseLine` | release line scope |
-| `revision` | revision component |
-| `qualifierKind` | `SNAPSHOT`, `PRE_RELEASE`, `RELEASE`, `FINAL`, or `POST_RELEASE` |
-| `qualifierLabel` | optional qualifier label |
+| `Lane` | lifecycle lane identity when used by the repository/version model |
+| `ReleaseLine` | release line scope |
+| `Revision` | revision component |
+| `QualifierKind` | optional portable qualifier; v1 currently defines `snapshot` |
 
-A version context is container-scoped and may be overridden at a lower structural boundary when artifacts need independent logical version lifecycles.
+`QualifierKind` is intentionally closed and portable. Version v1 removes the former free-form qualifier label; a snapshot is declared as `QualifierKind: snapshot`, while a final release omits `QualifierKind`. Additional portable qualifier kinds will be introduced only when their cross-technology mapping is defined.
+
+A version declaration is container-scoped and may be overridden at a lower structural boundary when artifacts need independent logical version lifecycles.
 
 The effective version is resolved by Algites infrastructure; technology adapters map it into ecosystem-specific publication versions.
 
@@ -373,24 +377,24 @@ Current axis values:
 Example:
 
 ```yaml
-repositories:
+Repositories:
   java:
     public:
       snapshot:
         download:
-          - id: algites-java-public-snapshot-download
-            url: https://example.invalid/maven/snapshots/
+          - Id: algites-java-public-snapshot-download
+            Url: https://example.invalid/maven/snapshots/
 ```
 
 ### 11.1 Endpoint fields
 
 | Field | Required | Meaning |
 | --- | ---: | --- |
-| `id` | yes | Stable canonical endpoint id. |
-| `url` | no for an inherited amendment; normally yes for a concrete endpoint | Repository/package-manager URL. |
-| `credentialProfile` | no | Non-secret credential profile id. |
-| `enabled` | no | Defaults to enabled; lower levels can disable an inherited endpoint. |
-| `usageProviderAdapter` | no | Provider adapter used for management operations such as package deletion. |
+| `Id` | yes | Stable canonical endpoint id. |
+| `Url` | no for an inherited amendment; normally yes for a concrete endpoint | Repository/package-manager URL. |
+| `CredentialProfile` | no | Non-secret credential profile id. |
+| `Enabled` | no | Defaults to enabled; lower levels can disable an inherited endpoint. |
+| `UsageProviderAdapter` | no | Provider adapter used for management operations such as package deletion. |
 
 Public **download** defaults are maintained in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`. Upload/manage governance is intentionally not part of the ordinary public artifact-author configuration.
 
@@ -412,44 +416,44 @@ Repository metadata never contains passwords, tokens, certificates, or other sec
 A repository endpoint references a non-secret profile:
 
 ```yaml
-credentialProfiles:
+CredentialProfiles:
   example-download:
-    type: basic
+    Type: basic
 
-artifact:
-  repositories:
+Artifact:
+  Repositories:
     java:
       private:
         release:
           download:
-            - id: example-download
-              url: https://example.invalid/maven/
-              credentialProfile: example-download
+            - Id: example-download
+              Url: https://example.invalid/maven/
+              CredentialProfile: example-download
 ```
 
 Supported profile types are:
 
 | Type | Required fields | Optional fields |
 | --- | --- | --- |
-| `basic` | `username`, `password` | — |
-| `bearer` | `token` | — |
-| `api-key` | `apiKey` | — |
-| `certificate` | `certificate` | `privateKey`, `privateKeyPassword` |
+| `basic` | `Username`, `Password` | — |
+| `bearer` | `Token` | — |
+| `api_key` | `ApiKey` | — |
+| `certificate` | `Certificate` | `PrivateKey`, `PrivateKeyPassword` |
 
 Actual values are supplied through the universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` JSON document or an Algites secure-store integration. See [`../devops/build/credentials/README.md`](../devops/build/credentials/README.md).
 
 ### 12.1 Value sources
 
-| Source | `value` contains | Materialized result |
+| Source | `Value` contains | Materialized result |
 | --- | --- | --- |
-| `DIRECT_VALUE` | credential content | unchanged content |
-| `FILE_CONTENT` | path to a file | UTF-8 file content |
-| `SECRET_CONTENT` | name/key in the active secret-provider context | secret content |
-| `ENVIRONMENT_VARIABLE_CONTENT` | environment-variable name | variable content |
+| `direct_value` | credential content | unchanged content |
+| `file_content` | path to a file | UTF-8 file content |
+| `secret_content` | name/key in the active secret-provider context | secret content |
+| `environment_variable_content` | environment-variable name | variable content |
 
-The `_CONTENT` suffix describes what is obtained after resolution. For example, `FILE_CONTENT.value` is a path, not literal file content.
+The `_CONTENT` suffix describes what is obtained after resolution. For example, `file_content` `Value` is a path, not literal file content.
 
-For a normal public developer build, upload/manage credentials are not required. The framework resolves only credentials needed for the requested repository contexts. Credential preflight is fail-fast when no effective declared `artifact.technologyKinds` remain after applying any optional TechnologyKind selection; an empty TechnologyKind set never means "all repository technologies".
+For a normal public developer build, upload/manage credentials are not required. The framework resolves only credentials needed for the requested repository contexts. Credential preflight is fail-fast when no effective declared `Artifact.TechnologyKinds` remain after applying any optional TechnologyKind selection; an empty TechnologyKind set never means "all repository technologies".
 
 ## 13. Licensing
 
@@ -462,33 +466,33 @@ For normal public local builds, central public licensing governance is available
 Example:
 
 ```yaml
-licenses:
-  - id: Apache-2.0
-    enabled: true
-    contentKinds:
+Licenses:
+  - Id: Apache-2.0
+    Enabled: true
+    ContentKinds:
       - product
-  - id: CC-BY-4.0
-    enabled: true
-    contentKinds:
+  - Id: CC-BY-4.0
+    Enabled: true
+    ContentKinds:
       - documentation
 ```
 
 Fields:
 
 - `id`: license id;
-- `enabled`: enables/disables the license at that hierarchy point;
-- `contentKinds`: optional list containing `product` and/or `documentation`.
+- `Enabled`: enables/disables the license at that hierarchy point;
+- `ContentKinds`: optional list containing `product` and/or `documentation`.
 
 ### 13.2 `licensing/license-definitions.yml`
 
 This optional repository-local catalog adds license definitions not already supplied by the effective governance. It maps license ids to display metadata and canonical text files. Common Algites public licenses are normally defined centrally and do not need to be copied into each repository.
 
 ```yaml
-licenses:
-  - id: Apache-2.0
-    name: Apache License 2.0
-    url: https://www.apache.org/licenses/LICENSE-2.0
-    text: texts/Apache-2.0.txt
+Licenses:
+  - Id: Apache-2.0
+    Name: Apache License 2.0
+    Url: https://www.apache.org/licenses/LICENSE-2.0
+    Text: texts/Apache-2.0.txt
 ```
 
 ### 13.3 Common licensing tasks
@@ -528,36 +532,36 @@ For Python distributions, the same TechnologyKind-neutral manifest is embedded i
 
 The wheel location is intentionally scoped by the distribution's `.dist-info` directory so multiple installed Python distributions do not compete for one global `META-INF/algites` path. Future TechnologyKind adapters that define another distributable package format SHOULD embed the same logical-artifact manifest in that package using a format-appropriate metadata location.
 
-The manifest identifies the **logical Algites artifact**, not one TechnologyKind-specific representation. Therefore it intentionally does not contain `technologyKinds`, Java/Python/MPS-specific coordinates, build-tool details, or documentation-tool details. The same logical artifact manifest can be embedded in all TechnologyKind outputs of that artifact.
+The manifest identifies the **logical Algites artifact**, not one TechnologyKind-specific representation. Therefore it intentionally does not contain `TechnologyKinds`, Java/Python/MPS-specific coordinates, build-tool details, or documentation-tool details. The same logical artifact manifest can be embedded in all TechnologyKind outputs of that artifact.
 
 Conceptual v1 example:
 
 ```yaml
-manifestVersion: 1
-artifact:
-  repositoryId: pub.lib.Example
-  localArtifactId: api.core
-  artifactCoordinateId: pub.lib.Example_api.core
-  groupId: eu.algites.lib.example
-  version: 1.0-SNAPSHOT
-  sourcePath: api/core
-  structureKind: artifact
-  name: Example Core API
-  description: Shared API of the example library.
-sourceMetadata:
-  descriptorHierarchy:
-    - structureKind: repository
-      path: algites-source-repository.yml
-      sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-    - structureKind: artifact-set
-      path: api/algites-artifact-set.yml
-      sha256: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0
-    - structureKind: artifact
-      path: api/core/algites-artifact.yml
-      sha256: 23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.lib.Example
+  LocalArtifactId: api.core
+  ArtifactCoordinateId: pub.lib.Example_api.core
+  GroupId: eu.algites.lib.example
+  Version: 1.0-SNAPSHOT
+  SourcePath: api/core
+  StructureKind: artifact
+  Name: Example Core API
+  Description: Shared API of the example library.
+SourceMetadata:
+  DescriptorHierarchy:
+    - StructureKind: repository
+      Path: algites-source-repository.yml
+      Sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    - StructureKind: artifact_set
+      Path: api/algites-artifact-set.yml
+      Sha256: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0
+    - StructureKind: artifact
+      Path: api/core/algites-artifact.yml
+      Sha256: 23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01
 ```
 
-Each `sha256` is calculated from the exact bytes of the corresponding source descriptor. The ordered `descriptorHierarchy` therefore records which repository/artifact-set/artifact descriptors governed the artifact and allows those source descriptors to be independently verified.
+Each `Sha256` is calculated from the exact bytes of the corresponding source descriptor. The ordered `DescriptorHierarchy` therefore records which repository/artifact-set/artifact descriptors governed the artifact and allows those source descriptors to be independently verified.
 
 The manifest is deliberately **cache-stable with respect to unrelated build context**. It MUST NOT contain values such as:
 
@@ -728,9 +732,9 @@ Artifact authors normally do not embed upload/manage repository secrets or centr
 2. Add `algites-artifact.yml`:
 
 ```yaml
-artifact:
-  technologyKinds: [java]
-  name: Example API
+Artifact:
+  TechnologyKinds: [java]
+  Name: Example API
 ```
 
 3. Add the Gradle project/build file.
@@ -740,9 +744,9 @@ artifact:
 ### 18.2 Add a multi-technology artifact
 
 ```yaml
-artifact:
-  technologyKinds: [java, python]
-  name: Shared definitions
+Artifact:
+  TechnologyKinds: [java, python]
+  Name: Shared definitions
 ```
 
 A single logical artifact/version may produce technology-specific outputs. Shared neutral source can live in a SourceType such as `yamldefs`; adapters may generate language-specific packaging input under `*.gen`.
@@ -750,12 +754,12 @@ A single logical artifact/version may produce technology-specific outputs. Share
 ### 18.3 Temporarily block publication
 
 ```yaml
-publicationReadiness:
-  level: none
-  cause: |
+PublicationReadiness:
+  Level: none
+  Cause: |
     Artifact format migration is incomplete.
     Build and tests may continue, but nothing should be published yet.
-  author: Maintainer Name
+  Author: Maintainer Name
 ```
 
 Local build/test remains available. Publication fails if this artifact enters the controlled publication closure.
@@ -763,10 +767,10 @@ Local build/test remains available. Publication fails if this artifact enters th
 ### 18.4 Permit snapshots but block release
 
 ```yaml
-publicationReadiness:
-  level: snapshot
-  cause: Public API is not release-stable yet.
-  author: Maintainer Name
+PublicationReadiness:
+  Level: snapshot
+  Cause: Public API is not release-stable yet.
+  Author: Maintainer Name
 ```
 
 ### 18.5 Build only selected technologies
@@ -793,7 +797,7 @@ ALGITES_TECHNOLOGY_KINDS=java,python ./gradlew algitesBuild
 
 ### Unknown or missing TechnologyKind
 
-Check `artifact.technologyKinds` and make sure the shared infrastructure has an adapter for the declared value.
+Check `Artifact.TechnologyKinds` and make sure the shared infrastructure has an adapter for the declared value.
 
 ### Publication readiness blocks publish
 
@@ -801,11 +805,11 @@ Read the blocking declaration(s) printed by the task. The error identifies descr
 
 ### Missing or unresolved TechnologyKind during credential preflight
 
-If `resolveAlgitesRequiredCredentials` reports that no TechnologyKinds were resolved, verify that each distributable artifact uses the current `artifact.technologyKinds` declaration. Legacy keys such as `artifact.type` are not a TechnologyKind declaration. An explicit TechnologyKind selection only narrows declared artifact technologies; it does not create missing declarations. An accidental empty resolution is rejected rather than expanded to all repository technologies.
+If `resolveAlgitesRequiredCredentials` reports that no TechnologyKinds were resolved, verify that each distributable artifact uses the current `Artifact.TechnologyKinds` declaration. Legacy keys such as `Artifact.Type` are not a TechnologyKind declaration. An explicit TechnologyKind selection only narrows declared artifact technologies; it does not create missing declarations. An accidental empty resolution is rejected rather than expanded to all repository technologies.
 
 ### Missing repository credentials
 
-Run `resolveAlgitesRequiredCredentials` for the intended context. Confirm that endpoint `credentialProfile` ids match the universal credential document and that the selected profile contains the type required by non-secret repository metadata.
+Run `resolveAlgitesRequiredCredentials` for the intended context. Confirm that endpoint `CredentialProfile` ids match the universal credential document and that the selected profile contains the type required by non-secret repository metadata.
 
 ### Licensing materialization is stale
 

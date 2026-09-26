@@ -5,11 +5,11 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "artifact": {
+    "Artifact": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "technologyKinds": {
+        "TechnologyKinds": {
           "type": "array",
           "minItems": 1,
           "uniqueItems": true,
@@ -22,40 +22,40 @@
             ]
           }
         },
-        "name": {
+        "Name": {
           "type": "string",
           "minLength": 1
         },
-        "description": {
+        "Description": {
           "type": "string"
         },
-        "repositories": {
+        "Repositories": {
           "$ref": "algites-repository-matrix_1.schema.json"
         },
-        "versionContext": {
-          "$ref": "algites-version-context_1.schema.json"
+        "Version": {
+          "$ref": "algites-version_1.schema.json"
         }
       },
       "required": [
-        "technologyKinds"
+        "TechnologyKinds"
       ]
     },
-    "groupId": {
+    "GroupId": {
       "type": "string",
       "minLength": 1
     },
-    "versionContext": {
-      "$ref": "algites-version-context_1.schema.json"
+    "Version": {
+      "$ref": "algites-version_1.schema.json"
     },
-    "credentialProfiles": {
+    "CredentialProfiles": {
       "$ref": "algites-credential-profiles_1.schema.json"
     },
-    "deleteSnapshotWhenReleased": {
+    "DeleteSnapshotWhenReleased": {
       "type": "boolean",
       "default": true
     }
   },
   "required": [
-    "artifact"
+    "Artifact"
   ]
 }

@@ -10,27 +10,22 @@ import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 
-data class AIcdAlgitesVersionContext(
+data class AIcdAlgitesVersion(
     val lane: String? = null,
     val revision: String? = null,
-    val qualifierKind: String? = null,
-    val qualifierLabel: String? = null
+    val qualifierKind: String? = null
 ) {
-    fun AIcMerge(aOther: AIcdAlgitesVersionContext): AIcdAlgitesVersionContext = AIcdAlgitesVersionContext(
+    fun AIcMerge(aOther: AIcdAlgitesVersion): AIcdAlgitesVersion = AIcdAlgitesVersion(
         lane = aOther.lane ?: lane,
         revision = aOther.revision ?: revision,
-        qualifierKind = aOther.qualifierKind ?: qualifierKind,
-        qualifierLabel = aOther.qualifierLabel ?: qualifierLabel
+        qualifierKind = aOther.qualifierKind ?: qualifierKind
     )
 
     fun AIcResolvedValue(): String? {
         val locLane = lane?.takeIf { it.isNotBlank() } ?: return null
         val locRevision = revision?.takeIf { it.isNotBlank() }
-        val locQualifier = qualifierLabel?.takeIf { it.isNotBlank() }
-            ?: qualifierKind?.takeIf { it.isNotBlank() }
-                ?.takeUnless { it.equals("RELEASE", true) || it.equals("FINAL", true) }
         val locBase = if (locRevision == null) locLane else "$locLane.$locRevision"
-        return if (locQualifier == null) locBase else "$locBase-${locQualifier.uppercase()}"
+        return if (qualifierKind?.equals("snapshot", true) == true) "$locBase-SNAPSHOT" else locBase
     }
 }
 
@@ -75,7 +70,7 @@ data class AIcdAlgitesResolvedState(
     val groupId: String? = null,
     val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>> = emptyMap(),
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition> = emptyMap(),
-    val versionContext: AIcdAlgitesVersionContext = AIcdAlgitesVersionContext(),
+    val version: AIcdAlgitesVersion = AIcdAlgitesVersion(),
     val deleteSnapshotWhenReleased: Boolean? = null
 ) {
     fun AIcMerge(aOther: AIcdAlgitesResolvedState): AIcdAlgitesResolvedState {
@@ -100,7 +95,7 @@ data class AIcdAlgitesResolvedState(
             groupId = aOther.groupId ?: groupId,
             repositories = locRepositories,
             credentialProfiles = locProfiles,
-            versionContext = versionContext.AIcMerge(aOther.versionContext),
+            version = version.AIcMerge(aOther.version),
             deleteSnapshotWhenReleased = aOther.deleteSnapshotWhenReleased ?: deleteSnapshotWhenReleased
         )
     }
@@ -130,7 +125,7 @@ data class AIcdAlgitesArtifactDirectoryMetadata(
     val contentsModel: String,
     val hasGradleBuild: Boolean,
     val gradleProjectPath: String,
-    val versionContext: AIcdAlgitesVersionContext,
+    val version: AIcdAlgitesVersion,
     val deleteSnapshotWhenReleased: Boolean,
     val descriptorHierarchy: List<AIcdAlgitesDescriptorDigest>
 )
@@ -154,7 +149,7 @@ val AIcAlgitesSupportedTechnologyKinds = linkedSetOf("java", "python", "mps")
 val AIcAlgitesRepositoryVisibilities = linkedSetOf("public", "private")
 val AIcAlgitesRepositoryStabilities = linkedSetOf("release", "snapshot")
 val AIcAlgitesRepositoryUsages = linkedSetOf("download", "upload", "manage")
-val AIcAlgitesCredentialTypes = linkedSetOf("basic", "bearer", "api-key", "certificate")
+val AIcAlgitesCredentialTypes = linkedSetOf("basic", "bearer", "api_key", "certificate")
 val AIcAlgitesUsageProviderAdaptersByUsage = mapOf(
     "download" to emptySet<String>(),
     "upload" to emptySet<String>(),
@@ -263,15 +258,15 @@ fun AIcResolveRepositoryMetadataBase(
     aRepositoryVisibilityOverride: String?
 ): AIcdAlgitesRepositoryMetadata {
     val locRootConfig = AIcFindAlgitesMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.takeIf { it.structureKind == "repository" }
-    val locRepositoryId = locRootConfig?.values?.let { AIcFirstValue(it, "sourceRepository.id", "repository.id", "id") }
+    val locRepositoryId = locRootConfig?.values?.let { AIcFirstValue(it, "SourceRepository.Id") }
         ?.takeIf { it.isNotBlank() } ?: aRepositoryRoot.name
     val locRepositoryName = aRepositoryNameOverride?.takeIf { it.isNotBlank() }
-        ?: locRootConfig?.values?.let { AIcFirstValue(it, "sourceRepository.name", "repository.name", "name") }?.takeIf { it.isNotBlank() }
+        ?: locRootConfig?.values?.let { AIcFirstValue(it, "SourceRepository.Name") }?.takeIf { it.isNotBlank() }
         ?: locRepositoryId
     val locVisibility = aRepositoryVisibilityOverride?.takeIf { it.isNotBlank() }
-        ?: locRootConfig?.values?.let { AIcFirstValue(it, "sourceRepository.visibility", "repository.visibility", "visibility") }?.takeIf { it.isNotBlank() }
+        ?: locRootConfig?.values?.let { AIcFirstValue(it, "SourceRepository.Visibility") }?.takeIf { it.isNotBlank() }
         ?: AIcInferVisibilityFromRepositoryName(locRepositoryId)
-    val locGroupId = locRootConfig?.values?.let { AIcFirstValue(it, "groupId") }?.takeIf { it.isNotBlank() }
+    val locGroupId = locRootConfig?.values?.let { AIcFirstValue(it, "GroupId") }?.takeIf { it.isNotBlank() }
     return AIcdAlgitesRepositoryMetadata(locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyMap(), emptyMap(), true)
 }
 
@@ -396,9 +391,9 @@ fun AIcArtifactDirectoryMetadataFromConfig(
 ): AIcdAlgitesArtifactDirectoryMetadata {
     val locPrefix = AIcStructureKindPrefix(aConfig.structureKind)
     val locPath = AIcRelativePath(aRepositoryRoot, aDirectory)
-    val locName = AIcFirstValue(aConfig.values, "$locPrefix.name", "name", "$locPrefix.id", "id")
+    val locName = AIcFirstValue(aConfig.values, "$locPrefix.Name", "$locPrefix.Id")
         ?.takeIf { it.isNotBlank() } ?: if (locPath == ".") aRepositoryRoot.name else aDirectory.name
-    val locDescription = AIcFirstValue(aConfig.values, "$locPrefix.description", "description") ?: ""
+    val locDescription = AIcFirstValue(aConfig.values, "$locPrefix.Description") ?: ""
     return AIcdAlgitesArtifactDirectoryMetadata(
         path = locPath,
         structureKind = aConfig.structureKind,
@@ -411,7 +406,7 @@ fun AIcArtifactDirectoryMetadataFromConfig(
         contentsModel = aContentsModel,
         hasGradleBuild = AIcHasGradleBuild(aDirectory),
         gradleProjectPath = AIcGradleProjectPath(aRepositoryRoot, aDirectory),
-        versionContext = aState.versionContext,
+        version = aState.version,
         deleteSnapshotWhenReleased = aState.deleteSnapshotWhenReleased ?: true,
         descriptorHierarchy = AIcDescriptorHierarchy(aRepositoryRoot, aDirectory)
     )
@@ -437,7 +432,7 @@ fun AIcResolvedStateFromConfig(aConfig: AIcdAlgitesDirectoryConfig): AIcdAlgites
     val locPrefix = AIcStructureKindPrefix(aConfig.structureKind)
     val locBase = AIcResolvedStateFromRawValues(aConfig.values, locPrefix, aConfig.file)
     val locTechnologyKinds = when (aConfig.structureKind) {
-        "artifact-set", "artifact" -> AIcFirstValue(aConfig.values, "$locPrefix.technologyKinds", "technologyKinds")?.let(::AIcParseYamlStringList)
+        "artifact-set", "artifact" -> AIcFirstValue(aConfig.values, "$locPrefix.TechnologyKinds")?.let(::AIcParseYamlStringList)
         else -> null
     }?.also { locKinds ->
         val locUnsupported = locKinds.filter { it !in AIcAlgitesSupportedTechnologyKinds }
@@ -447,21 +442,20 @@ fun AIcResolvedStateFromConfig(aConfig: AIcdAlgitesDirectoryConfig): AIcdAlgites
 }
 
 fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String, aFile: File): AIcdAlgitesResolvedState {
-    val locGroupId = AIcFirstValue(aValues, "groupId")?.takeIf { it.isNotBlank() }
-    val locVersionContext = AIcdAlgitesVersionContext(
-        lane = AIcFirstValue(aValues, "$aPrefix.versionContext.lane", "$aPrefix.versionContext.releaseLine", "versionContext.lane", "versionContext.releaseLine")?.takeIf { it.isNotBlank() },
-        revision = AIcFirstValue(aValues, "$aPrefix.versionContext.revision", "versionContext.revision")?.takeIf { it.isNotBlank() },
-        qualifierKind = AIcFirstValue(aValues, "$aPrefix.versionContext.qualifierKind", "versionContext.qualifierKind")?.takeIf { it.isNotBlank() },
-        qualifierLabel = AIcFirstValue(aValues, "$aPrefix.versionContext.qualifierLabel", "versionContext.qualifierLabel")?.takeIf { it.isNotBlank() }
+    val locGroupId = AIcFirstValue(aValues, "GroupId")?.takeIf { it.isNotBlank() }
+    val locVersion = AIcdAlgitesVersion(
+        lane = AIcFirstValue(aValues, "$aPrefix.Version.Lane", "$aPrefix.Version.ReleaseLine", "Version.Lane", "Version.ReleaseLine")?.takeIf { it.isNotBlank() },
+        revision = AIcFirstValue(aValues, "$aPrefix.Version.Revision", "Version.Revision")?.takeIf { it.isNotBlank() },
+        qualifierKind = AIcFirstValue(aValues, "$aPrefix.Version.QualifierKind", "Version.QualifierKind")?.takeIf { it.isNotBlank() }
     )
     return AIcdAlgitesResolvedState(
         groupId = locGroupId,
         repositories = AIcRepositoryOverridesFromConfig(aValues, aPrefix, aFile),
         credentialProfiles = AIcCredentialProfilesFromConfig(aValues, aFile),
-        versionContext = locVersionContext,
-        deleteSnapshotWhenReleased = AIcFirstValue(aValues, "deleteSnapshotWhenReleased")
+        version = locVersion,
+        deleteSnapshotWhenReleased = AIcFirstValue(aValues, "DeleteSnapshotWhenReleased")
             ?.takeIf { it.isNotBlank() }
-            ?.let { AIcParseBoolean(it, "deleteSnapshotWhenReleased", aFile) }
+            ?.let { AIcParseBoolean(it, "DeleteSnapshotWhenReleased", aFile) }
     )
 }
 
@@ -470,7 +464,7 @@ fun AIcRepositoryOverridesFromConfig(
     aPrefix: String,
     aFile: File
 ): Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>> {
-    val locPrefixes = listOf("$aPrefix.repositories.", "repositories.").filter { !it.startsWith(".repositories") }
+    val locPrefixes = listOf("$aPrefix.Repositories.", "Repositories.").filter { !it.startsWith(".Repositories") }
     data class AIcdBuilder(
         var id: String? = null,
         var url: String? = null,
@@ -495,11 +489,11 @@ fun AIcRepositoryOverridesFromConfig(
         val locCell = "$locTechnology.$locVisibility.$locStability.$locUsage"
         val locBuilder = locBuilders.getOrPut(locCell to locIndex) { AIcdBuilder() }
         when (locProperty) {
-            "id" -> locBuilder.id = locRawValue.trim()
-            "url" -> locBuilder.url = locRawValue.trim().takeIf { it.isNotBlank() }
-            "credentialProfile" -> locBuilder.credentialProfile = locRawValue.trim().takeIf { it.isNotBlank() }
-            "enabled" -> locBuilder.enabled = AIcParseBoolean(locRawValue, "repository endpoint enabled", aFile)
-            "usageProviderAdapter" -> locBuilder.usageProviderAdapter = locRawValue.trim().lowercase().takeIf { it.isNotBlank() }
+            "Id" -> locBuilder.id = locRawValue.trim()
+            "Url" -> locBuilder.url = locRawValue.trim().takeIf { it.isNotBlank() }
+            "CredentialProfile" -> locBuilder.credentialProfile = locRawValue.trim().takeIf { it.isNotBlank() }
+            "Enabled" -> locBuilder.enabled = AIcParseBoolean(locRawValue, "repository endpoint enabled", aFile)
+            "UsageProviderAdapter" -> locBuilder.usageProviderAdapter = locRawValue.trim().lowercase().takeIf { it.isNotBlank() }
         }
     }
 
@@ -527,20 +521,20 @@ fun AIcCredentialProfilesFromConfig(
     data class AIcdBuilder(var type: String? = null, val configuration: MutableMap<String, String> = linkedMapOf())
     val locBuilders = linkedMapOf<String, AIcdBuilder>()
     aValues.forEach { (locKey, locValue) ->
-        if (!locKey.startsWith("credentialProfiles.")) return@forEach
-        val locSegments = locKey.removePrefix("credentialProfiles.").split('.')
+        if (!locKey.startsWith("CredentialProfiles.")) return@forEach
+        val locSegments = locKey.removePrefix("CredentialProfiles.").split('.')
         if (locSegments.size < 2) return@forEach
         val locId = locSegments[0]
         val locBuilder = locBuilders.getOrPut(locId) { AIcdBuilder() }
         when {
-            locSegments[1] == "type" -> {
+            locSegments[1] == "Type" -> {
                 val locType = locValue.trim().lowercase()
                 if (locType !in AIcAlgitesCredentialTypes) {
                     error("Unsupported credential profile type '$locType' in '${aFile.path}'. Supported types: ${AIcAlgitesCredentialTypes.joinToString(", ")}.")
                 }
                 locBuilder.type = locType
             }
-            locSegments[1] == "configuration" && locSegments.size >= 3 -> {
+            locSegments[1] == "Configuration" && locSegments.size >= 3 -> {
                 locBuilder.configuration[locSegments.drop(2).joinToString(".")] = locValue
             }
         }
@@ -610,9 +604,9 @@ fun AIcParseBoolean(aValue: String, aLabel: String, aFile: File): Boolean = when
 }
 
 fun AIcStructureKindPrefix(aStructureKind: String): String = when (aStructureKind) {
-    "repository" -> "sourceRepository"
-    "artifact-set" -> "artifactSet"
-    "artifact" -> "artifact"
+    "repository" -> "SourceRepository"
+    "artifact-set" -> "ArtifactSet"
+    "artifact" -> "Artifact"
     else -> aStructureKind
 }
 
@@ -774,51 +768,50 @@ fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMa
                 )
             },
             "version" to linkedMapOf(
-                "lane" to locDirectory.versionContext.lane,
-                "revision" to locDirectory.versionContext.revision,
-                "qualifierKind" to locDirectory.versionContext.qualifierKind,
-                "qualifierLabel" to locDirectory.versionContext.qualifierLabel,
-                "resolvedValue" to locDirectory.versionContext.AIcResolvedValue()
+                "lane" to locDirectory.version.lane,
+                "revision" to locDirectory.version.revision,
+                "qualifierKind" to locDirectory.version.qualifierKind,
+                "resolvedValue" to locDirectory.version.AIcResolvedValue()
             )
         )
     }
 )
 
 fun AIcToYaml(aResult: AIcdAlgitesResolutionResult): String = buildString {
-    appendLine("repository:")
-    appendLine("  id: ${AIcYamlScalar(aResult.repository.id)}")
-    appendLine("  name: ${AIcYamlScalar(aResult.repository.name)}")
-    appendLine("  visibility: ${AIcYamlScalar(aResult.repository.visibility)}")
-    appendLine("  groupId: ${AIcYamlScalar(aResult.repository.groupId)}")
-    appendLine("  repositories: ${AIcYamlScalar(AIcRepositoryMapForOutput(aResult.repository.repositories).toString())}")
-    appendLine("  credentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(aResult.repository.credentialProfiles).toString())}")
-    appendLine("  deleteSnapshotWhenReleased: ${aResult.repository.deleteSnapshotWhenReleased}")
-    appendLine("artifactDirectories:")
+    fun locStructureKind(aValue: String): String = aValue.replace('-', '_')
+    appendLine("Repository:")
+    appendLine("  Id: ${AIcYamlScalar(aResult.repository.id)}")
+    appendLine("  Name: ${AIcYamlScalar(aResult.repository.name)}")
+    appendLine("  Visibility: ${AIcYamlScalar(aResult.repository.visibility)}")
+    appendLine("  GroupId: ${AIcYamlScalar(aResult.repository.groupId)}")
+    appendLine("  Repositories: ${AIcYamlScalar(AIcRepositoryMapForOutput(aResult.repository.repositories).toString())}")
+    appendLine("  CredentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(aResult.repository.credentialProfiles).toString())}")
+    appendLine("  DeleteSnapshotWhenReleased: ${aResult.repository.deleteSnapshotWhenReleased}")
+    appendLine("ArtifactDirectories:")
     aResult.artifactDirectories.forEach { locDirectory ->
-        appendLine("  - path: ${AIcYamlScalar(locDirectory.path)}")
-        appendLine("    structureKind: ${AIcYamlScalar(locDirectory.structureKind)}")
-        appendLine("    technologyKinds: [${locDirectory.technologyKinds.joinToString(", ")}]")
-        appendLine("    name: ${AIcYamlScalar(locDirectory.name)}")
-        appendLine("    description: ${AIcYamlScalar(locDirectory.description)}")
-        appendLine("    groupId: ${AIcYamlScalar(locDirectory.groupId)}")
-        appendLine("    repositories: ${AIcYamlScalar(AIcRepositoryMapForOutput(locDirectory.repositories).toString())}")
-        appendLine("    credentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(locDirectory.credentialProfiles).toString())}")
-        appendLine("    deleteSnapshotWhenReleased: ${locDirectory.deleteSnapshotWhenReleased}")
-        appendLine("    contentsModel: ${AIcYamlScalar(locDirectory.contentsModel)}")
-        appendLine("    hasGradleBuild: ${locDirectory.hasGradleBuild}")
-        appendLine("    gradleProjectPath: ${AIcYamlScalar(locDirectory.gradleProjectPath)}")
-        appendLine("    descriptorHierarchy:")
+        appendLine("  - Path: ${AIcYamlScalar(locDirectory.path)}")
+        appendLine("    StructureKind: ${AIcYamlScalar(locStructureKind(locDirectory.structureKind))}")
+        appendLine("    TechnologyKinds: [${locDirectory.technologyKinds.joinToString(", ")}]")
+        appendLine("    Name: ${AIcYamlScalar(locDirectory.name)}")
+        appendLine("    Description: ${AIcYamlScalar(locDirectory.description)}")
+        appendLine("    GroupId: ${AIcYamlScalar(locDirectory.groupId)}")
+        appendLine("    Repositories: ${AIcYamlScalar(AIcRepositoryMapForOutput(locDirectory.repositories).toString())}")
+        appendLine("    CredentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(locDirectory.credentialProfiles).toString())}")
+        appendLine("    DeleteSnapshotWhenReleased: ${locDirectory.deleteSnapshotWhenReleased}")
+        appendLine("    ContentsModel: ${AIcYamlScalar(locDirectory.contentsModel.replace('-', '_'))}")
+        appendLine("    HasGradleBuild: ${locDirectory.hasGradleBuild}")
+        appendLine("    GradleProjectPath: ${AIcYamlScalar(locDirectory.gradleProjectPath)}")
+        appendLine("    DescriptorHierarchy:")
         locDirectory.descriptorHierarchy.forEach { locDescriptor ->
-            appendLine("      - structureKind: ${AIcYamlScalar(locDescriptor.structureKind)}")
-            appendLine("        path: ${AIcYamlScalar(locDescriptor.path)}")
-            appendLine("        sha256: ${AIcYamlScalar(locDescriptor.sha256)}")
+            appendLine("      - StructureKind: ${AIcYamlScalar(locStructureKind(locDescriptor.structureKind))}")
+            appendLine("        Path: ${AIcYamlScalar(locDescriptor.path)}")
+            appendLine("        Sha256: ${AIcYamlScalar(locDescriptor.sha256)}")
         }
-        appendLine("    version:")
-        appendLine("      lane: ${AIcYamlScalar(locDirectory.versionContext.lane)}")
-        appendLine("      revision: ${AIcYamlScalar(locDirectory.versionContext.revision)}")
-        appendLine("      qualifierKind: ${AIcYamlScalar(locDirectory.versionContext.qualifierKind)}")
-        appendLine("      qualifierLabel: ${AIcYamlScalar(locDirectory.versionContext.qualifierLabel)}")
-        appendLine("      resolvedValue: ${AIcYamlScalar(locDirectory.versionContext.AIcResolvedValue())}")
+        appendLine("    Version:")
+        appendLine("      Lane: ${AIcYamlScalar(locDirectory.version.lane)}")
+        appendLine("      Revision: ${AIcYamlScalar(locDirectory.version.revision)}")
+        appendLine("      QualifierKind: ${AIcYamlScalar(locDirectory.version.qualifierKind)}")
+        appendLine("      ResolvedValue: ${AIcYamlScalar(locDirectory.version.AIcResolvedValue())}")
     }
 }
 

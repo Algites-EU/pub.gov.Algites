@@ -5,49 +5,49 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "sourceRepository": {
+    "SourceRepository": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "id": {
+        "Id": {
           "type": "string",
           "minLength": 1
         },
-        "name": {
+        "Name": {
           "type": "string",
           "minLength": 1
         },
-        "visibility": {
+        "Visibility": {
           "type": "string",
           "enum": [
             "pub",
             "priv"
           ]
         },
-        "repositories": {
+        "Repositories": {
           "$ref": "algites-repository-matrix_1.schema.json"
         }
       },
       "required": [
-        "id"
+        "Id"
       ]
     },
-    "groupId": {
+    "GroupId": {
       "type": "string",
       "minLength": 1
     },
-    "versionContext": {
-      "$ref": "algites-version-context_1.schema.json"
+    "Version": {
+      "$ref": "algites-version_1.schema.json"
     },
-    "credentialProfiles": {
+    "CredentialProfiles": {
       "$ref": "algites-credential-profiles_1.schema.json"
     },
-    "deleteSnapshotWhenReleased": {
+    "DeleteSnapshotWhenReleased": {
       "type": "boolean",
       "default": true
     }
   },
   "required": [
-    "sourceRepository"
+    "SourceRepository"
   ]
 }

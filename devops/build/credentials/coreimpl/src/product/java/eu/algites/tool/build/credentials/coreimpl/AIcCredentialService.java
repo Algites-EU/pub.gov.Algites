@@ -72,8 +72,8 @@ public final class AIcCredentialService {
             char[] locChars = locValue.get();
             try {
                 ObjectNode locFieldNode = OBJECT_MAPPER.createObjectNode();
-                locFieldNode.put("source", AInCredentialValueSource.DIRECT_VALUE.name());
-                locFieldNode.put("value", new String(locChars));
+                locFieldNode.put("Source", AInCredentialValueSource.DIRECT_VALUE.getId());
+                locFieldNode.put("Value", new String(locChars));
                 locTypedCredential.set(locField.getId(), locFieldNode);
             } finally {
                 Arrays.fill(locChars, '\0');

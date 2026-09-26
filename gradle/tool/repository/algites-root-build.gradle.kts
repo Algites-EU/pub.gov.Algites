@@ -94,25 +94,25 @@ abstract class AIcGenerateAlgitesArtifactManifestTask : DefaultTask() {
 
         locOutputFile.writeText(
             buildString {
-                appendLine("manifestVersion: 1")
-                appendLine("artifact:")
-                appendLine("  repositoryId: ${AIcYamlScalar(repositoryId.get())}")
-                appendLine("  localArtifactId: ${AIcYamlScalar(localArtifactId.get())}")
-                appendLine("  artifactCoordinateId: ${AIcYamlScalar(artifactCoordinateId.get())}")
+                appendLine("ManifestVersion: 1")
+                appendLine("Artifact:")
+                appendLine("  RepositoryId: ${AIcYamlScalar(repositoryId.get())}")
+                appendLine("  LocalArtifactId: ${AIcYamlScalar(localArtifactId.get())}")
+                appendLine("  ArtifactCoordinateId: ${AIcYamlScalar(artifactCoordinateId.get())}")
                 groupId.orNull?.takeIf { it.isNotBlank() }?.let { locGroupId ->
-                    appendLine("  groupId: ${AIcYamlScalar(locGroupId)}")
+                    appendLine("  GroupId: ${AIcYamlScalar(locGroupId)}")
                 }
-                appendLine("  version: ${AIcYamlScalar(artifactVersion.get())}")
-                appendLine("  sourcePath: ${AIcYamlScalar(sourcePath.get())}")
-                appendLine("  structureKind: ${AIcYamlScalar(structureKind.get())}")
-                appendLine("  name: ${AIcYamlScalar(artifactName.get())}")
-                appendLine("  description: ${AIcYamlScalar(artifactDescription.get())}")
-                appendLine("sourceMetadata:")
-                appendLine("  descriptorHierarchy:")
+                appendLine("  Version: ${AIcYamlScalar(artifactVersion.get())}")
+                appendLine("  SourcePath: ${AIcYamlScalar(sourcePath.get())}")
+                appendLine("  StructureKind: ${AIcYamlScalar(structureKind.get().replace('-', '_'))}")
+                appendLine("  Name: ${AIcYamlScalar(artifactName.get())}")
+                appendLine("  Description: ${AIcYamlScalar(artifactDescription.get())}")
+                appendLine("SourceMetadata:")
+                appendLine("  DescriptorHierarchy:")
                 locDescriptorEntries.forEach { locParts ->
-                    appendLine("    - structureKind: ${AIcYamlScalar(locParts[0])}")
-                    appendLine("      path: ${AIcYamlScalar(locParts[1])}")
-                    appendLine("      sha256: ${AIcYamlScalar(locParts[2])}")
+                    appendLine("    - StructureKind: ${AIcYamlScalar(locParts[0].replace('-', '_'))}")
+                    appendLine("      Path: ${AIcYamlScalar(locParts[1])}")
+                    appendLine("      Sha256: ${AIcYamlScalar(locParts[2])}")
                 }
             },
             Charsets.UTF_8
@@ -253,8 +253,8 @@ fun AIcAlgitesCredentialValue(aProfile: AIcdAlgitesCredentialProfile, aField: St
     locAlgitesResolveCredentialValue(aProfile.id, aProfile.type, aField, rootProject.projectDir)
 
 fun AIcAlgitesRequireBasicCredential(aProfile: AIcdAlgitesCredentialProfile): Pair<String, String> {
-    val locUsername = AIcAlgitesCredentialValue(aProfile, "username")
-    val locPassword = AIcAlgitesCredentialValue(aProfile, "password")
+    val locUsername = AIcAlgitesCredentialValue(aProfile, "Username")
+    val locPassword = AIcAlgitesCredentialValue(aProfile, "Password")
     if (locUsername.isNullOrEmpty() || locPassword.isNullOrEmpty()) {
         throw GradleException(
             "Credential profile '${aProfile.id}' type 'basic' is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
@@ -330,21 +330,21 @@ fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcdAlgitesRepositoryEndpoint, aProfi
     val locProfile = aProfiles[locProfileId]
         ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id}' references undefined credential profile '$locProfileId'.")
     return when (locProfile.type) {
-        "api-key" -> {
-            val locApiKey = AIcAlgitesCredentialValue(locProfile, "apiKey")
+        "api_key" -> {
+            val locApiKey = AIcAlgitesCredentialValue(locProfile, "ApiKey")
                 ?: throw GradleException("Credential profile '$locProfileId' does not provide required apiKey.")
             val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() } ?: "Authorization"
             val locPrefix = locProfile.configuration["headerValuePrefix"] ?: "token "
             mapOf(locHeaderName to "$locPrefix$locApiKey")
         }
         "bearer" -> {
-            val locToken = AIcAlgitesCredentialValue(locProfile, "token")
+            val locToken = AIcAlgitesCredentialValue(locProfile, "Token")
                 ?: throw GradleException("Credential profile '$locProfileId' does not provide required token.")
             mapOf("Authorization" to "Bearer $locToken")
         }
         else -> throw GradleException(
             "Cloudsmith manage endpoint '${aEndpoint.id}' uses credential type '${locProfile.type}'. " +
-                "The Cloudsmith management adapter supports 'api-key' and 'bearer'."
+                "The Cloudsmith management adapter supports 'api_key' and 'bearer'."
         )
     }
 }
@@ -419,7 +419,7 @@ fun AIcAlgitesRepsyHeaders(
     val locProfile = aProfiles[locProfileId]
         ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id}' references undefined credential profile '$locProfileId'.")
     val locToken = when (locProfile.type) {
-        "bearer" -> AIcAlgitesCredentialValue(locProfile, "token")
+        "bearer" -> AIcAlgitesCredentialValue(locProfile, "Token")
             ?: throw GradleException("Credential profile '$locProfileId' does not provide required token.")
         "basic" -> {
             val (locUsername, locPassword) = AIcAlgitesRequireBasicCredential(locProfile)
@@ -915,7 +915,7 @@ abstract class AIcResolveAlgitesRequiredCredentialsTask : DefaultTask() {
         if (locTechnologyKinds.isEmpty()) {
             throw GradleException(
                 "Cannot resolve Algites repository credentials because no TechnologyKinds were resolved for this repository. " +
-                    "Declare artifact.technologyKinds in algites-artifact.yml or explicitly select a valid TechnologyKind."
+                    "Declare Artifact.TechnologyKinds in algites-artifact.yml or explicitly select a valid TechnologyKind."
             )
         }
 
@@ -1204,7 +1204,7 @@ subprojects {
                                         }
                                     }
                                     "bearer" -> {
-                                        val locToken = AIcAlgitesCredentialValue(locProfile, "token")
+                                        val locToken = AIcAlgitesCredentialValue(locProfile, "Token")
                                             ?: throw GradleException(
                                                 "Credential profile '${locProfile.id}' type 'bearer' is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                                             )
@@ -1214,14 +1214,14 @@ subprojects {
                                         }
                                         authentication { create<HttpHeaderAuthentication>("header") }
                                     }
-                                    "api-key" -> {
-                                        val locApiKey = AIcAlgitesCredentialValue(locProfile, "apiKey")
+                                    "api_key" -> {
+                                        val locApiKey = AIcAlgitesCredentialValue(locProfile, "ApiKey")
                                             ?: throw GradleException(
-                                                "Credential profile '${locProfile.id}' type 'api-key' is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
+                                                "Credential profile '${locProfile.id}' type 'api_key' is not available in ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS or the local Algites secure-store credential document."
                                             )
                                         val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() }
                                             ?: throw GradleException(
-                                                "Credential profile '${locProfile.id}' type 'api-key' requires configuration.headerName for Java/Maven publication."
+                                                "Credential profile '${locProfile.id}' type 'api_key' requires configuration.headerName for Java/Maven publication."
                                             )
                                         credentials(HttpHeaderCredentials::class) {
                                             name = locHeaderName
