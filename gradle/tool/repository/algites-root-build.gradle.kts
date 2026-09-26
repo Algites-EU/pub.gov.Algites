@@ -554,7 +554,7 @@ fun AIcAlgitesPythonDistributionName(aArtifactCoordinateId: String): String {
         .lowercase()
         .replace(Regex("[._-]+"), "-")
         .trim('-')
-    return "algites-$locNormalized"
+    return "eu-algites-$locNormalized"
 }
 
 fun AIcAlgitesPythonIdentifierSegment(aValue: String): String {

@@ -239,7 +239,7 @@ fun AIcPythonDocsDistributionName(aArtifactCoordinateId: String): String {
         .lowercase()
         .replace(Regex("[._-]+"), "-")
         .trim('-')
-    return "algites-$locNormalized"
+    return "eu-algites-$locNormalized"
 }
 
 fun AIcPythonDocsIdentifierSegment(aValue: String): String {

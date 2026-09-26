@@ -333,7 +333,7 @@ Python uses one distribution/project name rather than a Maven-style `GroupId` + 
 The normative mapping is:
 
 ```text
-pythonDistributionName = "algites-" + normalizePythonProjectName(artifactCoordinateId)
+pythonDistributionName = "eu-algites-" + normalizePythonProjectName(artifactCoordinateId)
 ```
 
 where `normalizePythonProjectName`:
@@ -350,10 +350,10 @@ ArtifactCoordinateId:
 priv.lib.Customers.common_aaa.blfacadeintf-tests
 
 Python distribution/project name:
-algites-priv-lib-customers-common-aaa-blfacadeintf-tests
+eu-algites-priv-lib-customers-common-aaa-blfacadeintf-tests
 ```
 
-The `algites-` prefix is an ecosystem namespace prefix, not a DNS-derived group identifier. The Maven `eu.algites...` groupId MUST NOT be prepended to the Python distribution name.
+The `eu-algites-` prefix is the canonical Algites ecosystem namespace prefix for Python distribution names. It is derived from the Algites namespace but is not a separate Python equivalent of Maven `GroupId`; the Maven `eu.algites...` groupId is not prepended independently beyond this canonical prefix.
 
 #### 2.9.3 Python import namespace
 
@@ -415,7 +415,7 @@ Java/Maven artifactId:
 priv.lib.Customers.common_aaa.blfacadeintf-tests
 
 Python distribution/project name:
-algites-priv-lib-customers-common-aaa-blfacadeintf-tests
+eu-algites-priv-lib-customers-common-aaa-blfacadeintf-tests
 
 Python import namespace:
 algites.priv.lib.customers.common.aaa.blfacadeintf_tests
