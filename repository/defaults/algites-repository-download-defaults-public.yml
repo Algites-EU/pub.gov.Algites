@@ -12,29 +12,29 @@ Repositories:
     public:
       release:
         download:
-          - id: algites-java-public-release-download
+          - Id: algites-java-public-release-download
             Url: "https://repo1.maven.org/maven2"
       snapshot:
         download:
-          - id: algites-java-public-snapshot-download
+          - Id: algites-java-public-snapshot-download
             Url: "https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/"
   python:
     public:
       release:
         download:
-          - id: algites-python-public-release-download
+          - Id: algites-python-public-release-download
             Url: "https://pypi.org/simple/"
       snapshot:
         download:
-          - id: algites-python-public-snapshot-download
+          - Id: algites-python-public-snapshot-download
             Url: "https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/"
   mps:
     public:
       release:
         download:
-          - id: algites-mps-public-release-download
+          - Id: algites-mps-public-release-download
             Url: "https://dummy.invalid/algites/mps/public/release/download/"
       snapshot:
         download:
-          - id: algites-mps-public-snapshot-download
+          - Id: algites-mps-public-snapshot-download
             Url: "https://dummy.invalid/algites/mps/public/snapshot/download/"
