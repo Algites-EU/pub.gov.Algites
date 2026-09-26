@@ -1222,6 +1222,8 @@ val algitesResolveRequiredCredentials = tasks.register<AIcResolveAlgitesRequired
 
 subprojects {
     val locAlgitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
+    val locAlgitesResolvedProjectGroup = locAlgitesArtifactDirectory?.get("groupId")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+        ?: algitesResolvedRepositoryMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
     val locAlgitesTechnologyKinds = AIcAlgitesStringList(locAlgitesArtifactDirectory?.get("technologyKinds"))
     val locEffectiveTechnologyKinds = if (algitesRequestedTechnologyKinds.isEmpty()) {
         locAlgitesTechnologyKinds.toSet()
