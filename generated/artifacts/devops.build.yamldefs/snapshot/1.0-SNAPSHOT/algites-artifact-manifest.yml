@@ -1,22 +1,13 @@
-manifestVersion: 1
-artifact:
-  repositoryId: pub.gov.Algites
-  localArtifactId: devops.build.yamldefs
-  artifactCoordinateId: pub.gov.Algites_devops.build.yamldefs
-  groupId: eu.algites.tool.build
-  version: 1.0-SNAPSHOT
-  sourcePath: devops/build/yamldefs
-  structureKind: artifact
-  name: "Algites build YAML definitions"
-  description: "Versioned machine-readable schemas for Algites repository and artifact YAML metadata."
-sourceMetadata:
-  descriptorHierarchy:
-    - structureKind: repository
-      path: algites-source-repository.yml
-      sha256: 96d07bf763f1f694eb91cd8e611903827b9f216dda992c6d2dea3b6ac1cc302f
-    - structureKind: artifact-set
-      path: devops/build/algites-artifact-set.yml
-      sha256: 188f91a54a900e717b86f78e15a341e4368c500187c03a73771d12f975a0a088
-    - structureKind: artifact
-      path: devops/build/yamldefs/algites-artifact.yml
-      sha256: d056c294df76a2b2e0fe84eaa990eadebdb8a2c48404f4700d66c04a95b2a17f
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.gov.Algites
+  LocalArtifactId: devops.build.yamldefs
+  ArtifactCoordinateId: pub.gov.Algites_devops.build.yamldefs
+  GroupId: eu.algites.tool.build
+  Version: 1.0-SNAPSHOT
+  SourcePath: devops/build/yamldefs
+  StructureKind: artifact
+  Name: "Algites build YAML definitions"
+  Description: "Versioned machine-readable schemas for Algites repository and artifact YAML metadata."
+SourceMetadata:
+  DescriptorHierarchy:

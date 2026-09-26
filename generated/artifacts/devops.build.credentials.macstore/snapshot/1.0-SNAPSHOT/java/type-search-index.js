@@ -1,1 +1,0 @@
-typeSearchIndex = [{"p":"eu.algites.tool.build.credentials.macstore","l":"AIcMacCredentialStore"},{"l":"All Classes and Interfaces","u":"allclasses-index.html"}];updateSearchResults();

@@ -1,1 +1,0 @@
-packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"eu.algites.tool.build.credentials.secretservicestore"}];updateSearchResults();

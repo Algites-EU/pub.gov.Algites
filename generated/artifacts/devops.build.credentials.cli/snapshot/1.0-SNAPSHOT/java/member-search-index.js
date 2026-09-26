@@ -1,1 +1,0 @@
-memberSearchIndex = [{"p":"eu.algites.tool.build.credentials.cli","c":"AIcCredentialCli","l":"main(String[])","u":"main(java.lang.String[])"}];updateSearchResults();
