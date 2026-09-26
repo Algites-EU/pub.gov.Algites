@@ -1,5 +1,5 @@
-artifactSet:
-  name: Algites build infrastructure tools
-  description: Tools used for the building purposes on the Algites infrastructure.
+ArtifactSet:
+  Name: Algites build infrastructure tools
+  Description: Tools used for the building purposes on the Algites infrastructure.
 
-groupId: eu.algites.tool.build
+GroupId: eu.algites.tool.build

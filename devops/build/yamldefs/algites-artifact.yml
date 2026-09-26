@@ -1,4 +1,4 @@
-artifact:
-  technologyKinds: [java, python]
-  name: Algites build YAML definitions
-  description: Versioned machine-readable schemas for Algites repository and artifact YAML metadata.
+Artifact:
+  TechnologyKinds: [java, python]
+  Name: Algites build YAML definitions
+  Description: Versioned machine-readable schemas for Algites repository and artifact YAML metadata.
