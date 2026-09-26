@@ -5,20 +5,20 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "licenses": {
+    "Licenses": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
-          "id": {
+          "Id": {
             "type": "string",
             "pattern": "^[A-Za-z0-9.+-]+$"
           },
-          "enabled": {
+          "Enabled": {
             "type": "boolean"
           },
-          "contentKinds": {
+          "ContentKinds": {
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
@@ -32,13 +32,13 @@
           }
         },
         "required": [
-          "id",
-          "enabled"
+          "Id",
+          "Enabled"
         ]
       }
     }
   },
   "required": [
-    "licenses"
+    "Licenses"
   ]
 }

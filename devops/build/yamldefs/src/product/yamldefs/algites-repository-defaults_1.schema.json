@@ -5,10 +5,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "repositories": {
+    "Repositories": {
       "$ref": "algites-repository-matrix_1.schema.json"
     },
-    "credentialProfiles": {
+    "CredentialProfiles": {
       "$ref": "algites-credential-profiles_1.schema.json"
     }
   }

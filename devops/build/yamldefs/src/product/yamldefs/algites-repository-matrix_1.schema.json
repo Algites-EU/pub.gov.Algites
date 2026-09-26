@@ -5,13 +5,13 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "java": {
+    "Java": {
       "$ref": "#/$defs/visibilityMatrix"
     },
-    "python": {
+    "Python": {
       "$ref": "#/$defs/visibilityMatrix"
     },
-    "mps": {
+    "Mps": {
       "$ref": "#/$defs/visibilityMatrix"
     }
   },
@@ -20,29 +20,29 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "id": {
+        "Id": {
           "type": "string",
           "pattern": "^algites-[a-z0-9]+(?:-[a-z0-9]+)*$"
         },
-        "url": {
+        "Url": {
           "type": "string",
           "format": "uri",
           "minLength": 1
         },
-        "credentialProfile": {
+        "CredentialProfile": {
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         },
-        "enabled": {
+        "Enabled": {
           "type": "boolean"
         },
-        "usageProviderAdapter": {
+        "UsageProviderAdapter": {
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         }
       },
       "required": [
-        "id"
+        "Id"
       ],
       "minProperties": 1
     },
@@ -57,13 +57,13 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "download": {
+        "Download": {
           "$ref": "#/$defs/repositoryEndpointList"
         },
-        "upload": {
+        "Upload": {
           "$ref": "#/$defs/repositoryEndpointList"
         },
-        "manage": {
+        "Manage": {
           "$ref": "#/$defs/repositoryEndpointList"
         }
       },
@@ -73,10 +73,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "release": {
+        "Release": {
           "$ref": "#/$defs/usageMatrix"
         },
-        "snapshot": {
+        "Snapshot": {
           "$ref": "#/$defs/usageMatrix"
         }
       },
@@ -86,10 +86,10 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "public": {
+        "Public": {
           "$ref": "#/$defs/stabilityMatrix"
         },
-        "private": {
+        "Private": {
           "$ref": "#/$defs/stabilityMatrix"
         }
       },

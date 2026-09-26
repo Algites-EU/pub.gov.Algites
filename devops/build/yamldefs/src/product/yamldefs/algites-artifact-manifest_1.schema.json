@@ -5,107 +5,107 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
-    "manifestVersion": {
+    "ManifestVersion": {
       "const": 1
     },
-    "artifact": {
+    "Artifact": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "repositoryId": {
+        "RepositoryId": {
           "type": "string",
           "minLength": 1
         },
-        "localArtifactId": {
+        "LocalArtifactId": {
           "type": "string",
           "minLength": 1
         },
-        "artifactCoordinateId": {
+        "ArtifactCoordinateId": {
           "type": "string",
           "minLength": 1
         },
-        "groupId": {
+        "GroupId": {
           "type": "string",
           "minLength": 1
         },
-        "version": {
+        "Version": {
           "type": "string",
           "minLength": 1
         },
-        "sourcePath": {
+        "SourcePath": {
           "type": "string",
           "minLength": 1
         },
-        "structureKind": {
+        "StructureKind": {
           "type": "string",
           "enum": [
-            "artifact-set",
+            "artifact_set",
             "artifact"
           ]
         },
-        "name": {
+        "Name": {
           "type": "string",
           "minLength": 1
         },
-        "description": {
+        "Description": {
           "type": "string"
         }
       },
       "required": [
-        "repositoryId",
-        "localArtifactId",
-        "artifactCoordinateId",
-        "version",
-        "sourcePath",
-        "structureKind",
-        "name",
-        "description"
+        "RepositoryId",
+        "LocalArtifactId",
+        "ArtifactCoordinateId",
+        "Version",
+        "SourcePath",
+        "StructureKind",
+        "Name",
+        "Description"
       ]
     },
-    "sourceMetadata": {
+    "SourceMetadata": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "descriptorHierarchy": {
+        "DescriptorHierarchy": {
           "type": "array",
           "minItems": 1,
           "items": {
             "type": "object",
             "additionalProperties": false,
             "properties": {
-              "structureKind": {
+              "StructureKind": {
                 "type": "string",
                 "enum": [
                   "repository",
-                  "artifact-set",
+                  "artifact_set",
                   "artifact"
                 ]
               },
-              "path": {
+              "Path": {
                 "type": "string",
                 "minLength": 1
               },
-              "sha256": {
+              "Sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
               }
             },
             "required": [
-              "structureKind",
-              "path",
-              "sha256"
+              "StructureKind",
+              "Path",
+              "Sha256"
             ]
           }
         }
       },
       "required": [
-        "descriptorHierarchy"
+        "DescriptorHierarchy"
       ]
     }
   },
   "required": [
-    "manifestVersion",
-    "artifact",
-    "sourceMetadata"
+    "ManifestVersion",
+    "Artifact",
+    "SourceMetadata"
   ]
 }
