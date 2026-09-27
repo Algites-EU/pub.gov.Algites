@@ -53,7 +53,13 @@ rootProject.name =
 
 val locIncludedProjectPaths = linkedSetOf<String>()
 locAlgitesArtifactDirectories
-    .filter { locArtifactDirectory -> locArtifactDirectory["hasGradleBuild"] == true }
+    .filter { locArtifactDirectory ->
+        val locTechnologyKinds = (locArtifactDirectory["technologyKinds"] as? List<*>)
+            .orEmpty()
+            .mapNotNull { locTechnologyKind -> locTechnologyKind?.toString()?.trim()?.lowercase() }
+        locArtifactDirectory["hasGradleBuild"] == true ||
+            (locArtifactDirectory["structureKind"]?.toString() == "artifact" && "python" in locTechnologyKinds)
+    }
     .forEach { locArtifactDirectory ->
         val locArtifactDirectoryPath = locArtifactDirectory["path"]?.toString() ?: return@forEach
         val locGradleProjectPath = locArtifactDirectory["gradleProjectPath"]?.toString() ?: return@forEach

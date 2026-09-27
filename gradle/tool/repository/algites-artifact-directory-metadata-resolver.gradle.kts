@@ -643,7 +643,19 @@ fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
         val locIndent = locLine.takeWhile { it == ' ' }.length
         val locTrimmed = locLine.trim()
 
-        while (locStack.isNotEmpty() && locStack.last().first >= locIndent) locStack.removeAt(locStack.lastIndex)
+        if (locTrimmed.startsWith("- ")) {
+            /*
+             * YAML permits indentationless sequences, for example:
+             *
+             * TechnologyKinds:
+             * - python
+             *
+             * Keep the pending container at the same indentation level for a list item.
+             */
+            while (locStack.isNotEmpty() && locStack.last().first > locIndent) locStack.removeAt(locStack.lastIndex)
+        } else {
+            while (locStack.isNotEmpty() && locStack.last().first >= locIndent) locStack.removeAt(locStack.lastIndex)
+        }
 
         if (locTrimmed.startsWith("- ")) {
             val locParentPath = locStack.joinToString(".") { it.second }
