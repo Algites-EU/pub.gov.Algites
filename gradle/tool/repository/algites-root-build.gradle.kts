@@ -937,7 +937,15 @@ allprojects {
         ?: algitesResolvedRepositoryMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
 
     if (!locAlgitesResolvedProjectGroup.isNullOrBlank()) {
-        group = locAlgitesResolvedProjectGroup
+        /*
+         * Keep Gradle's internal component identity unique for nested Algites
+         * artifacts that can legitimately share the same leaf project name
+         * (for example common or v1). Maven publication coordinates are set
+         * explicitly from Algites metadata below and therefore remain unchanged.
+         */
+        val locAlgitesCanonicalArtifactId = AIcAlgitesCanonicalArtifactId(project.path)
+        group = "$locAlgitesResolvedProjectGroup.__algites_gradle.$locAlgitesCanonicalArtifactId"
+        extra["algitesResolvedProjectGroup"] = locAlgitesResolvedProjectGroup
     }
 
     version = algitesResolvedVersionValue(locAlgitesArtifactDirectory)
@@ -1294,22 +1302,6 @@ subprojects {
 
     if ("java" in locAlgitesTechnologyKinds) {
         plugins.withId("java") {
-            /*
-             * Gradle's implicit Java component capability uses project.name. Nested Algites
-             * artifact paths can legitimately repeat leaf names such as common or v1, while
-             * their canonical artifact IDs remain unique. Declare the canonical Algites
-             * artifact identity explicitly for consumable Java variants so local project
-             * dependency resolution cannot collapse distinct artifacts onto the same
-             * group:name:version capability.
-             */
-            listOf("apiElements", "runtimeElements").forEach { locConfigurationName ->
-                configurations.named(locConfigurationName) {
-                    outgoing.capability(
-                        "${project.group}:$locAlgitesCanonicalArtifactId:${project.version}"
-                    )
-                }
-            }
-
             tasks.withType(Jar::class.java).configureEach {
                 dependsOn(rootProject.tasks.named("verifyAlgitesLicensing"))
                 dependsOn(locGenerateAlgitesArtifactManifest)
@@ -1329,7 +1321,7 @@ subprojects {
 
         plugins.withId("maven-publish") {
             if (algitesIsPublishRequested) {
-                requireAlgitesGroupForPublish(project.path, project.group)
+                requireAlgitesGroupForPublish(project.path, locAlgitesResolvedProjectGroup)
             }
 
             plugins.withId("java") {
@@ -1346,6 +1338,7 @@ subprojects {
 
             extensions.configure<PublishingExtension>("publishing") {
                 publications.withType(MavenPublication::class.java).configureEach {
+                    locAlgitesResolvedProjectGroup?.let { locGroupId -> groupId = locGroupId }
                     artifactId = locAlgitesCanonicalArtifactId
                     pom {
                         licenses {
