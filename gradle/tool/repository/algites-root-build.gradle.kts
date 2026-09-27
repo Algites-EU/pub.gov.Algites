@@ -1294,6 +1294,22 @@ subprojects {
 
     if ("java" in locAlgitesTechnologyKinds) {
         plugins.withId("java") {
+            /*
+             * Gradle's implicit Java component capability uses project.name. Nested Algites
+             * artifact paths can legitimately repeat leaf names such as common or v1, while
+             * their canonical artifact IDs remain unique. Declare the canonical Algites
+             * artifact identity explicitly for consumable Java variants so local project
+             * dependency resolution cannot collapse distinct artifacts onto the same
+             * group:name:version capability.
+             */
+            listOf("apiElements", "runtimeElements").forEach { locConfigurationName ->
+                configurations.named(locConfigurationName) {
+                    outgoing.capability(
+                        "${project.group}:$locAlgitesCanonicalArtifactId:${project.version}"
+                    )
+                }
+            }
+
             tasks.withType(Jar::class.java).configureEach {
                 dependsOn(rootProject.tasks.named("verifyAlgitesLicensing"))
                 dependsOn(locGenerateAlgitesArtifactManifest)
