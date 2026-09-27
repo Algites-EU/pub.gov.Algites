@@ -124,6 +124,7 @@ class AIcGeneratePythonDocsSiteAction(
                 autoapi_root = 'autoapi'
                 autoapi_add_toctree_entry = True
                 autoapi_keep_files = True
+                autoapi_python_use_implicit_namespaces = True
                 autoapi_options = ['members', 'undoc-members', 'show-inheritance', 'show-module-summary']
                 """.trimIndent()
             }
