@@ -63,6 +63,11 @@ on:
         required: false
         type: string
         default: ""
+      drop-gradle-cache:
+        description: Drop restored Gradle cache state and force dependency refresh for this documentation build.
+        required: false
+        type: boolean
+        default: false
       publish-pages:
         description: Deprecated compatibility switch. If false, GitHub Pages publication is disabled even when publication-target resolves to github-pages.
         required: false
@@ -106,6 +111,7 @@ jobs:
           INPUT_DOCUMENTATION_BRANCH: ${{ inputs.documentation-branch }}
           INPUT_PUBLICATION_TARGET: ${{ inputs.publication-target }}
           INPUT_GRADLE_ARGUMENTS: ${{ inputs.gradle-arguments }}
+          INPUT_DROP_GRADLE_CACHE: ${{ inputs.drop-gradle-cache }}
           INPUT_PUBLISH_PAGES: ${{ inputs.publish-pages }}
         run: |
           set -euo pipefail
@@ -142,6 +148,14 @@ jobs:
           locDocumentationBranch="$(resolve_string documentationBranch "${INPUT_DOCUMENTATION_BRANCH}")"
           locPublicationTarget="$(resolve_string publicationTarget "${INPUT_PUBLICATION_TARGET}")"
           locGradleArguments="$(resolve_string gradleArguments "${INPUT_GRADLE_ARGUMENTS}")"
+          locDropGradleCache="$(jq -r '.dropGradleCache // empty | if type == "boolean" then tostring elif type == "string" then . else tostring end' <<< "${locRequest}")"
+          if [[ -z "${locDropGradleCache}" ]]; then
+            locDropGradleCache="${INPUT_DROP_GRADLE_CACHE}"
+          fi
+          case "${locDropGradleCache,,}" in
+            true|false) ;;
+            *) echo "::error::dropGradleCache must resolve to true or false, got '${locDropGradleCache}'."; exit 1 ;;
+          esac
 
           locPublishPages="$(jq -r '.publishPages // empty | if type == "boolean" then tostring elif type == "string" then . else tostring end' <<< "${locRequest}")"
           if [[ -z "${locPublishPages}" ]]; then
@@ -164,6 +178,7 @@ jobs:
             echo "documentation-branch=${locDocumentationBranch}"
             echo "publication-target=${locPublicationTarget}"
             echo "gradle-arguments=${locGradleArguments}"
+            echo "drop-gradle-cache=${locDropGradleCache,,}"
             echo "publish-pages=${locPublishPages,,}"
           } >> "${GITHUB_OUTPUT}"
 
@@ -302,6 +317,18 @@ jobs:
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: ${{ steps.request.outputs.drop-gradle-cache == 'true' }}
+
+      - name: Drop Gradle cache
+        if: ${{ steps.request.outputs.drop-gradle-cache == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          locGradleUserHome="${GRADLE_USER_HOME:-${HOME}/.gradle}"
+          echo "Dropping Gradle cache at ${locGradleUserHome}/caches and forcing dependency refresh."
+          rm -rf "${locGradleUserHome}/caches"
+          echo "ALGITES_GRADLE_REFRESH_ARGUMENT=--refresh-dependencies" >> "${GITHUB_ENV}"
 
       - name: Resolve Algites artifact metadata
         id: algites-artifact-metadata
@@ -388,7 +415,7 @@ jobs:
           }
           KTS
 
-          _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" ./gradlew --no-daemon --quiet --project-dir "${locResolverProjectDir}" writeAlgitesResolvedArtifactMetadataProperties
+          _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} --quiet --project-dir "${locResolverProjectDir}" writeAlgitesResolvedArtifactMetadataProperties
 
           locResolvedVersion="$(grep -m 1 '^artifactDirectories\.0\.version\.resolvedValue=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
           locResolvedLane="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
@@ -482,7 +509,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          ./gradlew --no-daemon \
+          ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
             ${{ steps.request.outputs.gradle-task }} \
             -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
             -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
