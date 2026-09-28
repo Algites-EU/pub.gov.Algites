@@ -1543,7 +1543,9 @@ allprojects {
     if (locAlgitesArtifactDirectory != null) {
         plugins.withId("java") {
             AIcConfigureAlgitesJavaEnvironment(project, locAlgitesArtifactDirectory)
-            AIcConfigureAlgitesJavaDependencies(project, locAlgitesArtifactDirectory)
+            afterEvaluate {
+                AIcConfigureAlgitesJavaDependencies(project, locAlgitesArtifactDirectory)
+            }
             val locJavaDependencyPreflight = tasks.register<AIcResolveJavaDependenciesTask>("resolveJavaDependencies") {
                 group = "verification"
                 description = "Resolves the Java dependency graph for this Algites artifact before compilation starts."
