@@ -1201,7 +1201,7 @@ fun AIcAlgitesPortableVersionRequirement(aDefinition: Map<String, Any?>, aContex
         locRequirement["exact"]?.toString()?.takeIf { it.isNotBlank() && it != "null" },
         locBoundary("minimum"),
         locBoundary("maximum"),
-        (locRequirement["maximumStrict"] as? Boolean) ?: true,
+        locRequirement["maximumStrict"] as? Boolean,
         locExclude,
         locRequirement["prefer"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
     )

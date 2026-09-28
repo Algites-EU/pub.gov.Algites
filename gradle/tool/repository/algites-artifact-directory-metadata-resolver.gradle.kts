@@ -38,7 +38,7 @@ data class AIcdAlgitesVersionRequirement(
     val exact: String? = null,
     val minimum: AIcdAlgitesVersionBoundary? = null,
     val maximum: AIcdAlgitesVersionBoundary? = null,
-    val maximumStrict: Boolean = true,
+    val maximumStrict: Boolean? = null,
     val exclude: List<String> = emptyList(),
     val prefer: String? = null
 )
@@ -595,7 +595,7 @@ fun AIcVersionRequirementFromConfig(
     val locMaximumStrictRaw = aValues["$aPrefix.MaximumStrict"]
     val locMaximumStrict = locMaximumStrictRaw?.let {
         AIcParseBoolean(it, "$aContext.MaximumStrict", aFile)
-    } ?: true
+    }
     val locExclude = aValues["$aPrefix.Exclude"]?.let(::AIcParseYamlRawStringList).orEmpty()
     val locPrefer = aValues["$aPrefix.Prefer"]?.trim()?.takeIf { it.isNotBlank() }
 
