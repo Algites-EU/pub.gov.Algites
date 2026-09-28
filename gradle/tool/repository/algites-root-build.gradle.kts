@@ -1368,8 +1368,9 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
     if ("java" !in locConsumerTechnologyKinds) return
 
     val locRequiredConfigurations = linkedMapOf<String, String>()
+    val locEntriesByConfiguration = linkedMapOf<String, MutableList<Pair<Map<String, Any?>, Boolean>>>()
 
-    fun locConfigure(aDefinitions: List<Map<String, Any?>>, aConstraintOnly: Boolean) {
+    fun locCollect(aDefinitions: List<Map<String, Any?>>, aConstraintOnly: Boolean) {
         aDefinitions.forEachIndexed { locIndex, locDefinition ->
             val locDependencyKind = locDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
                 ?: throw GradleException("Project '${aProject.path}' dependency entry #$locIndex is missing DependencyKind.")
@@ -1378,84 +1379,88 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
             val locUsage = locDefinition["usage"]?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: "product_implementation"
             val locConfiguration = AIcAlgitesDependencyUsageToGradleConfiguration(locUsage)
             locRequiredConfigurations.putIfAbsent(locConfiguration, locUsage)
+            locEntriesByConfiguration.getOrPut(locConfiguration) { mutableListOf() }.add(locDefinition to aConstraintOnly)
+        }
+    }
 
-            val locArtifactId = locDefinition["artifactId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-                ?: throw GradleException("Project '${aProject.path}' dependency entry #$locIndex is missing ArtifactId.")
-            val locContext = "Project '${aProject.path}' ${if (aConstraintOnly) "DependencyConstraints" else "Dependencies"}[$locIndex] '$locArtifactId'"
-            val locVersionConstraint = AIcAlgitesGradleVersionConstraint(locDefinition, locContext)
+    locCollect(AIcAlgitesDependencyDefinitions(aArtifactDirectory, "dependencies"), false)
+    locCollect(AIcAlgitesDependencyDefinitions(aArtifactDirectory, "dependencyConstraints"), true)
 
-            aProject.configurations.all(
-                object : Action<Configuration> {
-                    override fun execute(locGradleConfiguration: Configuration) {
-                        if (locGradleConfiguration.name != locConfiguration) return
+    aProject.configurations.all(
+        object : Action<Configuration> {
+            override fun execute(locGradleConfiguration: Configuration) {
+                val locEntries = locEntriesByConfiguration[locGradleConfiguration.name] ?: return
+                locEntries.forEachIndexed { locIndex, (locDefinition, locConstraintOnly) ->
+                    val locDependencyKind = locDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                        ?: throw GradleException("Project '${aProject.path}' dependency entry #$locIndex is missing DependencyKind.")
+                    val locArtifactId = locDefinition["artifactId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                        ?: throw GradleException("Project '${aProject.path}' dependency entry #$locIndex is missing ArtifactId.")
+                    val locContext = "Project '${aProject.path}' ${if (locConstraintOnly) "DependencyConstraints" else "Dependencies"}[$locIndex] '$locArtifactId'"
+                    val locVersionConstraint = AIcAlgitesGradleVersionConstraint(locDefinition, locContext)
 
-                        val locLocalTarget = AIcAlgitesLocalDependencyTarget(locDefinition, aProject.path)
-                        if (locLocalTarget != null) {
-                            val (locTargetProject, locTargetMetadata) = locLocalTarget
-                            val locTargetTechnologyKinds = AIcAlgitesStringList(locTargetMetadata["technologyKinds"]).toSet()
-                            if ("java" !in locTargetTechnologyKinds) {
-                                throw GradleException("$locContext targets local Algites artifact '${locTargetProject.path}' which does not provide TechnologyKind 'java'.")
-                            }
-                            AIcValidateLocalAlgitesDependencyVersion(locDefinition, locTargetProject, locContext)
-                            val locProjectDependency = aProject.dependencies.project(mapOf("path" to locTargetProject.path))
-                            if (aConstraintOnly) {
-                                aProject.dependencies.constraints.add(locConfiguration, locProjectDependency)
-                            } else {
-                                aProject.dependencies.add(locConfiguration, locProjectDependency)
-                            }
-                            return
+                    val locLocalTarget = AIcAlgitesLocalDependencyTarget(locDefinition, aProject.path)
+                    if (locLocalTarget != null) {
+                        val (locTargetProject, locTargetMetadata) = locLocalTarget
+                        val locTargetTechnologyKinds = AIcAlgitesStringList(locTargetMetadata["technologyKinds"]).toSet()
+                        if ("java" !in locTargetTechnologyKinds) {
+                            throw GradleException("$locContext targets local Algites artifact '${locTargetProject.path}' which does not provide TechnologyKind 'java'.")
                         }
+                        AIcValidateLocalAlgitesDependencyVersion(locDefinition, locTargetProject, locContext)
+                        val locProjectDependency = aProject.dependencies.project(mapOf("path" to locTargetProject.path))
+                        if (locConstraintOnly) {
+                            aProject.dependencies.constraints.add(locGradleConfiguration.name, locProjectDependency)
+                        } else {
+                            aProject.dependencies.add(locGradleConfiguration.name, locProjectDependency)
+                        }
+                        return@forEachIndexed
+                    }
 
-                        val locGroupId = locDefinition["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-                            ?: throw GradleException(
-                                "$locContext does not resolve to a local Algites artifact and therefore requires GroupId for external resolution."
-                            )
-                        val locVariantId = locDefinition["variantId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-                        val locEffectiveArtifactId = if (locDependencyKind == "algites" && locVariantId != null) "$locArtifactId-$locVariantId" else locArtifactId
-                        val locNotation = "$locGroupId:$locEffectiveArtifactId"
-                        if (aConstraintOnly) {
-                            aProject.dependencies.constraints.add(
-                                locConfiguration,
-                                locNotation,
-                                object : Action<DependencyConstraint> {
-                                    override fun execute(locDependencyConstraint: DependencyConstraint) {
-                                        locDependencyConstraint.version(
-                                            object : Action<MutableVersionConstraint> {
-                                                override fun execute(locMutableVersionConstraint: MutableVersionConstraint) {
-                                                    AIcApplyAlgitesGradleVersionConstraint(
-                                                        locMutableVersionConstraint,
-                                                        locVersionConstraint
-                                                    )
-                                                }
+                    val locGroupId = locDefinition["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                        ?: throw GradleException(
+                            "$locContext does not resolve to a local Algites artifact and therefore requires GroupId for external resolution."
+                        )
+                    val locVariantId = locDefinition["variantId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                    val locEffectiveArtifactId = if (locDependencyKind == "algites" && locVariantId != null) "$locArtifactId-$locVariantId" else locArtifactId
+                    val locNotation = "$locGroupId:$locEffectiveArtifactId"
+                    if (locConstraintOnly) {
+                        aProject.dependencies.constraints.add(
+                            locGradleConfiguration.name,
+                            locNotation,
+                            object : Action<DependencyConstraint> {
+                                override fun execute(locDependencyConstraint: DependencyConstraint) {
+                                    locDependencyConstraint.version(
+                                        object : Action<MutableVersionConstraint> {
+                                            override fun execute(locMutableVersionConstraint: MutableVersionConstraint) {
+                                                AIcApplyAlgitesGradleVersionConstraint(
+                                                    locMutableVersionConstraint,
+                                                    locVersionConstraint
+                                                )
                                             }
+                                        }
+                                    )
+                                }
+                            }
+                        )
+                    } else {
+                        val locDependency = aProject.dependencies.create(locNotation)
+                        if (locDependency is ExternalModuleDependency) {
+                            locDependency.version(
+                                object : Action<MutableVersionConstraint> {
+                                    override fun execute(locMutableVersionConstraint: MutableVersionConstraint) {
+                                        AIcApplyAlgitesGradleVersionConstraint(
+                                            locMutableVersionConstraint,
+                                            locVersionConstraint
                                         )
                                     }
                                 }
                             )
-                        } else {
-                            val locDependency = aProject.dependencies.create(locNotation)
-                            if (locDependency is ExternalModuleDependency) {
-                                locDependency.version(
-                                    object : Action<MutableVersionConstraint> {
-                                        override fun execute(locMutableVersionConstraint: MutableVersionConstraint) {
-                                            AIcApplyAlgitesGradleVersionConstraint(
-                                                locMutableVersionConstraint,
-                                                locVersionConstraint
-                                            )
-                                        }
-                                    }
-                                )
-                            }
-                            aProject.dependencies.add(locConfiguration, locDependency)
                         }
+                        aProject.dependencies.add(locGradleConfiguration.name, locDependency)
                     }
                 }
-            )
+            }
         }
-    }
-
-    locConfigure(AIcAlgitesDependencyDefinitions(aArtifactDirectory, "dependencies"), false)
-    locConfigure(AIcAlgitesDependencyDefinitions(aArtifactDirectory, "dependencyConstraints"), true)
+    )
 
     aProject.afterEvaluate {
         locRequiredConfigurations.forEach { (locConfiguration, locUsage) ->
