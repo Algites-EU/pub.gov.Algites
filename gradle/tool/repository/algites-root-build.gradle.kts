@@ -48,7 +48,7 @@ import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import java.io.File
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -364,7 +364,7 @@ abstract class AIcResolvePythonDependenciesTask : DefaultTask() {
         if (locUsername.isNullOrEmpty() || locPassword.isNullOrEmpty()) {
             throw GradleException("Credential profile '$locProfileId' type 'basic' is not available for Python dependency resolution.")
         }
-        val locUrl = URL(locEndpointUrl)
+        val locUrl = URI(locEndpointUrl).toURL()
         val locEncode: (String) -> String = { locValue -> URLEncoder.encode(locValue, StandardCharsets.UTF_8).replace("+", "%20") }
         val locPort = if (locUrl.port >= 0) ":${locUrl.port}" else ""
         val locPath = locUrl.file.ifBlank { "/" }
@@ -935,7 +935,7 @@ fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcdAlgitesRepositoryEndpoint, aProfi
 }
 
 fun AIcAlgitesHttpRequest(aMethod: String, aUrl: String, aHeaders: Map<String, String>): Pair<Int, String> {
-    val locConnection = URL(aUrl).openConnection() as HttpURLConnection
+    val locConnection = URI(aUrl).toURL().openConnection() as HttpURLConnection
     locConnection.requestMethod = aMethod
     locConnection.connectTimeout = 30_000
     locConnection.readTimeout = 60_000
@@ -958,7 +958,7 @@ fun AIcAlgitesHttpJsonRequest(
     aHeaders: Map<String, String>,
     aBody: String
 ): Pair<Int, String> {
-    val locConnection = URL(aUrl).openConnection() as HttpURLConnection
+    val locConnection = URI(aUrl).toURL().openConnection() as HttpURLConnection
     locConnection.requestMethod = aMethod
     locConnection.connectTimeout = 30_000
     locConnection.readTimeout = 60_000
@@ -1386,9 +1386,15 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
                     locNotation,
                     object : Action<DependencyConstraint> {
                         override fun execute(locDependencyConstraint: DependencyConstraint) {
-                            AIcApplyAlgitesGradleVersionConstraint(
-                                locDependencyConstraint.versionConstraint,
-                                locVersionConstraint
+                            locDependencyConstraint.version(
+                                object : Action<MutableVersionConstraint> {
+                                    override fun execute(locMutableVersionConstraint: MutableVersionConstraint) {
+                                        AIcApplyAlgitesGradleVersionConstraint(
+                                            locMutableVersionConstraint,
+                                            locVersionConstraint
+                                        )
+                                    }
+                                }
                             )
                         }
                     }
