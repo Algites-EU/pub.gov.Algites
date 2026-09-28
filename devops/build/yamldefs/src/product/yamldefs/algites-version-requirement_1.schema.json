@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-version-requirement_1.schema.json",
+  "title": "Algites Portable Version Requirement v1",
+  "$defs": {
+    "VersionList": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      ]
+    },
+    "VersionRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Exact": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Minimum": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:(?:>=|>)[^<>=!\\s]+|[^<>=!\\s]+(?:<=|<))$"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "Version": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "Inclusive": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "Version",
+                "Inclusive"
+              ]
+            }
+          ]
+        },
+        "Maximum": {
+          "oneOf": [
+            {
+              "type": "string",
+              "pattern": "^(?:(?:<=|<)[^<>=!\\s]+|[^<>=!\\s]+(?:>=|>))$"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "Version": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "Inclusive": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "Version",
+                "Inclusive"
+              ]
+            }
+          ]
+        },
+        "MaximumStrict": {
+          "type": "boolean",
+          "default": true
+        },
+        "Exclude": {
+          "$ref": "#/$defs/VersionList"
+        },
+        "Prefer": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "minProperties": 1,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "Exact"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "Minimum"
+                  ]
+                },
+                {
+                  "required": [
+                    "Maximum"
+                  ]
+                },
+                {
+                  "required": [
+                    "MaximumStrict"
+                  ]
+                },
+                {
+                  "required": [
+                    "Exclude"
+                  ]
+                },
+                {
+                  "required": [
+                    "Prefer"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "MaximumStrict"
+            ]
+          },
+          "then": {
+            "required": [
+              "Maximum"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "$ref": "#/$defs/VersionRequirement"
+}

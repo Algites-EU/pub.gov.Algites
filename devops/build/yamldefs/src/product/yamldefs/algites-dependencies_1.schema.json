@@ -1,0 +1,336 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-dependencies_1.schema.json",
+  "title": "Algites Dependencies v1",
+  "$defs": {
+    "AlgitesDependencyItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "GroupId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ArtifactId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Usage": {
+          "type": "string",
+          "enum": [
+            "product_api",
+            "product_implementation",
+            "product_compile_only",
+            "product_runtime_only",
+            "develop_implementation",
+            "develop_compile_only",
+            "develop_runtime_only"
+          ]
+        },
+        "VersionRequirement": {
+          "$ref": "algites-version-requirement_1.schema.json"
+        },
+        "VariantId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      },
+      "required": [
+        "ArtifactId"
+      ]
+    },
+    "AlgitesDependencyConstraintItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "GroupId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ArtifactId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Usage": {
+          "type": "string",
+          "enum": [
+            "product_api",
+            "product_implementation",
+            "product_compile_only",
+            "product_runtime_only",
+            "develop_implementation",
+            "develop_compile_only",
+            "develop_runtime_only"
+          ]
+        },
+        "VersionRequirement": {
+          "$ref": "algites-version-requirement_1.schema.json"
+        },
+        "VariantId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      },
+      "required": [
+        "ArtifactId",
+        "VersionRequirement"
+      ]
+    },
+    "JavaDependencyItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "GroupId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ArtifactId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Usage": {
+          "type": "string",
+          "enum": [
+            "product_api",
+            "product_implementation",
+            "product_compile_only",
+            "product_runtime_only",
+            "develop_implementation",
+            "develop_compile_only",
+            "develop_runtime_only"
+          ]
+        },
+        "VersionRequirement": {
+          "$ref": "algites-version-requirement_1.schema.json"
+        }
+      },
+      "required": [
+        "ArtifactId",
+        "GroupId"
+      ]
+    },
+    "JavaDependencyConstraintItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "GroupId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ArtifactId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Usage": {
+          "type": "string",
+          "enum": [
+            "product_api",
+            "product_implementation",
+            "product_compile_only",
+            "product_runtime_only",
+            "develop_implementation",
+            "develop_compile_only",
+            "develop_runtime_only"
+          ]
+        },
+        "VersionRequirement": {
+          "$ref": "algites-version-requirement_1.schema.json"
+        }
+      },
+      "required": [
+        "ArtifactId",
+        "GroupId",
+        "VersionRequirement"
+      ]
+    },
+    "PythonDependencyItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ArtifactId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Usage": {
+          "type": "string",
+          "enum": [
+            "product_api",
+            "product_implementation",
+            "product_compile_only",
+            "product_runtime_only",
+            "develop_implementation",
+            "develop_compile_only",
+            "develop_runtime_only"
+          ]
+        },
+        "VersionRequirement": {
+          "$ref": "algites-version-requirement_1.schema.json"
+        }
+      },
+      "required": [
+        "ArtifactId"
+      ]
+    },
+    "PythonDependencyConstraintItem": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ArtifactId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Usage": {
+          "type": "string",
+          "enum": [
+            "product_api",
+            "product_implementation",
+            "product_compile_only",
+            "product_runtime_only",
+            "develop_implementation",
+            "develop_compile_only",
+            "develop_runtime_only"
+          ]
+        },
+        "VersionRequirement": {
+          "$ref": "algites-version-requirement_1.schema.json"
+        }
+      },
+      "required": [
+        "ArtifactId",
+        "VersionRequirement"
+      ]
+    },
+    "DependencyGroup": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "DependencyKind": {
+              "const": "algites"
+            },
+            "Items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/AlgitesDependencyItem"
+              }
+            }
+          },
+          "required": [
+            "DependencyKind",
+            "Items"
+          ]
+        },
+        {
+          "properties": {
+            "DependencyKind": {
+              "const": "java"
+            },
+            "Items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/JavaDependencyItem"
+              }
+            }
+          },
+          "required": [
+            "DependencyKind",
+            "Items"
+          ]
+        },
+        {
+          "properties": {
+            "DependencyKind": {
+              "const": "python"
+            },
+            "Items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/PythonDependencyItem"
+              }
+            }
+          },
+          "required": [
+            "DependencyKind",
+            "Items"
+          ]
+        }
+      ]
+    },
+    "DependencyConstraintGroup": {
+      "type": "object",
+      "unevaluatedProperties": false,
+      "oneOf": [
+        {
+          "properties": {
+            "DependencyKind": {
+              "const": "algites"
+            },
+            "Items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/AlgitesDependencyConstraintItem"
+              }
+            }
+          },
+          "required": [
+            "DependencyKind",
+            "Items"
+          ]
+        },
+        {
+          "properties": {
+            "DependencyKind": {
+              "const": "java"
+            },
+            "Items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/JavaDependencyConstraintItem"
+              }
+            }
+          },
+          "required": [
+            "DependencyKind",
+            "Items"
+          ]
+        },
+        {
+          "properties": {
+            "DependencyKind": {
+              "const": "python"
+            },
+            "Items": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/PythonDependencyConstraintItem"
+              }
+            }
+          },
+          "required": [
+            "DependencyKind",
+            "Items"
+          ]
+        }
+      ]
+    },
+    "Dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DependencyGroup"
+      }
+    },
+    "DependencyConstraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DependencyConstraintGroup"
+      }
+    }
+  }
+}

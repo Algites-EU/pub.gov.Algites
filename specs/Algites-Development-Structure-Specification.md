@@ -53,7 +53,7 @@ The goals are:
 
 Algites-controlled structured-data formats MUST use one common wire naming convention across YAML definitions (`yamldefs`), JSON definitions (`jsondefs`), and XML definitions (`xmldefs`):
 
-- schema-defined Algites properties, XML elements, and XML attributes use **UpperCamelCase**, for example `TechnologyKinds`, `ArtifactId`, `ReleaseLine`, and `ContentKinds`;
+- schema-defined Algites properties, XML elements, and XML attributes use **UpperCamelCase**, for example `TechnologyKinds`, `ArtifactId`, `ReleaseLineVersion`, and `ContentKinds`;
 - Algites symbolic/enum values use **lower_snake_case**, for example `release_candidate`, `self_contained`, `api_key`, and `snapshot`; single-word symbolic values remain lowercase, for example `java`, `python`, and `count`;
 - environment variables and system-level constant identifiers use **UPPER_SNAKE_CASE**, for example `ALGITES_TECHNOLOGY_KINDS`;
 - controlled file and directory names use **lower-kebab-case** unless another established external syntax requires otherwise, for example `license-usage.yml` and `algites-artifact-manifest.yml`;
@@ -824,6 +824,14 @@ For every resolved artifact and dependency intent, the system should be able to 
 ---
 
 ### 3.5. Dependency Intent Model
+
+#### 3.5.0 Initial descriptor bridge
+
+Before the complete Dependency Intent model is implemented by the build system, source descriptors expose inherited top-level `Dependencies` and `DependencyConstraints` collections as a deliberately smaller authoring surface. This bridge does not replace the normative intent model; it provides deterministic dependency edges and constraints needed by the current build infrastructure while preserving scheme-specific version semantics through the common version library.
+
+Dependencies are grouped by `DependencyKind` (`algites`, `java`, or `python`). Each item uses the common portable `VersionRequirement` model; the target adapter converts that policy to native Gradle or PEP 440 semantics. An optional `VariantId` is part of Algites artifact identity. `DependencyConstraints` never create a dependency edge.
+
+The current `Usage` values (`product_api`, `product_implementation`, `product_compile_only`, `product_runtime_only`, and `develop_*` counterparts) are normalization inputs for the present adapters. They are expected to map into the richer Dependency Intent rules rather than become a parallel long-term semantic system.
 
 #### 3.5.1 DependencyIntentRule Templates (no versions)
 

@@ -23,10 +23,14 @@ val locAlgitesArtifactMetadata = locAlgitesResolvedArtifactDirectories.map { loc
         "technologyKinds" to locArtifactDirectory["technologyKinds"],
         "name" to locArtifactDirectory["name"],
         "description" to locArtifactDirectory["description"],
+        "variantId" to locArtifactDirectory["variantId"],
         "relativePath" to locArtifactDirectory["path"],
         "hasGradleBuild" to locArtifactDirectory["hasGradleBuild"],
         "projectPath" to locArtifactDirectory["gradleProjectPath"],
         "repositories" to locArtifactDirectory["repositories"],
+        "dependencies" to locArtifactDirectory["dependencies"],
+        "dependencyConstraints" to locArtifactDirectory["dependencyConstraints"],
+        "environmentRequirements" to locArtifactDirectory["environmentRequirements"],
         "deleteSnapshotWhenReleased" to locArtifactDirectory["deleteSnapshotWhenReleased"]
     )
 }

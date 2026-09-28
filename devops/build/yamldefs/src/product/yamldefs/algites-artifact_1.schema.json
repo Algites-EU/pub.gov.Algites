@@ -34,6 +34,10 @@
         },
         "Version": {
           "$ref": "algites-version_1.schema.json"
+        },
+        "VariantId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         }
       },
       "required": [
@@ -50,9 +54,18 @@
     "CredentialProfiles": {
       "$ref": "algites-credential-profiles_1.schema.json"
     },
+    "Dependencies": {
+      "$ref": "algites-dependencies_1.schema.json#/$defs/Dependencies"
+    },
+    "DependencyConstraints": {
+      "$ref": "algites-dependencies_1.schema.json#/$defs/DependencyConstraints"
+    },
     "DeleteSnapshotWhenReleased": {
       "type": "boolean",
       "default": true
+    },
+    "EnvironmentRequirements": {
+      "$ref": "algites-environment-requirements_1.schema.json"
     }
   },
   "required": [

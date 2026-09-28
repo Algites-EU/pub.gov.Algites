@@ -28,23 +28,11 @@ Future Algites build-runtime libraries that are not related to version handling 
 
 ## `pub.lib.General` version
 
-Until the Algites dependency model is used by the build infrastructure itself, the `pub.lib.General` version is declared directly by this artifact's Gradle build.
+The current source artifact declares its build-support dependencies in `algites-artifact.yml` through grouped `DependencyKind: algites` items with `Usage: product_api`, so the generated Java publication exports them transitively.
 
-The default is:
+The current dependency requirement uses the exact Algites v1 snapshot version `1.0-SNAPSHOT`; repository version metadata separately uses `ReleaseLineVersion`, `Revision`, and `QualifierKind`. Changing the build-support dependency set or its versions is therefore a governed source-metadata change of this artifact.
 
-```text
-1.0-SNAPSHOT
-```
-
-It can be overridden when building/publishing this artifact with:
-
-```bash
-./gradlew ... -Palgites.build.pubLibGeneral.version=<version>
-```
-
-The effective dependency version is written to the published Gradle module metadata/POM by the normal Gradle publication process. Consumers of this artifact therefore do not need to select the individual `pub.lib.General` versions themselves.
-
-A floating `*-SNAPSHOT` dependency is suitable for the initial bootstrap phase but does not identify one immutable snapshot instance. Once immutable release or snapshot coordinates are available, this artifact should pin those coordinates instead.
+The bootstrap remains intentionally asymmetric: the shared root build script obtains the version/conversion classes from an already-published `algitesbuild:1.0-SNAPSHOT`, while the current source `algitesbuild` artifact is built and republished using the dependency declarations above. This avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency model.
 
 ## Publication identity
 
@@ -66,3 +54,9 @@ eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:<bootstrap-versi
 ```
 
 The build of a new `pub.gov.Algites` generation must still use an already-published bootstrap version. After the new governance generation has published its own `algitesbuild` artifact, downstream builds such as `priv.gov.Algites` can use that newly published version.
+
+## Current Gradle bootstrap
+
+The shared `gradle/tool/repository/algites-root-build.gradle.kts` currently loads this artifact on its script classpath from the public Cloudsmith snapshot repository using version `1.0-SNAPSHOT`. The script therefore imports the version/conversion classes transitively exposed by this bundle instead of declaring the individual `pub.lib.General` artifacts itself.
+
+The floating snapshot coordinate is intentional during the current development phase. It can later be replaced by an immutable/released bootstrap coordinate without changing the dependency-model implementation or its consumers.

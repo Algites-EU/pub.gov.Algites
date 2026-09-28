@@ -11,22 +11,63 @@ import java.net.URI
 import java.security.MessageDigest
 
 data class AIcdAlgitesVersion(
-    val lane: String? = null,
+    val releaseLineVersion: String? = null,
     val revision: String? = null,
     val qualifierKind: String? = null
 ) {
     fun AIcMerge(aOther: AIcdAlgitesVersion): AIcdAlgitesVersion = AIcdAlgitesVersion(
-        lane = aOther.lane ?: lane,
+        releaseLineVersion = aOther.releaseLineVersion ?: releaseLineVersion,
         revision = aOther.revision ?: revision,
         qualifierKind = aOther.qualifierKind ?: qualifierKind
     )
 
     fun AIcResolvedValue(): String? {
-        val locLane = lane?.takeIf { it.isNotBlank() } ?: return null
+        val locReleaseLineVersion = releaseLineVersion?.takeIf { it.isNotBlank() } ?: return null
         val locRevision = revision?.takeIf { it.isNotBlank() }
-        val locBase = if (locRevision == null) locLane else "$locLane.$locRevision"
+        val locBase = if (locRevision == null) locReleaseLineVersion else "$locReleaseLineVersion.$locRevision"
         return if (qualifierKind?.equals("snapshot", true) == true) "$locBase-SNAPSHOT" else locBase
     }
+}
+
+data class AIcdAlgitesVersionBoundary(
+    val version: String,
+    val inclusive: Boolean
+)
+
+data class AIcdAlgitesVersionRequirement(
+    val exact: String? = null,
+    val minimum: AIcdAlgitesVersionBoundary? = null,
+    val maximum: AIcdAlgitesVersionBoundary? = null,
+    val maximumStrict: Boolean = true,
+    val exclude: List<String> = emptyList(),
+    val prefer: String? = null
+)
+
+data class AIcdAlgitesDependencyDefinition(
+    val dependencyKind: String,
+    val groupId: String? = null,
+    val artifactId: String,
+    val variantId: String? = null,
+    val usage: String = "product_implementation",
+    val versionRequirement: AIcdAlgitesVersionRequirement? = null
+) {
+    fun AIcIdentity(): String = listOf(
+        dependencyKind,
+        groupId ?: "",
+        artifactId,
+        variantId ?: "",
+        usage
+    ).joinToString("|")
+}
+
+fun AIcMergeDependencyDefinitions(
+    aBase: List<AIcdAlgitesDependencyDefinition>,
+    aOverride: List<AIcdAlgitesDependencyDefinition>
+): List<AIcdAlgitesDependencyDefinition> {
+    val locMerged = linkedMapOf<String, AIcdAlgitesDependencyDefinition>()
+    aBase.forEach { locDependency -> locMerged[locDependency.AIcIdentity()] = locDependency }
+    aOverride.forEach { locDependency -> locMerged[locDependency.AIcIdentity()] = locDependency }
+    return locMerged.values.toList()
 }
 
 data class AIcdAlgitesRepositoryEndpoint(
@@ -71,6 +112,9 @@ data class AIcdAlgitesResolvedState(
     val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>> = emptyMap(),
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition> = emptyMap(),
     val version: AIcdAlgitesVersion = AIcdAlgitesVersion(),
+    val dependencies: List<AIcdAlgitesDependencyDefinition> = emptyList(),
+    val dependencyConstraints: List<AIcdAlgitesDependencyDefinition> = emptyList(),
+    val environmentRequirements: Map<String, AIcdAlgitesVersionRequirement> = emptyMap(),
     val deleteSnapshotWhenReleased: Boolean? = null
 ) {
     fun AIcMerge(aOther: AIcdAlgitesResolvedState): AIcdAlgitesResolvedState {
@@ -96,6 +140,9 @@ data class AIcdAlgitesResolvedState(
             repositories = locRepositories,
             credentialProfiles = locProfiles,
             version = version.AIcMerge(aOther.version),
+            dependencies = AIcMergeDependencyDefinitions(dependencies, aOther.dependencies),
+            dependencyConstraints = AIcMergeDependencyDefinitions(dependencyConstraints, aOther.dependencyConstraints),
+            environmentRequirements = environmentRequirements + aOther.environmentRequirements,
             deleteSnapshotWhenReleased = aOther.deleteSnapshotWhenReleased ?: deleteSnapshotWhenReleased
         )
     }
@@ -120,12 +167,16 @@ data class AIcdAlgitesArtifactDirectoryMetadata(
     val name: String,
     val description: String,
     val groupId: String?,
+    val variantId: String?,
     val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>>,
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>,
     val contentsModel: String,
     val hasGradleBuild: Boolean,
     val gradleProjectPath: String,
     val version: AIcdAlgitesVersion,
+    val dependencies: List<AIcdAlgitesDependencyDefinition>,
+    val dependencyConstraints: List<AIcdAlgitesDependencyDefinition>,
+    val environmentRequirements: Map<String, AIcdAlgitesVersionRequirement>,
     val deleteSnapshotWhenReleased: Boolean,
     val descriptorHierarchy: List<AIcdAlgitesDescriptorDigest>
 )
@@ -137,6 +188,8 @@ data class AIcdAlgitesRepositoryMetadata(
     val groupId: String?,
     val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>>,
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>,
+    val dependencies: List<AIcdAlgitesDependencyDefinition>,
+    val dependencyConstraints: List<AIcdAlgitesDependencyDefinition>,
     val deleteSnapshotWhenReleased: Boolean
 )
 
@@ -234,6 +287,8 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
         groupId = locRootState.groupId ?: locRepositoryBase.groupId,
         repositories = locRootState.repositories,
         credentialProfiles = locRootState.credentialProfiles,
+        dependencies = locRootState.dependencies,
+        dependencyConstraints = locRootState.dependencyConstraints,
         deleteSnapshotWhenReleased = locRootState.deleteSnapshotWhenReleased ?: true
     )
 
@@ -248,8 +303,57 @@ fun AIcResolveAlgitesArtifactDirectoryMetadata(
     } else {
         AIcResolveArtifactDirectoryAndSubdirectories(aRepositoryRoot, locNormalizedPath ?: ".", locInitialState)
     }
+    AIcValidateArtifactVariantCoordinateCollisions(locRepository.id, locArtifactDirectories)
 
     return AIcdAlgitesResolutionResult(locRepository, locArtifactDirectories)
+}
+
+fun AIcCanonicalArtifactId(aRepositoryId: String, aArtifactPath: String): String {
+    val locPathDots = aArtifactPath.trim().trim('/').replace('/', '.')
+    return if (locPathDots.isBlank() || locPathDots == ".") aRepositoryId else "${aRepositoryId}_$locPathDots"
+}
+
+fun AIcEffectiveArtifactId(aRepositoryId: String, aArtifactPath: String, aVariantId: String?): String {
+    val locBase = AIcCanonicalArtifactId(aRepositoryId, aArtifactPath)
+    return aVariantId?.takeIf { it.isNotBlank() }?.let { "$locBase-$it" } ?: locBase
+}
+
+fun AIcPythonCoordinateName(aGroupId: String?, aArtifactId: String): String {
+    val locOwnerPrefix = aGroupId
+        ?.split('.')
+        ?.map(String::trim)
+        ?.filter(String::isNotEmpty)
+        ?.take(2)
+        ?.joinToString("-")
+        ?.lowercase()
+        ?.replace(Regex("[._-]+"), "-")
+        ?.trim('-')
+        .orEmpty()
+    val locArtifact = aArtifactId.lowercase().replace(Regex("[._-]+"), "-").trim('-')
+    return listOf(locOwnerPrefix, locArtifact).filter(String::isNotEmpty).joinToString("-")
+}
+
+fun AIcValidateArtifactVariantCoordinateCollisions(
+    aRepositoryId: String,
+    aArtifactDirectories: List<AIcdAlgitesArtifactDirectoryMetadata>
+) {
+    val locJavaCoordinates = linkedMapOf<String, MutableList<String>>()
+    val locPythonCoordinates = linkedMapOf<String, MutableList<String>>()
+    aArtifactDirectories.forEach { locArtifact ->
+        val locEffectiveId = AIcEffectiveArtifactId(aRepositoryId, locArtifact.path, locArtifact.variantId)
+        if ("java" in locArtifact.technologyKinds) {
+            val locCoordinate = "${locArtifact.groupId.orEmpty()}:$locEffectiveId"
+            locJavaCoordinates.getOrPut(locCoordinate) { mutableListOf() }.add(locArtifact.path)
+        }
+        if ("python" in locArtifact.technologyKinds) {
+            val locCoordinate = AIcPythonCoordinateName(locArtifact.groupId, locEffectiveId)
+            locPythonCoordinates.getOrPut(locCoordinate) { mutableListOf() }.add(locArtifact.path)
+        }
+    }
+    (locJavaCoordinates.filterValues { it.size > 1 }.map { (locCoordinate, locPaths) -> "Java '$locCoordinate' <- ${locPaths.joinToString(", ")}" } +
+        locPythonCoordinates.filterValues { it.size > 1 }.map { (locCoordinate, locPaths) -> "Python '$locCoordinate' <- ${locPaths.joinToString(", ")}" })
+        .takeIf { it.isNotEmpty() }
+        ?.let { locCollisions -> error("Algites artifact VariantId/native-coordinate collision(s): ${locCollisions.joinToString("; ")}") }
 }
 
 fun AIcResolveRepositoryMetadataBase(
@@ -267,7 +371,7 @@ fun AIcResolveRepositoryMetadataBase(
         ?: locRootConfig?.values?.let { AIcFirstValue(it, "SourceRepository.Visibility") }?.takeIf { it.isNotBlank() }
         ?: AIcInferVisibilityFromRepositoryName(locRepositoryId)
     val locGroupId = locRootConfig?.values?.let { AIcFirstValue(it, "GroupId") }?.takeIf { it.isNotBlank() }
-    return AIcdAlgitesRepositoryMetadata(locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyMap(), emptyMap(), true)
+    return AIcdAlgitesRepositoryMetadata(locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyMap(), emptyMap(), emptyList(), emptyList(), true)
 }
 
 fun AIcInferVisibilityFromRepositoryName(aRepositoryName: String): String = when {
@@ -394,6 +498,10 @@ fun AIcArtifactDirectoryMetadataFromConfig(
     val locName = AIcFirstValue(aConfig.values, "$locPrefix.Name", "$locPrefix.Id")
         ?.takeIf { it.isNotBlank() } ?: if (locPath == ".") aRepositoryRoot.name else aDirectory.name
     val locDescription = AIcFirstValue(aConfig.values, "$locPrefix.Description") ?: ""
+    val locVariantId = AIcFirstValue(aConfig.values, "$locPrefix.VariantId")?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+    if (locVariantId != null && !Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(locVariantId)) {
+        error("VariantId '$locVariantId' in '${aConfig.file.path}' must use lowercase dash-separated form.")
+    }
     return AIcdAlgitesArtifactDirectoryMetadata(
         path = locPath,
         structureKind = aConfig.structureKind,
@@ -401,12 +509,16 @@ fun AIcArtifactDirectoryMetadataFromConfig(
         name = locName,
         description = locDescription,
         groupId = aState.groupId,
+        variantId = locVariantId,
         repositories = aState.repositories,
         credentialProfiles = aState.credentialProfiles,
         contentsModel = aContentsModel,
         hasGradleBuild = AIcHasGradleBuild(aDirectory),
         gradleProjectPath = AIcGradleProjectPath(aRepositoryRoot, aDirectory),
         version = aState.version,
+        dependencies = aState.dependencies,
+        dependencyConstraints = aState.dependencyConstraints,
+        environmentRequirements = aState.environmentRequirements,
         deleteSnapshotWhenReleased = aState.deleteSnapshotWhenReleased ?: true,
         descriptorHierarchy = AIcDescriptorHierarchy(aRepositoryRoot, aDirectory)
     )
@@ -441,23 +553,193 @@ fun AIcResolvedStateFromConfig(aConfig: AIcdAlgitesDirectoryConfig): AIcdAlgites
     return locBase.copy(technologyKinds = locTechnologyKinds)
 }
 
+fun AIcParseVersionBoundary(aValue: String, aMinimum: Boolean, aContext: String): AIcdAlgitesVersionBoundary {
+    val locValue = aValue.trim()
+    if (locValue.isBlank()) error("$aContext must not be blank.")
+    val locPrefixOperator = listOf(">=", "<=", ">", "<").firstOrNull { locValue.startsWith(it) }
+    val locSuffixOperator = listOf(">=", "<=", ">", "<").firstOrNull { locValue.endsWith(it) }
+    if (locPrefixOperator != null && locSuffixOperator != null && locValue.length > locPrefixOperator.length + locSuffixOperator.length) {
+        error("$aContext must contain exactly one boundary operator.")
+    }
+    val locOperator = locPrefixOperator ?: locSuffixOperator ?: error("$aContext must contain a comparison operator.")
+    val locVersion = if (locPrefixOperator != null) locValue.removePrefix(locOperator).trim() else locValue.removeSuffix(locOperator).trim()
+    if (locVersion.isBlank()) error("$aContext is missing the version value.")
+    val locValid = if (locPrefixOperator != null) {
+        if (aMinimum) locOperator.startsWith(">") else locOperator.startsWith("<")
+    } else {
+        if (aMinimum) locOperator.startsWith("<") else locOperator.startsWith(">")
+    }
+    if (!locValid) error("$aContext operator '$locOperator' points in the wrong direction.")
+    return AIcdAlgitesVersionBoundary(locVersion, locOperator.length == 2)
+}
+
+fun AIcVersionRequirementFromConfig(
+    aValues: Map<String, String>,
+    aPrefix: String,
+    aFile: File,
+    aContext: String
+): AIcdAlgitesVersionRequirement? {
+    val locExact = aValues["$aPrefix.Exact"]?.trim()?.takeIf { it.isNotBlank() }
+    fun locBoundary(aName: String, aMinimum: Boolean): AIcdAlgitesVersionBoundary? {
+        aValues["$aPrefix.$aName"]?.trim()?.takeIf { it.isNotBlank() }?.let { locValue ->
+            return AIcParseVersionBoundary(locValue, aMinimum, "$aContext.$aName")
+        }
+        val locVersion = aValues["$aPrefix.$aName.Version"]?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        val locInclusive = aValues["$aPrefix.$aName.Inclusive"]?.let {
+            AIcParseBoolean(it, "$aContext.$aName.Inclusive", aFile)
+        } ?: error("$aContext.$aName requires Inclusive when the structured boundary form is used.")
+        return AIcdAlgitesVersionBoundary(locVersion, locInclusive)
+    }
+    val locMinimum = locBoundary("Minimum", true)
+    val locMaximum = locBoundary("Maximum", false)
+    val locMaximumStrictRaw = aValues["$aPrefix.MaximumStrict"]
+    val locMaximumStrict = locMaximumStrictRaw?.let {
+        AIcParseBoolean(it, "$aContext.MaximumStrict", aFile)
+    } ?: true
+    val locExclude = aValues["$aPrefix.Exclude"]?.let(::AIcParseYamlRawStringList).orEmpty()
+    val locPrefer = aValues["$aPrefix.Prefer"]?.trim()?.takeIf { it.isNotBlank() }
+
+    val locPresent = locExact != null || locMinimum != null || locMaximum != null || locMaximumStrictRaw != null || locExclude.isNotEmpty() || locPrefer != null
+    if (!locPresent) return null
+    if (locExact != null && (locMinimum != null || locMaximum != null || locMaximumStrictRaw != null || locExclude.isNotEmpty() || locPrefer != null)) {
+        error("$aContext.Exact cannot be combined with Minimum, Maximum, MaximumStrict, Exclude, or Prefer.")
+    }
+    if (locMaximumStrictRaw != null && locMaximum == null) {
+        error("$aContext.MaximumStrict requires Maximum.")
+    }
+    if (locPrefer != null && locPrefer in locExclude) {
+        error("$aContext.Prefer '$locPrefer' must not also be excluded.")
+    }
+    return AIcdAlgitesVersionRequirement(locExact, locMinimum, locMaximum, locMaximumStrict, locExclude, locPrefer)
+}
+
+fun AIcEnvironmentRequirementsFromConfig(aValues: Map<String, String>, aFile: File): Map<String, AIcdAlgitesVersionRequirement> {
+    val locResult = linkedMapOf<String, AIcdAlgitesVersionRequirement>()
+    listOf("Java", "Python", "Mps").forEach { locEnvironment ->
+        AIcVersionRequirementFromConfig(
+            aValues,
+            "EnvironmentRequirements.$locEnvironment",
+            aFile,
+            "${aFile.path}:EnvironmentRequirements.$locEnvironment"
+        )?.let { locRequirement -> locResult[locEnvironment.lowercase()] = locRequirement }
+    }
+    return locResult
+}
+
 fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String, aFile: File): AIcdAlgitesResolvedState {
     val locGroupId = AIcFirstValue(aValues, "GroupId")?.takeIf { it.isNotBlank() }
     val locVersion = AIcdAlgitesVersion(
-        lane = AIcFirstValue(aValues, "$aPrefix.Version.Lane", "$aPrefix.Version.ReleaseLine", "Version.Lane", "Version.ReleaseLine")?.takeIf { it.isNotBlank() },
+        releaseLineVersion = AIcFirstValue(aValues, "$aPrefix.Version.ReleaseLineVersion", "Version.ReleaseLineVersion")?.takeIf { it.isNotBlank() },
         revision = AIcFirstValue(aValues, "$aPrefix.Version.Revision", "Version.Revision")?.takeIf { it.isNotBlank() },
         qualifierKind = AIcFirstValue(aValues, "$aPrefix.Version.QualifierKind", "Version.QualifierKind")?.takeIf { it.isNotBlank() }
     )
+    locVersion.releaseLineVersion?.let { locReleaseLineVersion ->
+        if (!Regex("^[0-9]+(?:\\.[0-9]+)*$").matches(locReleaseLineVersion)) {
+            error("Algites ReleaseLineVersion '$locReleaseLineVersion' in '${aFile.path}' must contain only numeric components separated by dots.")
+        }
+    }
     return AIcdAlgitesResolvedState(
         groupId = locGroupId,
         repositories = AIcRepositoryOverridesFromConfig(aValues, aPrefix, aFile),
         credentialProfiles = AIcCredentialProfilesFromConfig(aValues, aFile),
         version = locVersion,
+        dependencies = AIcDependencyDefinitionsFromConfig(aValues, "Dependencies", aFile, false),
+        dependencyConstraints = AIcDependencyDefinitionsFromConfig(aValues, "DependencyConstraints", aFile, true),
+        environmentRequirements = AIcEnvironmentRequirementsFromConfig(aValues, aFile),
         deleteSnapshotWhenReleased = AIcFirstValue(aValues, "DeleteSnapshotWhenReleased")
             ?.takeIf { it.isNotBlank() }
             ?.let { AIcParseBoolean(it, "DeleteSnapshotWhenReleased", aFile) }
     )
 }
+
+fun AIcDependencyDefinitionsFromConfig(
+    aValues: Map<String, String>,
+    aPropertyName: String,
+    aFile: File,
+    aConstraint: Boolean
+): List<AIcdAlgitesDependencyDefinition> {
+    val locSupportedKinds = setOf("algites", "java", "python")
+    val locSupportedUsages = setOf(
+        "product_api", "product_implementation", "product_compile_only", "product_runtime_only",
+        "develop_implementation", "develop_compile_only", "develop_runtime_only"
+    )
+    val locGroupIndices = aValues.keys.mapNotNull { locKey ->
+        Regex("^${Regex.escape(aPropertyName)}\\.(\\d+)\\.DependencyKind$").matchEntire(locKey)?.groupValues?.get(1)?.toIntOrNull()
+    }.distinct().sorted()
+    val locResult = mutableListOf<AIcdAlgitesDependencyDefinition>()
+
+    locGroupIndices.forEach { locGroupIndex ->
+        val locGroupPrefix = "$aPropertyName.$locGroupIndex"
+        val locDependencyKind = aValues["$locGroupPrefix.DependencyKind"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+            ?: error("${aFile.path}:$aPropertyName[$locGroupIndex] is missing required DependencyKind.")
+        if (locDependencyKind !in locSupportedKinds) {
+            error("${aFile.path}:$aPropertyName[$locGroupIndex] uses unsupported DependencyKind '$locDependencyKind'.")
+        }
+        val locItemIndices = aValues.keys.mapNotNull { locKey ->
+            Regex("^${Regex.escape(locGroupPrefix)}\\.Items\\.(\\d+)\\.").find(locKey)?.groupValues?.get(1)?.toIntOrNull()
+        }.distinct().sorted()
+        if (locItemIndices.isEmpty()) {
+            error("${aFile.path}:$aPropertyName[$locGroupIndex] must contain at least one Items entry.")
+        }
+        locItemIndices.forEach { locItemIndex ->
+            val locItemPrefix = "$locGroupPrefix.Items.$locItemIndex"
+            val locContext = "${aFile.path}:$aPropertyName[$locGroupIndex].Items[$locItemIndex]"
+            val locArtifactId = aValues["$locItemPrefix.ArtifactId"]?.trim()?.takeIf { it.isNotBlank() }
+                ?: error("$locContext is missing required ArtifactId.")
+            val locGroupId = aValues["$locItemPrefix.GroupId"]?.trim()?.takeIf { it.isNotBlank() }
+            val locVariantId = aValues["$locItemPrefix.VariantId"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+            if (locDependencyKind == "java" && locGroupId == null) {
+                error("$locContext is a native Java dependency and requires GroupId.")
+            }
+            if (locDependencyKind != "algites" && locVariantId != null) {
+                error("$locContext may declare VariantId only for DependencyKind 'algites'.")
+            }
+            if (locVariantId != null && !Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(locVariantId)) {
+                error("$locContext VariantId '$locVariantId' must use lowercase dash-separated form.")
+            }
+            val locUsage = aValues["$locItemPrefix.Usage"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: "product_implementation"
+            if (locUsage !in locSupportedUsages) {
+                error("$locContext uses unsupported Usage '$locUsage'. Supported values: ${locSupportedUsages.sorted().joinToString(", ")}.")
+            }
+            val locVersionRequirement = AIcVersionRequirementFromConfig(
+                aValues,
+                "$locItemPrefix.VersionRequirement",
+                aFile,
+                "$locContext.VersionRequirement"
+            )
+            if (aConstraint && locVersionRequirement == null) {
+                error("$locContext is a DependencyConstraint and must define VersionRequirement.")
+            }
+            if (locDependencyKind == "algites" && locVersionRequirement != null) {
+                val locAlgitesVersionPattern = Regex("^[0-9]+(?:\\.[0-9]+)+(?:-SNAPSHOT|-rc[0-9]+)?$", RegexOption.IGNORE_CASE)
+                val locVersionValues = buildList {
+                    locVersionRequirement.exact?.let(::add)
+                    locVersionRequirement.minimum?.version?.let(::add)
+                    locVersionRequirement.maximum?.version?.let(::add)
+                    addAll(locVersionRequirement.exclude)
+                    locVersionRequirement.prefer?.let(::add)
+                }
+                locVersionValues.forEach { locVersionValue ->
+                    if (!locAlgitesVersionPattern.matches(locVersionValue)) {
+                        error("$locContext Algites VersionRequirement value '$locVersionValue' must use canonical Algites v1 version text such as '1.3.2' or '1.3.2-SNAPSHOT'.")
+                    }
+                }
+            }
+            locResult.add(
+                AIcdAlgitesDependencyDefinition(
+                    dependencyKind = locDependencyKind,
+                    groupId = locGroupId,
+                    artifactId = locArtifactId,
+                    variantId = locVariantId,
+                    usage = locUsage,
+                    versionRequirement = locVersionRequirement
+                )
+            )
+        }
+    }
+    return locResult
+}
+
 
 fun AIcRepositoryOverridesFromConfig(
     aValues: Map<String, String>,
@@ -700,6 +982,13 @@ fun AIcParseYamlStringList(aValue: String): List<String> {
     return locContent.split(',').map { AIcUnquoteYamlScalar(it.trim()).lowercase() }.filter { it.isNotBlank() }.distinct()
 }
 
+fun AIcParseYamlRawStringList(aValue: String): List<String> {
+    val locTrimmed = aValue.trim()
+    val locContent = if (locTrimmed.startsWith("[") && locTrimmed.endsWith("]")) locTrimmed.substring(1, locTrimmed.length - 1) else locTrimmed
+    if (locContent.isBlank()) return emptyList()
+    return locContent.split(',').map { AIcUnquoteYamlScalar(it.trim()) }.filter { it.isNotBlank() }.distinct()
+}
+
 fun AIcStripYamlComment(aLine: String): String {
     var locSingle = false
     var locDouble = false
@@ -748,6 +1037,27 @@ fun AIcCredentialProfilesMapForOutput(aProfiles: Map<String, AIcdAlgitesCredenti
         )
     }
 
+fun AIcVersionRequirementMapForOutput(aRequirement: AIcdAlgitesVersionRequirement): Map<String, Any?> = linkedMapOf(
+    "exact" to aRequirement.exact,
+    "minimum" to aRequirement.minimum?.let { locBoundary -> linkedMapOf("version" to locBoundary.version, "inclusive" to locBoundary.inclusive) },
+    "maximum" to aRequirement.maximum?.let { locBoundary -> linkedMapOf("version" to locBoundary.version, "inclusive" to locBoundary.inclusive) },
+    "maximumStrict" to aRequirement.maximumStrict,
+    "exclude" to aRequirement.exclude,
+    "prefer" to aRequirement.prefer
+)
+
+fun AIcDependencyMapForOutput(aDependency: AIcdAlgitesDependencyDefinition): Map<String, Any?> = linkedMapOf(
+    "dependencyKind" to aDependency.dependencyKind,
+    "groupId" to aDependency.groupId,
+    "artifactId" to aDependency.artifactId,
+    "variantId" to aDependency.variantId,
+    "usage" to aDependency.usage,
+    "versionRequirement" to aDependency.versionRequirement?.let(::AIcVersionRequirementMapForOutput)
+)
+
+fun AIcEnvironmentRequirementsMapForOutput(aRequirements: Map<String, AIcdAlgitesVersionRequirement>): Map<String, Any?> =
+    aRequirements.toSortedMap().mapValues { (_, locRequirement) -> AIcVersionRequirementMapForOutput(locRequirement) }
+
 fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMapOf(
     "repository" to linkedMapOf(
         "id" to aResult.repository.id,
@@ -756,6 +1066,8 @@ fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMa
         "groupId" to aResult.repository.groupId,
         "repositories" to AIcRepositoryMapForOutput(aResult.repository.repositories),
         "credentialProfiles" to AIcCredentialProfilesMapForOutput(aResult.repository.credentialProfiles),
+        "dependencies" to aResult.repository.dependencies.map(::AIcDependencyMapForOutput),
+        "dependencyConstraints" to aResult.repository.dependencyConstraints.map(::AIcDependencyMapForOutput),
         "deleteSnapshotWhenReleased" to aResult.repository.deleteSnapshotWhenReleased
     ),
     "artifactDirectories" to aResult.artifactDirectories.map { locDirectory ->
@@ -766,8 +1078,12 @@ fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMa
             "name" to locDirectory.name,
             "description" to locDirectory.description,
             "groupId" to locDirectory.groupId,
+            "variantId" to locDirectory.variantId,
             "repositories" to AIcRepositoryMapForOutput(locDirectory.repositories),
             "credentialProfiles" to AIcCredentialProfilesMapForOutput(locDirectory.credentialProfiles),
+            "dependencies" to locDirectory.dependencies.map(::AIcDependencyMapForOutput),
+            "dependencyConstraints" to locDirectory.dependencyConstraints.map(::AIcDependencyMapForOutput),
+            "environmentRequirements" to AIcEnvironmentRequirementsMapForOutput(locDirectory.environmentRequirements),
             "deleteSnapshotWhenReleased" to locDirectory.deleteSnapshotWhenReleased,
             "contentsModel" to locDirectory.contentsModel,
             "hasGradleBuild" to locDirectory.hasGradleBuild,
@@ -780,7 +1096,7 @@ fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMa
                 )
             },
             "version" to linkedMapOf(
-                "lane" to locDirectory.version.lane,
+                "releaseLineVersion" to locDirectory.version.releaseLineVersion,
                 "revision" to locDirectory.version.revision,
                 "qualifierKind" to locDirectory.version.qualifierKind,
                 "resolvedValue" to locDirectory.version.AIcResolvedValue()
@@ -798,6 +1114,8 @@ fun AIcToYaml(aResult: AIcdAlgitesResolutionResult): String = buildString {
     appendLine("  GroupId: ${AIcYamlScalar(aResult.repository.groupId)}")
     appendLine("  Repositories: ${AIcYamlScalar(AIcRepositoryMapForOutput(aResult.repository.repositories).toString())}")
     appendLine("  CredentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(aResult.repository.credentialProfiles).toString())}")
+    appendLine("  Dependencies: ${AIcYamlScalar(aResult.repository.dependencies.map(::AIcDependencyMapForOutput).toString())}")
+    appendLine("  DependencyConstraints: ${AIcYamlScalar(aResult.repository.dependencyConstraints.map(::AIcDependencyMapForOutput).toString())}")
     appendLine("  DeleteSnapshotWhenReleased: ${aResult.repository.deleteSnapshotWhenReleased}")
     appendLine("ArtifactDirectories:")
     aResult.artifactDirectories.forEach { locDirectory ->
@@ -807,8 +1125,12 @@ fun AIcToYaml(aResult: AIcdAlgitesResolutionResult): String = buildString {
         appendLine("    Name: ${AIcYamlScalar(locDirectory.name)}")
         appendLine("    Description: ${AIcYamlScalar(locDirectory.description)}")
         appendLine("    GroupId: ${AIcYamlScalar(locDirectory.groupId)}")
+        appendLine("    VariantId: ${AIcYamlScalar(locDirectory.variantId)}")
         appendLine("    Repositories: ${AIcYamlScalar(AIcRepositoryMapForOutput(locDirectory.repositories).toString())}")
         appendLine("    CredentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(locDirectory.credentialProfiles).toString())}")
+        appendLine("    Dependencies: ${AIcYamlScalar(locDirectory.dependencies.map(::AIcDependencyMapForOutput).toString())}")
+        appendLine("    DependencyConstraints: ${AIcYamlScalar(locDirectory.dependencyConstraints.map(::AIcDependencyMapForOutput).toString())}")
+        appendLine("    EnvironmentRequirements: ${AIcYamlScalar(AIcEnvironmentRequirementsMapForOutput(locDirectory.environmentRequirements).toString())}")
         appendLine("    DeleteSnapshotWhenReleased: ${locDirectory.deleteSnapshotWhenReleased}")
         appendLine("    ContentsModel: ${AIcYamlScalar(locDirectory.contentsModel.replace('-', '_'))}")
         appendLine("    HasGradleBuild: ${locDirectory.hasGradleBuild}")
@@ -820,7 +1142,7 @@ fun AIcToYaml(aResult: AIcdAlgitesResolutionResult): String = buildString {
             appendLine("        Sha256: ${AIcYamlScalar(locDescriptor.sha256)}")
         }
         appendLine("    Version:")
-        appendLine("      Lane: ${AIcYamlScalar(locDirectory.version.lane)}")
+        appendLine("      ReleaseLineVersion: ${AIcYamlScalar(locDirectory.version.releaseLineVersion)}")
         appendLine("      Revision: ${AIcYamlScalar(locDirectory.version.revision)}")
         appendLine("      QualifierKind: ${AIcYamlScalar(locDirectory.version.qualifierKind)}")
         appendLine("      ResolvedValue: ${AIcYamlScalar(locDirectory.version.AIcResolvedValue())}")

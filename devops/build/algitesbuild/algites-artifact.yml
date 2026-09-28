@@ -2,3 +2,62 @@ Artifact:
   TechnologyKinds: [java]
   Name: Algites build support bundle
   Description: Dependency bundle providing the libraries required by the Algites build infrastructure.
+
+Dependencies:
+  - DependencyKind: algites
+    Items:
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.core
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.algites.v1
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.maven
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.gradle
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.pep440
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.conversion.common
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.conversion.maven2gradle
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.conversion.algites2maven.v1
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.conversion.algites2gradle.v1
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.conversion.algites2pep440.v1
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.security
+        ArtifactId: pub.lib.Security_credentials.coreimpl
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"

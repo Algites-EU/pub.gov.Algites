@@ -66,6 +66,9 @@ The standard source metadata files are:
 Supporting reusable schemas include:
 
 - `algites-version_1.schema.json`
+- `algites-dependencies_1.schema.json`
+- `algites-version-requirement_1.schema.json`
+- `algites-environment-requirements_1.schema.json`
 - `algites-repository-matrix_1.schema.json`
 - `algites-repository-defaults_1.schema.json`
 - `algites-credential-profiles_1.schema.json`
@@ -74,6 +77,59 @@ Supporting reusable schemas include:
 - `algites-artifact-manifest_1.schema.json`
 
 The schemas use versioned filenames. A schema revision is therefore explicit and does not silently replace the meaning of an older version.
+
+### 3.1 Dependency declarations
+
+Dependency declarations are part of the inherited Algites metadata model and can be declared at repository, artifact-set, or artifact level. A more-specific declaration replaces an inherited declaration with the same dependency identity. `VariantId`, when present, is part of that identity.
+
+Two top-level properties are supported:
+
+- `Dependencies` creates dependency edges.
+- `DependencyConstraints` constrains versions but does not create dependency edges.
+
+Dependencies are grouped by `DependencyKind`, so the kind is declared once for a set of items:
+
+```yaml
+Dependencies:
+  - DependencyKind: algites
+    Items:
+      - GroupId: eu.algites.lib.security
+        ArtifactId: pub.lib.Security_credentials.coreimpl
+        VariantId: jakarta
+        Usage: product_implementation
+        VersionRequirement:
+          Minimum: ">=1.2.0"
+          Maximum: "<2.0.0"
+          MaximumStrict: false
+          Exclude: "1.4.0,1.6.0"
+          Prefer: "1.5.2"
+
+  - DependencyKind: java
+    Items:
+      - GroupId: org.example
+        ArtifactId: example-library
+        Usage: product_implementation
+        VersionRequirement:
+          Minimum: ">=2.0"
+          Maximum: "<3.0"
+          Prefer: "2.5"
+
+  - DependencyKind: python
+    Items:
+      - ArtifactId: pyyaml
+        Usage: product_implementation
+        VersionRequirement:
+          Minimum: ">=6.0"
+          Maximum: "<7.0"
+```
+
+For an Algites dependency that resolves to an artifact in the same source repository, `GroupId` may be omitted; the build maps canonical `ArtifactId` plus optional `VariantId` to the corresponding local artifact. Native Java dependencies require `GroupId`; native Python dependencies use their Python distribution name in `ArtifactId`.
+
+`VersionRequirement` is shared across dependency kinds. `Exact` is mutually exclusive with range fields. `Minimum` and `Maximum` accept either compact comparison syntax (for example `>=1.2.0`, `1.2.0<=`, `<2.0.0`, or `2.0.0>`) or the expanded `{ Version, Inclusive }` form. `Exclude` accepts one or more exact rejected versions and `Prefer` accepts at most one preferred version. `MaximumStrict` defaults to `true`; `false` marks the upper bound as relaxable by a target resolver while the lower bound, exclusions, and strict upper bounds remain hard constraints.
+
+For Python dependency preflight the portable policy is evaluated in at most three global phases: `PREFERRED`, `NON_STRICT_MAXIMUMS`, and `STRICT_MAXIMUMS`. `PREFERRED` uses each declared `Prefer` as an exact candidate while dependencies without a preference use their normal declared range. `NON_STRICT_MAXIMUMS` removes the exact preference and uses all declared upper bounds, including those marked `MaximumStrict: false`. `STRICT_MAXIMUMS` is the final fallback and removes only upper bounds marked `MaximumStrict: false`; strict upper bounds, minimums, exclusions, and exact requirements remain. A phase is skipped when no effective dependency needs it. The build always delegates graph resolution to the native Python resolver; it does not implement its own package resolver.
+
+Current `Usage` values are `product_api`, `product_implementation`, `product_compile_only`, `product_runtime_only`, `develop_implementation`, `develop_compile_only`, and `develop_runtime_only`.
 
 ## 4. `algites-source-repository.yml`
 
@@ -89,7 +145,7 @@ SourceRepository:
 GroupId: eu.algites.lib.example
 
 Version:
-  ReleaseLine: "1"
+  ReleaseLineVersion: "1"
   Revision: 0
   QualifierKind: snapshot
 ```
@@ -109,6 +165,8 @@ The repository descriptor may also contain these top-level inheritable propertie
 
 - `GroupId`
 - `Version`
+- `Dependencies`
+- `DependencyConstraints`
 - `CredentialProfiles`
 - `PublicationReadiness`
 - `DeleteSnapshotWhenReleased`
@@ -145,7 +203,7 @@ PublicationReadiness:
 | `ArtifactSet.Repositories` | no | Repository matrix contribution at this container. |
 | `ArtifactSet.Version` | no | Version-context contribution at this container. |
 
-Top-level `GroupId`, `Version`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
+Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
 
 Artifact sets may be nested. Inheritance follows the actual structural path from repository root through every containing artifact set to the artifact.
 
@@ -167,12 +225,28 @@ Artifact:
 | `Artifact.TechnologyKinds` | yes | Technologies actually produced/published by the artifact. Current values: `java`, `python`, `mps`. |
 | `Artifact.Name` | no | Human-readable artifact name. |
 | `Artifact.Description` | no | Free-form description. |
+| `Artifact.VariantId` | no | Optional lowercase dash-separated variant identity appended to native artifact/distribution identity. |
 | `Artifact.Repositories` | no | Repository matrix contribution for this artifact. |
 | `Artifact.Version` | no | Version-context contribution for this artifact. |
 
-Top-level `GroupId`, `Version`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
+Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
 
 `TechnologyKinds` is the normative declaration of build/publication technologies. Source directory names alone do not select a TechnologyKind.
+
+### 6.2 Environment requirements
+
+`EnvironmentRequirements` reuses the same portable version-requirement model for build/test environments. For example:
+
+```yaml
+EnvironmentRequirements:
+  Java:
+    Minimum: ">=21"
+    Prefer: "21"
+  Python:
+    Minimum: ">=3.14"
+```
+
+The Java adapter uses the preferred version, exact version, or minimum bound (in that order) to select the Java toolchain used for compilation and tests. Python publishes the hard `STRICT_MAXIMUMS` form as `Requires-Python`.
 
 ## 7. Source layout
 
@@ -351,7 +425,7 @@ Supported fields are:
 | Field | Meaning |
 | --- | --- |
 | `Lane` | lifecycle lane identity when used by the repository/version model |
-| `ReleaseLine` | release line scope |
+| `ReleaseLineVersion` | numeric release-line version scope |
 | `Revision` | revision component |
 | `QualifierKind` | optional portable qualifier; v1 currently defines `snapshot` |
 
