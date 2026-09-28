@@ -21,6 +21,7 @@ import eu.algites.lib.common.version.scheme.conversion.algites2pep440.v1.AIcAlgi
 import eu.algites.lib.common.version.scheme.pep440.AInPythonBuildPhase
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Delete
+import org.gradle.api.file.ConfigurableFileCollection
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.DuplicatesStrategy
 import org.gradle.api.file.RegularFileProperty
@@ -36,6 +37,7 @@ import org.gradle.authentication.http.HttpHeaderAuthentication
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
+import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.Optional
@@ -265,6 +267,17 @@ abstract class AIcGeneratePythonProjectMetadataTask : DefaultTask() {
         val locOutputFile = outputFile.get().asFile
         locOutputFile.parentFile.mkdirs()
         locOutputFile.writeText(locGenerated, Charsets.UTF_8)
+    }
+}
+
+
+abstract class AIcResolveJavaDependenciesTask : DefaultTask() {
+    @get:Classpath
+    abstract val dependencyFiles: ConfigurableFileCollection
+
+    @TaskAction
+    fun AIcResolve() {
+        dependencyFiles.files
     }
 }
 
@@ -1531,15 +1544,14 @@ allprojects {
         plugins.withId("java") {
             AIcConfigureAlgitesJavaEnvironment(project, locAlgitesArtifactDirectory)
             AIcConfigureAlgitesJavaDependencies(project, locAlgitesArtifactDirectory)
-            val locJavaDependencyPreflight = tasks.register("resolveJavaDependencies") {
+            val locJavaDependencyPreflight = tasks.register<AIcResolveJavaDependenciesTask>("resolveJavaDependencies") {
                 group = "verification"
                 description = "Resolves the Java dependency graph for this Algites artifact before compilation starts."
-                doLast {
+                dependencyFiles.from(
                     listOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath")
                         .mapNotNull { locName -> configurations.findByName(locName) }
                         .filter { locConfiguration -> locConfiguration.isCanBeResolved }
-                        .forEach { locConfiguration -> locConfiguration.incoming.resolutionResult.allComponents }
-                }
+                )
             }
             val locJavaSelected = algitesRequestedTechnologyKinds.isEmpty() || "java" in algitesRequestedTechnologyKinds
             if (locJavaSelected) {
