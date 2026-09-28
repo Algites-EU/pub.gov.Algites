@@ -932,9 +932,16 @@ fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
              * TechnologyKinds:
              * - python
              *
-             * Keep the pending container at the same indentation level for a list item.
+             * Keep a pending container at the same indentation level, but remove a previous
+             * list-item frame at that level so sibling items do not become nested items.
              */
-            while (locStack.isNotEmpty() && locStack.last().first > locIndent) locStack.removeAt(locStack.lastIndex)
+            while (
+                locStack.isNotEmpty() &&
+                (locStack.last().first > locIndent ||
+                    locStack.last().first == locIndent && locStack.last().second.toIntOrNull() != null)
+            ) {
+                locStack.removeAt(locStack.lastIndex)
+            }
         } else {
             while (locStack.isNotEmpty() && locStack.last().first >= locIndent) locStack.removeAt(locStack.lastIndex)
         }
