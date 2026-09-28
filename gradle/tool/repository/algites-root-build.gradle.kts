@@ -1384,16 +1384,26 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
                 aProject.dependencies.constraints.add(
                     locConfiguration,
                     locNotation,
-                    Action<DependencyConstraint> { locDependencyConstraint ->
-                        AIcApplyAlgitesGradleVersionConstraint(locDependencyConstraint.versionConstraint, locVersionConstraint)
+                    object : Action<DependencyConstraint> {
+                        override fun execute(locDependencyConstraint: DependencyConstraint) {
+                            AIcApplyAlgitesGradleVersionConstraint(
+                                locDependencyConstraint.versionConstraint,
+                                locVersionConstraint
+                            )
+                        }
                     }
                 )
             } else {
                 val locDependency = aProject.dependencies.create(locNotation)
                 if (locDependency is ExternalModuleDependency) {
                     locDependency.version(
-                        Action<MutableVersionConstraint> { locMutableVersionConstraint ->
-                            AIcApplyAlgitesGradleVersionConstraint(locMutableVersionConstraint, locVersionConstraint)
+                        object : Action<MutableVersionConstraint> {
+                            override fun execute(locMutableVersionConstraint: MutableVersionConstraint) {
+                                AIcApplyAlgitesGradleVersionConstraint(
+                                    locMutableVersionConstraint,
+                                    locVersionConstraint
+                                )
+                            }
                         }
                     )
                 }
