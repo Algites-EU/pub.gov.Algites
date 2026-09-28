@@ -8,6 +8,7 @@
 
 import org.gradle.api.Action
 import org.gradle.api.Project
+import org.gradle.api.artifacts.DependencyConstraint
 import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.MutableVersionConstraint
 import eu.algites.lib.common.version.AIcVersionBound
@@ -1330,9 +1331,9 @@ fun AIcAlgitesPreferredEnvironmentMajorVersion(aRequirement: Map<String, Any?>?,
 fun AIcConfigureAlgitesJavaEnvironment(aProject: Project, aArtifactDirectory: Map<String, Any?>) {
     val locRequirement = AIcAlgitesEnvironmentRequirement(aArtifactDirectory, "java") ?: return
     val locMajor = AIcAlgitesPreferredEnvironmentMajorVersion(locRequirement, "Project '${aProject.path}' EnvironmentRequirements.Java") ?: return
-    aProject.extensions.configure(JavaPluginExtension::class.java) { locJava ->
-        locJava.toolchain.languageVersion.set(JavaLanguageVersion.of(locMajor))
-    }
+    aProject.extensions
+        .getByType(JavaPluginExtension::class.java)
+        .toolchain.languageVersion.set(JavaLanguageVersion.of(locMajor))
 }
 
 fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: Map<String, Any?>) {
@@ -1383,7 +1384,7 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
                 aProject.dependencies.constraints.add(
                     locConfiguration,
                     locNotation,
-                    Action { locDependencyConstraint ->
+                    Action<DependencyConstraint> { locDependencyConstraint ->
                         AIcApplyAlgitesGradleVersionConstraint(locDependencyConstraint.versionConstraint, locVersionConstraint)
                     }
                 )
@@ -1391,7 +1392,7 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
                 val locDependency = aProject.dependencies.create(locNotation)
                 if (locDependency is ExternalModuleDependency) {
                     locDependency.version(
-                        Action { locMutableVersionConstraint ->
+                        Action<MutableVersionConstraint> { locMutableVersionConstraint ->
                             AIcApplyAlgitesGradleVersionConstraint(locMutableVersionConstraint, locVersionConstraint)
                         }
                     )
@@ -2052,8 +2053,7 @@ subprojects {
         val locPythonEnvironmentRequirementDefinition = locEnvironmentRequirements?.get("python")
         val locPythonRequiresPython = locPythonEnvironmentRequirementDefinition?.let { locRequirement ->
             val locDefinition = mapOf<String, Any?>("versionRequirement" to locRequirement)
-            AIcAlgitesPythonVersionRequirements(locDefinition, "Project '${project.path}' EnvironmentRequirements.Python")
-                [AInPythonBuildPhase.STRICT_MAXIMUMS]
+            AIcAlgitesPythonVersionRequirements(locDefinition, "Project '${project.path}' EnvironmentRequirements.Python")[AInPythonBuildPhase.STRICT_MAXIMUMS]
                 ?.takeIf { it.isNotBlank() }
         }
 
@@ -2094,7 +2094,9 @@ subprojects {
             artifactDescription.set(locPythonArtifactDescription)
             licenseIds.set(locPythonLicenseIds)
             projectDependencies.set(locPythonPublishedDependencies)
-            locPythonRequiresPython?.let(requiresPython::set)
+            if (locPythonRequiresPython != null) {
+                requiresPython.set(locPythonRequiresPython)
+            }
             if (locPythonTemplateFile.asFile.isFile) templateFile.set(locPythonTemplateFile)
             outputFile.set(locPythonProjectFile)
             inputs.files(locAlgitesProductLicenses.mapNotNull { it["file"]?.let(rootProject::file) })
