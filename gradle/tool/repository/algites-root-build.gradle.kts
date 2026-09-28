@@ -68,6 +68,17 @@ buildscript {
     }
     dependencies {
         classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:1.0-SNAPSHOT")
+
+        /*
+         * Bootstrap bridge: the currently published algitesbuild POM predates the
+         * split version/scheme artifacts, while this script already imports them.
+         * Keep these direct dependencies until a new algitesbuild snapshot carrying
+         * the same dependencies transitively has been published successfully.
+         */
+        classpath("eu.algites.lib.common:pub.lib.General_version.scheme.gradle:1.0-SNAPSHOT")
+        classpath("eu.algites.lib.common:pub.lib.General_version.scheme.conversion.algites2gradle.v1:1.0-SNAPSHOT")
+        classpath("eu.algites.lib.common:pub.lib.General_version.scheme.pep440:1.0-SNAPSHOT")
+        classpath("eu.algites.lib.common:pub.lib.General_version.scheme.conversion.algites2pep440.v1:1.0-SNAPSHOT")
     }
 }
 
