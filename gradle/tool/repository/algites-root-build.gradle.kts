@@ -796,7 +796,7 @@ fun AIcAlgitesRunDirectoryRelativePath(aProjectDirectory: File): String {
 
 fun AIcAlgitesStringList(aValue: Any?): List<String> {
     return when (aValue) {
-        is List<*> -> aValue.mapNotNull { it?.toString()?.trim()?.lowercase()?.takeIf(String::isNotBlank) }
+        is Iterable<*> -> aValue.mapNotNull { it?.toString()?.trim()?.lowercase()?.takeIf(String::isNotBlank) }
         null -> emptyList()
         else -> aValue.toString().split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }
     }
