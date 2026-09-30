@@ -1,0 +1,13 @@
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.gov.Algites
+  LocalArtifactId: devops.build.modustro.builder.coreintf
+  ArtifactCoordinateId: pub.gov.Algites_devops.build.modustro.builder.coreintf
+  GroupId: eu.algites.pltf.modustro.builder
+  Version: 1.0-SNAPSHOT
+  SourcePath: devops/build/modustro/builder/coreintf
+  StructureKind: artifact
+  Name: "Modustro Builder core interfaces"
+  Description: "Gradle-independent public contracts, model types, and canonical definitions for Modustro Builder."
+SourceMetadata:
+  DescriptorHierarchy:
