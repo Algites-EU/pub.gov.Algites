@@ -82,35 +82,43 @@ The schemas use versioned filenames. A schema revision is therefore explicit and
 
 ### 3.1 Dependency declarations
 
-Dependency declarations are part of the inherited Algites metadata model and can be declared at repository, artifact-set, or artifact level. A more-specific declaration replaces an inherited declaration with the same dependency identity. `VariantId`, when present, is part of that identity.
+Dependency declarations are part of the inherited Algites metadata model and can be declared at repository, artifact-set, or artifact level. The dependency identity is:
+
+```text
+DependencyKind + GroupId + ArtifactId + VariantId
+```
+
+`Usages` and `RequiredBuildOutputTypes` do **not** participate in identity. When the same dependency identity is contributed by several hierarchy levels, both sets are merge-only and therefore accumulate rather than overwrite inherited requirements. VersionRequirement scalar properties inherit independently; an omitted property inherits, an explicit `null` clears the inherited value, and an explicit value overrides it.
 
 Two top-level properties are supported:
 
 - `Dependencies` creates dependency edges.
 - `DependencyConstraints` constrains versions but does not create dependency edges.
 
-Dependencies are grouped by `DependencyKind`, so the kind is declared once for a set of items:
+Dependencies are grouped by `DependencyKind`. `modustro` references an artifact controlled by the Modustro model; `java` and `python` describe native ecosystem dependencies:
 
 ```yaml
 Dependencies:
-  - DependencyKind: algites
+  - DependencyKind: modustro
     Items:
       - GroupId: eu.algites.lib.security
         ArtifactId: pub.lib.Security_credentials.coreimpl
         VariantId: jakarta
-        Usage: product_implementation
+        Usages: [product_implementation, develop_implementation]
+        RequiredBuildOutputTypes: [java_classes_jar]
         VersionRequirement:
           Minimum: ">=1.2.0"
           Maximum: "<2.0.0"
           MaximumStrict: false
-          Exclude: "1.4.0,1.6.0"
+          Exclude:
+            Items: ["1.4.0", "1.6.0"]
           Prefer: "1.5.2"
 
   - DependencyKind: java
     Items:
       - GroupId: org.example
         ArtifactId: example-library
-        Usage: product_implementation
+        Usages: [product_implementation]
         VersionRequirement:
           Minimum: ">=2.0"
           Maximum: "<3.0"
@@ -119,19 +127,25 @@ Dependencies:
   - DependencyKind: python
     Items:
       - ArtifactId: pyyaml
-        Usage: product_implementation
+        Usages: [product_implementation]
         VersionRequirement:
           Minimum: ">=6.0"
           Maximum: "<7.0"
 ```
 
-For an Algites dependency that resolves to an artifact in the same source repository, `GroupId` may be omitted; the build maps canonical `ArtifactId` plus optional `VariantId` to the corresponding local artifact. Native Java dependencies require `GroupId`; native Python dependencies use their Python distribution name in `ArtifactId`.
+For a Modustro dependency that resolves to an artifact in the same source repository, `GroupId` may be omitted; the build maps canonical `ArtifactId` plus optional `VariantId` to the corresponding local artifact. Native Java dependencies require `GroupId`; native Python dependencies use their Python distribution name in `ArtifactId`.
 
-`VersionRequirement` is shared across dependency kinds. `Exact` is mutually exclusive with range fields. `Minimum` and `Maximum` accept either compact comparison syntax (for example `>=1.2.0`, `1.2.0<=`, `<2.0.0`, or `2.0.0>`) or the expanded `{ Version, Inclusive }` form. `Exclude` accepts one or more exact rejected versions and `Prefer` accepts at most one preferred version. When `Maximum` is present and `MaximumStrict` is omitted, its effective value is `true`; explicit `false` marks that upper bound as relaxable by a target resolver. When `Maximum` is absent, `MaximumStrict` is not applicable and its effective value is `false`. The raw omitted value remains unspecified so downstream conversions can preserve the distinction between omitted, explicit `true`, and explicit `false`. The lower bound, exclusions, and strict upper bounds remain hard constraints.
+Each `DependencyKind` group may set `ItemsInheritancePolicy` to `mergeMissingItems` (default) or `removeMissingItems`. The policy controls only membership of dependencies of that `DependencyKind`; a same-identity item is recursively merged in either mode. An explicit empty `Items: []` is valid, so `removeMissingItems` with an empty list removes all inherited dependencies of that kind. `Usages` and `RequiredBuildOutputTypes` inside a surviving same-identity dependency remain merge-only and cannot be narrowed by omission.
 
-For Python dependency preflight the portable policy is evaluated in at most three global phases: `PREFERRED`, `NON_STRICT_MAXIMUMS`, and `STRICT_MAXIMUMS`. `PREFERRED` uses each declared `Prefer` as an exact candidate while dependencies without a preference use their normal declared range. `NON_STRICT_MAXIMUMS` removes the exact preference and uses all declared upper bounds, including those marked `MaximumStrict: false`. `STRICT_MAXIMUMS` is the final fallback and removes only upper bounds marked `MaximumStrict: false`; strict upper bounds, minimums, exclusions, and exact requirements remain. A phase is skipped when no effective dependency needs it. The build always delegates graph resolution to the native Python resolver; it does not implement its own package resolver.
+`Usages` is a merge-only set. Omitting it for a newly introduced dependency defaults to `product_implementation`. Phase 2 supports the standard Java/Java-Library roles `product_api`, `product_implementation`, `product_compile_only`, `product_compile_only_api`, `product_runtime_only`, `product_annotation_processor`, `develop_implementation`, `develop_compile_only`, `develop_runtime_only`, and `develop_annotation_processor`. The Java bridge maps each usage directly to the corresponding Gradle configuration. Python intentionally has a lossy mapping: product API/implementation/runtime roles become normal package/runtime dependencies; compile-only roles map to the Modustro build/source-processing role and are not published as runtime requirements (Phase 2 resolves this role but does not yet materialize its dedicated environment); annotation-processor roles are currently diagnostic/no-op; development roles stay outside published runtime package metadata.
 
-Current `Usage` values are `product_api`, `product_implementation`, `product_compile_only`, `product_runtime_only`, `develop_implementation`, `develop_compile_only`, and `develop_runtime_only`.
+`RequiredBuildOutputTypes` is also merge-only and is valid for `DependencyKind: modustro`. When omitted, the target TechnologyKind's `DefaultDependencyOutputTypes` apply. Phase 2 actively resolves only the default output contracts (`java_classes_jar` for Java and virtual `python_distribution` for Python); selection of alternative concrete outputs is introduced with Phase 3 producers.
+
+`VersionRequirement` is shared across dependency kinds. `Exact` is a hard exact requirement and is mapped to native strict/exact semantics. A single source declaration must not combine a non-null `Exact` with non-null range/preference properties. Hierarchical inheritance may nevertheless produce an effective `Exact` together with an inherited `Prefer`; in that case `Prefer` is ignored with an informational diagnostic. An explicit scalar `null` clears an inherited version property.
+
+`Minimum` is a hard lower bound. `Maximum` may be strict or non-strict according to `MaximumStrict`; non-strict maxima may be relaxed only by the designated native-resolution fallback. `Exclude` remains hard and is itself an inherited collection using `Items` plus optional `ItemsInheritancePolicy`; `Exclude: null` explicitly clears inherited exclusions. `Prefer` is advisory. A conflict among simultaneously effective hard requirements is a native dependency-resolution failure, not an inheritance failure. Thus an artifact may override an inherited exact version successfully while a later WAR, deployment package, or other assembly can still fail when all participating artifacts are resolved together.
+
+For Python dependency preflight the portable policy is evaluated in at most three global phases: `PREFERRED`, `NON_STRICT_MAXIMUMS`, and `STRICT_MAXIMUMS`. `PREFERRED` attempts preferred candidates, `NON_STRICT_MAXIMUMS` retains relaxable upper bounds, and `STRICT_MAXIMUMS` removes only non-strict upper bounds. The build always delegates the actual graph solution to the native Python resolver.
 
 ## 4. `algites-source-repository.yml`
 

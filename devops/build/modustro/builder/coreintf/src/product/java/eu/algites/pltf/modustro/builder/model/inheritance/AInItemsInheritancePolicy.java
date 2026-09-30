@@ -6,8 +6,8 @@ import java.util.Arrays;
  * Controls membership of inherited keyed item collections.
  */
 public enum AInItemsInheritancePolicy {
-    MERGE_MISSING_ITEMS("mergeMissingItems"),
-    REMOVE_MISSING_ITEMS("removeMissingItems");
+    MERGE_MISSING_ITEMS("merge_missing_items"),
+    REMOVE_MISSING_ITEMS("remove_missing_items");
 
     private final String wireValue;
 

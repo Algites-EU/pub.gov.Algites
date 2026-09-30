@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:model:inheritance:1" xmlns="urn:algites:modustro:builder:model:inheritance:1" elementFormDefault="qualified">
   <xs:annotation><xs:appinfo><DefinitionVersion>1</DefinitionVersion></xs:appinfo></xs:annotation>
-  <xs:simpleType name="ItemsInheritancePolicyType"><xs:restriction base="xs:string"><xs:enumeration value="mergeMissingItems"/><xs:enumeration value="removeMissingItems"/></xs:restriction></xs:simpleType>
-  <xs:complexType name="StringItemsCollectionType"><xs:sequence><xs:element name="Items" minOccurs="0" maxOccurs="unbounded" type="xs:string"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="ItemsInheritancePolicyType" default="mergeMissingItems"/></xs:complexType>
-  <xs:element name="Inheritance"><xs:complexType><xs:sequence><xs:element name="Items" minOccurs="0" maxOccurs="unbounded" type="xs:anyType"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="ItemsInheritancePolicyType" default="mergeMissingItems"/></xs:complexType></xs:element>
+  <xs:simpleType name="ItemsInheritancePolicyType"><xs:restriction base="xs:string"><xs:enumeration value="merge_missing_items"/><xs:enumeration value="remove_missing_items"/></xs:restriction></xs:simpleType>
+  <xs:complexType name="StringItemsCollectionType"><xs:sequence><xs:element name="Items" minOccurs="0" maxOccurs="unbounded" type="xs:string"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="ItemsInheritancePolicyType" default="merge_missing_items"/></xs:complexType>
+  <xs:element name="Inheritance"><xs:complexType><xs:sequence><xs:element name="Items" minOccurs="0" maxOccurs="unbounded" type="xs:anyType"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="ItemsInheritancePolicyType" default="merge_missing_items"/></xs:complexType></xs:element>
 </xs:schema>

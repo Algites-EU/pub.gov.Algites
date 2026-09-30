@@ -825,15 +825,21 @@ For every resolved artifact and dependency intent, the system should be able to 
 
 ### 3.5. Dependency Intent Model
 
-#### 3.5.0 Initial descriptor bridge
+#### 3.5.0 Active Modustro dependency bridge
 
-Before the complete Dependency Intent model is implemented by the build system, source descriptors expose inherited top-level `Dependencies` and `DependencyConstraints` collections as a deliberately smaller authoring surface. This bridge does not replace the normative intent model; it provides deterministic dependency edges and constraints needed by the current build infrastructure while preserving scheme-specific version semantics through the common version library.
+Phase 2 connects the current source descriptors to the Gradle-independent Modustro dependency model while retaining the existing Gradle execution adapter. Source descriptors expose inherited top-level `Dependencies` and `DependencyConstraints`; the portable core and the active metadata resolver use the same identity and merge semantics.
 
-Dependencies are grouped by `DependencyKind` (`algites`, `java`, or `python`). Each item uses the common portable `VersionRequirement` model; the target adapter converts that policy to native Gradle or PEP 440 semantics. An optional `VariantId` is part of Algites artifact identity. `DependencyConstraints` never create a dependency edge.
+Dependencies are grouped by `DependencyKind` (`modustro`, `java`, or `python`). `modustro` replaces the former `algites` dependency kind and denotes a Modustro-controlled artifact whose native target is selected according to the build TechnologyKind. `VariantId` is part of the Modustro dependency/constraint identity. Native Java and Python dependencies retain their ecosystem coordinates.
 
-The current `Usage` values (`product_api`, `product_implementation`, `product_compile_only`, `product_runtime_only`, and `develop_*` counterparts) are normalization inputs for the present adapters. They are expected to map into the richer Dependency Intent rules rather than become a parallel long-term semantic system.
+The dependency identity is `DependencyKind + GroupId + ArtifactId + VariantId`. `Usages` is a merge-only set and is deliberately excluded from identity; one dependency can therefore participate in several Java/Python build roles without being modeled as several unrelated dependencies. `RequiredBuildOutputTypes` is likewise merge-only and does not change dependency identity.
 
-> **Modustro Builder migration note.** Phase 1 of the Gradle-independent Modustro Builder model introduces the successor contract described in `Modustro-Builder-Architecture-Specification.md`. That model uses merge-only `Usages`, adds the standard Java-library usages `product_compile_only_api`, `product_annotation_processor`, and `develop_annotation_processor`, makes `VariantId` part of dependency/constraint identity, and introduces explicit dependency output requirements. The existing descriptor bridge in this section remains the operational build format until a later migration phase connects the new contracts to the active resolver.
+At the `DependencyKind` group level, `ItemsInheritancePolicy` controls membership: `mergeMissingItems` retains inherited items not mentioned locally, while `removeMissingItems` removes inherited items of that kind that are not mentioned locally. Same-identity items recursively merge in both modes. Empty `Items` is valid. The membership policy never changes the merge-only behavior of `Usages` and `RequiredBuildOutputTypes` within a surviving item.
+
+The Java bridge maps the portable usages to the standard Gradle Java/Java-Library configurations (`api`, `implementation`, `compileOnly`, `compileOnlyApi`, `runtimeOnly`, annotation-processor configurations, and their test/develop counterparts). It delegates graph conflict resolution to Gradle. The Python bridge maps the same portable usages to package/runtime, build/source-processing, development, or diagnostic/no-op roles and delegates graph preflight to the existing three-phase pip resolver. Phase 2 records and resolves build/source-processing dependencies but does not yet materialize a separate Python source-processing environment.
+
+VersionRequirement scalar properties inherit independently. `Exact` is hard exact, `Minimum` is hard, `Maximum` can be strict or relaxable, and `Prefer` is advisory. `Exclude` is a hard inherited collection with its own `ItemsInheritancePolicy`; `Exclude: null` clears inherited exclusions. An inherited preference may coexist with a more-specific exact requirement; the exact wins and the preference is ignored diagnostically. Hard conflicts are evaluated when all requirements participating in one native assembly graph are resolved together.
+
+The richer long-term Dependency Intent model below remains the architectural direction for advanced policy/catalog behavior; the active Phase-2 bridge is intentionally smaller and deterministic.
 
 #### 3.5.1 DependencyIntentRule Templates (no versions)
 

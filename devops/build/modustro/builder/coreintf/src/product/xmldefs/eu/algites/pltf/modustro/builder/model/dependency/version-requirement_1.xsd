@@ -2,7 +2,7 @@
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:model:version-requirement:1" xmlns="urn:algites:modustro:builder:model:version-requirement:1" elementFormDefault="qualified">
   <xs:annotation><xs:appinfo><DefinitionVersion>1</DefinitionVersion><Note>Exact is mutually exclusive with non-null Minimum, Maximum, MaximumStrict, Exclude, and Prefer in one source declaration; inheritance may retain ignored preferences for diagnostics.</Note></xs:appinfo></xs:annotation>
   <xs:complexType name="VersionBoundType"><xs:sequence><xs:element name="Version" type="xs:string"/><xs:element name="Inclusive" type="xs:boolean"/></xs:sequence></xs:complexType>
-  <xs:complexType name="ExcludeType"><xs:sequence><xs:element name="Item" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="mergeMissingItems"/></xs:complexType>
+  <xs:complexType name="ExcludeType"><xs:sequence><xs:element name="Item" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items"/></xs:complexType>
   <xs:element name="VersionRequirement"><xs:complexType><xs:sequence>
     <xs:element name="Exact" type="xs:string" minOccurs="0" nillable="true"/>
     <xs:element name="Minimum" type="VersionBoundType" minOccurs="0" nillable="true"/>

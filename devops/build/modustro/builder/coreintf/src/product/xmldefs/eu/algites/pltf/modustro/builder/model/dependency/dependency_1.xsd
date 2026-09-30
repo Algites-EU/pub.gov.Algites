@@ -6,6 +6,6 @@
     <xs:element name="GroupId" type="xs:string" minOccurs="0" nillable="true"/><xs:element name="ArtifactId" type="xs:string"/><xs:element name="VariantId" type="xs:string" minOccurs="0" nillable="true"/>
     <xs:element name="Usage" type="UsageType" minOccurs="0" maxOccurs="unbounded"/><xs:element name="RequiredBuildOutputType" type="xs:string" minOccurs="0" maxOccurs="unbounded"/><xs:element name="VersionRequirement" type="xs:anyType" minOccurs="0" nillable="true"/>
   </xs:sequence></xs:complexType>
-  <xs:complexType name="DependencyGroupType"><xs:sequence><xs:element name="Item" type="DependencyItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:attribute name="DependencyKind" type="xs:string" use="required"/><xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="mergeMissingItems"/></xs:complexType>
+  <xs:complexType name="DependencyGroupType"><xs:sequence><xs:element name="Item" type="DependencyItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:attribute name="DependencyKind" type="xs:string" use="required"/><xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items"/></xs:complexType>
   <xs:element name="DependencyModel"><xs:complexType><xs:sequence><xs:element name="Dependencies" type="DependencyGroupType" minOccurs="0" maxOccurs="unbounded"/><xs:element name="DependencyConstraints" type="DependencyGroupType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
 </xs:schema>

@@ -223,10 +223,10 @@
             "ItemsInheritancePolicy": {
               "type": "string",
               "enum": [
-                "mergeMissingItems",
-                "removeMissingItems"
+                "merge_missing_items",
+                "remove_missing_items"
               ],
-              "default": "mergeMissingItems"
+              "default": "merge_missing_items"
             },
             "Items": {
               "type": "array",
@@ -248,10 +248,10 @@
             "ItemsInheritancePolicy": {
               "type": "string",
               "enum": [
-                "mergeMissingItems",
-                "removeMissingItems"
+                "merge_missing_items",
+                "remove_missing_items"
               ],
-              "default": "mergeMissingItems"
+              "default": "merge_missing_items"
             },
             "Items": {
               "type": "array",
@@ -273,10 +273,10 @@
             "ItemsInheritancePolicy": {
               "type": "string",
               "enum": [
-                "mergeMissingItems",
-                "removeMissingItems"
+                "merge_missing_items",
+                "remove_missing_items"
               ],
-              "default": "mergeMissingItems"
+              "default": "merge_missing_items"
             },
             "Items": {
               "type": "array",
@@ -304,10 +304,10 @@
             "ItemsInheritancePolicy": {
               "type": "string",
               "enum": [
-                "mergeMissingItems",
-                "removeMissingItems"
+                "merge_missing_items",
+                "remove_missing_items"
               ],
-              "default": "mergeMissingItems"
+              "default": "merge_missing_items"
             },
             "Items": {
               "type": "array",
@@ -329,10 +329,10 @@
             "ItemsInheritancePolicy": {
               "type": "string",
               "enum": [
-                "mergeMissingItems",
-                "removeMissingItems"
+                "merge_missing_items",
+                "remove_missing_items"
               ],
-              "default": "mergeMissingItems"
+              "default": "merge_missing_items"
             },
             "Items": {
               "type": "array",
@@ -354,10 +354,10 @@
             "ItemsInheritancePolicy": {
               "type": "string",
               "enum": [
-                "mergeMissingItems",
-                "removeMissingItems"
+                "merge_missing_items",
+                "remove_missing_items"
               ],
-              "default": "mergeMissingItems"
+              "default": "merge_missing_items"
             },
             "Items": {
               "type": "array",

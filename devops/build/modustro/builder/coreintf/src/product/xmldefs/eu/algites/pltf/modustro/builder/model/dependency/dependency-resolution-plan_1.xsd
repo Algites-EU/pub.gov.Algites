@@ -6,8 +6,8 @@
            version="1">
   <xs:simpleType name="DiagnosticSeverity">
     <xs:restriction base="xs:string">
-      <xs:enumeration value="INFO"/>
-      <xs:enumeration value="WARNING"/>
+      <xs:enumeration value="info"/>
+      <xs:enumeration value="warning"/>
     </xs:restriction>
   </xs:simpleType>
   <xs:complexType name="StringItems">

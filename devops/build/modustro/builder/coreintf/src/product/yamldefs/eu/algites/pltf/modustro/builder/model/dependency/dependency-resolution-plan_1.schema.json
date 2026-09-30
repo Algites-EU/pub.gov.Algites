@@ -98,8 +98,8 @@
           "Severity": {
             "type": "string",
             "enum": [
-              "INFO",
-              "WARNING"
+              "info",
+              "warning"
             ]
           },
           "Message": {

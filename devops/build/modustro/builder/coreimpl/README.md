@@ -5,7 +5,7 @@ This artifact contains Gradle-independent reusable implementations of the contra
 Phase 1 established:
 
 - scalar inheritance with absent / explicit-null / explicit-value semantics;
-- keyed collection inheritance with `mergeMissingItems` and `removeMissingItems` membership policies;
+- keyed collection inheritance with `merge_missing_items` and `remove_missing_items` membership policies;
 - merge-only set inheritance for properties such as dependency usages and required dependency output types;
 - validation of TechnologyKind and BuildOutputType definitions, including virtual dependency output alternatives.
 

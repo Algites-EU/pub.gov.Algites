@@ -4,7 +4,7 @@
 
 This specification defines the staged replacement architecture for the Algites build model under **Modustro Builder**.
 
-Phase 1 establishes portable contracts only. The current Gradle-based Algites build remains operational and authoritative for actual builds until subsequent migration phases connect it to these contracts.
+Phase 1 established the portable contracts. Phase 2 connects dependency authoring and resolution to those semantics while keeping Gradle as the current execution adapter. Modustro `coreintf` and `coreimpl` remain independent of the Gradle API.
 
 The portable implementation lives under:
 
@@ -160,23 +160,33 @@ develop_annotation_processor
 
 They form a merge-only set rather than one scalar Usage.
 
+Dependency and DependencyConstraint collections are grouped by `DependencyKind`. Each group has `ItemsInheritancePolicy: mergeMissingItems | removeMissingItems`; the default is `mergeMissingItems`. This policy controls dependency membership only. For a same-identity dependency, `Usages` and `RequiredBuildOutputTypes` always merge, regardless of the group membership policy. Explicit empty `Items` is permitted.
+
 The Java adapter maps these to standard Java/Java-Library Gradle configurations. The Python adapter intentionally performs a lossy mapping:
 
 - `product_api`, `product_implementation`, and `product_runtime_only` become normal published/runtime Python package dependencies;
-- `product_compile_only` is available only in the Modustro build/source-processing environment and is not published as a runtime requirement;
+- `product_compile_only` maps to the Modustro build/source-processing role and is not published as a runtime requirement; Phase 2 resolves this role but its dedicated source-processing environment is materialized by later source-processing phases;
 - `product_compile_only_api` has the same Python execution effect and produces a diagnostic because Python has no exported compile-only API equivalent;
 - annotation-processor usages are initially diagnostic/no-op for Python until a Python processing hook is implemented;
 - `develop_*` usages become development/build-environment dependencies and are not published as runtime package requirements.
 
 ## 7. Version requirements
 
-`Exact` is a hard exact constraint. In the future Java bridge it maps to a Gradle strict version and in Python to `==`.
+`Exact` is a hard exact constraint. The Phase-2 Java bridge maps it to native strict Gradle semantics and the Python bridge maps it to `==`.
 
-`Minimum` is a hard lower bound. `Maximum` may be strict or non-strict according to `MaximumStrict`. `Prefer` is only a preference.
+`Minimum` is a hard lower bound. `Maximum` may be strict or non-strict according to `MaximumStrict`. `Exclude` is a hard inherited collection (`Items` plus `ItemsInheritancePolicy`); explicit `Exclude: null` clears it. `Prefer` is only a preference.
 
 One source declaration must not combine non-null `Exact` with non-null `Minimum`, `Maximum`, `MaximumStrict`, `Exclude`, or `Prefer`; canonical schemas enforce this. Hierarchical resolution may nevertheless retain an inherited `Prefer` next to a more specific `Exact`. In that case the preference is ignored and an informational diagnostic should identify the source of the winning exact requirement.
 
 Conflicts between hard requirements are resolution failures only when the requirements participate simultaneously in the same native dependency graph. A child overriding an ancestor's direct `Exact` value is normal metadata inheritance and does not itself constitute a dependency conflict.
+
+## 7.1 Phase-2 dependency technology bridge
+
+`coreintf` defines a Gradle-independent `AIiDependencyTechnologyHandler` contract and a portable dependency technology resolution plan. `coreimpl` supplies built-in Java and Python handlers. A handler receives already-resolved dependency/constraint definitions and a TechnologyKind definition, applies `DefaultDependencyOutputTypes` when needed, validates that requested outputs are dependency-consumable, maps portable usages to technology-native logical roles, and emits non-fatal diagnostics for lossy mappings.
+
+The Java handler exposes standard Gradle configuration **names** only; it imports no Gradle API. The current `algites-root-build.gradle.kts` adapter creates/configures the actual Gradle dependencies and configurations. The Python handler exposes logical roles (`package_runtime`, `build_source_processing`, `development`, `no_op`); the current execution adapter continues to use pip for graph preflight. Phase 2 does not yet materialize a distinct Python source-processing environment; that execution concern follows with source processing/output production.
+
+For Phase 2, explicit non-default `RequiredBuildOutputTypes` are represented in the portable model but the active Gradle bridge accepts only `java_classes_jar` for Java and `python_distribution` for Python. Concrete producer/output selection begins in Phase 3.
 
 ## 8. Build preparation and producer architecture
 
@@ -213,7 +223,7 @@ PreparedSourceSet + package metadata -> python_wheel / python_sdist
 PreparedSourceSet + resolved runtime environment -> future deployment-package outputs
 ```
 
-Phase 1 contains no producer plugin manager. Producers remain hard-wired in later intermediate phases. The long-term architecture associates a BuildOutputType with a producer capability/profile and optional supporting capabilities rather than embedding implementation-artifact coordinates directly in the BuildOutputType definition.
+Phase 2 still contains no producer plugin manager. Producers remain hard-wired in later intermediate phases. The long-term architecture associates a BuildOutputType with a producer capability/profile and optional supporting capabilities rather than embedding implementation-artifact coordinates directly in the BuildOutputType definition.
 
 ## 9. Canonical definitions and global publication metadata
 
@@ -235,8 +245,8 @@ A later schema-site phase will make a valid sidecar mandatory for every selected
 
 The staged continuation is:
 
-1. portable model foundation (this phase);
-2. dependency model and Java/Python native-resolution bridges;
+1. portable model foundation (complete);
+2. dependency model and Java/Python native-resolution bridges (this phase);
 3. concrete BuildOutputType producers and `PreparedSourceSet`;
 4. technology capabilities and demand-driven build graph;
 5. generalized ResourceEndpoints and publication/deployment infrastructure;
