@@ -77,7 +77,8 @@ buildscript {
     }
     dependencies {
         classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:1.0-SNAPSHOT")
-
+        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
+        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
     }
 }
 

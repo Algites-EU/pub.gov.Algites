@@ -33,7 +33,7 @@ The current source artifact declares its build-support dependencies in `algites-
 
 The current dependency requirement uses the exact Algites v1 snapshot version `1.0-SNAPSHOT`; repository version metadata separately uses `ReleaseLineVersion`, `Revision`, and `QualifierKind`. Changing the build-support dependency set or its versions is therefore a governed source-metadata change of this artifact.
 
-The bootstrap remains intentionally asymmetric: the shared root build script obtains the version/conversion classes from an already-published `algitesbuild:1.0-SNAPSHOT`, while the current source `algitesbuild` artifact is built and republished using the dependency declarations above. This avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency model.
+The bootstrap remains intentionally asymmetric: the shared root build script obtains its directly imported build-runtime classes from already-published bootstrap artifacts. In Phase 3 this includes `algitesbuild:1.0-SNAPSHOT` plus the published Modustro Builder `coreintf` and `coreimpl` artifacts. The current source artifacts are then rebuilt and republished using the repository dependency declarations. This avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency and build-output model.
 
 ## Publication identity
 
@@ -48,17 +48,19 @@ The artifact version follows the version of `pub.gov.Algites`, so a published `a
 
 ## Intended bootstrap use
 
-Gradle bootstrap code should eventually need only this one external build-support dependency:
+Gradle bootstrap code currently needs these published build-support dependencies:
 
 ```text
 eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:<bootstrap-version>
+eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:<bootstrap-version>
+eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:<bootstrap-version>
 ```
 
-The build of a new `pub.gov.Algites` generation must still use an already-published bootstrap version. After the new governance generation has published its own `algitesbuild` artifact, downstream builds such as `priv.gov.Algites` can use that newly published version.
+The build of a new `pub.gov.Algites` generation must still use already-published bootstrap versions of every artifact directly imported by the shared root build script. After the new governance generation has published `algitesbuild` and the Modustro Builder core artifacts, downstream builds such as `priv.gov.Algites` and clean documentation builds can use that newly published bootstrap generation.
 
 ## Current Gradle bootstrap
 
-The shared `gradle/tool/repository/algites-root-build.gradle.kts` currently loads this artifact on its script classpath from the public Cloudsmith snapshot repository using version `1.0-SNAPSHOT`. The script therefore imports the version/conversion classes transitively exposed by this bundle instead of declaring the individual `pub.lib.General` artifacts itself.
+The shared `gradle/tool/repository/algites-root-build.gradle.kts` currently loads `algitesbuild`, Modustro Builder `coreintf`, and Modustro Builder `coreimpl` explicitly on its script classpath from the public Cloudsmith snapshot repository using version `1.0-SNAPSHOT`. `algitesbuild` continues to expose the version/conversion libraries transitively, while the Modustro artifacts are declared directly because the root script imports their classes directly.
 
 The floating snapshot coordinate is intentional during the current development phase. It can later be replaced by an immutable/released bootstrap coordinate without changing the dependency-model implementation or its consumers.
 
