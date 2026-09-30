@@ -19,6 +19,7 @@ import eu.algites.lib.common.version.AIsVersionRequirementNormalizer
 import eu.algites.lib.common.version.scheme.algites.v1.AIcAlgitesVersionTextV1
 import eu.algites.lib.common.version.scheme.conversion.algites2gradle.v1.AIcAlgitesToGradleVersionConverterV1
 import eu.algites.lib.common.version.scheme.conversion.algites2pep440.v1.AIcAlgitesToPep440VersionConverterV1
+import eu.algites.lib.common.version.scheme.conversion.algites2pep440.v1.AIcAlgitesVersionRequirementToPep440RendererV1
 import eu.algites.lib.common.version.scheme.gradle.AIcGradleVersionRequirementRenderer
 import eu.algites.lib.common.version.scheme.gradle.AIcGradleVersionScheme
 import eu.algites.lib.common.version.scheme.gradle.AIrGradleVersionConstraint
@@ -1420,6 +1421,17 @@ fun AIcAlgitesPythonVersionRequirements(aDefinition: Map<String, Any?>, aContext
         ?: return mapOf(AInPythonBuildPhase.STRICT_MAXIMUMS to "")
     val locDependencyKind = aDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
         ?: throw GradleException("$aContext is missing DependencyKind.")
+    if (locDependencyKind == "modustro") {
+        val locAlgitesRequirement = AIcVersionRequirement(
+            locRequirement.exact,
+            locRequirement.minimum,
+            locRequirement.maximum,
+            locRequirement.maximumStrict,
+            locRequirement.excludedVersions,
+            locRequirement.preferred
+        )
+        return AIcAlgitesVersionRequirementToPep440RendererV1.render(locAlgitesRequirement)
+    }
     val locNativeRequirement = AIcAlgitesNativePortableVersionRequirement(
         locRequirement,
         locDependencyKind,

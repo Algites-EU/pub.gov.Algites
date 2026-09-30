@@ -5,6 +5,7 @@ import eu.algites.lib.common.version.AIsVersionRequirementNormalizer;
 import eu.algites.lib.common.version.scheme.algites.v1.AIcAlgitesVersionTextV1;
 import eu.algites.lib.common.version.scheme.conversion.algites2gradle.v1.AIcAlgitesToGradleVersionConverterV1;
 import eu.algites.lib.common.version.scheme.conversion.algites2pep440.v1.AIcAlgitesToPep440VersionConverterV1;
+import eu.algites.lib.common.version.scheme.conversion.algites2pep440.v1.AIcAlgitesVersionRequirementToPep440ConverterV1;
 import eu.algites.lib.common.version.scheme.gradle.AIcGradleVersionScheme;
 import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionScheme;
 import eu.algites.pltf.modustro.builder.model.AIxModelValidationException;
@@ -33,16 +34,29 @@ public final class AIcDependencyVersionTechnologyBridge {
             return null;
         }
         try {
-            eu.algites.lib.common.version.AIcVersionRequirement locNativeRequirement = new eu.algites.lib.common.version.AIcVersionRequirement(
-                nativeVersion(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.exact()),
-                nativeBound(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.minimum()),
-                nativeBound(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.maximum()),
-                aRequirement.maximumStrict(),
-                aRequirement.excludedVersions().stream()
-                    .map(locVersion -> nativeVersion(aIdentity.dependencyKind(), aTechnologyKind, locVersion))
-                    .toList(),
-                nativeVersion(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.preferred())
-            );
+            eu.algites.lib.common.version.AIcVersionRequirement locNativeRequirement;
+            if ("modustro".equals(aIdentity.dependencyKind()) && "python".equals(aTechnologyKind)) {
+                var locAlgitesRequirement = new eu.algites.lib.common.version.AIcVersionRequirement(
+                    aRequirement.exact(),
+                    commonBound(aRequirement.minimum()),
+                    commonBound(aRequirement.maximum()),
+                    aRequirement.maximumStrict(),
+                    List.copyOf(aRequirement.excludedVersions()),
+                    aRequirement.preferred()
+                );
+                locNativeRequirement = AIcAlgitesVersionRequirementToPep440ConverterV1.convert(locAlgitesRequirement);
+            } else {
+                locNativeRequirement = new eu.algites.lib.common.version.AIcVersionRequirement(
+                    nativeVersion(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.exact()),
+                    nativeBound(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.minimum()),
+                    nativeBound(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.maximum()),
+                    aRequirement.maximumStrict(),
+                    aRequirement.excludedVersions().stream()
+                        .map(locVersion -> nativeVersion(aIdentity.dependencyKind(), aTechnologyKind, locVersion))
+                        .toList(),
+                    nativeVersion(aIdentity.dependencyKind(), aTechnologyKind, aRequirement.preferred())
+                );
+            }
             var locScheme = switch (aTechnologyKind) {
                 case "java" -> AIcGradleVersionScheme.INSTANCE;
                 case "python" -> AIcPep440VersionScheme.INSTANCE;
@@ -84,6 +98,15 @@ public final class AIcDependencyVersionTechnologyBridge {
                     + aTechnologyKind + "': " + locException.getMessage()
             );
         }
+    }
+
+    private static AIcVersionBound commonBound(
+        eu.algites.pltf.modustro.builder.model.dependency.AIcVersionBound aBound
+    ) {
+        if (aBound == null) {
+            return null;
+        }
+        return new AIcVersionBound(aBound.version(), aBound.inclusive());
     }
 
     private static AIcVersionBound nativeBound(
