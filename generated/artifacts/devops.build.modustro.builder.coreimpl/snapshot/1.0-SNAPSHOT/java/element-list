@@ -3,4 +3,7 @@ eu.algites.pltf.modustro.builder.dependency
 eu.algites.pltf.modustro.builder.dependency.java
 eu.algites.pltf.modustro.builder.dependency.python
 eu.algites.pltf.modustro.builder.inheritance
+eu.algites.pltf.modustro.builder.output
+eu.algites.pltf.modustro.builder.output.java
+eu.algites.pltf.modustro.builder.output.python
 eu.algites.pltf.modustro.builder.validation
