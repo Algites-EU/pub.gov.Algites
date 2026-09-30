@@ -190,7 +190,7 @@ For Phase 2, explicit non-default `RequiredBuildOutputTypes` are represented in 
 
 ## 8. Build preparation and producer architecture
 
-A future technology handler produces a technology-neutral internal `PreparedSourceSet` containing applicable declared sources, generated sources, and generated/processed resources.
+Phase 3 introduces a technology-neutral internal `PreparedSourceSet` containing applicable declared native sources, generated sources, and resource roots. Source-native processing remains a capability/demand-graph concern for Phase 4; Phase 3 defines the portable handoff consumed by output producers.
 
 Conceptually:
 
@@ -223,7 +223,9 @@ PreparedSourceSet + package metadata -> python_wheel / python_sdist
 PreparedSourceSet + resolved runtime environment -> future deployment-package outputs
 ```
 
-Phase 2 still contains no producer plugin manager. Producers remain hard-wired in later intermediate phases. The long-term architecture associates a BuildOutputType with a producer capability/profile and optional supporting capabilities rather than embedding implementation-artifact coordinates directly in the BuildOutputType definition.
+Phase 3A introduces a hard-wired Gradle-independent producer registry in `coreimpl`. A producer is selected by `(TechnologyKind, BuildOutputType)` and returns a portable production plan containing the prepared source set, a built-in production primitive, and the additional logical inputs required by that primitive. The initial producers cover Java classes/source/Javadoc JARs and Python wheel/sdist. Virtual `python_distribution` remains dependency-only and has no direct producer.
+
+Phase 3A deliberately leaves the active Gradle orchestration unchanged so the new `coreintf`/`coreimpl` binaries can be published without a bootstrap cycle. Phase 3B switches the Gradle adapter to output selection and production plans. The long-term architecture associates a BuildOutputType with a producer capability/profile and optional supporting capabilities rather than embedding implementation-artifact coordinates directly in the BuildOutputType definition.
 
 ## 9. Canonical definitions and global publication metadata
 
@@ -248,8 +250,8 @@ A later schema-site phase will make a valid sidecar mandatory for every selected
 The staged continuation is:
 
 1. portable model foundation (complete);
-2. dependency model and Java/Python native-resolution bridges (this phase);
-3. concrete BuildOutputType producers and `PreparedSourceSet`;
+2. dependency model and Java/Python native-resolution bridges (complete);
+3. concrete BuildOutputType producers and `PreparedSourceSet` (Phase 3A bootstrap layer implemented; Gradle adapter activation follows in Phase 3B);
 4. technology capabilities and demand-driven build graph;
 5. generalized ResourceEndpoints and publication/deployment infrastructure;
 6. `docs_site` and `schema_site` generation/publication;
@@ -257,3 +259,27 @@ The staged continuation is:
 8. later producer/plugin discovery through AAC capabilities/providers.
 
 The AAC integration phase is intentionally later. Modustro Builder Core must remain usable without Gradle and without AAC during the staged migration.
+
+
+### Common root-document schema metadata
+
+YAML and JSON root documents may carry an optional `$schema` URI as technical document metadata. The metadata is not part of the business model. The common contracts are published as:
+
+```text
+https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json
+https://defs.dev.algites.eu/api/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json
+```
+
+Object-root schemas compose the matching common contract. Schemas that are embedded by another contract expose and use `#EmbeddedContent` so `$schema` remains a root-document concern. Array/value-only contracts are not forced into an object wrapper.
+
+Generated YAML root documents carry all three interoperable forms with the same URI:
+
+```yaml
+# yaml-language-server: $schema=<URI>
+# $schema: <URI>
+$schema: <URI>
+```
+
+Strict validation that these three values are identical and equal to the publication base URL plus the definition sidecar `GlobalPublicationPathId` is intentionally deferred until global definition deployment is operational.
+
+`GlobalPublicationPathId` is always the logical/package-relative definition path below its canonical definition source root. Technical source-root segments and synthetic representation directories are not inserted. The publication endpoint provides `/api/yamldefs/`, `/api/jsondefs/`, or `/api/xmldefs/` separately.

@@ -3,8 +3,7 @@
   "$id": "urn:algites:modustro:builder:jsondef:model:dependency:1",
   "x-algites-definition-version": 1,
   "title": "Modustro Builder Dependency Model v1",
-  "type": "object",
-  "additionalProperties": false,
+  "x-algites-document-common-metadata": 1,
   "$defs": {
     "DependencyGroup": {
       "type": "object",
@@ -79,7 +78,7 @@
                     "type": "null"
                   },
                   {
-                    "$ref": "urn:algites:modustro:builder:jsondef:model:version-requirement:1"
+                    "$ref": "urn:algites:modustro:builder:jsondef:model:version-requirement:1#EmbeddedContent"
                   }
                 ]
               }
@@ -160,7 +159,7 @@
                     "type": "null"
                   },
                   {
-                    "$ref": "urn:algites:modustro:builder:jsondef:model:version-requirement:1"
+                    "$ref": "urn:algites:modustro:builder:jsondef:model:version-requirement:1#EmbeddedContent"
                   }
                 ]
               }
@@ -176,20 +175,41 @@
         "DependencyKind",
         "Items"
       ]
-    }
-  },
-  "properties": {
-    "Dependencies": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/DependencyGroup"
+    },
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "Dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DependencyGroup"
+          }
+        },
+        "DependencyConstraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DependencyConstraintGroup"
+          }
+        }
       }
     },
-    "DependencyConstraints": {
-      "type": "array",
-      "items": {
-        "$ref": "#/$defs/DependencyConstraintGroup"
-      }
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
     }
-  }
+  },
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
 }

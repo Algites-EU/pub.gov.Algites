@@ -3,47 +3,69 @@
   "$id": "urn:algites:modustro:builder:jsondef:model:technology-kind-definition:1",
   "x-algites-definition-version": 1,
   "title": "Modustro Builder TechnologyKind Definition v1",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "TechnologyKind": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "TechnologyKind": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+        },
+        "Capabilities": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:algites:modustro:builder:jsondef:model:capability-definition:1#EmbeddedContent"
+          }
+        },
+        "BuildOutputTypes": {
+          "type": "array",
+          "items": {
+            "$ref": "urn:algites:modustro:builder:jsondef:model:build-output-type-definition:1#EmbeddedContent"
+          }
+        },
+        "DefaultBuildOutputTypes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "DefaultDependencyOutputTypes": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "TechnologyKind",
+        "Capabilities",
+        "BuildOutputTypes",
+        "DefaultBuildOutputTypes",
+        "DefaultDependencyOutputTypes"
+      ]
     },
-    "Capabilities": {
-      "type": "array",
-      "items": {
-        "$ref": "urn:algites:modustro:builder:jsondef:model:capability-definition:1"
-      }
-    },
-    "BuildOutputTypes": {
-      "type": "array",
-      "items": {
-        "$ref": "urn:algites:modustro:builder:jsondef:model:build-output-type-definition:1"
-      }
-    },
-    "DefaultBuildOutputTypes": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "DefaultDependencyOutputTypes": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
     }
   },
-  "required": [
-    "TechnologyKind",
-    "Capabilities",
-    "BuildOutputTypes",
-    "DefaultBuildOutputTypes",
-    "DefaultDependencyOutputTypes"
-  ]
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
 }

@@ -3,104 +3,126 @@
   "$id": "urn:algites:modustro:builder:yamldef:model:build-output-type-definition:1",
   "x-algites-definition-version": 1,
   "title": "Modustro Builder BuildOutputType Definition v1",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "BuildOutputType": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
-    },
-    "CanBeProduced": {
-      "type": "boolean"
-    },
-    "CanBeUsedInDependency": {
-      "type": "boolean"
-    },
-    "DependencyOutputAlternatives": {
-      "type": "array",
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
-      }
-    },
-    "ConfigurationSchemaId": {
-      "type": [
-        "string",
-        "null"
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "BuildOutputType": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+        },
+        "CanBeProduced": {
+          "type": "boolean"
+        },
+        "CanBeUsedInDependency": {
+          "type": "boolean"
+        },
+        "DependencyOutputAlternatives": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+          }
+        },
+        "ConfigurationSchemaId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "required": [
+        "BuildOutputType",
+        "CanBeProduced",
+        "CanBeUsedInDependency"
       ],
-      "minLength": 1
+      "allOf": [
+        {
+          "not": {
+            "properties": {
+              "CanBeProduced": {
+                "const": false
+              },
+              "CanBeUsedInDependency": {
+                "const": false
+              }
+            },
+            "required": [
+              "CanBeProduced",
+              "CanBeUsedInDependency"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "DependencyOutputAlternatives": {
+                "minItems": 1
+              }
+            },
+            "required": [
+              "DependencyOutputAlternatives"
+            ]
+          },
+          "then": {
+            "properties": {
+              "CanBeProduced": {
+                "const": false
+              },
+              "CanBeUsedInDependency": {
+                "const": true
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "CanBeProduced": {
+                "const": false
+              },
+              "CanBeUsedInDependency": {
+                "const": true
+              }
+            },
+            "required": [
+              "CanBeProduced",
+              "CanBeUsedInDependency"
+            ]
+          },
+          "then": {
+            "required": [
+              "DependencyOutputAlternatives"
+            ],
+            "properties": {
+              "DependencyOutputAlternatives": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
     }
   },
-  "required": [
-    "BuildOutputType",
-    "CanBeProduced",
-    "CanBeUsedInDependency"
-  ],
   "allOf": [
     {
-      "not": {
-        "properties": {
-          "CanBeProduced": {
-            "const": false
-          },
-          "CanBeUsedInDependency": {
-            "const": false
-          }
-        },
-        "required": [
-          "CanBeProduced",
-          "CanBeUsedInDependency"
-        ]
-      }
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json"
     },
     {
-      "if": {
-        "properties": {
-          "DependencyOutputAlternatives": {
-            "minItems": 1
-          }
-        },
-        "required": [
-          "DependencyOutputAlternatives"
-        ]
-      },
-      "then": {
-        "properties": {
-          "CanBeProduced": {
-            "const": false
-          },
-          "CanBeUsedInDependency": {
-            "const": true
-          }
-        }
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "CanBeProduced": {
-            "const": false
-          },
-          "CanBeUsedInDependency": {
-            "const": true
-          }
-        },
-        "required": [
-          "CanBeProduced",
-          "CanBeUsedInDependency"
-        ]
-      },
-      "then": {
-        "required": [
-          "DependencyOutputAlternatives"
-        ],
-        "properties": {
-          "DependencyOutputAlternatives": {
-            "minItems": 1
-          }
-        }
-      }
+      "$ref": "#/$defs/DocumentContent"
     }
-  ]
+  ],
+  "unevaluatedProperties": false
 }

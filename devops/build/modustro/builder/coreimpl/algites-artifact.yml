@@ -1,3 +1,7 @@
+# yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-artifact_1.yamldef.schema.json
+# $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-artifact_1.yamldef.schema.json
+$schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-artifact_1.yamldef.schema.json
+
 Artifact:
   TechnologyKinds: [java]
   Name: Modustro Builder core implementation
@@ -13,6 +17,11 @@ Dependencies:
           Exact: "1.0-SNAPSHOT"
       - GroupId: eu.algites.lib.common
         ArtifactId: pub.lib.General_version.core
+        Usages: [product_implementation]
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.algites.v1
         Usages: [product_implementation]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"

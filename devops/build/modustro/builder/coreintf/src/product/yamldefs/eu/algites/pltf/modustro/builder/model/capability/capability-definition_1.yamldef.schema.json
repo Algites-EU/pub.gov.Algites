@@ -3,36 +3,58 @@
   "$id": "urn:algites:modustro:builder:yamldef:model:capability-definition:1",
   "x-algites-definition-version": 1,
   "title": "Modustro Builder Capability Definition v1",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "Capability": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "Capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+        },
+        "AllowedScopes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "repository",
+              "artifact_set",
+              "artifact"
+            ]
+          }
+        },
+        "ConfigurationSchemaId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        }
+      },
+      "required": [
+        "Capability",
+        "AllowedScopes"
+      ]
     },
-    "AllowedScopes": {
-      "type": "array",
-      "minItems": 1,
-      "uniqueItems": true,
-      "items": {
-        "type": "string",
-        "enum": [
-          "repository",
-          "artifact_set",
-          "artifact"
-        ]
-      }
-    },
-    "ConfigurationSchemaId": {
-      "type": [
-        "string",
-        "null"
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
       ],
-      "minLength": 1
+      "unevaluatedProperties": false
     }
   },
-  "required": [
-    "Capability",
-    "AllowedScopes"
-  ]
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
 }

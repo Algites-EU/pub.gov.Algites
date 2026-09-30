@@ -143,6 +143,10 @@ abstract class AIcGenerateAlgitesArtifactManifestTask : DefaultTask() {
 
         locOutputFile.writeText(
             buildString {
+                appendLine("# yaml-language-server: \$schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-artifact-manifest_1.yamldef.schema.json")
+                appendLine("# \$schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-artifact-manifest_1.yamldef.schema.json")
+                appendLine("\$schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-artifact-manifest_1.yamldef.schema.json")
+                appendLine()
                 appendLine("ManifestVersion: 1")
                 appendLine("Artifact:")
                 appendLine("  RepositoryId: ${AIcYamlScalar(repositoryId.get())}")

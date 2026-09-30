@@ -2,19 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-repository-matrix_1.yamldef.schema.json",
   "title": "Algites Repository Matrix v1",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "Java": {
-      "$ref": "#/$defs/visibilityMatrix"
-    },
-    "Python": {
-      "$ref": "#/$defs/visibilityMatrix"
-    },
-    "Mps": {
-      "$ref": "#/$defs/visibilityMatrix"
-    }
-  },
+  "x-algites-document-common-metadata": 1,
   "$defs": {
     "repositoryEndpoint": {
       "type": "object",
@@ -94,6 +82,38 @@
         }
       },
       "minProperties": 1
+    },
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "Java": {
+          "$ref": "#/$defs/visibilityMatrix"
+        },
+        "Python": {
+          "$ref": "#/$defs/visibilityMatrix"
+        },
+        "Mps": {
+          "$ref": "#/$defs/visibilityMatrix"
+        }
+      }
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
     }
-  }
+  },
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
 }

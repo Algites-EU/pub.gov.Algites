@@ -2,43 +2,65 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-license-usage_1.yamldef.schema.json",
   "title": "Algites License Usage v1",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "Licenses": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "properties": {
-          "Id": {
-            "type": "string",
-            "pattern": "^[A-Za-z0-9.+-]+$"
-          },
-          "Enabled": {
-            "type": "boolean"
-          },
-          "ContentKinds": {
-            "type": "array",
-            "minItems": 1,
-            "uniqueItems": true,
-            "items": {
-              "type": "string",
-              "enum": [
-                "product",
-                "documentation"
-              ]
-            }
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "Licenses": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "Id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9.+-]+$"
+              },
+              "Enabled": {
+                "type": "boolean"
+              },
+              "ContentKinds": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "product",
+                    "documentation"
+                  ]
+                }
+              }
+            },
+            "required": [
+              "Id",
+              "Enabled"
+            ]
           }
-        },
-        "required": [
-          "Id",
-          "Enabled"
-        ]
-      }
+        }
+      },
+      "required": [
+        "Licenses"
+      ]
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
     }
   },
-  "required": [
-    "Licenses"
-  ]
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
 }

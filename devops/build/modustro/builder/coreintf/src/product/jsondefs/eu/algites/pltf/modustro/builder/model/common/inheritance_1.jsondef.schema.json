@@ -3,8 +3,7 @@
   "$id": "urn:algites:modustro:builder:jsondef:model:inheritance:1",
   "x-algites-definition-version": 1,
   "title": "Modustro Builder Inheritance Model v1",
-  "type": "object",
-  "additionalProperties": false,
+  "x-algites-document-common-metadata": 1,
   "$defs": {
     "ItemsInheritancePolicy": {
       "type": "string",
@@ -33,17 +32,38 @@
       "required": [
         "Items"
       ]
-    }
-  },
-  "properties": {
-    "ItemsInheritancePolicy": {
-      "$ref": "#/$defs/ItemsInheritancePolicy"
     },
-    "Items": {
-      "type": "array"
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "ItemsInheritancePolicy": {
+          "$ref": "#/$defs/ItemsInheritancePolicy"
+        },
+        "Items": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "Items"
+      ]
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
     }
   },
-  "required": [
-    "Items"
-  ]
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
 }

@@ -3,25 +3,47 @@
   "$id": "urn:algites:modustro:builder:yamldef:publication:global-publication-metadata:1",
   "x-algites-definition-version": 1,
   "title": "Modustro Global Publication Metadata v1",
-  "type": "object",
-  "additionalProperties": false,
-  "properties": {
-    "MetadataVersion": {
-      "const": 1
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "MetadataVersion": {
+          "const": 1
+        },
+        "DefinitionVersion": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "GlobalPublicationPathId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)[A-Za-z0-9._/-]+$"
+        }
+      },
+      "required": [
+        "MetadataVersion",
+        "DefinitionVersion",
+        "GlobalPublicationPathId"
+      ]
     },
-    "DefinitionVersion": {
-      "type": "integer",
-      "minimum": 1
-    },
-    "GlobalPublicationPathId": {
-      "type": "string",
-      "minLength": 1,
-      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)[A-Za-z0-9._/-]+$"
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
     }
   },
-  "required": [
-    "MetadataVersion",
-    "DefinitionVersion",
-    "GlobalPublicationPathId"
-  ]
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
 }

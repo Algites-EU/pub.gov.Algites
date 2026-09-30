@@ -7,6 +7,7 @@ It contains:
 - technology, capability, build-output, dependency, version and inheritance model types;
 - portable Java interfaces for inheritance, model validation, and dependency technology handlers;
 - portable dependency-resolution plan and diagnostic contracts;
+- technology-neutral `PreparedSourceSet` plus portable build-output producer and production-plan contracts;
 - canonical versioned definitions in YAML-definition, JSON-definition and XML-definition source roots;
 - global-publication metadata sidecars for every canonical definition.
 
