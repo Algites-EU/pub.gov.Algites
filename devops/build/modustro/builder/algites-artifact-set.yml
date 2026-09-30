@@ -1,0 +1,5 @@
+ArtifactSet:
+  Name: Modustro Builder
+  Description: Gradle-independent Modustro Builder contracts and implementation.
+
+GroupId: eu.algites.pltf.modustro.builder

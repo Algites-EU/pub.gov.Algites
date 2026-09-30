@@ -1,0 +1,5 @@
+ArtifactSet:
+  Name: Modustro platform build infrastructure
+  Description: Shared Modustro platform build tooling and contracts.
+
+GroupId: eu.algites.pltf.modustro

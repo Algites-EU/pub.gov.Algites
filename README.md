@@ -10,3 +10,8 @@ The repository uses the Algites hierarchical licensing model. By public-governan
 - documentation, specifications, architectural descriptions, and other DOCUMENTATION material use Creative Commons Attribution 4.0 International.
 
 The generated root `LICENSE` summarizes the effective state and `LICENSES/` contains the complete canonical texts used anywhere in the repository. The machine-readable governance source is under `licensing/` together with any hierarchical `license-usage.yml` overrides.
+
+
+## Modustro Builder
+
+The Gradle-independent next-generation build model is developed under `devops/build/modustro/builder`. Its architecture and staged migration are specified in `specs/Modustro-Builder-Architecture-Specification.md`.

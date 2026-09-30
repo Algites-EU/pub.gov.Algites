@@ -1,0 +1,20 @@
+Artifact:
+  TechnologyKinds: [java]
+  Name: Modustro Builder core implementation
+  Description: Gradle-independent reusable implementation of Modustro Builder model validation and inheritance.
+
+Dependencies:
+  - DependencyKind: algites
+    Items:
+      - GroupId: eu.algites.pltf.modustro.builder
+        ArtifactId: pub.gov.Algites_devops.build.modustro.builder.coreintf
+        Usage: product_api
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+  - DependencyKind: java
+    Items:
+      - GroupId: org.testng
+        ArtifactId: testng
+        Usage: develop_implementation
+        VersionRequirement:
+          Exact: "7.10.2"

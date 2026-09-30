@@ -1,0 +1,247 @@
+# Modustro Builder Architecture Specification
+
+## 1. Status and scope
+
+This specification defines the staged replacement architecture for the Algites build model under **Modustro Builder**.
+
+Phase 1 establishes portable contracts only. The current Gradle-based Algites build remains operational and authoritative for actual builds until subsequent migration phases connect it to these contracts.
+
+The portable implementation lives under:
+
+```text
+devops/build/modustro/builder/coreintf
+devops/build/modustro/builder/coreimpl
+```
+
+with Java packages below `eu.algites.pltf.modustro.builder`. Neither artifact may depend on the Gradle API.
+
+## 2. Hierarchical inheritance
+
+Scalar properties distinguish three states:
+
+- property absent: inherit the parent value;
+- property explicitly `null`: clear the inherited value;
+- property containing a value: override the inherited value.
+
+Keyed item collections use `ItemsInheritancePolicy`:
+
+- `mergeMissingItems` keeps inherited items that are not locally re-declared;
+- `removeMissingItems` removes inherited items absent from the local collection;
+- a local item with the same identity as an inherited item is recursively merged under either policy.
+
+Some collections are explicitly **merge-only**. Dependency `Usages` and `RequiredBuildOutputTypes` are merge-only because a descendant declaration must not silently remove a requirement inherited from an ancestor.
+
+## 3. TechnologyKinds
+
+A logical artifact may declare one or more TechnologyKinds. YAML/JSON allow a compact form:
+
+```yaml
+TechnologyKinds:
+  - java
+  - python
+```
+
+and an extended form:
+
+```yaml
+TechnologyKinds:
+  Items:
+    - TechnologyKind: java
+      BuildOutputTypes:
+        Items:
+          - BuildOutputType: java_classes_jar
+          - BuildOutputType: java_sources_jar
+```
+
+Omitted `BuildOutputTypes` first inherit through the structural hierarchy. Built-in defaults are applied only when the effective hierarchy does not provide output selections for that TechnologyKind.
+
+A TechnologyKind definition contains:
+
+- supported capabilities;
+- supported BuildOutputTypes;
+- `DefaultBuildOutputTypes`;
+- `DefaultDependencyOutputTypes`.
+
+The two default sets are independent.
+
+## 4. BuildOutputTypes
+
+Every BuildOutputType declares:
+
+- `CanBeProduced`: whether the output can be requested as a build product;
+- `CanBeUsedInDependency`: whether a dependency may request that output;
+- optional `DependencyOutputAlternatives` for a virtual dependency-only output;
+- optional type-specific configuration schema.
+
+A type is invalid when both booleans are false.
+
+A BuildOutputType with `DependencyOutputAlternatives` is virtual: it must be non-producible and dependency-usable. Every alternative must be a concrete producible dependency output of the same TechnologyKind.
+
+Initial contracts are:
+
+```text
+java_classes_jar   produced=yes  dependency=yes
+java_sources_jar   produced=yes  dependency=yes
+java_javadoc_jar   produced=yes  dependency=yes
+
+python_wheel        produced=yes  dependency=yes
+python_sdist        produced=yes  dependency=yes
+python_distribution produced=no   dependency=yes
+                    alternatives=[python_wheel, python_sdist]
+
+docs_site           produced=yes  dependency=no
+schema_site         produced=yes  dependency=no
+```
+
+Java defaults:
+
+```text
+DefaultBuildOutputTypes      = [java_classes_jar, java_sources_jar]
+DefaultDependencyOutputTypes = [java_classes_jar]
+```
+
+Python defaults:
+
+```text
+DefaultBuildOutputTypes      = [python_wheel, python_sdist]
+DefaultDependencyOutputTypes = [python_distribution]
+```
+
+`python_distribution` expresses dependency-consumption OR semantics. The Python handler may prefer a wheel and fall back to an sdist according to the native resolver and platform context.
+
+## 5. Capabilities
+
+Capability is a property of a TechnologyKind and is distinct from BuildOutputType. A capability states what a technology implementation can do; an output type identifies a concrete or virtual output contract.
+
+Initial capability identities are reserved as follows:
+
+```text
+java/python:
+  source_native_processing
+  dependency_resolution
+  generation_of_native_documentation
+
+modustro:
+  publication_of_global_schemas
+  publication_of_docs_site
+  docs_site_content
+```
+
+`publication_of_docs_site` is repository-scoped. `publication_of_global_schemas` and `docs_site_content` may be configured at repository, artifact-set, or artifact scope.
+
+A capability definition may reference a TechnologyKind-specific configuration schema. The configuration item itself remains flat; a generic `Configuration` wrapper is not required. Linked semantic validation selects the schema using `(TechnologyKind, Capability)`.
+
+Later phases will define the Javadoc and Sphinx configuration schemas and the publication configuration schemas.
+
+## 6. Dependency identity and usages
+
+Dependency and DependencyConstraint identity contains at least:
+
+```text
+DependencyKind + GroupId + ArtifactId + VariantId
+```
+
+`VariantId` is therefore part of identity. Required output types are merge-only requirements on that identity rather than an independent dependency identity.
+
+Portable usages are:
+
+```text
+product_api
+product_implementation
+product_compile_only
+product_compile_only_api
+product_runtime_only
+product_annotation_processor
+develop_implementation
+develop_compile_only
+develop_runtime_only
+develop_annotation_processor
+```
+
+They form a merge-only set rather than one scalar Usage.
+
+The Java adapter maps these to standard Java/Java-Library Gradle configurations. The Python adapter intentionally performs a lossy mapping:
+
+- `product_api`, `product_implementation`, and `product_runtime_only` become normal published/runtime Python package dependencies;
+- `product_compile_only` is available only in the Modustro build/source-processing environment and is not published as a runtime requirement;
+- `product_compile_only_api` has the same Python execution effect and produces a diagnostic because Python has no exported compile-only API equivalent;
+- annotation-processor usages are initially diagnostic/no-op for Python until a Python processing hook is implemented;
+- `develop_*` usages become development/build-environment dependencies and are not published as runtime package requirements.
+
+## 7. Version requirements
+
+`Exact` is a hard exact constraint. In the future Java bridge it maps to a Gradle strict version and in Python to `==`.
+
+`Minimum` is a hard lower bound. `Maximum` may be strict or non-strict according to `MaximumStrict`. `Prefer` is only a preference.
+
+One source declaration must not combine non-null `Exact` with non-null `Minimum`, `Maximum`, `MaximumStrict`, `Exclude`, or `Prefer`; canonical schemas enforce this. Hierarchical resolution may nevertheless retain an inherited `Prefer` next to a more specific `Exact`. In that case the preference is ignored and an informational diagnostic should identify the source of the winning exact requirement.
+
+Conflicts between hard requirements are resolution failures only when the requirements participate simultaneously in the same native dependency graph. A child overriding an ancestor's direct `Exact` value is normal metadata inheritance and does not itself constitute a dependency conflict.
+
+## 8. Build preparation and producer architecture
+
+A future technology handler produces a technology-neutral internal `PreparedSourceSet` containing applicable declared sources, generated sources, and generated/processed resources.
+
+Conceptually:
+
+```text
+native sources
+    -> source_native_processing
+    -> PreparedSourceSet
+```
+
+For Java:
+
+```text
+PreparedSourceSet + compile dependency graph
+    -> compilation
+    -> compiled classes/resources
+    -> java_classes_jar
+
+PreparedSourceSet
+    -> java_sources_jar
+
+PreparedSourceSet + documentation classpath
+    -> generation_of_native_documentation
+    -> java_javadoc_jar and/or docs_site input
+```
+
+For Python:
+
+```text
+PreparedSourceSet + package metadata -> python_wheel / python_sdist
+PreparedSourceSet + resolved runtime environment -> future deployment-package outputs
+```
+
+Phase 1 contains no producer plugin manager. Producers remain hard-wired in later intermediate phases. The long-term architecture associates a BuildOutputType with a producer capability/profile and optional supporting capabilities rather than embedding implementation-artifact coordinates directly in the BuildOutputType definition.
+
+## 9. Canonical definitions and global publication metadata
+
+`coreintf` publishes equivalent canonical definitions below `yamldefs`, `jsondefs`, and `xmldefs` source roots. Versioned definition files use `_1` and also contain an internal definition version.
+
+Every canonical definition created by Modustro Builder carries a `<definition-file>.meta.yml` sidecar with:
+
+```yaml
+MetadataVersion: 1
+DefinitionVersion: 1
+GlobalPublicationPathId: ...
+```
+
+`GlobalPublicationPathId` is deliberately path-oriented: authors should choose a stable identifier that maps transparently to the global publication path rather than an opaque implementation identifier.
+
+A later schema-site phase will make a valid sidecar mandatory for every selected publication source. Automatic sidecar generation will be an explicit task; an ordinary build will validate rather than mutate source metadata.
+
+## 10. Planned continuation
+
+The staged continuation is:
+
+1. portable model foundation (this phase);
+2. dependency model and Java/Python native-resolution bridges;
+3. concrete BuildOutputType producers and `PreparedSourceSet`;
+4. technology capabilities and demand-driven build graph;
+5. generalized ResourceEndpoints and publication/deployment infrastructure;
+6. `docs_site` and `schema_site` generation/publication;
+7. additional producers, including `python_aws_lambda_zip`, and gradual removal of business logic from Gradle scripts;
+8. later producer/plugin discovery through AAC capabilities/providers.
+
+The AAC integration phase is intentionally later. Modustro Builder Core must remain usable without Gradle and without AAC during the staged migration.

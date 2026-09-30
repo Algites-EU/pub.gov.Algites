@@ -1,0 +1,4 @@
+Artifact:
+  TechnologyKinds: [java]
+  Name: Modustro Builder core interfaces
+  Description: Gradle-independent public contracts, model types, and canonical definitions for Modustro Builder.

@@ -1,5 +1,7 @@
 # Algites Artifact Developer Reference
 
+> The next-generation Gradle-independent build model is defined in `Modustro-Builder-Architecture-Specification.md`. The Phase-1 contracts coexist with the current operational metadata model until later migration phases explicitly connect them.
+
 ## 1. Purpose and scope
 
 This guide is the practical reference for developers and artifact authors working in an Algites source repository. It explains how to structure a repository, declare artifacts and artifact sets, select TechnologyKinds, configure inherited metadata, run the common Gradle lifecycle, maintain licensing metadata, generate documentation, and use the public GitHub workflow entry points.

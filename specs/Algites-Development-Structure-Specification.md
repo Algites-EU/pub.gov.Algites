@@ -833,6 +833,8 @@ Dependencies are grouped by `DependencyKind` (`algites`, `java`, or `python`). E
 
 The current `Usage` values (`product_api`, `product_implementation`, `product_compile_only`, `product_runtime_only`, and `develop_*` counterparts) are normalization inputs for the present adapters. They are expected to map into the richer Dependency Intent rules rather than become a parallel long-term semantic system.
 
+> **Modustro Builder migration note.** Phase 1 of the Gradle-independent Modustro Builder model introduces the successor contract described in `Modustro-Builder-Architecture-Specification.md`. That model uses merge-only `Usages`, adds the standard Java-library usages `product_compile_only_api`, `product_annotation_processor`, and `develop_annotation_processor`, makes `VariantId` part of dependency/constraint identity, and introduces explicit dependency output requirements. The existing descriptor bridge in this section remains the operational build format until a later migration phase connects the new contracts to the active resolver.
+
 #### 3.5.1 DependencyIntentRule Templates (no versions)
 
 A **DependencyIntentRuleTemplate** is a reusable “shape” (preset) describing dependency behavior **without versioning**.

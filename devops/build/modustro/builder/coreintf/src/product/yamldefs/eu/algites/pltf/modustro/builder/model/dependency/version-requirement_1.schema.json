@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:model:version-requirement:1",
+  "x-algites-definition-version": 1,
+  "title": "Modustro Builder Version Requirement v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "Exact": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    },
+    "Minimum": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?:(?:>=|>)[^<>=!\\s]+|[^<>=!\\s]+(?:<=|<))$"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Inclusive": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "Version",
+            "Inclusive"
+          ]
+        }
+      ]
+    },
+    "Maximum": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?:(?:<=|<)[^<>=!\\s]+|[^<>=!\\s]+(?:>=|>))$"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Inclusive": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "Version",
+            "Inclusive"
+          ]
+        }
+      ]
+    },
+    "MaximumStrict": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "Exclude": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
+            },
+            "Items": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "Items"
+          ]
+        }
+      ]
+    },
+    "Prefer": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1
+    }
+  },
+  "minProperties": 1,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "Exact": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "Exact"
+        ]
+      },
+      "then": {
+        "properties": {
+          "Minimum": {
+            "type": "null"
+          },
+          "Maximum": {
+            "type": "null"
+          },
+          "MaximumStrict": {
+            "type": "null"
+          },
+          "Exclude": {
+            "type": "null"
+          },
+          "Prefer": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ]
+}
