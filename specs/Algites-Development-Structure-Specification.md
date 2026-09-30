@@ -734,10 +734,10 @@ In the case of the internal handling of the Artifacts, we recognize the followin
 
 - **Artifact**: a modeled logical buildable unit (module), supporting one or more TechnologyKinds and producing one or more **outputs**.
 - **ArtifactCoordinateId**: a stable technology-neutral identifier for an artifact in the Algites model (not necessarily identical to Maven GAV, a Python distribution name, or another ecosystem coordinate).
-- **TechnologyKind**: a supported build/publication technology selected from the Algites TechnologyKind registry (initially including `java`, `python`, and `mps`). It is distinct from Artifact Roles.
+- **TechnologyKind**: a supported build/publication technology selected from the Algites TechnologyKind registry (currently including `java`, `python`, `mps`, and `modustro`). It is distinct from Artifact Roles.
 - **SourceType**: a source-directory category; SourceTypes are independent from TechnologyKind and MAY be consumed by several TechnologyKinds.
-- **OutputType**: a specific output contract of an artifact (e.g., jar, parent-pom, bom, plugin-marker, etc.).
-- **Output key (`outputKey`)**: `artifactCoordinateId + outputType` used to identify a dependency intent target.
+- **BuildOutputType**: a technology-scoped output contract that states whether an output is producible, dependency-consumable, or virtual dependency-only.
+- **RequiredBuildOutputTypes**: merge-only dependency requirements identifying which target outputs a Modustro dependency may consume.
 - **Repository configuration**: the root of a repository model, treated as:
     - **root container** (container inheritance origin), and
     - **root parent** (parent inheritance origin).
@@ -827,7 +827,7 @@ For every resolved artifact and dependency intent, the system should be able to 
 
 #### 3.5.0 Active Modustro dependency bridge
 
-Phase 2 connects the current source descriptors to the Gradle-independent Modustro dependency model while retaining the existing Gradle execution adapter. Source descriptors expose inherited top-level `Dependencies` and `DependencyConstraints`; the portable core and the active metadata resolver use the same identity and merge semantics.
+Phase 2 connected the current source descriptors to the Gradle-independent Modustro dependency model while retaining Gradle as the execution adapter. Source descriptors expose inherited top-level `Dependencies` and `DependencyConstraints`; the portable core and the active metadata resolver use the same identity and merge semantics.
 
 Dependencies are grouped by `DependencyKind` (`modustro`, `java`, or `python`). `modustro` replaces the former `algites` dependency kind and denotes a Modustro-controlled artifact whose native target is selected according to the build TechnologyKind. `VariantId` is part of the Modustro dependency/constraint identity. Native Java and Python dependencies retain their ecosystem coordinates.
 
@@ -835,7 +835,7 @@ The dependency identity is `DependencyKind + GroupId + ArtifactId + VariantId`. 
 
 At the `DependencyKind` group level, `ItemsInheritancePolicy` controls membership: `merge_missing_items` retains inherited items not mentioned locally, while `remove_missing_items` removes inherited items of that kind that are not mentioned locally. Same-identity items recursively merge in both modes. Empty `Items` is valid. The membership policy never changes the merge-only behavior of `Usages` and `RequiredBuildOutputTypes` within a surviving item.
 
-The Java bridge maps the portable usages to the standard Gradle Java/Java-Library configurations (`api`, `implementation`, `compileOnly`, `compileOnlyApi`, `runtimeOnly`, annotation-processor configurations, and their test/develop counterparts). It delegates graph conflict resolution to Gradle. The Python bridge maps the same portable usages to package/runtime, build/source-processing, development, or diagnostic/no-op roles and delegates graph preflight to the existing three-phase pip resolver. Phase 2 records and resolves build/source-processing dependencies but does not yet materialize a separate Python source-processing environment.
+The Java bridge maps the portable usages to the standard Gradle Java/Java-Library configurations (`api`, `implementation`, `compileOnly`, `compileOnlyApi`, `runtimeOnly`, annotation-processor configurations, and their test/develop counterparts). It delegates graph conflict resolution to Gradle. The Python bridge maps the same portable usages to package/runtime, build/source-processing, development, or diagnostic/no-op roles and delegates graph preflight to the existing three-phase pip resolver. The active bridge records and resolves build/source-processing dependencies but does not yet materialize a separate Python source-processing environment; that remains Phase 4/source-processing work.
 
 VersionRequirement scalar properties inherit independently. `Exact` is hard exact, `Minimum` is hard, `Maximum` can be strict or relaxable, and `Prefer` is advisory. `Exclude` is a hard inherited collection with its own `ItemsInheritancePolicy`; `Exclude: null` clears inherited exclusions. An inherited preference may coexist with a more-specific exact requirement; the exact wins and the preference is ignored diagnostically. Hard conflicts are evaluated when all requirements participating in one native assembly graph are resolved together.
 
@@ -868,9 +868,9 @@ Merge semantics:
     - identical definition → OK,
     - different definition → **error** (forces explicit resolution via id change or governance rule).
 
-#### 3.5.3 DependencyIntentTemplateSets (outputKey = artifactCoordinateId + outputType)
+#### 3.5.3 DependencyIntentTemplateSets (artifact target + required outputs)
 
-A **DependencyIntentTemplateSet** defines *concrete dependency intents* by `outputKey = artifactCoordinateId + outputType`, each intent referencing:
+A **DependencyIntentTemplateSet** defines *concrete dependency intents* by target artifact identity plus any merge-only `RequiredBuildOutputTypes`. Each intent references:
 - one or more **rule template sets** (e.g., `mavenCompile`, `gradleCompileOnly`),
 - optional inline **granular rules** (non-version),
 - optional **uncontrolled version rules** (`ranges[]`, `preferred`) that apply only to uncontrolled dependencies.
@@ -938,222 +938,108 @@ Version rules for uncontrolled:
 - The model may load catalogs and references without immediate existence checks.
 - A final validation phase must:
     - ensure all referenced template sets exist,
-    - ensure outputKeys can be interpreted (at least structurally),
+    - ensure dependency targets and any `RequiredBuildOutputTypes` can be interpreted and resolved structurally,
     - ensure no unresolved versions remain under strict publish policies,
     - ensure no rule collisions remain (id collisions, weight ties, incompatible ranges).
 
 ---
 
-### 3.7. Outputs and Publication Contracts
+### 3.7. BuildOutputTypes and Production Contracts
 
-Artifacts may produce multiple outputs. An **OutputType** identifies *which* output contract is being referenced (as a dependency target) or published (as an artifact output).
+Artifacts may produce multiple technology-specific outputs. The active model uses a stable string `BuildOutputType` within a TechnologyKind rather than the historical `builtinOutputKind/customUid` object model. BuildOutputType definitions are owned by the TechnologyKind catalog and are independent from Gradle task names or Maven classifiers.
 
-In Algites, an OutputType is **not** a free-form string. It is a **data object** composed of:
-- a **builtin output kind** (stable enum), and
-- an optional **custom UID** (only when builtin kind is `CUSTOM`).
+Each BuildOutputType declares:
 
-This makes output typing deterministic, tool-agnostic, and safely extensible.
+- `CanBeProduced`: the output may be selected as an artifact build product;
+- `CanBeUsedInDependency`: a dependency may request the output;
+- optional `DependencyOutputAlternatives`: concrete alternatives for a virtual dependency-only output;
+- optional type-specific configuration schema.
 
----
+A BuildOutputType is invalid if both booleans are false. A type with `DependencyOutputAlternatives` is virtual, MUST have `CanBeProduced=false`, MUST have `CanBeUsedInDependency=true`, and every alternative MUST identify a concrete dependency-consumable output of the same TechnologyKind.
 
-#### 3.7.1 Artifact Output Class Data Model
+The initial catalog is:
 
-**OutputType fields**
-- `builtinOutputKind: AInArtifactBuiltinOutputKind`
-- `customUid: String?` (required iff `builtinOutputKind == CUSTOM`)
+| TechnologyKind | BuildOutputType | Produced | Dependency-consumable |
+| --- | --- | ---: | ---: |
+| `java` | `java_classes_jar` | yes | yes |
+| `java` | `java_sources_jar` | yes | yes |
+| `java` | `java_javadoc_jar` | yes | yes |
+| `python` | `python_wheel` | yes | yes |
+| `python` | `python_sdist` | yes | yes |
+| `python` | `python_distribution` | no | yes |
+| `modustro` | `docs_site` | yes | no |
+| `modustro` | `schema_site` | yes | no |
 
-**Canonical OutputType identifier (`outputTypeUid`)**
-- If `builtinOutputKind != CUSTOM`  
-  → `outputTypeUid = builtinOutputKind.uid`
-- If `builtinOutputKind == CUSTOM`  
-  → `outputTypeUid = customUid` (must be non-empty and validated)
+`python_distribution` has dependency alternatives `[python_wheel, python_sdist]`; it expresses OR semantics for consumers and has no direct producer.
 
-**Recommended UID namespace convention**
-- Builtin kinds: `builtin:<kind>` (e.g., `builtin:jar`, `builtin:bom`)
-- Custom kinds: `custom:<namespaced-id>` (e.g., `custom:eu.algites.output.pibom.v1`)
+#### 3.7.1 Build defaults and dependency defaults
 
-The exact string format is governed by validation rules; the key requirement is global uniqueness and long-term stability.
+TechnologyKind definitions contain two independent default sets:
 
----
+```text
+DefaultBuildOutputTypes
+DefaultDependencyOutputTypes
+```
 
-#### 3.7.2 Builtin Output Kinds
+Current built-ins are:
 
-`AInArtifactBuiltinOutputKind` is a stable enum defining the output kinds the system understands natively.
-Each enum item MUST have:
-- `uid: String` — stable identifier used for comparisons and persistence
+```text
+java:
+  DefaultBuildOutputTypes      = [java_classes_jar, java_sources_jar]
+  DefaultDependencyOutputTypes = [java_classes_jar]
 
-Typical builtin kinds (illustrative, not exhaustive, builtin types use the unique id starting with "builtin:"
-and the identification is interpreted as complete uid, the custom types must have the uid starting with "custom:"):
+python:
+  DefaultBuildOutputTypes      = [python_wheel, python_sdist]
+  DefaultDependencyOutputTypes = [python_distribution]
+```
 
-- `MAIN_JAVA_CLASSES_JAR` (`builtin:jar`) — binary library artifact
-- `MAIN_JAVA_SOURCE_JAR` (`builtin:sourcesJar`) — sources artifact
-- `MAIN_JAVA_DOC_JAR` (`builtin:javadocJar`) — javadoc artifact
-- `MAIN_MAVEN_POM` (`builtin:mavenPom`) — standard module POM publication
-- `MAIN_PYTHON_WHEEL` (`builtin:pythonWheel`) — Python wheel distribution
-- `MAIN_PYTHON_SDIST` (`builtin:pythonSdist`) — Python source distribution
- 
-to be later discussed if something like this is reasonable, probably not::
-- `PARENT_POM` (`builtin:parentPom`) — parent-style POM (inheritance contract)
-- `BOM` (`builtin:bom`) — dependency steering output (constraints/catalog)
-- `PLUGIN_MARKER` (`builtin:pluginMarker`) — Gradle plugin marker publication
-- `CUSTOM` (`custom:`) — extension point for non-builtin output kinds; the value is used 
-                         as the UID prefix for custom identifications
+`java_javadoc_jar` is intentionally not a default build output. Dependency defaults do not imply build defaults and vice versa.
 
+#### 3.7.2 Hierarchical output selection
 
+`TechnologyKinds` supports both compact and extended forms. The extended form may select BuildOutputTypes per TechnologyKind:
 
-Notes:
-- Builtin kinds are intended to be *minimal but sufficient* for the current Algites model.
-- Adding new builtin kinds is a compatibility-sensitive change; prefer `CUSTOM` when possible.
+```yaml
+TechnologyKinds:
+  Items:
+    - TechnologyKind: java
+      BuildOutputTypes:
+        Items:
+          - BuildOutputType: java_classes_jar
+          - BuildOutputType: java_sources_jar
+```
 
----
+`TechnologyKinds.ItemsInheritancePolicy` controls TechnologyKind membership. Nested `BuildOutputTypes.ItemsInheritancePolicy` controls output membership within a same-identity TechnologyKind. Both support `merge_missing_items` (default) and `remove_missing_items`.
 
-#### 3.7.3 Custom Output Kinds
+Omitted `BuildOutputTypes` inherits an ancestor selection when present. Built-in `DefaultBuildOutputTypes` are applied only when the effective hierarchy contains no explicit/inherited selection. An explicit empty `BuildOutputTypes.Items` therefore means that the TechnologyKind remains effective but no build packaging output is requested.
 
-Custom output kinds are represented by:
-- `builtinOutputKind = CUSTOM`
-- `customUid = <non-empty, globally unique UID>`
+#### 3.7.3 PreparedSourceSet and producer plans
 
-Custom UIDs MUST be:
-- globally unique within the model space
-- stable across time (do not rename once published)
-- validation-safe (restricted character set / pattern)
+Phase 3 introduces a Gradle-independent `PreparedSourceSet` as the portable handoff from source preparation to output production. It separates declared native sources, generated sources, and resource roots. Source-native processing itself becomes capability/demand-graph driven in Phase 4.
 
-Custom outputs are especially useful for:
-- project-specific BOM variants (e.g., PIBOM/PVBOM-style outputs)
-- tool metadata outputs not covered by builtins
-- transitional outputs during migrations
+`coreimpl` currently contains a hard-wired producer registry. A producer is selected by `(TechnologyKind, BuildOutputType)` and emits a portable production plan. The plan identifies a built-in production primitive and logical inputs but does not import Gradle APIs.
 
----
+The Phase-3B Gradle adapter currently materializes the plans as:
 
-#### 3.7.4 OutputType Interface Contract
+- `java_classes_jar` -> `jar`;
+- `java_sources_jar` -> `sourcesJar`;
+- `java_javadoc_jar` -> `javadocJar`;
+- `python_wheel` -> native Python wheel build;
+- `python_sdist` -> native Python sdist build.
 
-If implemented as an interface, the minimal contract is:
+The default Python output set is built in one staging flow; an explicit wheel-only or sdist-only selection narrows the native build command accordingly. A virtual type such as `python_distribution` is rejected as a build output.
 
-- `AIiArtifactOutputType.getBuiltinOutputKind(): AInArtifactBuiltinOutputKind`
-- `AIiArtifactOutputType.getOutputTypeUid(): String`
+#### 3.7.4 Dependency output requirements
 
-Normative behavior:
-- `getOutputTypeUid()` MUST return:
-    - the builtin UID when builtin kind is not `CUSTOM`, or
-    - the custom UID when builtin kind is `CUSTOM`
+A `DependencyKind: modustro` item may contain merge-only `RequiredBuildOutputTypes`. These requirements do not participate in dependency identity; they accumulate for a surviving same-identity dependency. If omitted, the target TechnologyKind's `DefaultDependencyOutputTypes` apply.
 
-Implementations MUST NOT invent additional derivation rules beyond the above.
+Dependency output requirements and artifact build-output selection are intentionally independent: the first describes what a consumer needs, while the second describes what the current artifact produces. Final assembly resolution must eventually gather all participating native requirements into one technology-native dependency graph for the assembly context.
 
----
+#### 3.7.5 Publication mapping
 
-#### 3.7.5 How OutputType Is Used in Dependencies
+BuildOutputType is a logical contract, not a Maven classifier or Gradle task identity. The technology adapter maps it to native packaging/publication mechanics. For example, `java_sources_jar` may map to the Maven `sources` classifier, but that classifier is not part of the portable dependency model.
 
-Dependency intents reference outputs via the **dependency key**:
-
-- `outputKey = artifactCoordinateId + outputType`
-
-This enables a dependency to target *specific* contracts, for example:
-- a `PARENT_POM` output as the parent-like inheritance contract
-- a `BOM` output as dependency steering (constraints) input
-- a `JAR` output for normal library consumption
-
-Normative rule:
-- When an intent must distinguish contracts, it MUST specify the correct `outputType` rather than using implicit defaults.
-
----
-
-#### 3.7.6 Publication Contracts and Deterministic Mapping
-
-Publication configuration MUST map OutputTypes deterministically to build-tool publication mechanisms.
-
-Examples (tool mapping is defined in section 3.8):
-- `JAR` → Maven/Gradle main publication artifact (binary)
-- `SOURCES_JAR`, `JAVADOC_JAR` → classifier artifacts / additional publications
-- `MAVEN_POM`, `PARENT_POM` → POM publications with specific semantics
-- `BOM` → Gradle platform/constraints and/or Maven dependencyManagement/BOM import
-- `PLUGIN_MARKER` → Gradle plugin marker publication
-
-Custom outputs:
-- MUST define their mapping policy explicitly (by build policy / mapping layer)
-- SHOULD fail fast if no mapping exists for the target build tool/output format
-
----
-
-#### 3.7.7 Validation Rules (Normative)
-
-1. If `builtinOutputKind != CUSTOM`
-    - `customUid` MUST be absent/empty.
-2. If `builtinOutputKind == CUSTOM`
-    - `customUid` MUST be present and non-empty.
-3. `outputTypeUid` MUST be stable and globally unique within the model.
-4. Any dependency intent that references an OutputType MUST reference a resolvable output kind for the target artifact.
-5. Mapping MUST fail fast if an output kind cannot be mapped to the selected build tool or publication mode (unless a policy explicitly allows ignoring it).
-
----
-
-# 3.7.8 Export Intent Normalization and Transitive Stability
-
-This section defines **default normalization** and **validation rules** for the `exportUse` behavior flags, with the goal of ensuring **stable transitive dependency semantics** and preventing accidental **version divergence** across the dependency graph.
-
-## Motivation
-
-In mainstream build tools (Maven/Gradle), publishing a dependency as part of a module’s API or runtime surface typically implies that its **transitive graph participates** in consumer resolution. In the Algites model this is expressed via `exportUse.intent` (dependency steering/participation in exported intent).
-
-If a dependency were exported to consumers at `compile` or `runtime` **without** exporting its intent, downstream modules could silently re-introduce the same artifact with a different version, increasing the chance of conflicting or non-deterministic outcomes.
-
-Therefore, Algites defines a safe default:
-
-- **If a module exports a dependency for consumer compile/runtime, the dependency’s intent is exported as well**, unless the build policy explicitly permits otherwise (advanced/escape hatch).
-
-## Normative Rules
-
-### R1. Implicit intent export when exporting compile/runtime
-
-For any resolved dependency application where:
-
-- `exportUse.compile == true` **or** `exportUse.runtime == true`
-
-then the effective value must satisfy:
-
-- `exportUse.intent == true`
-
-unless an explicit override is permitted by the active Build Policy (see R3).
-
-> In other words: **compile/runtime export implies intent export** by default.
-
-### R2. Steering-only export remains valid
-
-A dependency may be exported as intent only:
-
-- `exportUse.intent == true`
-- `exportUse.compile == false`
-- `exportUse.runtime == false`
-
-This represents **dependency steering without classpath exposure** (e.g., generating/merging constraint outputs or variant BOMs without forcing the dependency onto consumer classpaths).
-
-### R3. Explicit intent disablement is restricted
-
-For `usage = classpathItem` (the default classpath channel), the following combination is **invalid** by default:
-
-- (`exportUse.compile == true` or `exportUse.runtime == true`) **and** `exportUse.intent == false`
-
-Rationale: it enables untracked re-introduction of the same artifact with a different version downstream, reducing determinism.
-
-A Build Policy may optionally allow this combination as an advanced escape hatch; if allowed, it should additionally require one or more of:
-
-- **explicit locking** of the application (to prevent downstream overrides),
-- **explicit conflict strategy** (deterministic choice rules),
-- or **explicit version constraints** at the same or higher weight layer.
-
-### R4. Behavior composition does not require explicit intent in data
-
-Because the model supports inheritance (unspecified values are inherited, otherwise default to `false`), the default intent implication in R1 may be applied during **normalization**:
-
-- If `exportUse.intent` is unspecified after merging layers, it is treated as `false` initially.
-- Then R1 is applied to produce an **effective** `exportUse.intent` value.
-
-This keeps authoring concise while preserving deterministic behavior.
-
-## Guidance
-
-- Prefer **R1 defaults** for all classpath-exposed exports (compile/runtime).
-- Use **R2 steering-only** exports for “variant/BOM-style” guidance where the dependency should not automatically appear on consumer classpaths.
-- Only consider violating R3 under an explicit Build Policy designed to preserve determinism.
+Phase 3 changes output selection/production only. Generalized ResourceEndpoints and publication/deployment selection remain Phase 5 work; capability/demand-graph producer discovery remains Phase 4 work.
 
 ---
 
@@ -1182,7 +1068,7 @@ Maven `<optional>` remains mapping-only and MUST NOT become a semantic source of
 
 The `python` TechnologyKind adapter defines Python source discovery, build/test task mapping, distribution naming, wheel/sdist outputs, dependency metadata mapping, and publication to Python-compatible repositories. These operations are orchestrated from Gradle but MAY delegate execution to Python-native tooling.
 
-A Python distribution MAY combine Python code with technology-neutral product resources from `jsondefs`, `yamldefs`, `xmldefs`, and `config`. The adapter stages those roots into the Python build project while preserving their business-relative path, so `src/product/jsondefs/eu/algites/.../x.json` is packaged as `eu/algites/.../x.json`; the `jsondefs` source-root name is not part of the runtime resource path. The same rule applies to `.gen` and `.extgen` variants when present.
+A Python distribution MAY combine Python code with technology-neutral product resources from `jsondefs`, `yamldefs`, `xmldefs`, and `config`. The adapter stages those roots into the Python build project while preserving their business-relative path, so `src/product/jsondefs/eu/algites/.../x_1.jsondef.schema.json` is packaged as `eu/algites/.../x_1.jsondef.schema.json`; the `jsondefs` source-root name is not part of the runtime resource path. The same rule applies to `.gen` and `.extgen` variants when present.
 
 Separate Python distributions MAY populate a common business package prefix only as a PEP 420 namespace. Two usable distributions MUST NOT provide the same final Python module/resource path, and a distribution MUST NOT place `__init__.py` in a package prefix that is also populated by another distribution. Repository validation MUST detect these collisions before a wheel is built or published.
 
@@ -2220,7 +2106,7 @@ This section is intentionally placed at the end and is **temporary**.
 
 - Historical uses of the name **ArtifactKind** for classifications such as policy/BOM/aggregator are retired. Those classifications are **Artifact Roles** in the current model. `TechnologyKind` now means only the supported build/publication technology (`java`, `python`, `mps`, ...). Historical role-driven models should be migrated by:
     - replacing “kind-driven behavior” with explicit **ContainerVersionContext** + **DependencyIntent** activation,
-    - moving BOM/policy logic into **OutputType** + intent rule templates for dependency steering.
+    - moving BOM/policy logic into explicit BuildOutputTypes/capability-backed producers plus intent rule templates for dependency steering where such policy outputs are still required.
 - Aggregator artifacts remain possible, but are no longer mandatory just to express policy inheritance:
     - repo-root and containers can supply catalogs,
     - parent edges define baseline dependency intents.

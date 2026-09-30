@@ -39,6 +39,56 @@ enum class AInAlgitesItemsInheritancePolicy {
     REMOVE_MISSING_ITEMS
 }
 
+data class AIcdAlgitesTechnologyKindSelection(
+    val technologyKind: String,
+    val buildOutputTypes: Set<String>? = null,
+    val buildOutputItemsInheritancePolicy: AInAlgitesItemsInheritancePolicy = AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+) {
+    fun AIcMerge(aOther: AIcdAlgitesTechnologyKindSelection): AIcdAlgitesTechnologyKindSelection {
+        require(technologyKind == aOther.technologyKind) {
+            "Cannot merge TechnologyKind selections '$technologyKind' and '${aOther.technologyKind}'."
+        }
+        val locBuildOutputTypes = when {
+            aOther.buildOutputTypes == null -> buildOutputTypes
+            buildOutputTypes == null -> aOther.buildOutputTypes
+            aOther.buildOutputItemsInheritancePolicy == AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS -> aOther.buildOutputTypes
+            else -> LinkedHashSet<String>().apply {
+                addAll(buildOutputTypes)
+                addAll(aOther.buildOutputTypes)
+            }
+        }
+        return AIcdAlgitesTechnologyKindSelection(
+            technologyKind = technologyKind,
+            buildOutputTypes = locBuildOutputTypes,
+            buildOutputItemsInheritancePolicy = AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+        )
+    }
+}
+
+data class AIcdAlgitesTechnologyKindsConfig(
+    val items: List<AIcdAlgitesTechnologyKindSelection>,
+    val itemsInheritancePolicy: AInAlgitesItemsInheritancePolicy = AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+) {
+    fun AIcMerge(aOther: AIcdAlgitesTechnologyKindsConfig): AIcdAlgitesTechnologyKindsConfig {
+        val locMerged = linkedMapOf<String, AIcdAlgitesTechnologyKindSelection>()
+        items.forEach { locItem -> locMerged[locItem.technologyKind] = locItem }
+        if (aOther.itemsInheritancePolicy == AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS) {
+            val locLocalKinds = aOther.items.mapTo(linkedSetOf()) { locItem -> locItem.technologyKind }
+            locMerged.entries.removeIf { locEntry -> locEntry.key !in locLocalKinds }
+        }
+        aOther.items.forEach { locItem ->
+            locMerged[locItem.technologyKind] = locMerged[locItem.technologyKind]?.AIcMerge(locItem) ?: locItem
+        }
+        return AIcdAlgitesTechnologyKindsConfig(locMerged.values.toList())
+    }
+
+    fun AIcTechnologyKinds(): List<String> = items.map { locItem -> locItem.technologyKind }
+
+    fun AIcBuildOutputTypesByTechnologyKind(): Map<String, Set<String>> = items
+        .filter { locItem -> locItem.buildOutputTypes != null }
+        .associate { locItem -> locItem.technologyKind to locItem.buildOutputTypes.orEmpty() }
+}
+
 data class AIcdAlgitesVersionRequirement(
     val exact: String? = null,
     val minimum: AIcdAlgitesVersionBoundary? = null,
@@ -175,7 +225,7 @@ data class AIcdAlgitesCredentialProfileDefinition(
 }
 
 data class AIcdAlgitesResolvedState(
-    val technologyKinds: List<String>? = null,
+    val technologyKinds: AIcdAlgitesTechnologyKindsConfig? = null,
     val groupId: String? = null,
     val repositories: Map<String, Map<String, AIcdAlgitesRepositoryEndpoint>> = emptyMap(),
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition> = emptyMap(),
@@ -205,7 +255,11 @@ data class AIcdAlgitesResolvedState(
         }
 
         return AIcdAlgitesResolvedState(
-            technologyKinds = aOther.technologyKinds ?: technologyKinds,
+            technologyKinds = when {
+                aOther.technologyKinds == null -> technologyKinds
+                technologyKinds == null -> aOther.technologyKinds
+                else -> technologyKinds.AIcMerge(aOther.technologyKinds)
+            },
             groupId = aOther.groupId ?: groupId,
             repositories = locRepositories,
             credentialProfiles = locProfiles,
@@ -244,6 +298,7 @@ data class AIcdAlgitesArtifactDirectoryMetadata(
     val path: String,
     val structureKind: String,
     val technologyKinds: List<String>,
+    val buildOutputTypesByTechnologyKind: Map<String, Set<String>>,
     val name: String,
     val description: String,
     val groupId: String?,
@@ -278,7 +333,7 @@ data class AIcdAlgitesResolutionResult(
     val artifactDirectories: List<AIcdAlgitesArtifactDirectoryMetadata>
 )
 
-val AIcAlgitesSupportedTechnologyKinds = linkedSetOf("java", "python", "mps")
+val AIcAlgitesSupportedTechnologyKinds = linkedSetOf("java", "python", "mps", "modustro")
 val AIcAlgitesRepositoryVisibilities = linkedSetOf("public", "private")
 val AIcAlgitesRepositoryStabilities = linkedSetOf("release", "snapshot")
 val AIcAlgitesRepositoryUsages = linkedSetOf("download", "upload", "manage")
@@ -477,7 +532,7 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
         if (locConfig != null) {
             locState = locState.AIcMerge(AIcResolvedStateFromConfig(locConfig))
             AIcValidateEffectiveState(locState, "${locConfig.structureKind} '${AIcRelativePath(aRepositoryRoot, aDirectory)}'")
-            val locContentsModel = AIcContentsModel(locConfig.structureKind, locState.technologyKinds ?: emptyList())
+            val locContentsModel = AIcContentsModel(locConfig.structureKind, locState.technologyKinds?.AIcTechnologyKinds() ?: emptyList())
             locResult.add(AIcArtifactDirectoryMetadataFromConfig(aRepositoryRoot, aDirectory, locConfig, locState, locContentsModel))
             locStop = locContentsModel == "self-contained"
         }
@@ -535,7 +590,7 @@ fun AIcResolveSingleArtifactDirectory(
     AIcValidateEffectiveState(locState, "${locConfig.structureKind} '$aArtifactDirectoryPath'")
     return AIcArtifactDirectoryMetadataFromConfig(
         aRepositoryRoot, locDirectory, locConfig, locState,
-        AIcContentsModel(locConfig.structureKind, locState.technologyKinds ?: emptyList())
+        AIcContentsModel(locConfig.structureKind, locState.technologyKinds?.AIcTechnologyKinds() ?: emptyList())
     )
 }
 
@@ -585,7 +640,8 @@ fun AIcArtifactDirectoryMetadataFromConfig(
     return AIcdAlgitesArtifactDirectoryMetadata(
         path = locPath,
         structureKind = aConfig.structureKind,
-        technologyKinds = aState.technologyKinds ?: emptyList(),
+        technologyKinds = aState.technologyKinds?.AIcTechnologyKinds() ?: emptyList(),
+        buildOutputTypesByTechnologyKind = aState.technologyKinds?.AIcBuildOutputTypesByTechnologyKind().orEmpty(),
         name = locName,
         description = locDescription,
         groupId = aState.groupId,
@@ -624,13 +680,95 @@ fun AIcResolvedStateFromConfig(aConfig: AIcdAlgitesDirectoryConfig): AIcdAlgites
     val locPrefix = AIcStructureKindPrefix(aConfig.structureKind)
     val locBase = AIcResolvedStateFromRawValues(aConfig.values, locPrefix, aConfig.file)
     val locTechnologyKinds = when (aConfig.structureKind) {
-        "artifact-set", "artifact" -> AIcFirstValue(aConfig.values, "$locPrefix.TechnologyKinds")?.let(::AIcParseYamlStringList)
+        "artifact-set", "artifact" -> AIcTechnologyKindsFromConfig(aConfig.values, "$locPrefix.TechnologyKinds", aConfig.file)
         else -> null
-    }?.also { locKinds ->
-        val locUnsupported = locKinds.filter { it !in AIcAlgitesSupportedTechnologyKinds }
+    }?.also { locConfig ->
+        val locUnsupported = locConfig.AIcTechnologyKinds().filter { it !in AIcAlgitesSupportedTechnologyKinds }
         if (locUnsupported.isNotEmpty()) error("Unsupported Algites TechnologyKind(s) in '${aConfig.file.path}': ${locUnsupported.joinToString(", ")}.")
     }
     return locBase.copy(technologyKinds = locTechnologyKinds)
+}
+
+fun AIcParseItemsInheritancePolicy(
+    aValue: String,
+    aLabel: String,
+    aFile: File
+): AInAlgitesItemsInheritancePolicy = when (aValue.trim().lowercase()) {
+    "merge_missing_items" -> AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+    "remove_missing_items" -> AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS
+    else -> error("$aLabel '$aValue' is unsupported in '${aFile.path}'.")
+}
+
+fun AIcTechnologyKindsFromConfig(
+    aValues: Map<String, String>,
+    aPrefix: String,
+    aFile: File
+): AIcdAlgitesTechnologyKindsConfig? {
+    val locCompact = aValues[aPrefix]?.let(::AIcParseYamlStringList)
+    if (locCompact != null) {
+        return AIcdAlgitesTechnologyKindsConfig(
+            locCompact.map { locTechnologyKind -> AIcdAlgitesTechnologyKindSelection(locTechnologyKind) }
+        )
+    }
+
+    val locItemPrefix = "$aPrefix.Items."
+    val locIndexes = aValues.keys
+        .mapNotNull { locKey ->
+            if (!locKey.startsWith(locItemPrefix)) return@mapNotNull null
+            locKey.removePrefix(locItemPrefix).substringBefore('.').toIntOrNull()
+        }
+        .distinct()
+        .sorted()
+    if (locIndexes.isEmpty() && aValues.keys.none { locKey -> locKey.startsWith("$aPrefix.") }) return null
+
+    val locPolicy = aValues["$aPrefix.ItemsInheritancePolicy"]
+        ?.let { locValue -> AIcParseItemsInheritancePolicy(locValue, "$aPrefix.ItemsInheritancePolicy", aFile) }
+        ?: AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+    val locItems = locIndexes.map { locIndex ->
+        val locBase = "$aPrefix.Items.$locIndex"
+        val locTechnologyKind = aValues["$locBase.TechnologyKind"]
+            ?.trim()
+            ?.lowercase()
+            ?.takeIf { it.isNotBlank() }
+            ?: error("$locBase.TechnologyKind is required in '${aFile.path}'.")
+        val locBuildPrefix = "$locBase.BuildOutputTypes"
+        val locBuildOutputDefined = aValues.keys.any { locKey -> locKey == locBuildPrefix || locKey.startsWith("$locBuildPrefix.") }
+        val locBuildOutputTypes = if (!locBuildOutputDefined) {
+            null
+        } else {
+            val locDirect = aValues[locBuildPrefix]?.let(::AIcParseYamlStringList)
+            if (locDirect != null) {
+                LinkedHashSet(locDirect)
+            } else {
+                val locBuildItemPrefix = "$locBuildPrefix.Items."
+                val locBuildIndexes = aValues.keys
+                    .mapNotNull { locKey ->
+                        if (!locKey.startsWith(locBuildItemPrefix)) return@mapNotNull null
+                        locKey.removePrefix(locBuildItemPrefix).substringBefore('.').toIntOrNull()
+                    }
+                    .distinct()
+                    .sorted()
+                LinkedHashSet(
+                    locBuildIndexes.map { locBuildIndex ->
+                        aValues["$locBuildItemPrefix$locBuildIndex.BuildOutputType"]
+                            ?.trim()
+                            ?.lowercase()
+                            ?.takeIf { it.isNotBlank() }
+                            ?: error("$locBuildItemPrefix$locBuildIndex.BuildOutputType is required in '${aFile.path}'.")
+                    }
+                )
+            }
+        }
+        val locBuildPolicy = aValues["$locBuildPrefix.ItemsInheritancePolicy"]
+            ?.let { locValue -> AIcParseItemsInheritancePolicy(locValue, "$locBuildPrefix.ItemsInheritancePolicy", aFile) }
+            ?: AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+        AIcdAlgitesTechnologyKindSelection(locTechnologyKind, locBuildOutputTypes, locBuildPolicy)
+    }
+    val locDuplicates = locItems.groupBy { locItem -> locItem.technologyKind }.filterValues { locItemsForKind -> locItemsForKind.size > 1 }.keys
+    if (locDuplicates.isNotEmpty()) {
+        error("Duplicate TechnologyKind item(s) in '${aFile.path}': ${locDuplicates.joinToString(", ")}.")
+    }
+    return AIcdAlgitesTechnologyKindsConfig(locItems, locPolicy)
 }
 
 fun AIcParseVersionBoundary(aValue: String, aMinimum: Boolean, aContext: String): AIcdAlgitesVersionBoundary {
@@ -1269,6 +1407,7 @@ fun AIcToMap(aResult: AIcdAlgitesResolutionResult): Map<String, Any?> = linkedMa
             "path" to locDirectory.path,
             "structureKind" to locDirectory.structureKind,
             "technologyKinds" to locDirectory.technologyKinds,
+            "buildOutputTypesByTechnologyKind" to locDirectory.buildOutputTypesByTechnologyKind.toSortedMap(),
             "name" to locDirectory.name,
             "description" to locDirectory.description,
             "groupId" to locDirectory.groupId,
@@ -1316,6 +1455,7 @@ fun AIcToYaml(aResult: AIcdAlgitesResolutionResult): String = buildString {
         appendLine("  - Path: ${AIcYamlScalar(locDirectory.path)}")
         appendLine("    StructureKind: ${AIcYamlScalar(locStructureKind(locDirectory.structureKind))}")
         appendLine("    TechnologyKinds: [${locDirectory.technologyKinds.joinToString(", ")}]")
+        appendLine("    BuildOutputTypesByTechnologyKind: ${AIcYamlScalar(locDirectory.buildOutputTypesByTechnologyKind.toString())}")
         appendLine("    Name: ${AIcYamlScalar(locDirectory.name)}")
         appendLine("    Description: ${AIcYamlScalar(locDirectory.description)}")
         appendLine("    GroupId: ${AIcYamlScalar(locDirectory.groupId)}")

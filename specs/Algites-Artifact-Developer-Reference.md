@@ -137,9 +137,9 @@ For a Modustro dependency that resolves to an artifact in the same source reposi
 
 Each `DependencyKind` group may set `ItemsInheritancePolicy` to `merge_missing_items` (default) or `remove_missing_items`. The policy controls only membership of dependencies of that `DependencyKind`; a same-identity item is recursively merged in either mode. An explicit empty `Items: []` is valid, so `remove_missing_items` with an empty list removes all inherited dependencies of that kind. `Usages` and `RequiredBuildOutputTypes` inside a surviving same-identity dependency remain merge-only and cannot be narrowed by omission.
 
-`Usages` is a merge-only set. Omitting it for a newly introduced dependency defaults to `product_implementation`. Phase 2 supports the standard Java/Java-Library roles `product_api`, `product_implementation`, `product_compile_only`, `product_compile_only_api`, `product_runtime_only`, `product_annotation_processor`, `develop_implementation`, `develop_compile_only`, `develop_runtime_only`, and `develop_annotation_processor`. The Java bridge maps each usage directly to the corresponding Gradle configuration. Python intentionally has a lossy mapping: product API/implementation/runtime roles become normal package/runtime dependencies; compile-only roles map to the Modustro build/source-processing role and are not published as runtime requirements (Phase 2 resolves this role but does not yet materialize its dedicated environment); annotation-processor roles are currently diagnostic/no-op; development roles stay outside published runtime package metadata.
+`Usages` is a merge-only set. Omitting it for a newly introduced dependency defaults to `product_implementation`. The active dependency bridge supports the standard Java/Java-Library roles `product_api`, `product_implementation`, `product_compile_only`, `product_compile_only_api`, `product_runtime_only`, `product_annotation_processor`, `develop_implementation`, `develop_compile_only`, `develop_runtime_only`, and `develop_annotation_processor`. The Java bridge maps each usage directly to the corresponding Gradle configuration. Python intentionally has a lossy mapping: product API/implementation/runtime roles become normal package/runtime dependencies; compile-only roles map to the Modustro build/source-processing role and are not published as runtime requirements (the bridge resolves this role but does not yet materialize its dedicated environment); annotation-processor roles are currently diagnostic/no-op; development roles stay outside published runtime package metadata.
 
-`RequiredBuildOutputTypes` is also merge-only and is valid for `DependencyKind: modustro`. When omitted, the target TechnologyKind's `DefaultDependencyOutputTypes` apply. Phase 2 actively resolves only the default output contracts (`java_classes_jar` for Java and virtual `python_distribution` for Python); selection of alternative concrete outputs is introduced with Phase 3 producers.
+`RequiredBuildOutputTypes` is also merge-only and is valid for `DependencyKind: modustro`. When omitted, the target TechnologyKind's `DefaultDependencyOutputTypes` apply. This is independent from the artifact's own `BuildOutputTypes`: dependency output requirements describe what a consumer needs from a target, while `BuildOutputTypes` describes what the current artifact should produce.
 
 `VersionRequirement` is shared across dependency kinds. `Exact` is a hard exact requirement and is mapped to native strict/exact semantics. A single source declaration must not combine a non-null `Exact` with non-null range/preference properties. Hierarchical inheritance may nevertheless produce an effective `Exact` together with an inherited `Prefer`; in that case `Prefer` is ignored with an informational diagnostic. An explicit scalar `null` clears an inherited version property.
 
@@ -215,7 +215,7 @@ PublicationReadiness:
 | --- | ---: | --- |
 | `ArtifactSet.Name` | no | Human-readable set name. |
 | `ArtifactSet.Description` | no | Free-form description. |
-| `ArtifactSet.TechnologyKinds` | no | TechnologyKinds made available to descendants as structural metadata. Allowed values currently include `java`, `python`, and `mps`. |
+| `ArtifactSet.TechnologyKinds` | no | TechnologyKinds made available to descendants as structural metadata. Allowed values currently include `java`, `python`, `mps`, and `modustro`. |
 | `ArtifactSet.Repositories` | no | Repository matrix contribution at this container. |
 | `ArtifactSet.Version` | no | Version-context contribution at this container. |
 
@@ -238,7 +238,7 @@ Artifact:
 
 | Attribute | Required | Meaning |
 | --- | ---: | --- |
-| `Artifact.TechnologyKinds` | yes | Technologies actually produced/published by the artifact. Current values: `java`, `python`, `mps`. |
+| `Artifact.TechnologyKinds` | yes | Technologies actually produced/published by the artifact. Current values: `java`, `python`, `mps`, `modustro`. |
 | `Artifact.Name` | no | Human-readable artifact name. |
 | `Artifact.Description` | no | Free-form description. |
 | `Artifact.VariantId` | no | Optional lowercase dash-separated variant identity appended to native artifact/distribution identity. |
@@ -248,6 +248,41 @@ Artifact:
 Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
 
 `TechnologyKinds` is the normative declaration of build/publication technologies. Source directory names alone do not select a TechnologyKind.
+
+### 6.1.1 Selecting BuildOutputTypes
+
+The compact form selects technologies and uses inherited/built-in output defaults:
+
+```yaml
+Artifact:
+  TechnologyKinds: [java, python]
+```
+
+Use the extended form when one TechnologyKind needs an explicit build-output selection:
+
+```yaml
+Artifact:
+  TechnologyKinds:
+    Items:
+      - TechnologyKind: java
+        BuildOutputTypes:
+          Items:
+            - BuildOutputType: java_classes_jar
+            - BuildOutputType: java_sources_jar
+```
+
+The built-in defaults currently are:
+
+| TechnologyKind | Default build outputs | Default dependency output |
+| --- | --- | --- |
+| `java` | `java_classes_jar`, `java_sources_jar` | `java_classes_jar` |
+| `python` | `python_wheel`, `python_sdist` | `python_distribution` |
+
+`java_javadoc_jar` is supported but is not a default build output. `python_distribution` is virtual and dependency-only; requesting it as an artifact build output is an error.
+
+`TechnologyKinds.ItemsInheritancePolicy` and nested `BuildOutputTypes.ItemsInheritancePolicy` accept `merge_missing_items` (default) and `remove_missing_items`. Omitting `BuildOutputTypes` inherits a selection from an ancestor if present; otherwise the built-in default applies. An explicit `BuildOutputTypes: { Items: [] }` retains the TechnologyKind while requesting no packaging output for it.
+
+Phase 3B actively applies these selections: Java maps to `jar`, `sourcesJar`, and optional `javadocJar`; Python maps to wheel and/or sdist production.
 
 ### 6.2 Environment requirements
 

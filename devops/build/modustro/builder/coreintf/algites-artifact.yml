@@ -3,6 +3,12 @@
 $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-artifact_1.yamldef.schema.json
 
 Artifact:
-  TechnologyKinds: [java]
+  TechnologyKinds:
+    Items:
+      - TechnologyKind: java
+        BuildOutputTypes:
+          Items:
+            - BuildOutputType: java_classes_jar
+            - BuildOutputType: java_sources_jar
   Name: Modustro Builder core interfaces
   Description: Gradle-independent public contracts, model types, and canonical definitions for Modustro Builder.

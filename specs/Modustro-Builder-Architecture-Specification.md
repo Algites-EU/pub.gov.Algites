@@ -4,7 +4,7 @@
 
 This specification defines the staged replacement architecture for the Algites build model under **Modustro Builder**.
 
-Phase 1 established the portable contracts. Phase 2 connects dependency authoring and resolution to those semantics while keeping Gradle as the current execution adapter. Modustro `coreintf` and `coreimpl` remain independent of the Gradle API.
+Phase 1 established the portable contracts. Phase 2 connected dependency authoring and resolution to those semantics. Phase 3 adds concrete BuildOutputType producers, `PreparedSourceSet`, output selection, and an active Gradle adapter that consumes portable production plans. Modustro `coreintf` and `coreimpl` remain independent of the Gradle API; Gradle stays at the execution/integration edge.
 
 The portable implementation lives under:
 
@@ -186,7 +186,7 @@ Conflicts between hard requirements are resolution failures only when the requir
 
 The Java handler exposes standard Gradle configuration **names** only; it imports no Gradle API. The current `algites-root-build.gradle.kts` adapter creates/configures the actual Gradle dependencies and configurations. The Python handler exposes logical roles (`package_runtime`, `build_source_processing`, `development`, `no_op`); the current execution adapter continues to use pip for graph preflight. Phase 2 does not yet materialize a distinct Python source-processing environment; that execution concern follows with source processing/output production.
 
-For Phase 2, explicit non-default `RequiredBuildOutputTypes` are represented in the portable model but the active Gradle bridge accepts only `java_classes_jar` for Java and `python_distribution` for Python. Concrete producer/output selection begins in Phase 3.
+`RequiredBuildOutputTypes` remains a dependency-consumption concern and uses `DefaultDependencyOutputTypes` when omitted. Build production is independent: Phase 3B now resolves effective `BuildOutputTypes` per TechnologyKind and materializes the selected concrete outputs through the producer registry. Virtual dependency-only outputs such as `python_distribution` cannot be requested as build products.
 
 ## 8. Build preparation and producer architecture
 
@@ -225,7 +225,35 @@ PreparedSourceSet + resolved runtime environment -> future deployment-package ou
 
 Phase 3A introduces a hard-wired Gradle-independent producer registry in `coreimpl`. A producer is selected by `(TechnologyKind, BuildOutputType)` and returns a portable production plan containing the prepared source set, a built-in production primitive, and the additional logical inputs required by that primitive. The initial producers cover Java classes/source/Javadoc JARs and Python wheel/sdist. Virtual `python_distribution` remains dependency-only and has no direct producer.
 
-Phase 3A deliberately leaves the active Gradle orchestration unchanged so the new `coreintf`/`coreimpl` binaries can be published without a bootstrap cycle. Phase 3B switches the Gradle adapter to output selection and production plans. The long-term architecture associates a BuildOutputType with a producer capability/profile and optional supporting capabilities rather than embedding implementation-artifact coordinates directly in the BuildOutputType definition.
+Phase 3A deliberately left the active Gradle orchestration unchanged so the new `coreintf`/`coreimpl` binaries could be published without a bootstrap cycle. Phase 3B activates the model: the metadata resolver computes effective `BuildOutputTypes`, `coreimpl` creates portable production plans, and the Gradle adapter maps those plans to native execution primitives. The long-term architecture associates a BuildOutputType with a producer capability/profile and optional supporting capabilities rather than embedding implementation-artifact coordinates directly in the BuildOutputType definition.
+
+
+### Phase-3B active output-selection semantics
+
+`TechnologyKinds` may use the compact list form when no technology-specific output override is required. The extended form selects BuildOutputTypes per TechnologyKind and participates in normal hierarchy inheritance:
+
+```yaml
+TechnologyKinds:
+  Items:
+    - TechnologyKind: java
+      BuildOutputTypes:
+        Items:
+          - BuildOutputType: java_classes_jar
+          - BuildOutputType: java_sources_jar
+```
+
+`TechnologyKinds.ItemsInheritancePolicy` controls TechnologyKind membership. Within one same-identity TechnologyKind, `BuildOutputTypes.ItemsInheritancePolicy` controls output membership. In both collections, `merge_missing_items` is the default; `remove_missing_items` removes inherited members that are not present locally. Omitting `BuildOutputTypes` inherits an ancestor selection if one exists; only when the effective hierarchy contains no selection does the built-in `DefaultBuildOutputTypes` set apply. An explicit empty `BuildOutputTypes.Items: []` therefore means that the TechnologyKind is retained but no build output is requested for it.
+
+The active Phase-3B adapter currently maps production plans as follows:
+
+- `java_classes_jar` -> Gradle `jar`;
+- `java_sources_jar` -> Gradle `sourcesJar`;
+- `java_javadoc_jar` -> Gradle `javadocJar`;
+- `python_wheel` -> `python -m build --wheel`;
+- `python_sdist` -> `python -m build --sdist`;
+- the default Python selection requests both wheel and sdist in one native build staging flow.
+
+`algitesBuild` still performs the normal verification/test lifecycle for an effective Java TechnologyKind, but output packaging is now driven by the selected production plans rather than by unconditional Gradle packaging defaults. Phase 4 will replace the hard-wired producer registry with capability/demand-graph orchestration; Phase 3B does not yet do capability discovery or source-native processing.
 
 ## 9. Canonical definitions and global publication metadata
 
@@ -251,7 +279,7 @@ The staged continuation is:
 
 1. portable model foundation (complete);
 2. dependency model and Java/Python native-resolution bridges (complete);
-3. concrete BuildOutputType producers and `PreparedSourceSet` (Phase 3A bootstrap layer implemented; Gradle adapter activation follows in Phase 3B);
+3. concrete BuildOutputType producers, `PreparedSourceSet`, effective output selection, and Gradle adapter activation (complete);
 4. technology capabilities and demand-driven build graph;
 5. generalized ResourceEndpoints and publication/deployment infrastructure;
 6. `docs_site` and `schema_site` generation/publication;

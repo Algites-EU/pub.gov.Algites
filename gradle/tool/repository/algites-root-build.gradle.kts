@@ -25,6 +25,9 @@ import eu.algites.lib.common.version.scheme.gradle.AIrGradleVersionConstraint
 import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionRequirementRenderer
 import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionScheme
 import eu.algites.lib.common.version.scheme.pep440.AInPythonBuildPhase
+import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind
+import eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet
+import eu.algites.pltf.modustro.builder.output.AIcBuiltinBuildOutputProducers
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Delete
 import org.gradle.api.file.ConfigurableFileCollection
@@ -793,6 +796,50 @@ fun AIcAlgitesStringList(aValue: Any?): List<String> {
         is List<*> -> aValue.mapNotNull { it?.toString()?.trim()?.lowercase()?.takeIf(String::isNotBlank) }
         null -> emptyList()
         else -> aValue.toString().split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+fun AIcAlgitesExplicitBuildOutputTypes(aArtifactDirectory: Map<String, Any?>?, aTechnologyKind: String): Set<String>? {
+    val locByTechnology = aArtifactDirectory?.get("buildOutputTypesByTechnologyKind") as? Map<*, *> ?: return null
+    if (!locByTechnology.containsKey(aTechnologyKind)) return null
+    return AIcAlgitesStringList(locByTechnology[aTechnologyKind]).toCollection(linkedSetOf())
+}
+
+fun AIcAlgitesPreparedSourceSet(aProject: Project, aTechnologyKind: String): AIcPreparedSourceSet {
+    fun locExisting(aPaths: List<String>): List<String> = aPaths.filter { locPath ->
+        aProject.layout.projectDirectory.dir(locPath).asFile.isDirectory
+    }
+
+    return when (aTechnologyKind) {
+        "java" -> AIcPreparedSourceSet(
+            "java",
+            locExisting(listOf("src/product/java")),
+            locExisting(listOf("src/product/java.gen", "src/product/java.extgen")),
+            locExisting(
+                listOf(
+                    "src/product/resources",
+                    "src/product/yamldefs", "src/product/yamldefs.gen", "src/product/yamldefs.extgen",
+                    "src/product/jsondefs", "src/product/jsondefs.gen", "src/product/jsondefs.extgen",
+                    "src/product/xmldefs", "src/product/xmldefs.gen", "src/product/xmldefs.extgen",
+                    "src/product/config", "src/product/config.gen", "src/product/config.extgen"
+                )
+            )
+        )
+        "python" -> AIcPreparedSourceSet(
+            "python",
+            locExisting(listOf("src/product/python")),
+            locExisting(listOf("src/product/python.gen", "src/product/python.extgen")),
+            locExisting(
+                listOf(
+                    "src/product/yamldefs", "src/product/yamldefs.gen", "src/product/yamldefs.extgen",
+                    "src/product/jsondefs", "src/product/jsondefs.gen", "src/product/jsondefs.extgen",
+                    "src/product/xmldefs", "src/product/xmldefs.gen", "src/product/xmldefs.extgen",
+                    "src/product/config", "src/product/config.gen", "src/product/config.extgen"
+                )
+            )
+        )
+        else -> throw GradleException("Phase-3 PreparedSourceSet adapter does not support TechnologyKind '$aTechnologyKind'.")
     }
 }
 
@@ -1774,6 +1821,12 @@ val algitesBuild = tasks.register("algitesBuild") {
     description = "Builds all effective or explicitly selected Algites TechnologyKinds."
 }
 
+val algitesBuiltinBuildOutputProducers = AIcBuiltinBuildOutputProducers()
+
+algitesBuild.configure {
+    dependsOn(algitesDependencyPreflight)
+}
+
 val locAlgitesPythonValidationArtifactPaths = algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap()
     .mapNotNull { (locProjectPath, locMetadata) ->
         if ("python" !in AIcAlgitesStringList(locMetadata["technologyKinds"])) {
@@ -2035,6 +2088,30 @@ subprojects {
         locAlgitesTechnologyKinds.filter { it in algitesRequestedTechnologyKinds }.toSet()
     }
 
+    fun locBuildOutputPlans(aTechnologyKind: String) = if (aTechnologyKind !in locAlgitesTechnologyKinds) {
+        emptyList()
+    } else {
+        val locPreparedSourceSet = AIcAlgitesPreparedSourceSet(project, aTechnologyKind)
+        val locExplicitBuildOutputTypes = AIcAlgitesExplicitBuildOutputTypes(locAlgitesArtifactDirectory, aTechnologyKind)
+        if (locExplicitBuildOutputTypes == null) {
+            algitesBuiltinBuildOutputProducers.createDefaultProductionPlans(aTechnologyKind, locPreparedSourceSet)
+        } else {
+            algitesBuiltinBuildOutputProducers.createProductionPlans(aTechnologyKind, locExplicitBuildOutputTypes, locPreparedSourceSet)
+        }
+    }
+
+    val locJavaBuildOutputPlans = if ("java" in locAlgitesTechnologyKinds) locBuildOutputPlans("java") else emptyList()
+    val locJavaProductionKinds = locJavaBuildOutputPlans.map { locPlan -> locPlan.productionKind() }.toSet()
+    val locPythonBuildOutputPlans = if ("python" in locAlgitesTechnologyKinds) locBuildOutputPlans("python") else emptyList()
+    val locPythonProductionKinds = locPythonBuildOutputPlans.map { locPlan -> locPlan.productionKind() }.toSet()
+
+    if (locJavaBuildOutputPlans.isNotEmpty()) {
+        logger.lifecycle("Modustro Java BuildOutputTypes for '${project.path}': ${locJavaBuildOutputPlans.joinToString(", ") { locPlan -> locPlan.buildOutputType() }}")
+    }
+    if (locPythonBuildOutputPlans.isNotEmpty()) {
+        logger.lifecycle("Modustro Python BuildOutputTypes for '${project.path}': ${locPythonBuildOutputPlans.joinToString(", ") { locPlan -> locPlan.buildOutputType() }}")
+    }
+
     val locAlgitesSubprojectPathDots = project.path
         .removePrefix(":")
         .replace(':', '.')
@@ -2093,15 +2170,30 @@ subprojects {
         extensions.configure<BasePluginExtension>("base") {
             archivesName.set(locAlgitesEffectiveArtifactId)
         }
-        if ("java" in locEffectiveTechnologyKinds) {
-            val locJavaBuildTask = tasks.named("build")
-            locJavaBuildTask.configure { dependsOn(rootProject.tasks.named("algitesDependencyPreflight")) }
-            algitesBuild.configure { dependsOn(locJavaBuildTask) }
-        }
     }
 
     if ("java" in locAlgitesTechnologyKinds) {
         plugins.withId("java") {
+            val locJavaExtension = extensions.getByType(JavaPluginExtension::class.java)
+            if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
+                locJavaExtension.withSourcesJar()
+            }
+            if (AInBuildOutputProductionKind.JAVA_JAVADOC_JAR in locJavaProductionKinds) {
+                locJavaExtension.withJavadocJar()
+            }
+            if ("java" in locEffectiveTechnologyKinds) {
+                algitesBuild.configure { dependsOn(tasks.named("check")) }
+                if (AInBuildOutputProductionKind.JAVA_CLASSES_JAR in locJavaProductionKinds) {
+                    algitesBuild.configure { dependsOn(tasks.named("jar")) }
+                }
+                if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
+                    algitesBuild.configure { dependsOn(tasks.named("sourcesJar")) }
+                }
+                if (AInBuildOutputProductionKind.JAVA_JAVADOC_JAR in locJavaProductionKinds) {
+                    algitesBuild.configure { dependsOn(tasks.named("javadocJar")) }
+                }
+            }
+
             tasks.withType(Jar::class.java).configureEach {
                 dependsOn(rootProject.tasks.named("verifyAlgitesLicensing"))
                 dependsOn(locGenerateAlgitesArtifactManifest)
@@ -2408,6 +2500,7 @@ subprojects {
             project_dir = pathlib.Path(sys.argv[1]).resolve()
             output_dir = pathlib.Path(sys.argv[2]).resolve()
             manifest_file = pathlib.Path(sys.argv[3]).resolve()
+            requested_outputs = {value for value in sys.argv[4].split(",") if value}
             manifest_name = "algites-artifact-manifest.yml"
             manifest_bytes = manifest_file.read_bytes()
 
@@ -2415,11 +2508,15 @@ subprojects {
                 shutil.rmtree(output_dir)
             output_dir.mkdir(parents=True, exist_ok=True)
 
-            subprocess.run(
-                [sys.executable, "-m", "build", "--outdir", str(output_dir)],
-                cwd=project_dir,
-                check=True,
-            )
+            build_command = [sys.executable, "-m", "build", "--outdir", str(output_dir)]
+            if requested_outputs == {"wheel"}:
+                build_command.append("--wheel")
+            elif requested_outputs == {"sdist"}:
+                build_command.append("--sdist")
+            elif requested_outputs != {"wheel", "sdist"}:
+                raise RuntimeError(f"Unsupported Python BuildOutput production set: {sorted(requested_outputs)}")
+
+            subprocess.run(build_command, cwd=project_dir, check=True)
 
             def inject_wheel(path):
                 with zipfile.ZipFile(path, "r") as source:
@@ -2500,16 +2597,23 @@ subprojects {
 
             wheel_files = sorted(output_dir.glob("*.whl"))
             sdist_files = sorted(output_dir.glob("*.tar.gz"))
-            if not wheel_files:
+            if "wheel" in requested_outputs and not wheel_files:
                 raise RuntimeError("Python build did not produce a wheel.")
-            if not sdist_files:
+            if "sdist" in requested_outputs and not sdist_files:
                 raise RuntimeError("Python build did not produce a .tar.gz source distribution.")
 
-            for wheel_file in wheel_files:
-                inject_wheel(wheel_file)
-            for sdist_file in sdist_files:
-                inject_sdist(sdist_file)
+            if "wheel" in requested_outputs:
+                for wheel_file in wheel_files:
+                    inject_wheel(wheel_file)
+            if "sdist" in requested_outputs:
+                for sdist_file in sdist_files:
+                    inject_sdist(sdist_file)
         """.trimIndent()
+
+        val locPythonBuildModes = buildList {
+            if (AInBuildOutputProductionKind.PYTHON_WHEEL in locPythonProductionKinds) add("wheel")
+            if (AInBuildOutputProductionKind.PYTHON_SDIST in locPythonProductionKinds) add("sdist")
+        }
 
         val locBuildPython = tasks.register<Exec>("buildPython") {
             group = "build"
@@ -2524,7 +2628,8 @@ subprojects {
                 locPythonBuildAndManifestScript,
                 locPythonBuildProjectDirectory.asFile.absolutePath,
                 locPythonDistDirectory.asFile.absolutePath,
-                locAlgitesManifestOutputFile.get().asFile.absolutePath
+                locAlgitesManifestOutputFile.get().asFile.absolutePath,
+                locPythonBuildModes.joinToString(",")
             )
             inputs.dir(locPythonBuildProjectDirectory)
             inputs.file(locAlgitesManifestOutputFile)
@@ -2561,7 +2666,7 @@ subprojects {
         locBuildPython.configure {
             dependsOn(rootProject.tasks.named("validateAlgitesPythonDistributionPaths"))
         }
-        if ("python" in locEffectiveTechnologyKinds) {
+        if ("python" in locEffectiveTechnologyKinds && locPythonBuildModes.isNotEmpty()) {
             algitesBuild.configure { dependsOn(locBuildPython) }
             algitesPublish.configure { dependsOn(locPublishPython) }
         }

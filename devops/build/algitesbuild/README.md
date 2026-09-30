@@ -61,3 +61,7 @@ The build of a new `pub.gov.Algites` generation must still use an already-publis
 The shared `gradle/tool/repository/algites-root-build.gradle.kts` currently loads this artifact on its script classpath from the public Cloudsmith snapshot repository using version `1.0-SNAPSHOT`. The script therefore imports the version/conversion classes transitively exposed by this bundle instead of declaring the individual `pub.lib.General` artifacts itself.
 
 The floating snapshot coordinate is intentional during the current development phase. It can later be replaced by an immutable/released bootstrap coordinate without changing the dependency-model implementation or its consumers.
+
+## Phase-3 output adapter
+
+The active root Gradle script imports the published Modustro Builder `coreimpl` producer registry from this bootstrap bundle. Effective `BuildOutputTypes` are resolved from artifact metadata, converted by Modustro into portable production plans, and only then mapped to Gradle/native tasks. The bundle therefore bootstraps the portable decision layer, while the Gradle script remains the execution adapter rather than the owner of BuildOutput selection semantics.
