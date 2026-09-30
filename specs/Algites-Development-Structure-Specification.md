@@ -1198,7 +1198,7 @@ The workspace mirrors the artifact's repository-relative source path and then pr
 
 For repository-level generated state, `<repository>/build/run/...` is used directly. For example, artifact `aac/coreintf` uses `build/run/aac/coreintf/run/...` while its source and documentation inputs remain below `aac/coreintf/src` and `aac/coreintf/doc`.
 
-The repository-level `build/` tree is disposable derived state. Generated SourceTypes such as `src/product/java.gen` or `src/product/python.gen` are intentionally excluded from this relocation because they remain source roots for compilers and development tools.
+The repository-level `build/` tree is disposable derived state. Generated SourceTypes such as `src/product/java.gen` or `src/product/python.gen` are intentionally excluded from this relocation because they remain source roots for compilers and development tools. Legacy `_obsolete/` repository content is excluded from active artifact discovery; archival Gradle plugins or descriptors below that root do not participate in the current build and therefore must not define parallel source-layout conventions.
 
 #### 3.9.4 Inherited `GroupId` metadata
 

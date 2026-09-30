@@ -28,7 +28,8 @@ public final class AIcJavaSourcesJarBuildOutputProducer implements AIiBuildOutpu
             buildOutputType(),
             AInBuildOutputProductionKind.JAVA_SOURCES_JAR,
             aPreparedSourceSet,
-            Set.of()
+            Set.of(),
+            Set.of("source_native_processing")
         );
     }
 }

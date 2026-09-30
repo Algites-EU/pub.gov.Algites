@@ -29,7 +29,8 @@ public final class AIcJavaJavadocJarBuildOutputProducer implements AIiBuildOutpu
             buildOutputType(),
             AInBuildOutputProductionKind.JAVA_JAVADOC_JAR,
             aPreparedSourceSet,
-            Set.of(AInBuildOutputProductionInput.DOCUMENTATION_CLASSPATH)
+            Set.of(AInBuildOutputProductionInput.DOCUMENTATION_CLASSPATH),
+            Set.of("generation_of_native_documentation")
         );
     }
 }

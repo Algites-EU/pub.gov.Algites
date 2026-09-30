@@ -29,7 +29,8 @@ public final class AIcJavaClassesJarBuildOutputProducer implements AIiBuildOutpu
             buildOutputType(),
             AInBuildOutputProductionKind.JAVA_CLASSES_JAR,
             aPreparedSourceSet,
-            Set.of(AInBuildOutputProductionInput.COMPILE_DEPENDENCY_GRAPH)
+            Set.of(AInBuildOutputProductionInput.COMPILE_DEPENDENCY_GRAPH),
+            Set.of("source_native_processing", "dependency_resolution")
         );
     }
 }

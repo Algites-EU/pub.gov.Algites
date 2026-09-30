@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:yamldef:capability-configuration:modustro:publication-of-docs-site:1",
+  "x-algites-definition-version": 1,
+  "title": "Docs Site Publication Capability Configuration v1",
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "PublicationDestinations": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
+}

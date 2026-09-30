@@ -29,7 +29,8 @@ public final class AIcPythonWheelBuildOutputProducer implements AIiBuildOutputPr
             buildOutputType(),
             AInBuildOutputProductionKind.PYTHON_WHEEL,
             aPreparedSourceSet,
-            Set.of(AInBuildOutputProductionInput.PACKAGE_METADATA)
+            Set.of(AInBuildOutputProductionInput.PACKAGE_METADATA),
+            Set.of("source_native_processing", "dependency_resolution")
         );
     }
 }

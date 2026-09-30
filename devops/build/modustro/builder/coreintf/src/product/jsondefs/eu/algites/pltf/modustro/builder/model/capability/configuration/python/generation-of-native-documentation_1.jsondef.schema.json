@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:jsondef:capability-configuration:python:generation-of-native-documentation:1",
+  "x-algites-definition-version": 1,
+  "title": "Python Native Documentation Capability Configuration v1",
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "Sphinx": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Builder": {
+              "type": "string",
+              "minLength": 1,
+              "default": "html"
+            },
+            "ConfigurationDirectory": {
+              "type": "string",
+              "minLength": 1
+            },
+            "AdditionalArguments": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
+}

@@ -29,7 +29,8 @@ public final class AIcPythonSdistBuildOutputProducer implements AIiBuildOutputPr
             buildOutputType(),
             AInBuildOutputProductionKind.PYTHON_SDIST,
             aPreparedSourceSet,
-            Set.of(AInBuildOutputProductionInput.PACKAGE_METADATA)
+            Set.of(AInBuildOutputProductionInput.PACKAGE_METADATA),
+            Set.of("source_native_processing")
         );
     }
 }

@@ -21,7 +21,7 @@ public final class AIcBuiltinTechnologyKindDefinitions {
             List.of(
                 capability("source_native_processing"),
                 capability("dependency_resolution"),
-                capability("generation_of_native_documentation")
+                capability("generation_of_native_documentation", "urn:algites:modustro:builder:capability-configuration:java:generation-of-native-documentation:1")
             ),
             List.of(
                 output("java_classes_jar", true, true),
@@ -39,7 +39,7 @@ public final class AIcBuiltinTechnologyKindDefinitions {
             List.of(
                 capability("source_native_processing"),
                 capability("dependency_resolution"),
-                capability("generation_of_native_documentation")
+                capability("generation_of_native_documentation", "urn:algites:modustro:builder:capability-configuration:python:generation-of-native-documentation:1")
             ),
             List.of(
                 output("python_wheel", true, true),
@@ -61,9 +61,9 @@ public final class AIcBuiltinTechnologyKindDefinitions {
         return new AIcTechnologyKindDefinition(
             "modustro",
             List.of(
-                new AIcCapabilityDefinition("publication_of_global_schemas", Set.of(AInModelScope.REPOSITORY, AInModelScope.ARTIFACT_SET, AInModelScope.ARTIFACT), null),
-                new AIcCapabilityDefinition("publication_of_docs_site", Set.of(AInModelScope.REPOSITORY), null),
-                new AIcCapabilityDefinition("docs_site_content", Set.of(AInModelScope.REPOSITORY, AInModelScope.ARTIFACT_SET, AInModelScope.ARTIFACT), null)
+                new AIcCapabilityDefinition("publication_of_global_schemas", Set.of(AInModelScope.REPOSITORY, AInModelScope.ARTIFACT_SET, AInModelScope.ARTIFACT), "urn:algites:modustro:builder:capability-configuration:modustro:publication-of-global-schemas:1"),
+                new AIcCapabilityDefinition("publication_of_docs_site", Set.of(AInModelScope.REPOSITORY), "urn:algites:modustro:builder:capability-configuration:modustro:publication-of-docs-site:1"),
+                new AIcCapabilityDefinition("docs_site_content", Set.of(AInModelScope.REPOSITORY, AInModelScope.ARTIFACT_SET, AInModelScope.ARTIFACT), "urn:algites:modustro:builder:capability-configuration:modustro:docs-site-content:1")
             ),
             List.of(
                 output("docs_site", true, false),
@@ -75,7 +75,15 @@ public final class AIcBuiltinTechnologyKindDefinitions {
     }
 
     private static AIcCapabilityDefinition capability(String aId) {
-        return new AIcCapabilityDefinition(aId, Set.of(AInModelScope.REPOSITORY, AInModelScope.ARTIFACT_SET, AInModelScope.ARTIFACT), null);
+        return capability(aId, null);
+    }
+
+    private static AIcCapabilityDefinition capability(String aId, String aConfigurationSchemaId) {
+        return new AIcCapabilityDefinition(
+            aId,
+            Set.of(AInModelScope.REPOSITORY, AInModelScope.ARTIFACT_SET, AInModelScope.ARTIFACT),
+            aConfigurationSchemaId
+        );
     }
 
     private static AIcBuildOutputTypeDefinition output(String aId, boolean aCanBeProduced, boolean aCanBeUsedInDependency) {

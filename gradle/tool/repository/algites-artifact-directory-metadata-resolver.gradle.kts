@@ -345,7 +345,7 @@ val AIcAlgitesUsageProviderAdaptersByUsage = mapOf(
 )
 
 val AIcAlgitesRootIgnoredDirectoryNames = setOf(
-    ".git", ".gradle", ".idea", ".mps", "run", "build", "target", "out", "output",
+    ".git", ".gradle", ".idea", ".mps", "_obsolete", "run", "build", "target", "out", "output",
     "docs-site", "documentation-branch", "gh-pages", "source_gen", "source_gen.caches", "classes_gen"
 )
 

@@ -26,6 +26,7 @@ public final class AItcBuiltinBuildOutputProducersTest {
         Assert.assertTrue(locPlans.stream().anyMatch(locPlan -> locPlan.productionKind() == AInBuildOutputProductionKind.JAVA_CLASSES_JAR));
         Assert.assertTrue(locPlans.stream().anyMatch(locPlan -> locPlan.productionKind() == AInBuildOutputProductionKind.JAVA_SOURCES_JAR));
         Assert.assertTrue(locPlans.stream().allMatch(locPlan -> locPlan.preparedSourceSet() == locPrepared));
+        Assert.assertTrue(locPlans.stream().anyMatch(locPlan -> locPlan.requiredCapabilityIds().contains("dependency_resolution")));
     }
 
     @Test
@@ -36,6 +37,7 @@ public final class AItcBuiltinBuildOutputProducersTest {
             .createProductionPlan(locPrepared);
         Assert.assertEquals(locPlan.productionKind(), AInBuildOutputProductionKind.JAVA_JAVADOC_JAR);
         Assert.assertEquals(locPlan.requiredInputs(), Set.of(AInBuildOutputProductionInput.DOCUMENTATION_CLASSPATH));
+        Assert.assertEquals(locPlan.requiredCapabilityIds(), Set.of("generation_of_native_documentation"));
     }
 
     @Test

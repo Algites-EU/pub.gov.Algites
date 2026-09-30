@@ -15,13 +15,15 @@ public final class AIcBuildOutputProductionPlan {
     private final AInBuildOutputProductionKind productionKind;
     private final AIcPreparedSourceSet preparedSourceSet;
     private final Set<AInBuildOutputProductionInput> requiredInputs;
+    private final Set<String> requiredCapabilityIds;
 
     public AIcBuildOutputProductionPlan(
         String aTechnologyKind,
         String aBuildOutputType,
         AInBuildOutputProductionKind aProductionKind,
         AIcPreparedSourceSet aPreparedSourceSet,
-        Set<AInBuildOutputProductionInput> aRequiredInputs
+        Set<AInBuildOutputProductionInput> aRequiredInputs,
+        Set<String> aRequiredCapabilityIds
     ) {
         technologyKind = requireText(aTechnologyKind, "technologyKind");
         buildOutputType = requireText(aBuildOutputType, "buildOutputType");
@@ -33,6 +35,12 @@ public final class AIcBuildOutputProductionPlan {
             );
         }
         requiredInputs = Set.copyOf(new LinkedHashSet<>(Objects.requireNonNull(aRequiredInputs, "requiredInputs")));
+        requiredCapabilityIds = Set.copyOf(new LinkedHashSet<>(Objects.requireNonNull(aRequiredCapabilityIds, "requiredCapabilityIds")));
+        requiredCapabilityIds.forEach(locCapabilityId -> {
+            if (locCapabilityId == null || locCapabilityId.trim().isEmpty()) {
+                throw new IllegalArgumentException("requiredCapabilityIds must not contain blank values.");
+            }
+        });
     }
 
     private static String requireText(String aValue, String aName) {
@@ -62,5 +70,9 @@ public final class AIcBuildOutputProductionPlan {
 
     public Set<AInBuildOutputProductionInput> requiredInputs() {
         return requiredInputs;
+    }
+
+    public Set<String> requiredCapabilityIds() {
+        return requiredCapabilityIds;
     }
 }
