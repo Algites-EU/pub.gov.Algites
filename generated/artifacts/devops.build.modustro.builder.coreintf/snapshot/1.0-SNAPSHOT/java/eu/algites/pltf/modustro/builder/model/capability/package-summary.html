@@ -93,13 +93,39 @@ loadScripts(document, 'script');</script>
 </li>
 <li>
 <div id="class-summary">
-<div class="caption"><span>Classes</span></div>
+<div class="table-tabs" role="tablist" aria-orientation="horizontal"><button id="class-summary-tab0" role="tab" aria-selected="true" aria-controls="class-summary.tabpanel" tabindex="0" onkeydown="switchTab(event)" onclick="show('class-summary', 'class-summary', 2)" class="active-table-tab">All Classes and Interfaces</button><button id="class-summary-tab1" role="tab" aria-selected="false" aria-controls="class-summary.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('class-summary', 'class-summary-tab1', 2)" class="table-tab">Interfaces</button><button id="class-summary-tab2" role="tab" aria-selected="false" aria-controls="class-summary.tabpanel" tabindex="-1" onkeydown="switchTab(event)" onclick="show('class-summary', 'class-summary-tab2', 2)" class="table-tab">Classes</button></div>
+<div id="class-summary.tabpanel" role="tabpanel" aria-labelledby="class-summary-tab0">
 <div class="summary-table two-column-summary">
 <div class="table-header col-first">Class</div>
 <div class="table-header col-last">Description</div>
-<div class="col-first even-row-color class-summary class-summary-tab2"><a href="AIcCapabilityDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDefinition</a></div>
+<div class="col-first even-row-color class-summary class-summary-tab2"><a href="AIcCapabilityConfiguration.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityConfiguration</a></div>
 <div class="col-last even-row-color class-summary class-summary-tab2">
+<div class="block">Portable effective configuration of one TechnologyKind capability.</div>
+</div>
+<div class="col-first odd-row-color class-summary class-summary-tab2"><a href="AIcCapabilityDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDefinition</a></div>
+<div class="col-last odd-row-color class-summary class-summary-tab2">
 <div class="block">Definition of a build-technology capability and its allowed configuration scopes.</div>
+</div>
+<div class="col-first even-row-color class-summary class-summary-tab2"><a href="AIcCapabilityDemand.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemand</a></div>
+<div class="col-last even-row-color class-summary class-summary-tab2">
+<div class="block">One deduplicated capability demand together with the reasons that requested it.</div>
+</div>
+<div class="col-first odd-row-color class-summary class-summary-tab2"><a href="AIcCapabilityDemandDependency.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandDependency</a></div>
+<div class="col-last odd-row-color class-summary class-summary-tab2">
+<div class="block">Directed prerequisite edge between capability demands.</div>
+</div>
+<div class="col-first even-row-color class-summary class-summary-tab2"><a href="AIcCapabilityDemandGraph.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandGraph</a></div>
+<div class="col-last even-row-color class-summary class-summary-tab2">
+<div class="block">Portable deduplicated capability demand DAG.</div>
+</div>
+<div class="col-first odd-row-color class-summary class-summary-tab2"><a href="AIcCapabilityDemandKey.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandKey</a></div>
+<div class="col-last odd-row-color class-summary class-summary-tab2">
+<div class="block">Stable identity of one capability demand in a concrete model scope.</div>
+</div>
+<div class="col-first even-row-color class-summary class-summary-tab1"><a href="AIiCapabilityDemandPlanner.html" title="interface in eu.algites.pltf.modustro.builder.model.capability">AIiCapabilityDemandPlanner</a></div>
+<div class="col-last even-row-color class-summary class-summary-tab1">
+<div class="block">Creates a portable capability demand DAG from build-output and explicit capability demands.</div>
+</div>
 </div>
 </div>
 </div>

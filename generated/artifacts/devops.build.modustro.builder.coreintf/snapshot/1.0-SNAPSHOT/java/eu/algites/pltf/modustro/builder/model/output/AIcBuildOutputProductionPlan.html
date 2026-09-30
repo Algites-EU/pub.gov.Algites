@@ -103,11 +103,12 @@ loadScripts(document, 'script');</script>
 <div class="summary-table two-column-summary">
 <div class="table-header col-first">Constructor</div>
 <div class="table-header col-last">Description</div>
-<div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E(java.lang.String,java.lang.String,eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind,eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet,java.util.Set)" class="member-name-link">AIcBuildOutputProductionPlan</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aTechnologyKind,
+<div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E(java.lang.String,java.lang.String,eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind,eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet,java.util.Set,java.util.Set)" class="member-name-link">AIcBuildOutputProductionPlan</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aTechnologyKind,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aBuildOutputType,
  <a href="AInBuildOutputProductionKind.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionKind</a>&nbsp;aProductionKind,
  <a href="../source/AIcPreparedSourceSet.html" title="class in eu.algites.pltf.modustro.builder.model.source">AIcPreparedSourceSet</a>&nbsp;aPreparedSourceSet,
- <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInBuildOutputProductionInput.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionInput</a>&gt;&nbsp;aRequiredInputs)</code></div>
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInBuildOutputProductionInput.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionInput</a>&gt;&nbsp;aRequiredInputs,
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aRequiredCapabilityIds)</code></div>
 <div class="col-last even-row-color">&nbsp;</div>
 </div>
 </section>
@@ -132,12 +133,15 @@ loadScripts(document, 'script');</script>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="AInBuildOutputProductionKind.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionKind</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#productionKind()" class="member-name-link">productionKind</a>()</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
-<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a><wbr>&lt;<a href="AInBuildOutputProductionInput.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionInput</a>&gt;</code></div>
-<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#requiredInputs()" class="member-name-link">requiredInputs</a>()</code></div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a><wbr>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#requiredCapabilityIds()" class="member-name-link">requiredCapabilityIds</a>()</code></div>
 <div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
-<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
-<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#technologyKind()" class="member-name-link">technologyKind</a>()</code></div>
+<div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a><wbr>&lt;<a href="AInBuildOutputProductionInput.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionInput</a>&gt;</code></div>
+<div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#requiredInputs()" class="member-name-link">requiredInputs</a>()</code></div>
 <div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
+<div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#technologyKind()" class="member-name-link">technologyKind</a>()</code></div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
 </div>
 </div>
 </div>
@@ -156,13 +160,14 @@ loadScripts(document, 'script');</script>
 <h2>Constructor Details</h2>
 <ul class="member-list">
 <li>
-<section class="detail" id="&lt;init&gt;(java.lang.String,java.lang.String,eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind,eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet,java.util.Set)">
+<section class="detail" id="&lt;init&gt;(java.lang.String,java.lang.String,eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind,eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet,java.util.Set,java.util.Set)">
 <h3>AIcBuildOutputProductionPlan</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcBuildOutputProductionPlan</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aTechnologyKind,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aBuildOutputType,
  <a href="AInBuildOutputProductionKind.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionKind</a>&nbsp;aProductionKind,
  <a href="../source/AIcPreparedSourceSet.html" title="class in eu.algites.pltf.modustro.builder.model.source">AIcPreparedSourceSet</a>&nbsp;aPreparedSourceSet,
- <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInBuildOutputProductionInput.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionInput</a>&gt;&nbsp;aRequiredInputs)</span></div>
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInBuildOutputProductionInput.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionInput</a>&gt;&nbsp;aRequiredInputs,
+ <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aRequiredCapabilityIds)</span></div>
 </section>
 </li>
 </ul>
@@ -201,6 +206,12 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="requiredInputs()">
 <h3>requiredInputs</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInBuildOutputProductionInput.html" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionInput</a>&gt;</span>&nbsp;<span class="element-name">requiredInputs</span>()</div>
+</section>
+</li>
+<li>
+<section class="detail" id="requiredCapabilityIds()">
+<h3>requiredCapabilityIds</h3>
+<div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</span>&nbsp;<span class="element-name">requiredCapabilityIds</span>()</div>
 </section>
 </li>
 </ul>
