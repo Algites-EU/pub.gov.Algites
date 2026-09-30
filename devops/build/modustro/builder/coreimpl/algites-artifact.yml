@@ -11,6 +11,43 @@ Dependencies:
         Usage: product_api
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
+
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.core
+        Usage: product_implementation
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.algites.v1
+        Usage: product_implementation
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.gradle
+        Usage: product_implementation
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.pep440
+        Usage: product_implementation
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.conversion.algites2gradle.v1
+        Usage: product_implementation
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+
+      - GroupId: eu.algites.lib.common
+        ArtifactId: pub.lib.General_version.scheme.conversion.algites2pep440.v1
+        Usage: product_implementation
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+
   - DependencyKind: java
     Items:
       - GroupId: org.testng
