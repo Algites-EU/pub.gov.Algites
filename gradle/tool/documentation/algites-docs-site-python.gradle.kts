@@ -9,6 +9,10 @@
  * documented project or install its runtime dependencies.
  */
 
+import eu.algites.pltf.modustro.builder.capability.AIcBuiltinCapabilityDemandPlanner
+import eu.algites.pltf.modustro.builder.model.AInModelScope
+import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemand
+import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemandKey
 import org.gradle.api.Action
 import org.gradle.api.Task
 
@@ -16,6 +20,10 @@ val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as Strin
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-base.gradle.kts"
 
 apply(from = uri(locAlgitesDocsBaseScript))
+
+@Suppress("UNCHECKED_CAST")
+val locPythonDocsResolveSourceRootFiles = rootProject.extra["algitesResolveSourceRootFiles"] as
+    (File, String, String) -> List<File>
 
 val locArtifactDocsRoot = layout.projectDirectory.dir(
     (extra.properties["algitesArtifactDocsRootPath"] as String?)
@@ -93,7 +101,7 @@ class AIcGeneratePythonDocsSiteAction(
                 $locTitle
                 $locUnderline
 
-                No Python API source files were found below ``src/product/python`` or ``src/product/python.gen`` for this artifact.
+                No Python API source files were found in the canonical Python product source roots for this artifact.
                 """.trimIndent() + System.lineSeparator()
             } else {
                 """
@@ -308,9 +316,10 @@ val locPythonDocsEntries = locAlgitesDocsResolvedArtifactDirectories
             "build/run/$locRelativePath/run"
         }
         val locWorkingDirectory = File(rootProject.projectDir, "$locArtifactRunRelativePath/bld/algites-docs/python")
-        val locSourceDirectories = listOf(
-            File(locArtifactDirectoryFile, "src/product/python"),
-            File(locArtifactDirectoryFile, "src/product/python.gen")
+        val locSourceDirectories = locPythonDocsResolveSourceRootFiles(
+            locArtifactDirectoryFile,
+            "product",
+            "python"
         )
         val locArtifactMetadata = mapOf(
             "localArtifactId" to locLocalArtifactId,
@@ -343,6 +352,8 @@ val locPythonDocsEntries = locAlgitesDocsResolvedArtifactDirectories
         )
     }
 
+val locPythonDocsCapabilityPlanner = AIcBuiltinCapabilityDemandPlanner()
+
 val locGeneratePythonDocsSite = tasks.register("generatePythonDocsSite") {
     group = "algites"
     description = "Generates and stages Python API documentation into the Algites documentation site."
@@ -366,6 +377,44 @@ val locGeneratePythonDocsSite = tasks.register("generatePythonDocsSite") {
             locPythonDocsEntries
         )
     )
+}
+
+locPythonDocsEntries.forEach { locEntry ->
+    val locScopeIdentity = locEntry.locArtifactMetadata["path"]?.takeIf { it.isNotBlank() } ?: locEntry.locLocalArtifactId
+    val locNativeDocumentationGraph = locPythonDocsCapabilityPlanner.createDemandGraph(
+        locScopeIdentity,
+        emptyList(),
+        listOf(
+            AIcCapabilityDemand(
+                AIcCapabilityDemandKey(
+                    "python",
+                    "generation_of_native_documentation",
+                    AInModelScope.ARTIFACT,
+                    locScopeIdentity
+                ),
+                setOf("docs_site_content")
+            )
+        )
+    )
+    val locNativeDocumentationCapabilityIds = locNativeDocumentationGraph.topologicalOrder()
+        .map { locDemand -> locDemand.key().capabilityId() }
+        .toSet()
+    val locGradleProjectPath = locEntry.locArtifactMetadata["gradleProjectPath"].orEmpty()
+    val locGradleProject = rootProject.findProject(locGradleProjectPath)
+    if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
+        locGradleProject?.tasks
+            ?.matching { locTask -> locTask.name == "processAlgitesPythonNativeSources" }
+            ?.configureEach { locTask ->
+                locGeneratePythonDocsSite.configure { dependsOn(locTask) }
+            }
+    }
+    if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
+        locGradleProject?.tasks
+            ?.matching { locTask -> locTask.name == "resolvePythonDependencies" }
+            ?.configureEach { locTask ->
+                locGeneratePythonDocsSite.configure { dependsOn(locTask) }
+            }
+    }
 }
 
 locGeneratePythonDocsSite.configure {

@@ -8,6 +8,10 @@
  * documentation-site script.
  */
 
+import eu.algites.pltf.modustro.builder.capability.AIcBuiltinCapabilityDemandPlanner
+import eu.algites.pltf.modustro.builder.model.AInModelScope
+import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemand
+import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemandKey
 import org.gradle.api.Action
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -158,6 +162,7 @@ fun AIcBuildJavaArtifactMetadata(
 }
 
 val locJavaDocsSiteEntries = mutableListOf<AIcdJavaDocsSiteEntry>()
+val locJavaDocsCapabilityPlanner = AIcBuiltinCapabilityDemandPlanner()
 
 val locGenerateJavaDocsSite = tasks.register("generateJavaDocsSite") {
     group = "algites"
@@ -189,6 +194,36 @@ subprojects.forEach { locSubproject ->
 
     if ("java" !in locDeclaredTechnologyKinds) {
         return@forEach
+    }
+
+    val locNativeDocumentationGraph = locJavaDocsCapabilityPlanner.createDemandGraph(
+        locResolvedMetadata["path"]?.takeIf { it.isNotBlank() } ?: locSubproject.path,
+        emptyList(),
+        listOf(
+            AIcCapabilityDemand(
+                AIcCapabilityDemandKey(
+                    "java",
+                    "generation_of_native_documentation",
+                    AInModelScope.ARTIFACT,
+                    locResolvedMetadata["path"]?.takeIf { it.isNotBlank() } ?: locSubproject.path
+                ),
+                setOf("docs_site_content")
+            )
+        )
+    )
+    val locNativeDocumentationCapabilityIds = locNativeDocumentationGraph.topologicalOrder()
+        .map { locDemand -> locDemand.key().capabilityId() }
+        .toSet()
+
+    if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
+        locSubproject.tasks.matching { locTask -> locTask.name == "processAlgitesJavaNativeSources" }.configureEach { locTask ->
+            locGenerateJavaDocsSite.configure { dependsOn(locTask) }
+        }
+    }
+    if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
+        locSubproject.tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach { locTask ->
+            locGenerateJavaDocsSite.configure { dependsOn(locTask) }
+        }
     }
 
     locSubproject.plugins.withId("java") {

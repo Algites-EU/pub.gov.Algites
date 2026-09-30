@@ -282,7 +282,7 @@ The built-in defaults currently are:
 
 `TechnologyKinds.ItemsInheritancePolicy` and nested `BuildOutputTypes.ItemsInheritancePolicy` accept `merge_missing_items` (default) and `remove_missing_items`. Omitting `BuildOutputTypes` inherits a selection from an ancestor if present; otherwise the built-in default applies. An explicit `BuildOutputTypes: { Items: [] }` retains the TechnologyKind while requesting no packaging output for it.
 
-Phase 3B actively applies these selections: Java maps to `jar`, `sourcesJar`, and optional `javadocJar`; Python maps to wheel and/or sdist production.
+Phase 3B actively applies these selections: Java maps to `jar`, `sourcesJar`, and optional `javadocJar`; Python maps to wheel and/or sdist production. Phase 4B additionally derives the required capability DAG from those production plans. In particular, dependency-resolution preflight is wired only when an effective output or documentation demand requires the `dependency_resolution` capability, while shared prerequisites are deduplicated by the capability planner.
 
 ### 6.2 Environment requirements
 
@@ -318,6 +318,8 @@ The general-purpose SourceTypes currently include:
 - `resources`
 
 Technology adapters may define additional SourceTypes.
+
+The active build and documentation adapters use one shared source-root resolver. For any SourceType it resolves the canonical `<type>`, `<type>.gen`, and `<type>.extgen` candidate roots under the requested `product` or `develop` scope; consumers may ignore roots that do not exist yet, while generators can materialize `.gen` roots later in the same build. Artifact-local Gradle scripts SHOULD NOT duplicate these lists.
 
 ### 7.1 Product vs development sources
 

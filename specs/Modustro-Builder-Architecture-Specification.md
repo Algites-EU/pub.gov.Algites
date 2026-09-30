@@ -131,7 +131,7 @@ modustro:
 
 A capability definition may reference a TechnologyKind-specific configuration schema. The configuration item itself remains flat; a generic `Configuration` wrapper is not required. Linked semantic validation selects the schema using `(TechnologyKind, Capability)`.
 
-Phase 4A defines the first TechnologyKind-specific capability configuration contracts. Java native documentation uses a Javadoc-oriented configuration, Python native documentation uses a Sphinx-oriented configuration, and Modustro defines configurations for docs-site content/publication and global schema publication. The contracts are representation-specific canonical definitions in `coreintf`; a `CapabilityDefinition.ConfigurationSchemaId` identifies the logical configuration contract independently of its YAML/JSON/XML representation.
+Phase 4 defines the first TechnologyKind-specific capability configuration contracts. Java native documentation uses a Javadoc-oriented configuration, Python native documentation uses a Sphinx-oriented configuration, and Modustro defines configurations for docs-site content/publication and global schema publication. The contracts are representation-specific canonical definitions in `coreintf`; a `CapabilityDefinition.ConfigurationSchemaId` identifies the logical configuration contract independently of its YAML/JSON/XML representation.
 
 ## 6. Dependency identity and usages
 
@@ -253,10 +253,10 @@ The active Phase-3B adapter currently maps production plans as follows:
 - `python_sdist` -> `python -m build --sdist`;
 - the default Python selection requests both wheel and sdist in one native build staging flow.
 
-`algitesBuild` still performs the normal verification/test lifecycle for an effective Java TechnologyKind, but output packaging is now driven by the selected production plans rather than by unconditional Gradle packaging defaults. Phase 4A retains the hard-wired producer registry for producer selection but adds portable capability requirements to every production plan and introduces the capability demand DAG. The planner deduplicates common demands and expands capability prerequisites. Phase 4B activates this DAG in the Gradle adapter and documentation generation; Phase 4A deliberately leaves the active Gradle orchestration unchanged for bootstrap publication.
+`algitesBuild` still performs the normal verification/test lifecycle for an effective Java TechnologyKind, but output packaging is now driven by the selected production plans rather than by unconditional Gradle packaging defaults. Phase 4 retains the hard-wired producer registry for producer selection but adds portable capability requirements to every production plan and introduces the capability demand DAG. The planner deduplicates common demands and expands capability prerequisites. Phase 4A published the portable graph/model first as a bootstrap stage. Phase 4B activates the DAG in the Gradle adapter and documentation generation.
 
 
-### Phase-4A capability demand graph
+### Phase-4 capability demand graph
 
 Every concrete `AIcBuildOutputProductionPlan` carries the capability IDs required by that producer. Initial mappings are:
 
@@ -268,7 +268,7 @@ Every concrete `AIcBuildOutputProductionPlan` carries the capability IDs require
 
 `generation_of_native_documentation` has built-in prerequisites `source_native_processing` and `dependency_resolution` for Java and Python. `AIcBuiltinCapabilityDemandPlanner` expands these prerequisites and deduplicates demands by `(TechnologyKind, Capability, Scope, ScopeIdentity)`. The resulting graph is a portable DAG and has no Gradle dependency. Additional repository/artifact-set/artifact demands such as `publication_of_docs_site`, `docs_site_content`, and `publication_of_global_schemas` can be added to the same graph.
 
-Phase 4A is a bootstrap stage: the graph/model and configuration schemas are published first. Phase 4B will make the Gradle adapter consume the graph so shared prerequisites execute once even when multiple outputs or documentation consumers request them.
+Phase 4A was the bootstrap stage in which the graph/model and configuration schemas were published without changing active orchestration. Phase 4B consumes the graph in the Gradle adapter. Build-output demands now control whether technology dependency-resolution preflight is required, and `source_native_processing` is materialized as one lifecycle boundary per TechnologyKind/artifact. Documentation generation adds an explicit `generation_of_native_documentation` demand; the planner expands it to `source_native_processing` and `dependency_resolution`, and Gradle task dependency deduplication ensures that shared prerequisites execute once even when multiple outputs or documentation consumers require them. The documentation site itself is represented by repository-scoped `publication_of_docs_site` and scoped `docs_site_content` demands. Global-schema publication remains dormant until the `schema_site` work in Phase 6.
 
 ## 9. Canonical definitions and global publication metadata
 
@@ -295,7 +295,7 @@ The staged continuation is:
 1. portable model foundation (complete);
 2. dependency model and Java/Python native-resolution bridges (complete);
 3. concrete BuildOutputType producers, `PreparedSourceSet`, effective output selection, and Gradle adapter activation (complete);
-4. technology capabilities and demand-driven build graph;
+4. technology capabilities and demand-driven build graph (complete);
 5. generalized ResourceEndpoints and publication/deployment infrastructure;
 6. `docs_site` and `schema_site` generation/publication;
 7. additional producers, including `python_aws_lambda_zip`, and gradual removal of business logic from Gradle scripts;

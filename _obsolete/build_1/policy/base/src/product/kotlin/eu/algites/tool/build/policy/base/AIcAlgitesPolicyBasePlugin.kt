@@ -2,8 +2,6 @@ package eu.algites.tool.build.policy.base
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
-import org.gradle.api.tasks.SourceSetContainer
-import org.gradle.kotlin.dsl.getByType
 import java.io.File
 
 class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
@@ -20,16 +18,6 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         aProject.layout.buildDirectory.set(
             aProject.rootProject.layout.projectDirectory.dir("$locRunPath/bld/gradle")
         )
-
-        /*
-         * Source layout convention for Java and Gradle plugin projects.
-         */
-        aProject.plugins.withId("java") {
-            configureSourceLayout(aProject)
-        }
-        aProject.plugins.withId("java-gradle-plugin") {
-            configureSourceLayout(aProject)
-        }
 
         val locMetadataFiles = findAlgitesMetadataFiles(aProject)
         val locVersion = readVersion(locMetadataFiles)
@@ -50,47 +38,6 @@ class AIcAlgitesPolicyBasePlugin : Plugin<Project> {
         }
 
         aProject.version = locComputedVersion
-    }
-
-    private fun configureSourceLayout(aProject: Project) {
-
-        val locSourceSets = aProject.extensions.getByType<SourceSetContainer>()
-
-        locSourceSets.getByName("main").java.setSrcDirs(
-            listOf(
-                "src/product/java",
-                "src/product/javagen",
-                "src/product/javaextgen",
-                "src/product/kotlin"
-            )
-        )
-        locSourceSets.getByName("main").resources.setSrcDirs(
-            listOf(
-                "src/product/resources",
-                "src/product/config",
-                "src/product/configgen",
-                "src/product/configextgen",
-                "src/product/loader"
-            )
-        )
-
-        locSourceSets.getByName("test").java.setSrcDirs(
-            listOf(
-                "src/develop/java",
-                "src/develop/javagen",
-                "src/develop/javaextgen",
-                "src/develop/kotlin"
-            )
-        )
-        locSourceSets.getByName("test").resources.setSrcDirs(
-            listOf(
-                "src/develop/resources",
-                "src/develop/config",
-                "src/develop/configgen",
-                "src/develop/configextgen",
-                "src/develop/loader"
-            )
-        )
     }
 
     private fun findAlgitesMetadataFiles(aProject: Project): List<File> {

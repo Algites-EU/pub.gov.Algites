@@ -54,6 +54,19 @@ abstract class AIcPrepareAlgitesDocsPublicationTask : DefaultTask() {
 
 apply(plugin = "base")
 
+if (!rootProject.extra.has("algitesResolveSourceRootFiles")) {
+    val locAlgitesSourceRootResolverScript = rootProject.file("gradle/tool/repository/algites-source-root-resolver.gradle.kts")
+    if (locAlgitesSourceRootResolverScript.isFile) {
+        apply(from = locAlgitesSourceRootResolverScript)
+    } else {
+        apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-source-root-resolver.gradle.kts"))
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsResolveSourceRootFiles = rootProject.extra["algitesResolveSourceRootFiles"] as
+    (File, String, String) -> List<File>
+
 val locAlgitesRepositoryMetadataResolverScript = (findProperty("algites.docs.repositoryMetadataResolverScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver-wrapper.gradle.kts"
 

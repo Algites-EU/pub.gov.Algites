@@ -14,4 +14,4 @@ The package namespace is `eu.algites.pltf.modustro.builder`.
 
 ## Phase 4 capability planning
 
-Phase 4A adds the Gradle-independent capability demand graph and TechnologyKind-specific capability configuration contracts. Build-output production plans now declare required capabilities; the built-in planner deduplicates them and expands prerequisites. The active Gradle adapter is intentionally switched to the graph only in Phase 4B after the new `coreintf`/`coreimpl` snapshot has been published.
+Phase 4 adds the Gradle-independent capability demand graph and TechnologyKind-specific capability configuration contracts. Build-output production plans declare required capabilities; the built-in planner deduplicates them and expands prerequisites. Phase 4A published that portable model as a bootstrap stage. Phase 4B activates it in the Gradle adapter and documentation generation: dependency-resolution preflight is demand-driven, source-native processing has one shared lifecycle boundary per TechnologyKind/artifact, and native documentation expands through the same prerequisite graph.

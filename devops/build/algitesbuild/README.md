@@ -33,7 +33,7 @@ The current source artifact declares its build-support dependencies in `algites-
 
 The current dependency requirement uses the exact Algites v1 snapshot version `1.0-SNAPSHOT`; repository version metadata separately uses `ReleaseLineVersion`, `Revision`, and `QualifierKind`. Changing the build-support dependency set or its versions is therefore a governed source-metadata change of this artifact.
 
-The bootstrap remains intentionally asymmetric: the shared root build script obtains its directly imported build-runtime classes from already-published bootstrap artifacts. In Phase 3 this includes `algitesbuild:1.0-SNAPSHOT` plus the published Modustro Builder `coreintf` and `coreimpl` artifacts. The current source artifacts are then rebuilt and republished using the repository dependency declarations. This avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency and build-output model.
+The bootstrap remains intentionally asymmetric: the shared root build script obtains its directly imported build-runtime classes from already-published bootstrap artifacts. Since Phase 3 this includes `algitesbuild:1.0-SNAPSHOT` plus the published Modustro Builder `coreintf` and `coreimpl` artifacts. Phase 4B also uses the published capability-demand planner from `coreimpl` while the root Gradle script remains the execution adapter. The current source artifacts are then rebuilt and republished using the repository dependency declarations. This avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency and build-output model.
 
 ## Publication identity
 

@@ -11,13 +11,6 @@ plugins {
     `maven-publish`
 }
 
-java {
-    sourceSets {
-        val main by getting {
-            resources.setSrcDirs(listOf("src/product/yamldefs"))
-        }
-    }
-}
 
 abstract class AIcGeneratePythonYamlDefinitionsPackageTask : DefaultTask() {
     @get:InputDirectory
@@ -69,6 +62,10 @@ val generatePythonYamlDefinitionsPackage = tasks.register<AIcGeneratePythonYamlD
     description = "Stages Algites YAML definition schemas as Python package data."
     sourceDirectory.set(layout.projectDirectory.dir("src/product/yamldefs"))
     outputDirectory.set(locPythonGeneratedSourceDirectory)
+}
+
+tasks.matching { locTask -> locTask.name == "processAlgitesPythonNativeSources" }.configureEach {
+    dependsOn(generatePythonYamlDefinitionsPackage)
 }
 
 tasks.named("preparePythonBuildProject") {

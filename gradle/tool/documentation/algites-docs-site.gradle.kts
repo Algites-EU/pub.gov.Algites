@@ -10,6 +10,11 @@
  * documentation scripts.
  */
 
+import eu.algites.pltf.modustro.builder.capability.AIcBuiltinCapabilityDemandPlanner
+import eu.algites.pltf.modustro.builder.model.AInModelScope
+import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemand
+import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemandKey
+
 val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-base.gradle.kts"
 
@@ -31,6 +36,55 @@ val locResolvedArtifactDirectories = extra.properties["algitesDocsResolvedArtifa
 @Suppress("UNCHECKED_CAST")
 val locEffectiveDocumentationKinds = extra.properties["algitesDocsEffectiveTechnologyKinds"] as? Set<String>
     ?: emptySet()
+
+val locDocsRepositoryId = (extra.properties["algitesDocsResolvedRepositoryId"] as String?) ?: rootProject.name
+val locDocsCapabilityPlanner = AIcBuiltinCapabilityDemandPlanner()
+val locDocsCapabilityDemands = mutableListOf(
+    AIcCapabilityDemand(
+        AIcCapabilityDemandKey(
+            "modustro",
+            "publication_of_docs_site",
+            AInModelScope.REPOSITORY,
+            locDocsRepositoryId
+        ),
+        setOf("task:generateAlgitesDocsSite")
+    )
+)
+locResolvedArtifactDirectories.forEach { locArtifactDirectory ->
+    val locScope = when (locArtifactDirectory["structureKind"]) {
+        "repository" -> AInModelScope.REPOSITORY
+        "artifact-set" -> AInModelScope.ARTIFACT_SET
+        "artifact" -> AInModelScope.ARTIFACT
+        else -> null
+    }
+    val locScopeIdentity = locArtifactDirectory["path"]?.takeIf { it.isNotBlank() } ?: locDocsRepositoryId
+    if (locScope != null) {
+        locDocsCapabilityDemands.add(
+            AIcCapabilityDemand(
+                AIcCapabilityDemandKey(
+                    "modustro",
+                    "docs_site_content",
+                    locScope,
+                    locScopeIdentity
+                ),
+                setOf("task:generateAlgitesDocsSite")
+            )
+        )
+    }
+}
+val locDocsCapabilityGraph = locDocsCapabilityPlanner.createDemandGraph(
+    locDocsRepositoryId,
+    emptyList(),
+    locDocsCapabilityDemands
+)
+extra["algitesDocsCapabilityDemandIds"] = locDocsCapabilityGraph.topologicalOrder()
+    .map { locDemand -> locDemand.key().toString() }
+logger.lifecycle(
+    "Modustro documentation capability demands: " +
+        locDocsCapabilityGraph.topologicalOrder().joinToString(", ") { locDemand ->
+            "${locDemand.key().technologyKind()}:${locDemand.key().capabilityId()}@${locDemand.key().scope().wireValue()}"
+        }
+)
 
 logger.lifecycle("Algites documentation artifact directory resolution:")
 locResolvedArtifactDirectories.forEach { locArtifactDirectory ->

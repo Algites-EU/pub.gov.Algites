@@ -470,7 +470,7 @@ Documentation generation uses the same TechnologyKind selection semantics as con
 
 The artifact-level `index.html` MUST retain the logical artifact identity (`GroupId`, `artifactId`, and logical version), list all declared TechnologyKinds, and separately list only the TechnologyKinds requested/effective for the documentation build. Technology-specific sections MAY additionally expose ecosystem-specific publication identities such as Maven coordinates, Python distribution/import names, MPS module identity, or resulting artifact filenames. Shared documentation provenance SHOULD include the requested source ref/branch, exact source commit, and generation date/time at the logical-artifact publication level; these values need not be duplicated into per-TechnologyKind metadata files.
 
-The standard Python documentation adapter uses Sphinx with Sphinx AutoAPI over Algites Python product source roots (`src/product/python` and `src/product/python.gen`). The adapter generates its static site below the canonical `python/` TechnologyKind directory without importing the documented project as part of API discovery.
+The standard Python documentation adapter uses Sphinx with Sphinx AutoAPI over all existing canonical Python product source roots (`src/product/python`, `src/product/python.gen`, and `src/product/python.extgen`). The adapter generates its static site below the canonical `python/` TechnologyKind directory without importing the documented project as part of API discovery.
 
 Also there is generated an additonal index with following publication agnostic generated path structure:
 
@@ -1199,6 +1199,8 @@ The workspace mirrors the artifact's repository-relative source path and then pr
 For repository-level generated state, `<repository>/build/run/...` is used directly. For example, artifact `aac/coreintf` uses `build/run/aac/coreintf/run/...` while its source and documentation inputs remain below `aac/coreintf/src` and `aac/coreintf/doc`.
 
 The repository-level `build/` tree is disposable derived state. Generated SourceTypes such as `src/product/java.gen` or `src/product/python.gen` are intentionally excluded from this relocation because they remain source roots for compilers and development tools. Legacy `_obsolete/` repository content is excluded from active artifact discovery; archival Gradle plugins or descriptors below that root do not participate in the current build and therefore must not define parallel source-layout conventions.
+
+The active Gradle adapter resolves canonical source roots through the shared source-root resolver. The resolver applies the same `<source-type>`, `<source-type>.gen`, and `<source-type>.extgen` rule to Java compilation/resources, Python package staging, `PreparedSourceSet`, and documentation discovery. Artifact-local Gradle scripts SHOULD NOT restate those source-root lists.
 
 #### 3.9.4 Inherited `GroupId` metadata
 

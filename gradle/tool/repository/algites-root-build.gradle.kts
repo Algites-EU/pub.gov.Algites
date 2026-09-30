@@ -26,6 +26,7 @@ import eu.algites.lib.common.version.scheme.gradle.AIrGradleVersionConstraint
 import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionRequirementRenderer
 import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionScheme
 import eu.algites.lib.common.version.scheme.pep440.AInPythonBuildPhase
+import eu.algites.pltf.modustro.builder.capability.AIcBuiltinCapabilityDemandPlanner
 import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind
 import eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet
 import eu.algites.pltf.modustro.builder.output.AIcBuiltinBuildOutputProducers
@@ -189,6 +190,7 @@ abstract class AIcGeneratePythonProjectMetadataTask : DefaultTask() {
     @get:Input abstract val artifactDescription: Property<String>
     @get:Input abstract val licenseIds: ListProperty<String>
     @get:Input abstract val projectDependencies: ListProperty<String>
+    @get:Input abstract val packageSourceRoots: ListProperty<String>
     @get:Input @get:Optional abstract val requiresPython: Property<String>
     @get:InputFile @get:Optional abstract val templateFile: RegularFileProperty
     @get:OutputFile abstract val outputFile: RegularFileProperty
@@ -269,7 +271,9 @@ abstract class AIcGeneratePythonProjectMetadataTask : DefaultTask() {
             }
             appendLine()
             appendLine("[tool.setuptools.packages.find]")
-            appendLine("where = [\"src/product/python\", \"src/product/python.gen\"]")
+            val locPackageSourceRoots = packageSourceRoots.get()
+                .joinToString(", ") { locRoot -> "\"${locRoot.replace("\\", "/").replace("\"", "\\\"")}\"" }
+            appendLine("where = [$locPackageSourceRoots]")
             appendLine("namespaces = true")
             appendLine()
             appendLine("[tool.setuptools.package-data]")
@@ -753,6 +757,17 @@ val locAlgitesResolveCredentialValue = extra["algitesResolveCredentialValue"] as
 val algitesCredentialPreflight = System.getenv("_TMP_ALGITES_CREDENTIAL_PREFLIGHT")
     ?.equals("true", ignoreCase = true) == true
 
+val locAlgitesSourceRootResolverScript = rootProject.file("gradle/tool/repository/algites-source-root-resolver.gradle.kts")
+if (locAlgitesSourceRootResolverScript.isFile) {
+    apply(from = locAlgitesSourceRootResolverScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-source-root-resolver.gradle.kts"))
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesResolveSourceRootRelativePaths = rootProject.extra["algitesResolveSourceRootRelativePaths"] as
+    (File, String, String) -> List<String>
+
 val locAlgitesDocsSiteScript = rootProject.file("gradle/tool/documentation/algites-docs-site.gradle.kts")
 if (locAlgitesDocsSiteScript.isFile) {
     apply(from = locAlgitesDocsSiteScript)
@@ -811,39 +826,31 @@ fun AIcAlgitesExplicitBuildOutputTypes(aArtifactDirectory: Map<String, Any?>?, a
 }
 
 fun AIcAlgitesPreparedSourceSet(aProject: Project, aTechnologyKind: String): AIcPreparedSourceSet {
-    fun locExisting(aPaths: List<String>): List<String> = aPaths.filter { locPath ->
-        aProject.layout.projectDirectory.dir(locPath).asFile.isDirectory
-    }
+    fun locRoots(aSourceType: String): List<String> =
+        locAlgitesResolveSourceRootRelativePaths(aProject.projectDir, "product", aSourceType)
 
     return when (aTechnologyKind) {
-        "java" -> AIcPreparedSourceSet(
-            "java",
-            locExisting(listOf("src/product/java")),
-            locExisting(listOf("src/product/java.gen", "src/product/java.extgen")),
-            locExisting(
-                listOf(
-                    "src/product/resources",
-                    "src/product/yamldefs", "src/product/yamldefs.gen", "src/product/yamldefs.extgen",
-                    "src/product/jsondefs", "src/product/jsondefs.gen", "src/product/jsondefs.extgen",
-                    "src/product/xmldefs", "src/product/xmldefs.gen", "src/product/xmldefs.extgen",
-                    "src/product/config", "src/product/config.gen", "src/product/config.extgen"
-                )
+        "java" -> {
+            val locJavaRoots = locRoots("java")
+            AIcPreparedSourceSet(
+                "java",
+                locJavaRoots.filterNot { it.endsWith(".gen") || it.endsWith(".extgen") },
+                locJavaRoots.filter { it.endsWith(".gen") || it.endsWith(".extgen") },
+                listOf("resources", "yamldefs", "jsondefs", "xmldefs", "config")
+                    .flatMap(::locRoots)
             )
-        )
-        "python" -> AIcPreparedSourceSet(
-            "python",
-            locExisting(listOf("src/product/python")),
-            locExisting(listOf("src/product/python.gen", "src/product/python.extgen")),
-            locExisting(
-                listOf(
-                    "src/product/yamldefs", "src/product/yamldefs.gen", "src/product/yamldefs.extgen",
-                    "src/product/jsondefs", "src/product/jsondefs.gen", "src/product/jsondefs.extgen",
-                    "src/product/xmldefs", "src/product/xmldefs.gen", "src/product/xmldefs.extgen",
-                    "src/product/config", "src/product/config.gen", "src/product/config.extgen"
-                )
+        }
+        "python" -> {
+            val locPythonRoots = locRoots("python")
+            AIcPreparedSourceSet(
+                "python",
+                locPythonRoots.filterNot { it.endsWith(".gen") || it.endsWith(".extgen") },
+                locPythonRoots.filter { it.endsWith(".gen") || it.endsWith(".extgen") },
+                listOf("yamldefs", "jsondefs", "xmldefs", "config")
+                    .flatMap(::locRoots)
             )
-        )
-        else -> throw GradleException("Phase-3 PreparedSourceSet adapter does not support TechnologyKind '$aTechnologyKind'.")
+        }
+        else -> throw GradleException("Phase-4 PreparedSourceSet adapter does not support TechnologyKind '$aTechnologyKind'.")
     }
 }
 
@@ -1813,10 +1820,6 @@ allprojects {
                         .filter { locConfiguration -> locConfiguration.isCanBeResolved }
                 )
             }
-            val locJavaSelected = algitesRequestedTechnologyKinds.isEmpty() || "java" in algitesRequestedTechnologyKinds
-            if (locJavaSelected) {
-                rootProject.tasks.named("algitesDependencyPreflight").configure { dependsOn(locJavaDependencyPreflight) }
-            }
         }
     }
 }
@@ -1837,6 +1840,7 @@ val algitesBuild = tasks.register("algitesBuild") {
 }
 
 val algitesBuiltinBuildOutputProducers = AIcBuiltinBuildOutputProducers()
+val algitesBuiltinCapabilityDemandPlanner = AIcBuiltinCapabilityDemandPlanner()
 
 algitesBuild.configure {
     dependsOn(algitesDependencyPreflight)
@@ -2119,6 +2123,61 @@ subprojects {
     val locJavaProductionKinds = locJavaBuildOutputPlans.map { locPlan -> locPlan.productionKind() }.toSet()
     val locPythonBuildOutputPlans = if ("python" in locAlgitesTechnologyKinds) locBuildOutputPlans("python") else emptyList()
     val locPythonProductionKinds = locPythonBuildOutputPlans.map { locPlan -> locPlan.productionKind() }.toSet()
+    val locBuildOutputPlans = locJavaBuildOutputPlans + locPythonBuildOutputPlans
+    val locCapabilityDemandGraph = algitesBuiltinCapabilityDemandPlanner.createDemandGraph(
+        locAlgitesArtifactDirectory?.get("path")?.toString()?.takeIf { it.isNotBlank() } ?: project.path,
+        locBuildOutputPlans,
+        emptyList()
+    )
+
+    fun locHasCapabilityDemand(aTechnologyKind: String, aCapabilityId: String): Boolean =
+        locCapabilityDemandGraph.demands().any { locDemand ->
+            locDemand.key().technologyKind() == aTechnologyKind && locDemand.key().capabilityId() == aCapabilityId
+        }
+
+    extra["algitesBuildCapabilityDemandIds"] = locCapabilityDemandGraph.topologicalOrder()
+        .map { locDemand -> locDemand.key().toString() }
+
+    if (locCapabilityDemandGraph.demands().isNotEmpty()) {
+        logger.lifecycle(
+            "Modustro capability demands for '${project.path}': " +
+                locCapabilityDemandGraph.topologicalOrder().joinToString(", ") { locDemand ->
+                    "${locDemand.key().technologyKind()}:${locDemand.key().capabilityId()}"
+                }
+        )
+    }
+
+    val locJavaSourceProcessingTask = if ("java" in locAlgitesTechnologyKinds) {
+        tasks.register("processAlgitesJavaNativeSources") {
+            group = "algites"
+            description = "Materializes the Java source_native_processing capability boundary for this artifact."
+            val locPrepared = AIcAlgitesPreparedSourceSet(project, "java")
+            inputs.files((locPrepared.nativeSourceRoots() + locPrepared.generatedSourceRoots() + locPrepared.resourceRoots()).map(project::file))
+        }
+    } else {
+        null
+    }
+    val locPythonSourceProcessingTask = if ("python" in locAlgitesTechnologyKinds) {
+        tasks.register("processAlgitesPythonNativeSources") {
+            group = "algites"
+            description = "Materializes the Python source_native_processing capability boundary for this artifact."
+            val locPrepared = AIcAlgitesPreparedSourceSet(project, "python")
+            inputs.files((locPrepared.nativeSourceRoots() + locPrepared.generatedSourceRoots() + locPrepared.resourceRoots()).map(project::file))
+        }
+    } else {
+        null
+    }
+
+    if ("java" in locEffectiveTechnologyKinds && locHasCapabilityDemand("java", "dependency_resolution")) {
+        tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach { locTask ->
+            rootProject.tasks.named("algitesDependencyPreflight").configure { dependsOn(locTask) }
+        }
+    }
+    if ("python" in locEffectiveTechnologyKinds && locHasCapabilityDemand("python", "dependency_resolution")) {
+        tasks.matching { locTask -> locTask.name == "resolvePythonDependencies" }.configureEach { locTask ->
+            rootProject.tasks.named("algitesDependencyPreflight").configure { dependsOn(locTask) }
+        }
+    }
 
     if (locJavaBuildOutputPlans.isNotEmpty()) {
         logger.lifecycle("Modustro Java BuildOutputTypes for '${project.path}': ${locJavaBuildOutputPlans.joinToString(", ") { locPlan -> locPlan.buildOutputType() }}")
@@ -2190,6 +2249,26 @@ subprojects {
     if ("java" in locAlgitesTechnologyKinds) {
         plugins.withId("java") {
             val locJavaExtension = extensions.getByType(JavaPluginExtension::class.java)
+            val locMainSourceSet = locJavaExtension.sourceSets.getByName("main")
+            val locTestSourceSet = locJavaExtension.sourceSets.getByName("test")
+            val locJavaProductRoots = locAlgitesResolveSourceRootRelativePaths(project.projectDir, "product", "java")
+            val locJavaDevelopRoots = locAlgitesResolveSourceRootRelativePaths(project.projectDir, "develop", "java")
+            val locProductResourceRoots = listOf("resources", "yamldefs", "jsondefs", "xmldefs", "config")
+                .flatMap { locSourceType -> locAlgitesResolveSourceRootRelativePaths(project.projectDir, "product", locSourceType) }
+            val locDevelopResourceRoots = listOf("resources", "yamldefs", "jsondefs", "xmldefs", "config")
+                .flatMap { locSourceType -> locAlgitesResolveSourceRootRelativePaths(project.projectDir, "develop", locSourceType) }
+
+            locMainSourceSet.java.setSrcDirs(locJavaProductRoots)
+            locMainSourceSet.resources.setSrcDirs(locProductResourceRoots)
+            locTestSourceSet.java.setSrcDirs(locJavaDevelopRoots)
+            locTestSourceSet.resources.setSrcDirs(locDevelopResourceRoots)
+            if (locHasCapabilityDemand("java", "source_native_processing")) {
+                tasks.matching { locTask ->
+                    locTask.name in setOf("compileJava", "processResources", "sourcesJar", "javadoc", "javadocJar")
+                }.configureEach { locTask ->
+                    locJavaSourceProcessingTask?.let { locSourceProcessingTask -> locTask.dependsOn(locSourceProcessingTask) }
+                }
+            }
             if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
                 locJavaExtension.withSourcesJar()
             }
@@ -2431,10 +2510,6 @@ subprojects {
             if (locPythonTemplateFile.asFile.isFile) pyprojectTemplateFile.set(locPythonTemplateFile)
             selectedPhaseFile.set(layout.buildDirectory.file("algites/python/dependency-resolution-phase.txt"))
         }
-        if ("python" in locEffectiveTechnologyKinds) {
-            rootProject.tasks.named("algitesDependencyPreflight").configure { dependsOn(locResolvePythonDependencies) }
-        }
-
         val locGeneratePythonProjectMetadata = tasks.register<AIcGeneratePythonProjectMetadataTask>("generatePythonProjectMetadata") {
             group = "algites"
             description = "Generates the effective pyproject.toml for this Algites Python artifact."
@@ -2445,6 +2520,7 @@ subprojects {
             artifactDescription.set(locPythonArtifactDescription)
             licenseIds.set(locPythonLicenseIds)
             projectDependencies.set(locPythonPublishedDependencies)
+            packageSourceRoots.set(locAlgitesResolveSourceRootRelativePaths(project.projectDir, "product", "python"))
             if (locPythonRequiresPython != null) {
                 requiresPython.set(locPythonRequiresPython)
             }
@@ -2472,6 +2548,9 @@ subprojects {
             group = "build"
             description = "Stages the Python package project in the repository build workspace."
             dependsOn(locGeneratePythonProjectMetadata)
+            if (locHasCapabilityDemand("python", "source_native_processing")) {
+                locPythonSourceProcessingTask?.let { locSourceProcessingTask -> dependsOn(locSourceProcessingTask) }
+            }
 
             duplicatesStrategy = DuplicatesStrategy.FAIL
             into(locPythonBuildProjectDirectory)
@@ -2479,14 +2558,9 @@ subprojects {
                 exclude("run/**", "build/**", ".gradle/**", ".kotlin/**", "**/__pycache__/**", "**/*.pyc", "**/*.pyo")
             }
             listOf("jsondefs", "yamldefs", "xmldefs", "config").forEach { locSourceKind ->
-                listOf("", ".gen", ".extgen").forEach { locGenerationSuffix ->
-                    val locSourceDirectory = project.layout.projectDirectory.dir(
-                        "src/product/$locSourceKind$locGenerationSuffix"
-                    )
-                    if (locSourceDirectory.asFile.isDirectory) {
-                        from(locSourceDirectory) {
-                            into("src/product/python")
-                        }
+                locAlgitesResolveSourceRootRelativePaths(project.projectDir, "product", locSourceKind).forEach { locSourcePath ->
+                    from(project.layout.projectDirectory.dir(locSourcePath)) {
+                        into("src/product/python")
                     }
                 }
             }
