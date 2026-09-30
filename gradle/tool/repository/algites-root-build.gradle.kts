@@ -298,6 +298,8 @@ abstract class AIcResolveJavaDependenciesTask : DefaultTask() {
 
 abstract class AIcResolvePythonDependenciesTask : DefaultTask() {
     @get:Input abstract val pythonExecutable: Property<String>
+    @get:Input abstract val projectPathValue: Property<String>
+    @get:Internal abstract val projectDirectory: DirectoryProperty
     @get:Input abstract val dependencyDefinitions: ListProperty<String>
     @get:Input abstract val constraintDefinitions: ListProperty<String>
     @get:Input abstract val endpointDefinitions: ListProperty<String>
@@ -474,22 +476,22 @@ abstract class AIcResolvePythonDependenciesTask : DefaultTask() {
             locIndexUrls.firstOrNull()?.let { locUrl -> locCommand.addAll(listOf("--index-url", locUrl)) }
             locIndexUrls.drop(1).forEach { locUrl -> locCommand.addAll(listOf("--extra-index-url", locUrl)) }
             val locProcess = ProcessBuilder(locCommand)
-                .directory(project.projectDir)
+                .directory(projectDirectory.get().asFile)
                 .redirectErrorStream(true)
                 .start()
             val locOutputText = locProcess.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             val locExitCode = locProcess.waitFor()
             if (locExitCode == 0) {
                 locOutput.writeText(locPhase.name + "\n", Charsets.UTF_8)
-                logger.lifecycle("Python dependency preflight for '${project.path}' succeeded in phase ${locPhase.name}.")
+                logger.lifecycle("Python dependency preflight for '${projectPathValue.get()}' succeeded in phase ${locPhase.name}.")
                 return
             }
             locLastFailure = locOutputText
-            logger.lifecycle("Python dependency preflight for '${project.path}' did not resolve in phase ${locPhase.name}; trying the next applicable phase.")
+            logger.lifecycle("Python dependency preflight for '${projectPathValue.get()}' did not resolve in phase ${locPhase.name}; trying the next applicable phase.")
         }
 
         throw GradleException(
-            "Python dependency preflight for '${project.path}' failed in all applicable phases." +
+            "Python dependency preflight for '${projectPathValue.get()}' failed in all applicable phases." +
                 (if (locLastFailure.isBlank()) "" else "\n$locLastFailure")
         )
     }
@@ -2407,6 +2409,8 @@ subprojects {
             group = "verification"
             description = "Runs the bounded Python dependency-resolution preflight for this Algites artifact."
             pythonExecutable.set(algitesGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3")
+            projectPathValue.set(project.path)
+            projectDirectory.set(layout.projectDirectory)
             dependencyDefinitions.set(locPythonResolutionDependencies)
             constraintDefinitions.set(locPythonResolutionConstraints)
             endpointDefinitions.set(locPythonDownloadEndpointDefinitions)
