@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-artifact_1.yamldef.schema.json",
+  "title": "Algites Artifact Definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "Artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "TechnologyKinds": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "java",
+              "python",
+              "mps"
+            ]
+          }
+        },
+        "Name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Description": {
+          "type": "string"
+        },
+        "Repositories": {
+          "$ref": "algites-repository-matrix_1.yamldef.schema.json"
+        },
+        "Version": {
+          "$ref": "algites-version_1.yamldef.schema.json"
+        },
+        "VariantId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      },
+      "required": [
+        "TechnologyKinds"
+      ]
+    },
+    "GroupId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "Version": {
+      "$ref": "algites-version_1.yamldef.schema.json"
+    },
+    "CredentialProfiles": {
+      "$ref": "algites-credential-profiles_1.yamldef.schema.json"
+    },
+    "Dependencies": {
+      "$ref": "algites-dependencies_1.yamldef.schema.json#/$defs/Dependencies"
+    },
+    "DependencyConstraints": {
+      "$ref": "algites-dependencies_1.yamldef.schema.json#/$defs/DependencyConstraints"
+    },
+    "DeleteSnapshotWhenReleased": {
+      "type": "boolean",
+      "default": true
+    },
+    "EnvironmentRequirements": {
+      "$ref": "algites-environment-requirements_1.yamldef.schema.json"
+    }
+  },
+  "required": [
+    "Artifact"
+  ]
+}

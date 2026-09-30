@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:jsondef:model:dependency-resolution-plan:1",
+  "x-algites-definition-version": 1,
+  "title": "Modustro Builder Dependency Technology Resolution Plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "DependencyKind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "TechnologyKind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+    },
+    "Entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "DependencyKind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "GroupId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ArtifactId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "VariantId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ConstraintOnly": {
+            "type": "boolean"
+          },
+          "Usages": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "NativeUsageMappings": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "RequiredBuildOutputTypes": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": {
+              "type": "string"
+            }
+          },
+          "VersionRequirement": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "version-requirement_1.jsondef.schema.json"
+              }
+            ]
+          }
+        },
+        "required": [
+          "DependencyKind",
+          "ArtifactId",
+          "ConstraintOnly",
+          "Usages",
+          "NativeUsageMappings",
+          "RequiredBuildOutputTypes"
+        ]
+      }
+    },
+    "Diagnostics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "Code": {
+            "type": "string",
+            "minLength": 1
+          },
+          "Severity": {
+            "type": "string",
+            "enum": [
+              "info",
+              "warning"
+            ]
+          },
+          "Message": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "Code",
+          "Severity",
+          "Message"
+        ]
+      }
+    }
+  },
+  "required": [
+    "DependencyKind",
+    "TechnologyKind",
+    "Entries",
+    "Diagnostics"
+  ]
+}

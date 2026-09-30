@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:yamldef:model:inheritance:1",
+  "x-algites-definition-version": 1,
+  "title": "Modustro Builder Inheritance Model v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "ItemsInheritancePolicy": {
+      "type": "string",
+      "enum": [
+        "merge_missing_items",
+        "remove_missing_items"
+      ],
+      "default": "merge_missing_items"
+    },
+    "StringItemsCollection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ItemsInheritancePolicy": {
+          "$ref": "#/$defs/ItemsInheritancePolicy"
+        },
+        "Items": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": [
+        "Items"
+      ]
+    }
+  },
+  "properties": {
+    "ItemsInheritancePolicy": {
+      "$ref": "#/$defs/ItemsInheritancePolicy"
+    },
+    "Items": {
+      "type": "array"
+    }
+  },
+  "required": [
+    "Items"
+  ]
+}

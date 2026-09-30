@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:jsondef:model:technology-kinds:1",
+  "x-algites-definition-version": 1,
+  "title": "Modustro Builder TechnologyKinds Configuration v1",
+  "$defs": {
+    "BuildOutputTypeItem": {
+      "type": "object",
+      "properties": {
+        "BuildOutputType": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "BuildOutputType"
+      ],
+      "additionalProperties": true
+    },
+    "CapabilityItem": {
+      "type": "object",
+      "properties": {
+        "Capability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "Enabled": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "Capability"
+      ],
+      "additionalProperties": true
+    },
+    "TechnologyKindItem": {
+      "type": "object",
+      "properties": {
+        "TechnologyKind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "BuildOutputTypes": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "merge_missing_items",
+                "remove_missing_items"
+              ],
+              "default": "merge_missing_items"
+            },
+            "Items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/BuildOutputTypeItem"
+              }
+            }
+          },
+          "required": [
+            "Items"
+          ]
+        },
+        "Capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "merge_missing_items",
+                "remove_missing_items"
+              ],
+              "default": "merge_missing_items"
+            },
+            "Items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/CapabilityItem"
+              }
+            }
+          },
+          "required": [
+            "Items"
+          ]
+        }
+      },
+      "required": [
+        "TechnologyKind"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "oneOf": [
+    {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ItemsInheritancePolicy": {
+          "type": "string",
+          "enum": [
+            "merge_missing_items",
+            "remove_missing_items"
+          ],
+          "default": "merge_missing_items"
+        },
+        "Items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/TechnologyKindItem"
+          }
+        }
+      },
+      "required": [
+        "Items"
+      ]
+    }
+  ]
+}

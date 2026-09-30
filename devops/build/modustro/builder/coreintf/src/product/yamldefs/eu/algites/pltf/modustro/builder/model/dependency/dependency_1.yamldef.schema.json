@@ -1,0 +1,195 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:yamldef:model:dependency:1",
+  "x-algites-definition-version": 1,
+  "title": "Modustro Builder Dependency Model v1",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "DependencyGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "DependencyKind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ItemsInheritancePolicy": {
+          "type": "string",
+          "enum": [
+            "merge_missing_items",
+            "remove_missing_items"
+          ],
+          "default": "merge_missing_items"
+        },
+        "Items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "GroupId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "ArtifactId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "VariantId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              "Usages": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "product_api",
+                    "product_implementation",
+                    "product_compile_only",
+                    "product_compile_only_api",
+                    "product_runtime_only",
+                    "product_annotation_processor",
+                    "develop_implementation",
+                    "develop_compile_only",
+                    "develop_runtime_only",
+                    "develop_annotation_processor"
+                  ]
+                }
+              },
+              "RequiredBuildOutputTypes": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+                }
+              },
+              "VersionRequirement": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "urn:algites:modustro:builder:yamldef:model:version-requirement:1"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "ArtifactId"
+            ]
+          }
+        }
+      },
+      "required": [
+        "DependencyKind",
+        "Items"
+      ]
+    },
+    "DependencyConstraintGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "DependencyKind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ItemsInheritancePolicy": {
+          "type": "string",
+          "enum": [
+            "merge_missing_items",
+            "remove_missing_items"
+          ],
+          "default": "merge_missing_items"
+        },
+        "Items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "GroupId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "minLength": 1
+              },
+              "ArtifactId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "VariantId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+              },
+              "Usages": {
+                "type": "array",
+                "uniqueItems": true,
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "product_api",
+                    "product_implementation",
+                    "product_compile_only",
+                    "product_compile_only_api",
+                    "product_runtime_only",
+                    "product_annotation_processor",
+                    "develop_implementation",
+                    "develop_compile_only",
+                    "develop_runtime_only",
+                    "develop_annotation_processor"
+                  ]
+                }
+              },
+              "VersionRequirement": {
+                "oneOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "$ref": "urn:algites:modustro:builder:yamldef:model:version-requirement:1"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "ArtifactId",
+              "VersionRequirement"
+            ]
+          }
+        }
+      },
+      "required": [
+        "DependencyKind",
+        "Items"
+      ]
+    }
+  },
+  "properties": {
+    "Dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DependencyGroup"
+      }
+    },
+    "DependencyConstraints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/DependencyConstraintGroup"
+      }
+    }
+  }
+}
