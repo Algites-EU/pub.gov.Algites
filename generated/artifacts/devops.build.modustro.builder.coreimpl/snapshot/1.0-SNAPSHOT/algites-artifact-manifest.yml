@@ -8,6 +8,6 @@ Artifact:
   SourcePath: devops/build/modustro/builder/coreimpl
   StructureKind: artifact
   Name: "Modustro Builder core implementation"
-  Description: "Gradle-independent reusable implementation of Modustro Builder model validation and inheritance."
+  Description: "Gradle-independent reusable implementation of Modustro Builder inheritance, validation, and dependency technology resolution planning."
 SourceMetadata:
   DescriptorHierarchy:
