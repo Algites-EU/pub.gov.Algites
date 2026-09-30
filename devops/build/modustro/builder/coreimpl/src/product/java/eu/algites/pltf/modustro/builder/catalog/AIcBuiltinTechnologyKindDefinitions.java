@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Phase-1 built-in model definitions. They describe contracts only and do not execute build actions.
+ * Built-in Modustro Builder technology definitions. They describe contracts only and do not execute build actions.
  */
 public final class AIcBuiltinTechnologyKindDefinitions {
 

@@ -51,7 +51,7 @@ The Python package tree below `src/product/python.gen` is generated during the b
 
 ## Dependency metadata schema
 
-`algites-dependencies_1.schema.json` defines the inherited `Dependencies` and `DependencyConstraints` surface. Declarations are grouped by `DependencyKind` (`algites`, `java`, `python`) and all kinds use the same portable `VersionRequirement` structure.
+`algites-dependencies_1.schema.json` defines the inherited `Dependencies` and `DependencyConstraints` surface. Declarations are grouped by `DependencyKind` (`modustro`, `java`, `python`) and all kinds use the same portable `VersionRequirement` structure. Dependency identity excludes the merge-only `Usages`; Modustro dependency items may additionally request merge-only `RequiredBuildOutputTypes`.
 
 The portable requirement supports exact versions, lower/upper bounds, strict or relaxable upper bounds, exclusions, and one preferred version. Algites dependencies may additionally select an optional `VariantId`. `DependencyConstraints` steer resolution without creating a dependency edge.
 

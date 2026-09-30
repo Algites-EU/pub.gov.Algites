@@ -7,9 +7,10 @@ The artifact intentionally owns the concrete dependency set used by the build in
 
 ## Current dependencies
 
-The first version aggregates the version infrastructure from `pub.lib.General`:
+The bundle aggregates Modustro Builder core implementation plus the version infrastructure from `pub.lib.General`:
 
 ```text
+pub.gov.Algites/devops/build/modustro/builder/coreimpl
 pub.lib.General/version/core
 pub.lib.General/version/scheme/algites/v1
 pub.lib.General/version/scheme/maven
@@ -28,7 +29,7 @@ Future Algites build-runtime libraries that are not related to version handling 
 
 ## `pub.lib.General` version
 
-The current source artifact declares its build-support dependencies in `algites-artifact.yml` through grouped `DependencyKind: algites` items with `Usage: product_api`, so the generated Java publication exports them transitively.
+The current source artifact declares its build-support dependencies in `algites-artifact.yml` through `DependencyKind: modustro` items with `Usages: [product_api]`, so the generated Java publication exports them transitively. The bundle also exports `modustro/builder/coreimpl`; `coreimpl` in turn exports the Gradle-independent `coreintf` contract layer.
 
 The current dependency requirement uses the exact Algites v1 snapshot version `1.0-SNAPSHOT`; repository version metadata separately uses `ReleaseLineVersion`, `Revision`, and `QualifierKind`. Changing the build-support dependency set or its versions is therefore a governed source-metadata change of this artifact.
 

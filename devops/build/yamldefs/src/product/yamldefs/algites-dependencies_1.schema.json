@@ -3,72 +3,105 @@
   "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-dependencies_1.schema.json",
   "title": "Algites Dependencies v1",
   "$defs": {
-    "AlgitesDependencyItem": {
+    "Usages": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "product_api",
+          "product_implementation",
+          "product_compile_only",
+          "product_compile_only_api",
+          "product_runtime_only",
+          "product_annotation_processor",
+          "develop_implementation",
+          "develop_compile_only",
+          "develop_runtime_only",
+          "develop_annotation_processor"
+        ]
+      }
+    },
+    "RequiredBuildOutputTypes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$"
+      }
+    },
+    "ModustroDependencyItem": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "GroupId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         },
         "ArtifactId": {
           "type": "string",
           "minLength": 1
         },
-        "Usage": {
-          "type": "string",
-          "enum": [
-            "product_api",
-            "product_implementation",
-            "product_compile_only",
-            "product_runtime_only",
-            "develop_implementation",
-            "develop_compile_only",
-            "develop_runtime_only"
-          ]
+        "VariantId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Usages": {
+          "$ref": "#/$defs/Usages"
+        },
+        "RequiredBuildOutputTypes": {
+          "$ref": "#/$defs/RequiredBuildOutputTypes"
         },
         "VersionRequirement": {
-          "$ref": "algites-version-requirement_1.schema.json"
-        },
-        "VariantId": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "algites-version-requirement_1.schema.json"
+            }
+          ]
         }
       },
       "required": [
         "ArtifactId"
       ]
     },
-    "AlgitesDependencyConstraintItem": {
+    "ModustroDependencyConstraintItem": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "GroupId": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         },
         "ArtifactId": {
           "type": "string",
           "minLength": 1
         },
-        "Usage": {
-          "type": "string",
-          "enum": [
-            "product_api",
-            "product_implementation",
-            "product_compile_only",
-            "product_runtime_only",
-            "develop_implementation",
-            "develop_compile_only",
-            "develop_runtime_only"
-          ]
+        "VariantId": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Usages": {
+          "$ref": "#/$defs/Usages"
         },
         "VersionRequirement": {
           "$ref": "algites-version-requirement_1.schema.json"
-        },
-        "VariantId": {
-          "type": "string",
-          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
         }
       },
       "required": [
@@ -88,20 +121,18 @@
           "type": "string",
           "minLength": 1
         },
-        "Usage": {
-          "type": "string",
-          "enum": [
-            "product_api",
-            "product_implementation",
-            "product_compile_only",
-            "product_runtime_only",
-            "develop_implementation",
-            "develop_compile_only",
-            "develop_runtime_only"
-          ]
+        "Usages": {
+          "$ref": "#/$defs/Usages"
         },
         "VersionRequirement": {
-          "$ref": "algites-version-requirement_1.schema.json"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "algites-version-requirement_1.schema.json"
+            }
+          ]
         }
       },
       "required": [
@@ -121,17 +152,8 @@
           "type": "string",
           "minLength": 1
         },
-        "Usage": {
-          "type": "string",
-          "enum": [
-            "product_api",
-            "product_implementation",
-            "product_compile_only",
-            "product_runtime_only",
-            "develop_implementation",
-            "develop_compile_only",
-            "develop_runtime_only"
-          ]
+        "Usages": {
+          "$ref": "#/$defs/Usages"
         },
         "VersionRequirement": {
           "$ref": "algites-version-requirement_1.schema.json"
@@ -151,20 +173,18 @@
           "type": "string",
           "minLength": 1
         },
-        "Usage": {
-          "type": "string",
-          "enum": [
-            "product_api",
-            "product_implementation",
-            "product_compile_only",
-            "product_runtime_only",
-            "develop_implementation",
-            "develop_compile_only",
-            "develop_runtime_only"
-          ]
+        "Usages": {
+          "$ref": "#/$defs/Usages"
         },
         "VersionRequirement": {
-          "$ref": "algites-version-requirement_1.schema.json"
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "algites-version-requirement_1.schema.json"
+            }
+          ]
         }
       },
       "required": [
@@ -179,17 +199,8 @@
           "type": "string",
           "minLength": 1
         },
-        "Usage": {
-          "type": "string",
-          "enum": [
-            "product_api",
-            "product_implementation",
-            "product_compile_only",
-            "product_runtime_only",
-            "develop_implementation",
-            "develop_compile_only",
-            "develop_runtime_only"
-          ]
+        "Usages": {
+          "$ref": "#/$defs/Usages"
         },
         "VersionRequirement": {
           "$ref": "algites-version-requirement_1.schema.json"
@@ -207,13 +218,20 @@
         {
           "properties": {
             "DependencyKind": {
-              "const": "algites"
+              "const": "modustro"
+            },
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
             },
             "Items": {
               "type": "array",
-              "minItems": 1,
               "items": {
-                "$ref": "#/$defs/AlgitesDependencyItem"
+                "$ref": "#/$defs/ModustroDependencyItem"
               }
             }
           },
@@ -227,9 +245,16 @@
             "DependencyKind": {
               "const": "java"
             },
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
+            },
             "Items": {
               "type": "array",
-              "minItems": 1,
               "items": {
                 "$ref": "#/$defs/JavaDependencyItem"
               }
@@ -245,9 +270,16 @@
             "DependencyKind": {
               "const": "python"
             },
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
+            },
             "Items": {
               "type": "array",
-              "minItems": 1,
               "items": {
                 "$ref": "#/$defs/PythonDependencyItem"
               }
@@ -267,13 +299,20 @@
         {
           "properties": {
             "DependencyKind": {
-              "const": "algites"
+              "const": "modustro"
+            },
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
             },
             "Items": {
               "type": "array",
-              "minItems": 1,
               "items": {
-                "$ref": "#/$defs/AlgitesDependencyConstraintItem"
+                "$ref": "#/$defs/ModustroDependencyConstraintItem"
               }
             }
           },
@@ -287,9 +326,16 @@
             "DependencyKind": {
               "const": "java"
             },
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
+            },
             "Items": {
               "type": "array",
-              "minItems": 1,
               "items": {
                 "$ref": "#/$defs/JavaDependencyConstraintItem"
               }
@@ -305,9 +351,16 @@
             "DependencyKind": {
               "const": "python"
             },
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
+            },
             "Items": {
               "type": "array",
-              "minItems": 1,
               "items": {
                 "$ref": "#/$defs/PythonDependencyConstraintItem"
               }

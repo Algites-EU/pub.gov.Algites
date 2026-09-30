@@ -6,16 +6,88 @@
     "VersionList": {
       "oneOf": [
         {
-          "type": "string",
-          "minLength": 1
+          "type": "null"
         },
         {
-          "type": "array",
-          "uniqueItems": true,
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "ItemsInheritancePolicy": {
+              "type": "string",
+              "enum": [
+                "mergeMissingItems",
+                "removeMissingItems"
+              ],
+              "default": "mergeMissingItems"
+            },
+            "Items": {
+              "type": "array",
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "required": [
+            "Items"
+          ]
+        }
+      ]
+    },
+    "Boundary": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?:(?:>=|>)[^<>=!\\s]+|[^<>=!\\s]+(?:<=|<))$"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Inclusive": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "Version",
+            "Inclusive"
+          ]
+        }
+      ]
+    },
+    "MaximumBoundary": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "pattern": "^(?:(?:<=|<)[^<>=!\\s]+|[^<>=!\\s]+(?:>=|>))$"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Version": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Inclusive": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "Version",
+            "Inclusive"
+          ]
         }
       ]
     },
@@ -24,67 +96,32 @@
       "additionalProperties": false,
       "properties": {
         "Exact": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         },
         "Minimum": {
-          "oneOf": [
-            {
-              "type": "string",
-              "pattern": "^(?:(?:>=|>)[^<>=!\\s]+|[^<>=!\\s]+(?:<=|<))$"
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "Version": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "Inclusive": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "Version",
-                "Inclusive"
-              ]
-            }
-          ]
+          "$ref": "#/$defs/Boundary"
         },
         "Maximum": {
-          "oneOf": [
-            {
-              "type": "string",
-              "pattern": "^(?:(?:<=|<)[^<>=!\\s]+|[^<>=!\\s]+(?:>=|>))$"
-            },
-            {
-              "type": "object",
-              "additionalProperties": false,
-              "properties": {
-                "Version": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "Inclusive": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "Version",
-                "Inclusive"
-              ]
-            }
-          ]
+          "$ref": "#/$defs/MaximumBoundary"
         },
         "MaximumStrict": {
-          "type": "boolean"
+          "type": [
+            "boolean",
+            "null"
+          ]
         },
         "Exclude": {
           "$ref": "#/$defs/VersionList"
         },
         "Prefer": {
-          "type": "string",
+          "type": [
+            "string",
+            "null"
+          ],
           "minLength": 1
         }
       },
@@ -92,52 +129,33 @@
       "allOf": [
         {
           "if": {
+            "properties": {
+              "Exact": {
+                "type": "string"
+              }
+            },
             "required": [
               "Exact"
             ]
           },
           "then": {
-            "not": {
-              "anyOf": [
-                {
-                  "required": [
-                    "Minimum"
-                  ]
-                },
-                {
-                  "required": [
-                    "Maximum"
-                  ]
-                },
-                {
-                  "required": [
-                    "MaximumStrict"
-                  ]
-                },
-                {
-                  "required": [
-                    "Exclude"
-                  ]
-                },
-                {
-                  "required": [
-                    "Prefer"
-                  ]
-                }
-              ]
+            "properties": {
+              "Minimum": {
+                "type": "null"
+              },
+              "Maximum": {
+                "type": "null"
+              },
+              "MaximumStrict": {
+                "type": "null"
+              },
+              "Exclude": {
+                "type": "null"
+              },
+              "Prefer": {
+                "type": "null"
+              }
             }
-          }
-        },
-        {
-          "if": {
-            "required": [
-              "MaximumStrict"
-            ]
-          },
-          "then": {
-            "required": [
-              "Maximum"
-            ]
           }
         }
       ]
