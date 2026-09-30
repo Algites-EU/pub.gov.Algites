@@ -59,24 +59,24 @@ The standard source metadata files are:
 
 | File | Structural role | Schema |
 | --- | --- | --- |
-| `algites-source-repository.yml` | repository root | `algites-source-repository_1.schema.json` |
-| `algites-artifact-set.yml` | inheritable container | `algites-artifact-set_1.schema.json` |
-| `algites-artifact.yml` | artifact leaf | `algites-artifact_1.schema.json` |
-| `license-usage.yml` | hierarchical licensing declaration | `algites-license-usage_1.schema.json` |
-| `licensing/license-definitions.yml` | repository-local license catalog | `algites-license-definitions_1.schema.json` |
+| `algites-source-repository.yml` | repository root | `algites-source-repository_1.yamldef.schema.json` |
+| `algites-artifact-set.yml` | inheritable container | `algites-artifact-set_1.yamldef.schema.json` |
+| `algites-artifact.yml` | artifact leaf | `algites-artifact_1.yamldef.schema.json` |
+| `license-usage.yml` | hierarchical licensing declaration | `algites-license-usage_1.yamldef.schema.json` |
+| `licensing/license-definitions.yml` | repository-local license catalog | `algites-license-definitions_1.yamldef.schema.json` |
 
 Supporting reusable schemas include:
 
-- `algites-version_1.schema.json`
-- `algites-dependencies_1.schema.json`
-- `algites-version-requirement_1.schema.json`
-- `algites-environment-requirements_1.schema.json`
-- `algites-repository-matrix_1.schema.json`
-- `algites-repository-defaults_1.schema.json`
-- `algites-credential-profiles_1.schema.json`
-- `algites-credentials_1.schema.json`
-- `algites-publication-readiness_1.schema.json`
-- `algites-artifact-manifest_1.schema.json`
+- `algites-version_1.yamldef.schema.json`
+- `algites-dependencies_1.yamldef.schema.json`
+- `algites-version-requirement_1.yamldef.schema.json`
+- `algites-environment-requirements_1.yamldef.schema.json`
+- `algites-repository-matrix_1.yamldef.schema.json`
+- `algites-repository-defaults_1.yamldef.schema.json`
+- `algites-credential-profiles_1.yamldef.schema.json`
+- `algites-credentials_1.yamldef.schema.json`
+- `algites-publication-readiness_1.yamldef.schema.json`
+- `algites-artifact-manifest_1.yamldef.schema.json`
 
 The schemas use versioned filenames. A schema revision is therefore explicit and does not silently replace the meaning of an older version.
 
@@ -135,7 +135,7 @@ Dependencies:
 
 For a Modustro dependency that resolves to an artifact in the same source repository, `GroupId` may be omitted; the build maps canonical `ArtifactId` plus optional `VariantId` to the corresponding local artifact. Native Java dependencies require `GroupId`; native Python dependencies use their Python distribution name in `ArtifactId`.
 
-Each `DependencyKind` group may set `ItemsInheritancePolicy` to `mergeMissingItems` (default) or `removeMissingItems`. The policy controls only membership of dependencies of that `DependencyKind`; a same-identity item is recursively merged in either mode. An explicit empty `Items: []` is valid, so `removeMissingItems` with an empty list removes all inherited dependencies of that kind. `Usages` and `RequiredBuildOutputTypes` inside a surviving same-identity dependency remain merge-only and cannot be narrowed by omission.
+Each `DependencyKind` group may set `ItemsInheritancePolicy` to `merge_missing_items` (default) or `remove_missing_items`. The policy controls only membership of dependencies of that `DependencyKind`; a same-identity item is recursively merged in either mode. An explicit empty `Items: []` is valid, so `remove_missing_items` with an empty list removes all inherited dependencies of that kind. `Usages` and `RequiredBuildOutputTypes` inside a surviving same-identity dependency remain merge-only and cannot be narrowed by omission.
 
 `Usages` is a merge-only set. Omitting it for a newly introduced dependency defaults to `product_implementation`. Phase 2 supports the standard Java/Java-Library roles `product_api`, `product_implementation`, `product_compile_only`, `product_compile_only_api`, `product_runtime_only`, `product_annotation_processor`, `develop_implementation`, `develop_compile_only`, `develop_runtime_only`, and `develop_annotation_processor`. The Java bridge maps each usage directly to the corresponding Gradle configuration. Python intentionally has a lossy mapping: product API/implementation/runtime roles become normal package/runtime dependencies; compile-only roles map to the Modustro build/source-processing role and are not published as runtime requirements (Phase 2 resolves this role but does not yet materialize its dedicated environment); annotation-processor roles are currently diagnostic/no-op; development roles stay outside published runtime package metadata.
 
@@ -434,7 +434,7 @@ Publication is different. Before `algitesPublish`, the framework validates the s
 
 ## 10. Version
 
-`Version` uses `algites-version_1.schema.json`.
+`Version` uses `algites-version_1.yamldef.schema.json`.
 
 Supported fields are:
 
@@ -609,7 +609,7 @@ Every Java/Python distribution produced by the shared Algites adapters carries t
 algites-artifact-manifest.yml
 ```
 
-The governed v1 structure is defined by `algites-artifact-manifest_1.schema.json`.
+The governed v1 structure is defined by `algites-artifact-manifest_1.yamldef.schema.json`.
 
 For every Java JAR produced by the project, including any sources JAR when present, the manifest is embedded at:
 
@@ -927,7 +927,7 @@ Use this guide for day-to-day authoring, then consult the source of truth when n
 
 - structure, naming, inheritance, output model: `specs/Algites-Development-Structure-Specification.md`
 - CI/release/lane/licensing lifecycle: `specs/Algites-Development-Lifecycle-Specification.md`
-- exact YAML syntax: `devops/build/yamldefs/src/product/yamldefs/*.schema.json`
+- exact YAML syntax: `devops/build/yamldefs/src/product/yamldefs/*.yamldef.schema.json`
 - credentials: `devops/build/credentials/README.md`
 - public repository defaults: `repository/defaults/README.md`
 - licensing: `licensing/README.md`

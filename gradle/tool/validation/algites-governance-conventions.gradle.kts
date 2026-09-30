@@ -73,6 +73,46 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
             "release", "snapshot",
             "download", "upload", "manage"
         )
+
+        /*
+         * Representation-specific JSON Schema filenames.
+         *
+         * YAML and JSON definitions can legitimately diverge while both are
+         * expressed using JSON Schema. Their logical representation therefore
+         * remains part of the filename after the technical source root is
+         * removed during packaging. XML-family definitions use their native
+         * definition filename extensions, such as .xsd or .wsdl.
+         */
+        locRepositoryDirectory.walkTopDown()
+            .onEnter { locDirectory ->
+                locDirectory == locRepositoryDirectory || locDirectory.name !in locIgnoredDirectoryNames
+            }
+            .filter { locFile -> locFile.isFile && locFile.name.endsWith(".schema.json") }
+            .forEach { locFile ->
+                val locRelativePath = locRepositoryDirectory.toPath()
+                    .relativize(locFile.toPath())
+                    .toString()
+                    .replace(File.separatorChar, '/')
+                val locSegments = locRelativePath.split('/')
+                val locSourceKind = locSegments.firstOrNull { locSegment ->
+                    locSegment == "yamldefs" || locSegment == "yamldefs.gen" || locSegment == "yamldefs.extgen" ||
+                        locSegment == "jsondefs" || locSegment == "jsondefs.gen" || locSegment == "jsondefs.extgen"
+                }
+                when {
+                    locSourceKind?.startsWith("yamldefs") == true &&
+                        !locFile.name.endsWith(".yamldef.schema.json") ->
+                        locProblems.add(
+                            "$locRelativePath: JSON Schema below a yamldefs source root must use the " +
+                                "'.yamldef.schema.json' suffix."
+                        )
+                    locSourceKind?.startsWith("jsondefs") == true &&
+                        !locFile.name.endsWith(".jsondef.schema.json") ->
+                        locProblems.add(
+                            "$locRelativePath: JSON Schema below a jsondefs source root must use the " +
+                                "'.jsondef.schema.json' suffix."
+                        )
+                }
+            }
         val locSchemaDirectory = File(
             locRepositoryDirectory,
             "devops/build/yamldefs/src/product/yamldefs"

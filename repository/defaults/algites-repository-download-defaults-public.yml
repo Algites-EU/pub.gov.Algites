@@ -5,7 +5,7 @@
 # Replace explicit dummy.invalid placeholders before enabling the corresponding
 # TechnologyKind in a production build.
 #
-# Schema: algites-repository-defaults_1.schema.json
+# Schema: algites-repository-defaults_1.yamldef.schema.json
 
 Repositories:
   java:

@@ -25,8 +25,8 @@ Scalar properties distinguish three states:
 
 Keyed item collections use `ItemsInheritancePolicy`:
 
-- `mergeMissingItems` keeps inherited items that are not locally re-declared;
-- `removeMissingItems` removes inherited items absent from the local collection;
+- `merge_missing_items` keeps inherited items that are not locally re-declared;
+- `remove_missing_items` removes inherited items absent from the local collection;
 - a local item with the same identity as an inherited item is recursively merged under either policy.
 
 Some collections are explicitly **merge-only**. Dependency `Usages` and `RequiredBuildOutputTypes` are merge-only because a descendant declaration must not silently remove a requirement inherited from an ancestor.
@@ -160,7 +160,7 @@ develop_annotation_processor
 
 They form a merge-only set rather than one scalar Usage.
 
-Dependency and DependencyConstraint collections are grouped by `DependencyKind`. Each group has `ItemsInheritancePolicy: mergeMissingItems | removeMissingItems`; the default is `mergeMissingItems`. This policy controls dependency membership only. For a same-identity dependency, `Usages` and `RequiredBuildOutputTypes` always merge, regardless of the group membership policy. Explicit empty `Items` is permitted.
+Dependency and DependencyConstraint collections are grouped by `DependencyKind`. Each group has `ItemsInheritancePolicy: merge_missing_items | remove_missing_items`; the default is `merge_missing_items`. This policy controls dependency membership only. For a same-identity dependency, `Usages` and `RequiredBuildOutputTypes` always merge, regardless of the group membership policy. Explicit empty `Items` is permitted.
 
 The Java adapter maps these to standard Java/Java-Library Gradle configurations. The Python adapter intentionally performs a lossy mapping:
 
@@ -227,7 +227,9 @@ Phase 2 still contains no producer plugin manager. Producers remain hard-wired i
 
 ## 9. Canonical definitions and global publication metadata
 
-`coreintf` publishes equivalent canonical definitions below `yamldefs`, `jsondefs`, and `xmldefs` source roots. Versioned definition files use `_1` and also contain an internal definition version.
+`coreintf` publishes representation-specific canonical definitions below `yamldefs`, `jsondefs`, and `xmldefs` source roots. The representations model the same logical contract but MAY differ where the target representation or its schema technology supports different constraints. Versioned definition files use `_1` and also contain an internal definition version.
+
+When YAML or JSON definitions are expressed as JSON Schema, the target representation is retained in the logical filename: `<name>_<version>.yamldef.schema.json` below `yamldefs` and `<name>_<version>.jsondef.schema.json` below `jsondefs`. XSD definitions retain the normal `<name>_<version>.xsd` form because the `.xsd` extension already identifies the XML representation. Representation-specific JSON Schema resources MUST also use distinct `$id` values; two representations that happen to have identical schema contents are still independent contracts and may diverge later.
 
 Every canonical definition created by Modustro Builder carries a `<definition-file>.meta.yml` sidecar with:
 

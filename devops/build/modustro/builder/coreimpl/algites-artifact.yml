@@ -1,57 +1,45 @@
 Artifact:
   TechnologyKinds: [java]
   Name: Modustro Builder core implementation
-  Description: Gradle-independent reusable implementation of Modustro Builder model validation and inheritance.
+  Description: Gradle-independent reusable implementation of Modustro Builder inheritance, validation, and dependency technology resolution planning.
 
 Dependencies:
-  - DependencyKind: algites
+  - DependencyKind: modustro
     Items:
       - GroupId: eu.algites.pltf.modustro.builder
         ArtifactId: pub.gov.Algites_devops.build.modustro.builder.coreintf
-        Usage: product_api
+        Usages: [product_api]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
-
       - GroupId: eu.algites.lib.common
         ArtifactId: pub.lib.General_version.core
-        Usage: product_implementation
+        Usages: [product_implementation]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
-
-      - GroupId: eu.algites.lib.common
-        ArtifactId: pub.lib.General_version.scheme.algites.v1
-        Usage: product_implementation
-        VersionRequirement:
-          Exact: "1.0-SNAPSHOT"
-
       - GroupId: eu.algites.lib.common
         ArtifactId: pub.lib.General_version.scheme.gradle
-        Usage: product_implementation
+        Usages: [product_implementation]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
-
       - GroupId: eu.algites.lib.common
         ArtifactId: pub.lib.General_version.scheme.pep440
-        Usage: product_implementation
+        Usages: [product_implementation]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
-
       - GroupId: eu.algites.lib.common
         ArtifactId: pub.lib.General_version.scheme.conversion.algites2gradle.v1
-        Usage: product_implementation
+        Usages: [product_implementation]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
-
       - GroupId: eu.algites.lib.common
         ArtifactId: pub.lib.General_version.scheme.conversion.algites2pep440.v1
-        Usage: product_implementation
+        Usages: [product_implementation]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
-
   - DependencyKind: java
     Items:
       - GroupId: org.testng
         ArtifactId: testng
-        Usage: develop_implementation
+        Usages: [develop_implementation]
         VersionRequirement:
           Exact: "7.10.2"

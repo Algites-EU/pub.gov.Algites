@@ -833,7 +833,7 @@ Dependencies are grouped by `DependencyKind` (`modustro`, `java`, or `python`). 
 
 The dependency identity is `DependencyKind + GroupId + ArtifactId + VariantId`. `Usages` is a merge-only set and is deliberately excluded from identity; one dependency can therefore participate in several Java/Python build roles without being modeled as several unrelated dependencies. `RequiredBuildOutputTypes` is likewise merge-only and does not change dependency identity.
 
-At the `DependencyKind` group level, `ItemsInheritancePolicy` controls membership: `mergeMissingItems` retains inherited items not mentioned locally, while `removeMissingItems` removes inherited items of that kind that are not mentioned locally. Same-identity items recursively merge in both modes. Empty `Items` is valid. The membership policy never changes the merge-only behavior of `Usages` and `RequiredBuildOutputTypes` within a surviving item.
+At the `DependencyKind` group level, `ItemsInheritancePolicy` controls membership: `merge_missing_items` retains inherited items not mentioned locally, while `remove_missing_items` removes inherited items of that kind that are not mentioned locally. Same-identity items recursively merge in both modes. Empty `Items` is valid. The membership policy never changes the merge-only behavior of `Usages` and `RequiredBuildOutputTypes` within a surviving item.
 
 The Java bridge maps the portable usages to the standard Gradle Java/Java-Library configurations (`api`, `implementation`, `compileOnly`, `compileOnlyApi`, `runtimeOnly`, annotation-processor configurations, and their test/develop counterparts). It delegates graph conflict resolution to Gradle. The Python bridge maps the same portable usages to package/runtime, build/source-processing, development, or diagnostic/no-op roles and delegates graph preflight to the existing three-phase pip resolver. Phase 2 records and resolves build/source-processing dependencies but does not yet materialize a separate Python source-processing environment.
 
@@ -1226,6 +1226,8 @@ Technology adapters MAY define additional source types when required by the ecos
 
 The SourceType is a source-root concern and MUST NOT be repeated inside the business-relative path. For example, a JSON definition owned by `eu.algites.example.contracts` belongs under `src/product/jsondefs/eu/algites/example/contracts/...`, not under an additional `jsondefs/` package segment.
 
+When a YAML or JSON definition is itself expressed as JSON Schema, its filename MUST retain the target representation because the technical SourceType root is removed from packaged resource paths. A YAML-target schema therefore uses `<name>_<version>.yamldef.schema.json`, while a JSON-target schema uses `<name>_<version>.jsondef.schema.json`. These schemas MAY differ. An XSD continues to use `<name>_<version>.xsd`; an `xmldef` marker would be redundant because the XSD format already identifies the XML representation. The same convention applies in `.gen` and `.extgen` variants.
+
 #### 3.9.2 Generated and externally generated sources
 
 For any source type, the following semantics apply:
@@ -1492,7 +1494,7 @@ Credential type is a closed, implementation-supported enum because each type def
 
 The canonical implementation constants are `AInCredentialType` and `AInCredentialField`. A field that is valid for one type is not implicitly valid for another type.
 
-Credential values use the single provider-independent document `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, governed by `algites-credentials_1.schema.json`. The document is keyed by profile id and credential type. Each field has the same `{ source, value }` shape. `Source` is the closed `AInCredentialValueSource` enum:
+Credential values use the single provider-independent document `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`, governed by `algites-credentials_1.yamldef.schema.json`. The document is keyed by profile id and credential type. Each field has the same `{ source, value }` shape. `Source` is the closed `AInCredentialValueSource` enum:
 
 | Source | Meaning of `Value` | Materialized result |
 |---|---|---|
@@ -1558,7 +1560,7 @@ Algites public-governance download defaults
 
 Public governance MUST contain only repository information safe to expose publicly. Canonical private repository endpoints and canonical upload endpoints MUST NOT be embedded in `pub.gov.Algites`. Private governance supplies them as authorized overlays.
 
-Private-governance overlay files use `algites-repository-defaults_1.schema.json` and MAY contain both:
+Private-governance overlay files use `algites-repository-defaults_1.yamldef.schema.json` and MAY contain both:
 
 - `Repositories` — endpoint-list overrides for selected matrix cells;
 - `CredentialProfiles` — non-secret profile definitions referenced by those endpoints.
@@ -1611,9 +1613,9 @@ The normative stem convention is:
 The initial schema version therefore uses suffix `_1`; an unversioned canonical schema filename MUST NOT be used as the authoritative schema contract. Conceptual examples are:
 
 ```text
-algites-source-repository_1.schema.json
-algites-artifact_1.schema.json
-algites-artifact-set_1.schema.json
+algites-source-repository_1.yamldef.schema.json
+algites-artifact_1.yamldef.schema.json
+algites-artifact-set_1.yamldef.schema.json
 ```
 
 The exact schema serialization/extension is defined by the schema TechnologyKind/SourceType conventions, but the `_N` version suffix is independent of serialization. An incompatible schema-contract change requires a new schema version (for example `_2`) rather than silently changing the meaning of `_1`. Multiple schema versions MAY coexist when compatibility requires it.

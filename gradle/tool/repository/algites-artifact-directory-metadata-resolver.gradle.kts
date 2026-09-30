@@ -34,39 +34,107 @@ data class AIcdAlgitesVersionBoundary(
     val inclusive: Boolean
 )
 
+enum class AInAlgitesItemsInheritancePolicy {
+    MERGE_MISSING_ITEMS,
+    REMOVE_MISSING_ITEMS
+}
+
 data class AIcdAlgitesVersionRequirement(
     val exact: String? = null,
     val minimum: AIcdAlgitesVersionBoundary? = null,
     val maximum: AIcdAlgitesVersionBoundary? = null,
     val maximumStrict: Boolean? = null,
     val exclude: List<String> = emptyList(),
-    val prefer: String? = null
-)
+    val excludeItemsInheritancePolicy: AInAlgitesItemsInheritancePolicy? = null,
+    val prefer: String? = null,
+    val specifiedProperties: Set<String> = emptySet()
+) {
+    fun AIcMerge(aOther: AIcdAlgitesVersionRequirement): AIcdAlgitesVersionRequirement {
+        val locExclude = if ("Exclude" in aOther.specifiedProperties) {
+            when (aOther.excludeItemsInheritancePolicy ?: AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS) {
+                AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS -> (exclude + aOther.exclude).distinct()
+                AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS -> aOther.exclude
+            }
+        } else exclude
+        return AIcdAlgitesVersionRequirement(
+            exact = if ("Exact" in aOther.specifiedProperties) aOther.exact else exact,
+            minimum = if ("Minimum" in aOther.specifiedProperties) aOther.minimum else minimum,
+            maximum = if ("Maximum" in aOther.specifiedProperties) aOther.maximum else maximum,
+            maximumStrict = if ("MaximumStrict" in aOther.specifiedProperties) aOther.maximumStrict else maximumStrict,
+            exclude = locExclude,
+            excludeItemsInheritancePolicy = null,
+            prefer = if ("Prefer" in aOther.specifiedProperties) aOther.prefer else prefer,
+            specifiedProperties = specifiedProperties + aOther.specifiedProperties
+        )
+    }
+}
 
 data class AIcdAlgitesDependencyDefinition(
     val dependencyKind: String,
     val groupId: String? = null,
     val artifactId: String,
     val variantId: String? = null,
-    val usage: String = "product_implementation",
+    val usages: Set<String> = emptySet(),
+    val requiredBuildOutputTypes: Set<String> = emptySet(),
     val versionRequirement: AIcdAlgitesVersionRequirement? = null
 ) {
     fun AIcIdentity(): String = listOf(
         dependencyKind,
         groupId ?: "",
         artifactId,
-        variantId ?: "",
-        usage
+        variantId ?: ""
     ).joinToString("|")
+
+    fun AIcEffectiveUsages(): Set<String> = if (usages.isEmpty()) setOf("product_implementation") else usages
+
+    fun AIcMerge(aOther: AIcdAlgitesDependencyDefinition): AIcdAlgitesDependencyDefinition {
+        require(AIcIdentity() == aOther.AIcIdentity()) {
+            "Cannot merge dependency definitions with different identities '${AIcIdentity()}' and '${aOther.AIcIdentity()}'."
+        }
+        return AIcdAlgitesDependencyDefinition(
+            dependencyKind = dependencyKind,
+            groupId = groupId,
+            artifactId = artifactId,
+            variantId = variantId,
+            usages = usages + aOther.usages,
+            requiredBuildOutputTypes = requiredBuildOutputTypes + aOther.requiredBuildOutputTypes,
+            versionRequirement = when {
+                versionRequirement == null -> aOther.versionRequirement
+                aOther.versionRequirement == null -> versionRequirement
+                else -> versionRequirement.AIcMerge(aOther.versionRequirement)
+            }
+        )
+    }
 }
+
+data class AIcdAlgitesDependencyCollectionConfig(
+    val definitions: List<AIcdAlgitesDependencyDefinition> = emptyList(),
+    val itemsInheritancePoliciesByDependencyKind: Map<String, AInAlgitesItemsInheritancePolicy> = emptyMap()
+)
 
 fun AIcMergeDependencyDefinitions(
     aBase: List<AIcdAlgitesDependencyDefinition>,
-    aOverride: List<AIcdAlgitesDependencyDefinition>
+    aOverride: List<AIcdAlgitesDependencyDefinition>,
+    aOverridePoliciesByDependencyKind: Map<String, AInAlgitesItemsInheritancePolicy> = emptyMap()
 ): List<AIcdAlgitesDependencyDefinition> {
     val locMerged = linkedMapOf<String, AIcdAlgitesDependencyDefinition>()
     aBase.forEach { locDependency -> locMerged[locDependency.AIcIdentity()] = locDependency }
-    aOverride.forEach { locDependency -> locMerged[locDependency.AIcIdentity()] = locDependency }
+
+    aOverridePoliciesByDependencyKind.forEach { (locDependencyKind, locPolicy) ->
+        if (locPolicy == AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS) {
+            val locLocalIdentities = aOverride
+                .filter { locDependency -> locDependency.dependencyKind == locDependencyKind }
+                .mapTo(linkedSetOf()) { locDependency -> locDependency.AIcIdentity() }
+            locMerged.entries.removeIf { locEntry ->
+                locEntry.value.dependencyKind == locDependencyKind && locEntry.key !in locLocalIdentities
+            }
+        }
+    }
+
+    aOverride.forEach { locDependency ->
+        val locIdentity = locDependency.AIcIdentity()
+        locMerged[locIdentity] = locMerged[locIdentity]?.AIcMerge(locDependency) ?: locDependency
+    }
     return locMerged.values.toList()
 }
 
@@ -113,7 +181,9 @@ data class AIcdAlgitesResolvedState(
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition> = emptyMap(),
     val version: AIcdAlgitesVersion = AIcdAlgitesVersion(),
     val dependencies: List<AIcdAlgitesDependencyDefinition> = emptyList(),
+    val dependencyItemsInheritancePoliciesByKind: Map<String, AInAlgitesItemsInheritancePolicy> = emptyMap(),
     val dependencyConstraints: List<AIcdAlgitesDependencyDefinition> = emptyList(),
+    val dependencyConstraintItemsInheritancePoliciesByKind: Map<String, AInAlgitesItemsInheritancePolicy> = emptyMap(),
     val environmentRequirements: Map<String, AIcdAlgitesVersionRequirement> = emptyMap(),
     val deleteSnapshotWhenReleased: Boolean? = null
 ) {
@@ -140,8 +210,18 @@ data class AIcdAlgitesResolvedState(
             repositories = locRepositories,
             credentialProfiles = locProfiles,
             version = version.AIcMerge(aOther.version),
-            dependencies = AIcMergeDependencyDefinitions(dependencies, aOther.dependencies),
-            dependencyConstraints = AIcMergeDependencyDefinitions(dependencyConstraints, aOther.dependencyConstraints),
+            dependencies = AIcMergeDependencyDefinitions(
+                dependencies,
+                aOther.dependencies,
+                aOther.dependencyItemsInheritancePoliciesByKind
+            ),
+            dependencyItemsInheritancePoliciesByKind = emptyMap(),
+            dependencyConstraints = AIcMergeDependencyDefinitions(
+                dependencyConstraints,
+                aOther.dependencyConstraints,
+                aOther.dependencyConstraintItemsInheritancePoliciesByKind
+            ),
+            dependencyConstraintItemsInheritancePoliciesByKind = emptyMap(),
             environmentRequirements = environmentRequirements + aOther.environmentRequirements,
             deleteSnapshotWhenReleased = aOther.deleteSnapshotWhenReleased ?: deleteSnapshotWhenReleased
         )
@@ -579,38 +659,90 @@ fun AIcVersionRequirementFromConfig(
     aFile: File,
     aContext: String
 ): AIcdAlgitesVersionRequirement? {
-    val locExact = aValues["$aPrefix.Exact"]?.trim()?.takeIf { it.isNotBlank() }
+    fun locRaw(aName: String): String? = aValues["$aPrefix.$aName"]?.trim()
+    fun locIsNull(aValue: String?): Boolean = aValue?.equals("null", true) == true || aValue == "~"
+    val locSpecified = linkedSetOf<String>()
+
+    val locExactRaw = locRaw("Exact")
+    if (locExactRaw != null) locSpecified.add("Exact")
+    val locExact = locExactRaw?.takeUnless(::locIsNull)?.takeIf { it.isNotBlank() }
+
     fun locBoundary(aName: String, aMinimum: Boolean): AIcdAlgitesVersionBoundary? {
-        aValues["$aPrefix.$aName"]?.trim()?.takeIf { it.isNotBlank() }?.let { locValue ->
-            return AIcParseVersionBoundary(locValue, aMinimum, "$aContext.$aName")
+        val locDirect = locRaw(aName)
+        val locVersionKey = "$aPrefix.$aName.Version"
+        val locInclusiveKey = "$aPrefix.$aName.Inclusive"
+        if (locDirect != null || locVersionKey in aValues || locInclusiveKey in aValues) locSpecified.add(aName)
+        if (locDirect != null) {
+            if (locIsNull(locDirect)) return null
+            if (locDirect.isNotBlank()) return AIcParseVersionBoundary(locDirect, aMinimum, "$aContext.$aName")
         }
-        val locVersion = aValues["$aPrefix.$aName.Version"]?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        val locInclusive = aValues["$aPrefix.$aName.Inclusive"]?.let {
-            AIcParseBoolean(it, "$aContext.$aName.Inclusive", aFile)
-        } ?: error("$aContext.$aName requires Inclusive when the structured boundary form is used.")
+        val locVersionRaw = aValues[locVersionKey]?.trim() ?: return null
+        if (locIsNull(locVersionRaw)) return null
+        val locVersion = locVersionRaw.takeIf { it.isNotBlank() } ?: return null
+        val locInclusiveRaw = aValues[locInclusiveKey]
+            ?: error("$aContext.$aName requires Inclusive when the structured boundary form is used.")
+        if (locIsNull(locInclusiveRaw)) error("$aContext.$aName.Inclusive must not be null when Version is defined.")
+        val locInclusive = AIcParseBoolean(locInclusiveRaw, "$aContext.$aName.Inclusive", aFile)
         return AIcdAlgitesVersionBoundary(locVersion, locInclusive)
     }
+
     val locMinimum = locBoundary("Minimum", true)
     val locMaximum = locBoundary("Maximum", false)
-    val locMaximumStrictRaw = aValues["$aPrefix.MaximumStrict"]
-    val locMaximumStrict = locMaximumStrictRaw?.let {
-        AIcParseBoolean(it, "$aContext.MaximumStrict", aFile)
-    }
-    val locExclude = aValues["$aPrefix.Exclude"]?.let(::AIcParseYamlRawStringList).orEmpty()
-    val locPrefer = aValues["$aPrefix.Prefer"]?.trim()?.takeIf { it.isNotBlank() }
 
-    val locPresent = locExact != null || locMinimum != null || locMaximum != null || locMaximumStrictRaw != null || locExclude.isNotEmpty() || locPrefer != null
-    if (!locPresent) return null
-    if (locExact != null && (locMinimum != null || locMaximum != null || locMaximumStrictRaw != null || locExclude.isNotEmpty() || locPrefer != null)) {
-        error("$aContext.Exact cannot be combined with Minimum, Maximum, MaximumStrict, Exclude, or Prefer.")
+    val locMaximumStrictRaw = locRaw("MaximumStrict")
+    if (locMaximumStrictRaw != null) locSpecified.add("MaximumStrict")
+    val locMaximumStrict = locMaximumStrictRaw
+        ?.takeUnless(::locIsNull)
+        ?.let { AIcParseBoolean(it, "$aContext.MaximumStrict", aFile) }
+
+    val locExcludeRaw = locRaw("Exclude")
+    val locExcludeItemsRaw = aValues["$aPrefix.Exclude.Items"]?.trim()
+    val locExcludePolicyRaw = aValues["$aPrefix.Exclude.ItemsInheritancePolicy"]?.trim()
+    val locExcludeSpecified = locExcludeRaw != null || locExcludeItemsRaw != null || locExcludePolicyRaw != null
+    if (locExcludeSpecified) locSpecified.add("Exclude")
+    val locExcludePolicy: AInAlgitesItemsInheritancePolicy?
+    val locExclude: List<String>
+    if (locExcludeRaw != null) {
+        if (!locIsNull(locExcludeRaw)) {
+            error("$aContext.Exclude must use the structured Items form or null.")
+        }
+        locExcludePolicy = AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS
+        locExclude = emptyList()
+    } else if (locExcludeSpecified) {
+        val locPolicyText = locExcludePolicyRaw?.takeIf { it.isNotBlank() } ?: "merge_missing_items"
+        locExcludePolicy = when (locPolicyText) {
+            "merge_missing_items" -> AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+            "remove_missing_items" -> AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS
+            else -> error("$aContext.Exclude.ItemsInheritancePolicy '$locPolicyText' is unsupported.")
+        }
+        locExclude = locExcludeItemsRaw?.let(::AIcParseYamlRawStringList).orEmpty()
+    } else {
+        locExcludePolicy = null
+        locExclude = emptyList()
     }
-    if (locMaximumStrictRaw != null && locMaximum == null) {
-        error("$aContext.MaximumStrict requires Maximum.")
+
+    val locPreferRaw = locRaw("Prefer")
+    if (locPreferRaw != null) locSpecified.add("Prefer")
+    val locPrefer = locPreferRaw?.takeUnless(::locIsNull)?.takeIf { it.isNotBlank() }
+
+    if (locSpecified.isEmpty()) return null
+    val locExcludeIsNonNull = locExcludeSpecified && locExcludeRaw == null
+    if (locExact != null && (locMinimum != null || locMaximum != null || locMaximumStrict != null || locExcludeIsNonNull || locPrefer != null)) {
+        error("$aContext.Exact cannot be combined in one declaration with non-null Minimum, Maximum, MaximumStrict, Exclude, or Prefer.")
     }
     if (locPrefer != null && locPrefer in locExclude) {
         error("$aContext.Prefer '$locPrefer' must not also be excluded.")
     }
-    return AIcdAlgitesVersionRequirement(locExact, locMinimum, locMaximum, locMaximumStrict, locExclude, locPrefer)
+    return AIcdAlgitesVersionRequirement(
+        exact = locExact,
+        minimum = locMinimum,
+        maximum = locMaximum,
+        maximumStrict = locMaximumStrict,
+        exclude = locExclude,
+        excludeItemsInheritancePolicy = locExcludePolicy,
+        prefer = locPrefer,
+        specifiedProperties = locSpecified
+    )
 }
 
 fun AIcEnvironmentRequirementsFromConfig(aValues: Map<String, String>, aFile: File): Map<String, AIcdAlgitesVersionRequirement> {
@@ -638,13 +770,17 @@ fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String,
             error("Algites ReleaseLineVersion '$locReleaseLineVersion' in '${aFile.path}' must contain only numeric components separated by dots.")
         }
     }
+    val locDependencies = AIcDependencyDefinitionsFromConfig(aValues, "Dependencies", aFile, false)
+    val locDependencyConstraints = AIcDependencyDefinitionsFromConfig(aValues, "DependencyConstraints", aFile, true)
     return AIcdAlgitesResolvedState(
         groupId = locGroupId,
         repositories = AIcRepositoryOverridesFromConfig(aValues, aPrefix, aFile),
         credentialProfiles = AIcCredentialProfilesFromConfig(aValues, aFile),
         version = locVersion,
-        dependencies = AIcDependencyDefinitionsFromConfig(aValues, "Dependencies", aFile, false),
-        dependencyConstraints = AIcDependencyDefinitionsFromConfig(aValues, "DependencyConstraints", aFile, true),
+        dependencies = locDependencies.definitions,
+        dependencyItemsInheritancePoliciesByKind = locDependencies.itemsInheritancePoliciesByDependencyKind,
+        dependencyConstraints = locDependencyConstraints.definitions,
+        dependencyConstraintItemsInheritancePoliciesByKind = locDependencyConstraints.itemsInheritancePoliciesByDependencyKind,
         environmentRequirements = AIcEnvironmentRequirementsFromConfig(aValues, aFile),
         deleteSnapshotWhenReleased = AIcFirstValue(aValues, "DeleteSnapshotWhenReleased")
             ?.takeIf { it.isNotBlank() }
@@ -657,16 +793,18 @@ fun AIcDependencyDefinitionsFromConfig(
     aPropertyName: String,
     aFile: File,
     aConstraint: Boolean
-): List<AIcdAlgitesDependencyDefinition> {
-    val locSupportedKinds = setOf("algites", "java", "python")
+): AIcdAlgitesDependencyCollectionConfig {
+    val locSupportedKinds = setOf("modustro", "java", "python")
     val locSupportedUsages = setOf(
-        "product_api", "product_implementation", "product_compile_only", "product_runtime_only",
-        "develop_implementation", "develop_compile_only", "develop_runtime_only"
+        "product_api", "product_implementation", "product_compile_only", "product_compile_only_api",
+        "product_runtime_only", "product_annotation_processor",
+        "develop_implementation", "develop_compile_only", "develop_runtime_only", "develop_annotation_processor"
     )
     val locGroupIndices = aValues.keys.mapNotNull { locKey ->
         Regex("^${Regex.escape(aPropertyName)}\\.(\\d+)\\.DependencyKind$").matchEntire(locKey)?.groupValues?.get(1)?.toIntOrNull()
     }.distinct().sorted()
     val locResult = mutableListOf<AIcdAlgitesDependencyDefinition>()
+    val locPolicies = linkedMapOf<String, AInAlgitesItemsInheritancePolicy>()
 
     locGroupIndices.forEach { locGroupIndex ->
         val locGroupPrefix = "$aPropertyName.$locGroupIndex"
@@ -675,32 +813,70 @@ fun AIcDependencyDefinitionsFromConfig(
         if (locDependencyKind !in locSupportedKinds) {
             error("${aFile.path}:$aPropertyName[$locGroupIndex] uses unsupported DependencyKind '$locDependencyKind'.")
         }
+        if (locDependencyKind in locPolicies) {
+            error("${aFile.path}:$aPropertyName declares DependencyKind '$locDependencyKind' more than once; combine its Items into one group.")
+        }
+        val locPolicyText = aValues["$locGroupPrefix.ItemsInheritancePolicy"]
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: "merge_missing_items"
+        val locPolicy = when (locPolicyText) {
+            "merge_missing_items" -> AInAlgitesItemsInheritancePolicy.MERGE_MISSING_ITEMS
+            "remove_missing_items" -> AInAlgitesItemsInheritancePolicy.REMOVE_MISSING_ITEMS
+            else -> error("${aFile.path}:$aPropertyName[$locGroupIndex].ItemsInheritancePolicy '$locPolicyText' is unsupported.")
+        }
+        locPolicies[locDependencyKind] = locPolicy
         val locItemIndices = aValues.keys.mapNotNull { locKey ->
             Regex("^${Regex.escape(locGroupPrefix)}\\.Items\\.(\\d+)\\.").find(locKey)?.groupValues?.get(1)?.toIntOrNull()
         }.distinct().sorted()
         if (locItemIndices.isEmpty()) {
-            error("${aFile.path}:$aPropertyName[$locGroupIndex] must contain at least one Items entry.")
+            val locItemsRaw = aValues["$locGroupPrefix.Items"]?.trim()
+            if (locItemsRaw == null || AIcParseYamlRawStringList(locItemsRaw).isNotEmpty()) {
+                error("${aFile.path}:$aPropertyName[$locGroupIndex] must define Items as a sequence; an explicit empty Items list is allowed.")
+            }
         }
         locItemIndices.forEach { locItemIndex ->
             val locItemPrefix = "$locGroupPrefix.Items.$locItemIndex"
             val locContext = "${aFile.path}:$aPropertyName[$locGroupIndex].Items[$locItemIndex]"
             val locArtifactId = aValues["$locItemPrefix.ArtifactId"]?.trim()?.takeIf { it.isNotBlank() }
                 ?: error("$locContext is missing required ArtifactId.")
-            val locGroupId = aValues["$locItemPrefix.GroupId"]?.trim()?.takeIf { it.isNotBlank() }
-            val locVariantId = aValues["$locItemPrefix.VariantId"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+            val locGroupId = aValues["$locItemPrefix.GroupId"]?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", true) }
+            val locVariantId = aValues["$locItemPrefix.VariantId"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() && !it.equals("null", true) }
             if (locDependencyKind == "java" && locGroupId == null) {
                 error("$locContext is a native Java dependency and requires GroupId.")
             }
-            if (locDependencyKind != "algites" && locVariantId != null) {
-                error("$locContext may declare VariantId only for DependencyKind 'algites'.")
+            if (locDependencyKind != "modustro" && locVariantId != null) {
+                error("$locContext may declare VariantId only for DependencyKind 'modustro'.")
             }
             if (locVariantId != null && !Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(locVariantId)) {
                 error("$locContext VariantId '$locVariantId' must use lowercase dash-separated form.")
             }
-            val locUsage = aValues["$locItemPrefix.Usage"]?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: "product_implementation"
-            if (locUsage !in locSupportedUsages) {
-                error("$locContext uses unsupported Usage '$locUsage'. Supported values: ${locSupportedUsages.sorted().joinToString(", ")}.")
+
+            val locUsagesRaw = aValues["$locItemPrefix.Usages"]
+            val locUsages = locUsagesRaw?.let(::AIcParseYamlStringList)?.toCollection(linkedSetOf()).orEmpty()
+            locUsages.forEach { locUsage ->
+                if (locUsage !in locSupportedUsages) {
+                    error("$locContext uses unsupported Usage '$locUsage'. Supported values: ${locSupportedUsages.sorted().joinToString(", ")}.")
+                }
             }
+
+            val locRequiredBuildOutputTypes = if (aConstraint) {
+                if (aValues["$locItemPrefix.RequiredBuildOutputTypes"] != null) {
+                    error("$locContext is a DependencyConstraint and must not define RequiredBuildOutputTypes.")
+                }
+                emptySet()
+            } else {
+                aValues["$locItemPrefix.RequiredBuildOutputTypes"]
+                    ?.let(::AIcParseYamlStringList)
+                    ?.onEach { locOutputType ->
+                        if (!Regex("^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$").matches(locOutputType)) {
+                            error("$locContext RequiredBuildOutputType '$locOutputType' must use lowercase underscore-separated form.")
+                        }
+                    }
+                    ?.toCollection(linkedSetOf())
+                    .orEmpty()
+            }
+
             val locVersionRequirement = AIcVersionRequirementFromConfig(
                 aValues,
                 "$locItemPrefix.VersionRequirement",
@@ -710,7 +886,7 @@ fun AIcDependencyDefinitionsFromConfig(
             if (aConstraint && locVersionRequirement == null) {
                 error("$locContext is a DependencyConstraint and must define VersionRequirement.")
             }
-            if (locDependencyKind == "algites" && locVersionRequirement != null) {
+            if (locDependencyKind == "modustro" && locVersionRequirement != null) {
                 val locAlgitesVersionPattern = Regex("^[0-9]+(?:\\.[0-9]+)+(?:-SNAPSHOT|-rc[0-9]+)?$", RegexOption.IGNORE_CASE)
                 val locVersionValues = buildList {
                     locVersionRequirement.exact?.let(::add)
@@ -721,7 +897,7 @@ fun AIcDependencyDefinitionsFromConfig(
                 }
                 locVersionValues.forEach { locVersionValue ->
                     if (!locAlgitesVersionPattern.matches(locVersionValue)) {
-                        error("$locContext Algites VersionRequirement value '$locVersionValue' must use canonical Algites v1 version text such as '1.3.2' or '1.3.2-SNAPSHOT'.")
+                        error("$locContext Modustro VersionRequirement value '$locVersionValue' must use canonical Algites v1 version text such as '1.3.2' or '1.3.2-SNAPSHOT'.")
                     }
                 }
             }
@@ -731,13 +907,14 @@ fun AIcDependencyDefinitionsFromConfig(
                     groupId = locGroupId,
                     artifactId = locArtifactId,
                     variantId = locVariantId,
-                    usage = locUsage,
+                    usages = locUsages,
+                    requiredBuildOutputTypes = locRequiredBuildOutputTypes,
                     versionRequirement = locVersionRequirement
                 )
             )
         }
     }
-    return locResult
+    return AIcdAlgitesDependencyCollectionConfig(locResult, locPolicies)
 }
 
 
@@ -847,6 +1024,15 @@ fun AIcValidateRepositoryEndpointId(aId: String, aCell: String, aFile: File) {
 }
 
 fun AIcValidateEffectiveState(aState: AIcdAlgitesResolvedState, aContext: String) {
+    (aState.dependencies + aState.dependencyConstraints).forEach { locDependency ->
+        val locRequirement = locDependency.versionRequirement ?: return@forEach
+        if (locRequirement.maximumStrict != null && locRequirement.maximum == null) {
+            error("$aContext dependency '${locDependency.artifactId}' has MaximumStrict without an effective Maximum after inheritance.")
+        }
+        if (locRequirement.exact != null && locRequirement.exact in locRequirement.exclude) {
+            error("$aContext dependency '${locDependency.artifactId}' excludes its effective Exact version '${locRequirement.exact}'.")
+        }
+    }
     aState.repositories.forEach { (locCell, locEndpoints) ->
         locEndpoints.values.forEach { locEndpoint ->
             if (locEndpoint.AIcEffectiveEnabled() && locEndpoint.url.isNullOrBlank()) {
@@ -1058,7 +1244,8 @@ fun AIcDependencyMapForOutput(aDependency: AIcdAlgitesDependencyDefinition): Map
     "groupId" to aDependency.groupId,
     "artifactId" to aDependency.artifactId,
     "variantId" to aDependency.variantId,
-    "usage" to aDependency.usage,
+    "usages" to aDependency.AIcEffectiveUsages().toList(),
+    "requiredBuildOutputTypes" to aDependency.requiredBuildOutputTypes.toList(),
     "versionRequirement" to aDependency.versionRequirement?.let(::AIcVersionRequirementMapForOutput)
 )
 

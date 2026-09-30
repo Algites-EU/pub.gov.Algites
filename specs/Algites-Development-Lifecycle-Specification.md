@@ -422,7 +422,7 @@ Supported profile types are the closed set `basic`, `bearer`, `api_key`, and `ce
 
 Core support for a credential type does not imply that every TechnologyKind repository adapter can apply that authentication mechanism. Unsupported endpoint/type combinations MUST fail rather than silently fall back to another authentication mechanism.
 
-Secret values use one provider-independent credential document supplied as `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` and governed by `algites-credentials_1.schema.json`. Every credential field has exactly the properties `Source` and `Value`. The closed value-source enum is:
+Secret values use one provider-independent credential document supplied as `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` and governed by `algites-credentials_1.yamldef.schema.json`. Every credential field has exactly the properties `Source` and `Value`. The closed value-source enum is:
 
 | `Source` | interpretation of `Value` |
 | --- | --- |
@@ -459,7 +459,7 @@ For GitHub Actions the resolution is deliberately two-phase. `resolveAlgitesRequ
 
 `_TMP_ALGITES_CREDENTIAL_SECRETS_JSON` carries an optional provider secret context required for exact-name `secret_content` lookup. It is not a credential document and MUST NOT contain profile-selection semantics. GitHub wrappers populate it from the complete GitHub Actions `secrets` context for the trusted bridge. For local processing it is normally absent: the installed Java resolver and Gradle bootstrap resolve a missing `secret_content` key from a named value in the Algites local secure store. When `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` itself is not set in the environment, the Gradle bootstrap obtains the stored universal document through the installed `algites-credentials` helper (`ALGITES_CREDENTIAL_CLI` MAY override its executable path). This does not create another credential schema; the helper is only a secure-store bootstrap adapter.
 
-Concrete public download locations are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`; they are not hard-coded in the resolver. Governed public upload/manage locations and all private download/upload/manage locations remain private-governance data. All defaults files use `algites-repository-defaults_1.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` supplies the combined public upload/manage overlay and `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies the combined private download/upload/manage overlay.
+Concrete public download locations are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`; they are not hard-coded in the resolver. Governed public upload/manage locations and all private download/upload/manage locations remain private-governance data. All defaults files use `algites-repository-defaults_1.yamldef.schema.json` and may contain endpoint definitions plus non-secret `credentialProfiles`; they MUST NOT contain secret values. `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` supplies the combined public upload/manage overlay and `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` supplies the combined private download/upload/manage overlay.
 
 Repository visibility usage is constrained by source-repository visibility:
 

@@ -14,11 +14,16 @@ import org.gradle.api.artifacts.ExternalModuleDependency
 import org.gradle.api.artifacts.MutableVersionConstraint
 import eu.algites.lib.common.version.AIcVersionBound
 import eu.algites.lib.common.version.AIcVersionRequirement
+import eu.algites.lib.common.version.AIiVersionRequirement
+import eu.algites.lib.common.version.AIsVersionRequirementNormalizer
+import eu.algites.lib.common.version.scheme.algites.v1.AIcAlgitesVersionTextV1
+import eu.algites.lib.common.version.scheme.conversion.algites2gradle.v1.AIcAlgitesToGradleVersionConverterV1
+import eu.algites.lib.common.version.scheme.conversion.algites2pep440.v1.AIcAlgitesToPep440VersionConverterV1
 import eu.algites.lib.common.version.scheme.gradle.AIcGradleVersionRequirementRenderer
-import eu.algites.lib.common.version.scheme.conversion.algites2gradle.v1.AIcAlgitesVersionRequirementToGradleRendererV1
+import eu.algites.lib.common.version.scheme.gradle.AIcGradleVersionScheme
 import eu.algites.lib.common.version.scheme.gradle.AIrGradleVersionConstraint
 import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionRequirementRenderer
-import eu.algites.lib.common.version.scheme.conversion.algites2pep440.v1.AIcAlgitesVersionRequirementToPep440RendererV1
+import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionScheme
 import eu.algites.lib.common.version.scheme.pep440.AInPythonBuildPhase
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Delete
@@ -1178,15 +1183,86 @@ fun AIcAlgitesDependencyUsageToGradleConfiguration(aUsage: String): String = whe
     "product_api" -> "api"
     "product_implementation" -> "implementation"
     "product_compile_only" -> "compileOnly"
+    "product_compile_only_api" -> "compileOnlyApi"
     "product_runtime_only" -> "runtimeOnly"
+    "product_annotation_processor" -> "annotationProcessor"
     "develop_implementation" -> "testImplementation"
     "develop_compile_only" -> "testCompileOnly"
     "develop_runtime_only" -> "testRuntimeOnly"
-    else -> throw GradleException("Unsupported Algites dependency Usage '$aUsage'.")
+    "develop_annotation_processor" -> "testAnnotationProcessor"
+    else -> throw GradleException("Unsupported Modustro Builder dependency Usage '$aUsage'.")
+}
+
+fun AIcAlgitesDependencyUsages(aDefinition: Map<String, Any?>): List<String> {
+    val locUsages = AIcAlgitesStringList(aDefinition["usages"]).distinct()
+    return if (locUsages.isEmpty()) listOf("product_implementation") else locUsages
+}
+
+fun AIcAlgitesRequiredBuildOutputTypes(aDefinition: Map<String, Any?>): List<String> =
+    AIcAlgitesStringList(aDefinition["requiredBuildOutputTypes"]).distinct()
+
+fun AIcValidatePhase2DependencyOutputs(
+    aDefinition: Map<String, Any?>,
+    aTechnologyKind: String,
+    aContext: String
+) {
+    val locOutputs = AIcAlgitesRequiredBuildOutputTypes(aDefinition)
+    if (locOutputs.isEmpty()) return
+    val locDependencyKind = aDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+    if (locDependencyKind != "modustro") {
+        throw GradleException("$aContext may use RequiredBuildOutputTypes only with DependencyKind 'modustro' in the Phase-2 bridge.")
+    }
+    val locSupported = when (aTechnologyKind) {
+        "java" -> setOf("java_classes_jar")
+        "python" -> setOf("python_distribution")
+        else -> emptySet()
+    }
+    val locUnsupported = locOutputs.filterNot(locSupported::contains)
+    if (locUnsupported.isNotEmpty()) {
+        throw GradleException(
+            "$aContext requests BuildOutputType(s) ${locUnsupported.joinToString(", ")} for TechnologyKind '$aTechnologyKind'. " +
+                "Phase 2 resolves only the default dependency output(s) ${locSupported.joinToString(", ")}; concrete alternative output selection is introduced with Phase 3 producers."
+        )
+    }
+}
+
+fun AIcAlgitesPythonEffectiveUsages(aDefinition: Map<String, Any?>, aContext: String): List<String> {
+    val locUsages = AIcAlgitesDependencyUsages(aDefinition)
+    locUsages.forEach { locUsage ->
+        when (locUsage) {
+            "product_implementation" -> logger.warn(
+                "$aContext Usage 'product_implementation' is equivalent to a normal published/runtime dependency in Python; Python has no separate API/implementation package metadata."
+            )
+            "product_compile_only_api" -> logger.warn(
+                "$aContext Usage 'product_compile_only_api' is build/source-processing-only in Python; Python has no exported compile-only API equivalent."
+            )
+            "product_annotation_processor", "develop_annotation_processor" -> logger.warn(
+                "$aContext Usage '$locUsage' is currently a no-op for Python because the Modustro Python annotation-processing hook is not implemented yet."
+            )
+            "develop_compile_only", "develop_runtime_only" -> logger.warn(
+                "$aContext Usage '$locUsage' is mapped to the common Python development environment because Python packaging does not distinguish this Gradle-style development role."
+            )
+        }
+    }
+    return locUsages
+}
+
+fun AIcAlgitesPythonParticipatesInResolution(aUsage: String): Boolean =
+    aUsage !in setOf("product_annotation_processor", "develop_annotation_processor")
+
+data class AIcdAlgitesBridgeVersionRequirement(
+    val exact: String?,
+    val minimum: AIcVersionBound?,
+    val maximum: AIcVersionBound?,
+    val maximumStrict: Boolean?,
+    val excludedVersions: List<String>,
+    val preferred: String?
+) {
+    fun AIcEffectiveMaximumStrict(): Boolean = maximum != null && (maximumStrict == null || maximumStrict)
 }
 
 @Suppress("UNCHECKED_CAST")
-fun AIcAlgitesPortableVersionRequirement(aDefinition: Map<String, Any?>, aContext: String): AIcVersionRequirement? {
+fun AIcAlgitesPortableVersionRequirement(aDefinition: Map<String, Any?>, aContext: String): AIcdAlgitesBridgeVersionRequirement? {
     val locRequirement = aDefinition["versionRequirement"] as? Map<String, Any?> ?: return null
     fun locBoundary(aName: String): AIcVersionBound? {
         val locBoundary = locRequirement[aName] as? Map<String, Any?> ?: return null
@@ -1196,36 +1272,108 @@ fun AIcAlgitesPortableVersionRequirement(aDefinition: Map<String, Any?>, aContex
             ?: throw GradleException("$aContext VersionRequirement.$aName is missing Inclusive.")
         return AIcVersionBound(locVersion, locInclusive)
     }
-    val locExclude = (locRequirement["exclude"] as? List<*>)
-        .orEmpty()
-        .mapNotNull { locValue -> locValue?.toString()?.takeIf { it.isNotBlank() && it != "null" } }
-    return AIcVersionRequirement(
-        locRequirement["exact"]?.toString()?.takeIf { it.isNotBlank() && it != "null" },
-        locBoundary("minimum"),
-        locBoundary("maximum"),
-        locRequirement["maximumStrict"] as? Boolean,
-        locExclude,
-        locRequirement["prefer"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+    return AIcdAlgitesBridgeVersionRequirement(
+        exact = locRequirement["exact"]?.toString()?.takeIf { it.isNotBlank() && it != "null" },
+        minimum = locBoundary("minimum"),
+        maximum = locBoundary("maximum"),
+        maximumStrict = locRequirement["maximumStrict"] as? Boolean,
+        excludedVersions = (locRequirement["exclude"] as? List<*>)
+            .orEmpty()
+            .mapNotNull { locValue -> locValue?.toString()?.takeIf { it.isNotBlank() && it != "null" } },
+        preferred = locRequirement["prefer"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
     )
+}
+
+fun AIcAlgitesNativeVersionText(
+    aVersion: String,
+    aDependencyKind: String,
+    aTechnologyKind: String,
+    aContext: String
+): String {
+    if (aDependencyKind != "modustro") return aVersion
+    return when (aTechnologyKind) {
+        "java" -> {
+            val locResult = AIcAlgitesToGradleVersionConverterV1().convert(AIcAlgitesVersionTextV1.parse(aVersion)).value()
+                ?: throw GradleException("$aContext cannot convert Modustro version '$aVersion' to a Gradle version.")
+            locResult.strictly()?.takeIf { it.isNotBlank() }
+                ?: locResult.require()?.takeIf { it.isNotBlank() }
+                ?: throw GradleException("$aContext Modustro version '$aVersion' did not produce an exact Gradle version.")
+        }
+        "python" -> AIcAlgitesToPep440VersionConverterV1()
+            .convert(AIcAlgitesVersionTextV1.parse(aVersion))
+            .value()
+            ?.text()
+            ?.takeIf { it.isNotBlank() }
+            ?: throw GradleException("$aContext cannot convert Modustro version '$aVersion' to a PEP 440 version.")
+        else -> throw GradleException("$aContext uses unsupported TechnologyKind '$aTechnologyKind' for version comparison.")
+    }
+}
+
+fun AIcAlgitesNativePortableVersionRequirement(
+    aRequirement: AIcdAlgitesBridgeVersionRequirement,
+    aDependencyKind: String,
+    aTechnologyKind: String,
+    aContext: String
+): AIiVersionRequirement {
+    fun locVersion(aVersion: String?): String? = aVersion?.let { locValue ->
+        AIcAlgitesNativeVersionText(locValue, aDependencyKind, aTechnologyKind, aContext)
+    }
+    fun locBound(aBound: AIcVersionBound?): AIcVersionBound? = aBound?.let { locValue ->
+        AIcVersionBound(
+            AIcAlgitesNativeVersionText(locValue.versionText(), aDependencyKind, aTechnologyKind, aContext),
+            locValue.inclusive()
+        )
+    }
+
+    val locNativeRequirement = AIcVersionRequirement(
+        locVersion(aRequirement.exact),
+        locBound(aRequirement.minimum),
+        locBound(aRequirement.maximum),
+        aRequirement.maximumStrict,
+        aRequirement.excludedVersions.mapNotNull(::locVersion),
+        locVersion(aRequirement.preferred)
+    )
+    val locScheme = when (aTechnologyKind) {
+        "java" -> AIcGradleVersionScheme.INSTANCE
+        "python" -> AIcPep440VersionScheme.INSTANCE
+        else -> throw GradleException("$aContext uses unsupported TechnologyKind '$aTechnologyKind' for version normalization.")
+    }
+    val locNormalization = try {
+        AIsVersionRequirementNormalizer.normalize(locNativeRequirement, locScheme)
+    } catch (locException: IllegalArgumentException) {
+        throw GradleException("$aContext has incompatible effective version requirements: ${locException.message}", locException)
+    }
+    locNormalization.informationMessages().forEach { locMessage ->
+        logger.info("$aContext $locMessage")
+    }
+    return locNormalization.requirement()
 }
 
 fun AIcAlgitesGradleVersionConstraint(aDefinition: Map<String, Any?>, aContext: String): AIrGradleVersionConstraint? {
     val locRequirement = AIcAlgitesPortableVersionRequirement(aDefinition, aContext) ?: return null
-    return if (aDefinition["dependencyKind"]?.toString() == "algites") {
-        AIcAlgitesVersionRequirementToGradleRendererV1.render(locRequirement)
-    } else {
-        AIcGradleVersionRequirementRenderer.render(locRequirement)
-    }
+    val locDependencyKind = aDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+        ?: throw GradleException("$aContext is missing DependencyKind.")
+    val locNativeRequirement = AIcAlgitesNativePortableVersionRequirement(
+        locRequirement,
+        locDependencyKind,
+        "java",
+        aContext
+    )
+    return AIcGradleVersionRequirementRenderer.render(locNativeRequirement)
 }
 
 fun AIcAlgitesPythonVersionRequirements(aDefinition: Map<String, Any?>, aContext: String): Map<AInPythonBuildPhase, String> {
     val locRequirement = AIcAlgitesPortableVersionRequirement(aDefinition, aContext)
         ?: return mapOf(AInPythonBuildPhase.STRICT_MAXIMUMS to "")
-    return if (aDefinition["dependencyKind"]?.toString() == "algites") {
-        AIcAlgitesVersionRequirementToPep440RendererV1.render(locRequirement)
-    } else {
-        AIcPep440VersionRequirementRenderer.render(locRequirement)
-    }
+    val locDependencyKind = aDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+        ?: throw GradleException("$aContext is missing DependencyKind.")
+    val locNativeRequirement = AIcAlgitesNativePortableVersionRequirement(
+        locRequirement,
+        locDependencyKind,
+        "python",
+        aContext
+    )
+    return AIcPep440VersionRequirementRenderer.render(locNativeRequirement)
 }
 
 fun AIcAlgitesPythonDependencyPackageName(
@@ -1237,7 +1385,7 @@ fun AIcAlgitesPythonDependencyPackageName(
     val locArtifactId = aDefinition["artifactId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
         ?: throw GradleException("Python dependency for '$aConsumerProjectPath' is missing ArtifactId.")
     if (locDependencyKind == "python") return locArtifactId
-    if (locDependencyKind != "algites") {
+    if (locDependencyKind != "modustro") {
         throw GradleException("DependencyKind '$locDependencyKind' cannot participate in Python dependency resolution for '$aConsumerProjectPath'.")
     }
 
@@ -1245,7 +1393,7 @@ fun AIcAlgitesPythonDependencyPackageName(
     if (locLocalTarget != null) {
         val (locTargetProject, locTargetMetadata) = locLocalTarget
         if ("python" !in AIcAlgitesStringList(locTargetMetadata["technologyKinds"])) {
-            throw GradleException("Algites dependency '$locArtifactId' for '$aConsumerProjectPath' targets '${locTargetProject.path}', which does not provide TechnologyKind 'python'.")
+            throw GradleException("Modustro dependency '$locArtifactId' for '$aConsumerProjectPath' targets '${locTargetProject.path}', which does not provide TechnologyKind 'python'.")
         }
         val locTargetGroupId = locTargetMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
             ?: algitesResolvedRepositoryMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
@@ -1255,7 +1403,7 @@ fun AIcAlgitesPythonDependencyPackageName(
     }
 
     val locGroupId = aDefinition["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-        ?: throw GradleException("External Algites Python dependency '$locArtifactId' for '$aConsumerProjectPath' requires GroupId.")
+        ?: throw GradleException("External Modustro Python dependency '$locArtifactId' for '$aConsumerProjectPath' requires GroupId.")
     val locVariantId = aDefinition["variantId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
     return AIcAlgitesPythonDistributionName(locGroupId, AIcAlgitesEffectiveArtifactId(locArtifactId, locVariantId))
 }
@@ -1288,9 +1436,9 @@ fun AIcAlgitesLocalDependencyTarget(
     aConsumerProjectPath: String
 ): Pair<Project, Map<String, Any?>>? {
     val locDependencyKind = aDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-    if (locDependencyKind != "algites") return null
+    if (locDependencyKind != "modustro") return null
     val locArtifactId = aDefinition["artifactId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-        ?: throw GradleException("Algites dependency for '$aConsumerProjectPath' is missing ArtifactId.")
+        ?: throw GradleException("Modustro dependency for '$aConsumerProjectPath' is missing ArtifactId.")
     val locGroupId = aDefinition["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
     val locVariantId = aDefinition["variantId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
     val locMatches = algitesResolvedArtifactDirectoriesByGradleProjectPath.entries.mapNotNull { (locProjectPath, locMetadata) ->
@@ -1306,7 +1454,7 @@ fun AIcAlgitesLocalDependencyTarget(
         } else null
     }
     if (locMatches.size > 1) {
-        throw GradleException("Algites dependency '$locArtifactId' for '$aConsumerProjectPath' matches multiple local artifacts.")
+        throw GradleException("Modustro dependency '$locArtifactId' for '$aConsumerProjectPath' matches multiple local artifacts.")
     }
     return locMatches.singleOrNull()
 }
@@ -1316,14 +1464,29 @@ fun AIcValidateLocalAlgitesDependencyVersion(
     aTargetProject: Project,
     aContext: String
 ) {
-    val locConstraint = AIcAlgitesGradleVersionConstraint(aDefinition, aContext) ?: return
-    val locRequire = locConstraint.require()?.takeIf { it.isNotBlank() }
-    val locStrictly = locConstraint.strictly()?.takeIf { it.isNotBlank() }
-    val locExpected = locStrictly ?: locRequire ?: return
-    val locRange = locExpected.contains(',') && locExpected.firstOrNull() in setOf('[', '(', ']')
-    if (!locRange && aTargetProject.version.toString() != locExpected) {
+    val locRequirement = AIcAlgitesPortableVersionRequirement(aDefinition, aContext) ?: return
+    val locDependencyKind = aDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+        ?: throw GradleException("$aContext is missing DependencyKind.")
+    val locNativeRequirement = AIcAlgitesNativePortableVersionRequirement(
+        locRequirement,
+        locDependencyKind,
+        "java",
+        aContext
+    )
+    val locCandidateRequirement = AIcVersionRequirement(
+        aTargetProject.version.toString(),
+        locNativeRequirement.minimum(),
+        locNativeRequirement.maximum(),
+        locNativeRequirement.maximumStrict(),
+        locNativeRequirement.excludedVersionTexts(),
+        locNativeRequirement.preferredVersionText()
+    )
+    try {
+        AIsVersionRequirementNormalizer.normalize(locCandidateRequirement, AIcGradleVersionScheme.INSTANCE)
+    } catch (locException: IllegalArgumentException) {
         throw GradleException(
-            "$aContext requires local project '${aTargetProject.path}' version '$locExpected', but the resolved local project version is '${aTargetProject.version}'."
+            "$aContext does not accept local project '${aTargetProject.path}' version '${aTargetProject.version}': ${locException.message}",
+            locException
         )
     }
 }
@@ -1362,12 +1525,17 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
         aDefinitions.forEachIndexed { locIndex, locDefinition ->
             val locDependencyKind = locDefinition["dependencyKind"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
                 ?: throw GradleException("Project '${aProject.path}' dependency entry #$locIndex is missing DependencyKind.")
-            if (locDependencyKind !in setOf("algites", "java")) return@forEachIndexed
+            if (locDependencyKind !in setOf("modustro", "java")) return@forEachIndexed
+            val locArtifactId = locDefinition["artifactId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: "<unknown>"
+            val locContext = "Project '${aProject.path}' ${if (aConstraintOnly) "DependencyConstraints" else "Dependencies"}[$locIndex] '$locArtifactId'"
+            if (!aConstraintOnly) AIcValidatePhase2DependencyOutputs(locDefinition, "java", locContext)
 
-            val locUsage = locDefinition["usage"]?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: "product_implementation"
-            val locConfiguration = AIcAlgitesDependencyUsageToGradleConfiguration(locUsage)
-            locRequiredConfigurations.putIfAbsent(locConfiguration, locUsage)
-            locEntriesByConfiguration.getOrPut(locConfiguration) { mutableListOf() }.add(locDefinition to aConstraintOnly)
+            val locUsages = AIcAlgitesDependencyUsages(locDefinition)
+            locUsages.forEach { locUsage ->
+                val locConfiguration = AIcAlgitesDependencyUsageToGradleConfiguration(locUsage)
+                locRequiredConfigurations.putIfAbsent(locConfiguration, locUsage)
+                locEntriesByConfiguration.getOrPut(locConfiguration) { mutableListOf() }.add(locDefinition to aConstraintOnly)
+            }
         }
     }
 
@@ -1408,7 +1576,7 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
                             "$locContext does not resolve to a local Algites artifact and therefore requires GroupId for external resolution."
                         )
                     val locVariantId = locDefinition["variantId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-                    val locEffectiveArtifactId = if (locDependencyKind == "algites" && locVariantId != null) "$locArtifactId-$locVariantId" else locArtifactId
+                    val locEffectiveArtifactId = if (locDependencyKind == "modustro" && locVariantId != null) "$locArtifactId-$locVariantId" else locArtifactId
                     val locNotation = "$locGroupId:$locEffectiveArtifactId"
                     if (locConstraintOnly) {
                         aProject.dependencies.constraints.add(
@@ -2079,20 +2247,33 @@ subprojects {
 
         fun locPythonDefinitions(aPropertyName: String): List<Map<String, Any?>> =
             AIcAlgitesDependencyDefinitions(locAlgitesArtifactDirectory, aPropertyName)
-                .filter { locDefinition -> locDefinition["dependencyKind"]?.toString() in setOf("algites", "python") }
+                .filter { locDefinition -> locDefinition["dependencyKind"]?.toString() in setOf("modustro", "python") }
 
         val locPythonDependencyDefinitions = locPythonDefinitions("dependencies")
         val locPythonConstraintDefinitions = locPythonDefinitions("dependencyConstraints")
-        val locPythonResolutionDependencies = locPythonDependencyDefinitions.mapIndexed { locIndex, locDefinition ->
-            AIcAlgitesPythonResolutionEntry(locDefinition, project.path, "Project '${project.path}' Dependencies[$locIndex]")
+        locPythonDependencyDefinitions.forEachIndexed { locIndex, locDefinition ->
+            val locContext = "Project '${project.path}' Dependencies[$locIndex]"
+            AIcValidatePhase2DependencyOutputs(locDefinition, "python", locContext)
+            AIcAlgitesPythonEffectiveUsages(locDefinition, locContext)
         }
-        val locPythonResolutionConstraints = locPythonConstraintDefinitions.mapIndexed { locIndex, locDefinition ->
-            AIcAlgitesPythonResolutionEntry(locDefinition, project.path, "Project '${project.path}' DependencyConstraints[$locIndex]")
+        locPythonConstraintDefinitions.forEachIndexed { locIndex, locDefinition ->
+            AIcAlgitesPythonEffectiveUsages(locDefinition, "Project '${project.path}' DependencyConstraints[$locIndex]")
         }
+        val locPythonResolutionDependencies = locPythonDependencyDefinitions
+            .filter { locDefinition -> AIcAlgitesDependencyUsages(locDefinition).any(::AIcAlgitesPythonParticipatesInResolution) }
+            .mapIndexed { locIndex, locDefinition ->
+                AIcAlgitesPythonResolutionEntry(locDefinition, project.path, "Project '${project.path}' Dependencies[$locIndex]")
+            }
+        val locPythonResolutionConstraints = locPythonConstraintDefinitions
+            .filter { locDefinition -> AIcAlgitesDependencyUsages(locDefinition).any(::AIcAlgitesPythonParticipatesInResolution) }
+            .mapIndexed { locIndex, locDefinition ->
+                AIcAlgitesPythonResolutionEntry(locDefinition, project.path, "Project '${project.path}' DependencyConstraints[$locIndex]")
+            }
         val locPythonPublishedDependencies = locPythonDependencyDefinitions
             .filter { locDefinition ->
-                val locUsage = locDefinition["usage"]?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: "product_implementation"
-                locUsage.startsWith("product_")
+                AIcAlgitesDependencyUsages(locDefinition).any { locUsage ->
+                    locUsage in setOf("product_api", "product_implementation", "product_runtime_only")
+                }
             }
             .mapIndexed { locIndex, locDefinition ->
                 val locPackageName = AIcAlgitesPythonDependencyPackageName(locDefinition, project.path)
@@ -2106,7 +2287,10 @@ subprojects {
         val locEnvironmentRequirements = locAlgitesArtifactDirectory?.get("environmentRequirements") as? Map<String, Map<String, Any?>>
         val locPythonEnvironmentRequirementDefinition = locEnvironmentRequirements?.get("python")
         val locPythonRequiresPython = locPythonEnvironmentRequirementDefinition?.let { locRequirement ->
-            val locDefinition = mapOf<String, Any?>("versionRequirement" to locRequirement)
+            val locDefinition = mapOf<String, Any?>(
+                "dependencyKind" to "python",
+                "versionRequirement" to locRequirement
+            )
             AIcAlgitesPythonVersionRequirements(locDefinition, "Project '${project.path}' EnvironmentRequirements.Python")[AInPythonBuildPhase.STRICT_MAXIMUMS]
                 ?.takeIf { it.isNotBlank() }
         }

@@ -2,7 +2,7 @@
 
 GitHub Actions provider adapter for the universal Algites credential document.
 
-The persistent/provider-independent credential document is supplied through `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`. Its structure is defined by `algites-credentials_1.schema.json`. The GitHub bridge does not invent credential profile names, types, or fields. A Gradle preflight first resolves the enabled repository endpoints for the current operation and writes the required profile/type pairs. The bridge then keeps only those pairs and materializes every retained field to `direct_value`.
+The persistent/provider-independent credential document is supplied through `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS`. Its structure is defined by `algites-credentials_1.yamldef.schema.json`. The GitHub bridge does not invent credential profile names, types, or fields. A Gradle preflight first resolves the enabled repository endpoints for the current operation and writes the required profile/type pairs. The bridge then keeps only those pairs and materializes every retained field to `direct_value`.
 
 Supported value sources are:
 
