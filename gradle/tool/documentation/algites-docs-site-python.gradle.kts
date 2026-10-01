@@ -16,6 +16,24 @@ import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemandKey
 import org.gradle.api.Action
 import org.gradle.api.Task
 
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            name = "algites_public_snapshots_bootstrap"
+            url = uri("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/")
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
+    }
+    dependencies {
+        classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:1.0-SNAPSHOT")
+        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
+        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
+    }
+}
+
 val locAlgitesDocsBaseScript = (findProperty("algites.docs.baseScript") as String?)
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/algites-docs-site-base.gradle.kts"
 
@@ -404,15 +422,17 @@ locPythonDocsEntries.forEach { locEntry ->
     if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
         locGradleProject?.tasks
             ?.matching { locTask -> locTask.name == "processAlgitesPythonNativeSources" }
-            ?.configureEach { locTask ->
-                locGeneratePythonDocsSite.configure { dependsOn(locTask) }
+            ?.configureEach {
+                val locNativeSourceProcessingTask = this
+                locGeneratePythonDocsSite.configure { dependsOn(locNativeSourceProcessingTask) }
             }
     }
     if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
         locGradleProject?.tasks
             ?.matching { locTask -> locTask.name == "resolvePythonDependencies" }
-            ?.configureEach { locTask ->
-                locGeneratePythonDocsSite.configure { dependsOn(locTask) }
+            ?.configureEach {
+                val locDependencyResolutionTask = this
+                locGeneratePythonDocsSite.configure { dependsOn(locDependencyResolutionTask) }
             }
     }
 }

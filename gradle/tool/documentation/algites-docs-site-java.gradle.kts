@@ -18,6 +18,24 @@ import org.gradle.api.Task
 import org.gradle.api.tasks.javadoc.Javadoc
 import org.gradle.external.javadoc.StandardJavadocDocletOptions
 
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            name = "algites_public_snapshots_bootstrap"
+            url = uri("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/")
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
+    }
+    dependencies {
+        classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:1.0-SNAPSHOT")
+        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
+        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
+    }
+}
+
 data class AIcdJavaDocsSiteEntry(
     val locModulePath: String,
     val locJavadocOutputDirectory: File,
@@ -216,13 +234,15 @@ subprojects.forEach { locSubproject ->
         .toSet()
 
     if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
-        locSubproject.tasks.matching { locTask -> locTask.name == "processAlgitesJavaNativeSources" }.configureEach { locTask ->
-            locGenerateJavaDocsSite.configure { dependsOn(locTask) }
+        locSubproject.tasks.matching { locTask -> locTask.name == "processAlgitesJavaNativeSources" }.configureEach {
+            val locNativeSourceProcessingTask = this
+            locGenerateJavaDocsSite.configure { dependsOn(locNativeSourceProcessingTask) }
         }
     }
     if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
-        locSubproject.tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach { locTask ->
-            locGenerateJavaDocsSite.configure { dependsOn(locTask) }
+        locSubproject.tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach {
+            val locDependencyResolutionTask = this
+            locGenerateJavaDocsSite.configure { dependsOn(locDependencyResolutionTask) }
         }
     }
 
