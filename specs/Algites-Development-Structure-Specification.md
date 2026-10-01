@@ -46,7 +46,7 @@ The goals are:
 - **Artifact** – a logical, modeled buildable unit. One artifact MAY support multiple build technologies and MAY produce multiple technology-specific outputs.
 - **ArtifactCoordinateId** – the stable Algites identity of a logical artifact. It is independent of ecosystem-specific publication coordinates such as Maven GAV or a Python distribution name.
 - **StructureKind** – the structural role of a resolved metadata node: `repository`, `artifact_set`, or `artifact`. It describes where the node belongs in the source-repository structure and is independent of build technology.
-- **TechnologyKind** – a supported build/publication technology (for example `java`, `python`, or `mps`). Technology kinds are registry-/enum-like, deliberately few, and not arbitrary free-form strings. The name describes the technology/build nature of the artifact and is distinct from artifact roles such as Core, Aggregator, Policy, or BOM.
+- **TechnologyKind** – a supported build/publication technology or build-domain technology (for example `java`, `python`, `mps`, or `modustro`). Technology kinds are registry-/enum-like, deliberately few, and not arbitrary free-form strings. The name describes the technology/build nature of the artifact and is distinct from artifact roles such as Core, Aggregator, Policy, or BOM.
 - **SourceType** – a semantic type of source directory below `src/product` or `src/develop` (for example `java`, `python`, `xmldefs`, `yamldefs`, `config`, or `resources`). Source types are a broader classification than technology kinds and do not automatically select a build/publication technology.
 
 #### 2.2.1 Structured-data wire naming convention
@@ -58,7 +58,7 @@ Algites-controlled structured-data formats MUST use one common wire naming conve
 - environment variables and system-level constant identifiers use **UPPER_SNAKE_CASE**, for example `ALGITES_TECHNOLOGY_KINDS`;
 - controlled file and directory names use **lower-kebab-case** unless another established external syntax requires otherwise, for example `license-usage.yml` and `algites-artifact-manifest.yml`;
 - keywords owned by an external schema/meta-language keep that language's spelling, for example JSON Schema `allOf`, `oneOf`, `additionalProperties`, and XML Schema `complexType`/`minOccurs`;
-- map keys that represent dynamic identifiers or symbolic dimensions are values rather than field names and therefore keep their identifier/value convention. Examples are credential profile IDs and repository-matrix keys such as `java`, `public`, `release`, and `download`.
+- map keys that represent dynamic identifiers or symbolic dimensions are values rather than field names and therefore keep their identifier/value convention. Examples are credential profile IDs and ResourceEndpoint matrix dimension keys such as `java`, `modustro`, `native_build_output`, `docs_site`, `public`, `release`, and `download`.
 
 The convention applies to the serialized wire representation. Language bindings SHOULD use the idiomatic naming of their target language; for example wire `ArtifactId` maps naturally to Java/Kotlin `artifactId` and Python `artifact_id`. Acronyms in UpperCamelCase field names are treated as words (`ArtifactId`, `GroupId`, `Url`, `ApiKey`, `Sha256`) so conversion is deterministic.
 

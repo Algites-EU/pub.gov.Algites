@@ -191,6 +191,7 @@ Version:
 | `SourceRepository.Repositories` | no | Legacy native-build-output repository matrix accepted during migration and normalized to `ResourceEndpoints`. |
 
 Wire names in all examples below follow the Algites structured-data naming convention from the Development Structure Specification: Algites fields use `UpperCamelCase` and symbolic values use `lower_snake_case`.
+ResourceEndpoint matrix dimensions are symbolic values used as map keys, so TechnologyKind, ResourceKind, visibility, stability, and action keys such as `modustro`, `native_build_output`, `docs_site`, `public`, `snapshot`, and `upload` intentionally retain their symbolic `lower_snake_case` spelling.
 
 The repository descriptor may also contain these top-level inheritable properties:
 

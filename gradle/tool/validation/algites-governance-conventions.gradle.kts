@@ -66,13 +66,31 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
          */
         val locUpperCamelPattern = Regex("^[A-Z][A-Za-z0-9]*$")
         val locLowerSnakePattern = Regex("^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
-        val locSymbolicPropertyNames = setOf(
-            "basic", "bearer", "api_key", "certificate",
-            "java", "python", "mps",
-            "public", "private",
-            "release", "snapshot",
+        val locCredentialTypeSymbolicPropertyNames = setOf(
+            "basic", "bearer", "api_key", "certificate"
+        )
+        val locTechnologyKindSymbolicPropertyNames = setOf(
+            "java", "python", "mps", "modustro"
+        )
+        val locResourceKindSymbolicPropertyNames = setOf(
+            "native_build_output", "docs_site", "schema_site"
+        )
+        val locVisibilitySymbolicPropertyNames = setOf(
+            "public", "private"
+        )
+        val locStabilitySymbolicPropertyNames = setOf(
+            "release", "snapshot"
+        )
+        val locResourceEndpointActionSymbolicPropertyNames = setOf(
             "download", "upload", "manage"
         )
+        val locSymbolicPropertyNames =
+            locCredentialTypeSymbolicPropertyNames +
+                locTechnologyKindSymbolicPropertyNames +
+                locResourceKindSymbolicPropertyNames +
+                locVisibilitySymbolicPropertyNames +
+                locStabilitySymbolicPropertyNames +
+                locResourceEndpointActionSymbolicPropertyNames
 
         /*
          * Representation-specific JSON Schema filenames.
