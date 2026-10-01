@@ -108,7 +108,9 @@ loadScripts(document, 'script');</script>
  boolean&nbsp;aCanBeUsedInDependency,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aDependencyOutputAlternatives,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aConfigurationSchemaId)</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates an <code>AIcBuildOutputTypeDefinition</code> instance.</div>
+</div>
 </div>
 </section>
 </li>
@@ -125,19 +127,29 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#buildOutputType()" class="member-name-link">buildOutputType</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the BuildOutputType identifier.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>boolean</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#canBeProduced()" class="member-name-link">canBeProduced</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns whether this BuildOutputType can be produced directly.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>boolean</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#canBeUsedInDependency()" class="member-name-link">canBeUsedInDependency</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns whether this BuildOutputType may be requested by a dependency.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#configurationSchemaId()" class="member-name-link">configurationSchemaId</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the optional configuration-schema identifier.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a><wbr>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#dependencyOutputAlternatives()" class="member-name-link">dependencyOutputAlternatives</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns concrete outputs that can satisfy this virtual dependency output.</div>
+</div>
 </div>
 </div>
 </div>
@@ -163,6 +175,15 @@ loadScripts(document, 'script');</script>
  boolean&nbsp;aCanBeUsedInDependency,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aDependencyOutputAlternatives,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aConfigurationSchemaId)</span></div>
+<div class="block">Creates an <code>AIcBuildOutputTypeDefinition</code> instance.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aBuildOutputType</code> - BuildOutputType identifier</dd>
+<dd><code>aCanBeProduced</code> - whether this output type can be directly produced</dd>
+<dd><code>aCanBeUsedInDependency</code> - whether this output type can be requested by dependencies</dd>
+<dd><code>aDependencyOutputAlternatives</code> - concrete alternatives satisfying a virtual dependency output</dd>
+<dd><code>aConfigurationSchemaId</code> - optional identifier of the capability configuration schema</dd>
+</dl>
 </section>
 </li>
 </ul>
@@ -177,30 +198,55 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="buildOutputType()">
 <h3>buildOutputType</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">buildOutputType</span>()</div>
+<div class="block">Returns the BuildOutputType identifier.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>BuildOutputType identifier</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="canBeProduced()">
 <h3>canBeProduced</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">boolean</span>&nbsp;<span class="element-name">canBeProduced</span>()</div>
+<div class="block">Returns whether this BuildOutputType can be produced directly.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>whether the output is directly producible</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="canBeUsedInDependency()">
 <h3>canBeUsedInDependency</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">boolean</span>&nbsp;<span class="element-name">canBeUsedInDependency</span>()</div>
+<div class="block">Returns whether this BuildOutputType may be requested by a dependency.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>whether the output may be used in dependencies</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="dependencyOutputAlternatives()">
 <h3>dependencyOutputAlternatives</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</span>&nbsp;<span class="element-name">dependencyOutputAlternatives</span>()</div>
+<div class="block">Returns concrete outputs that can satisfy this virtual dependency output.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>immutable set of alternative BuildOutputTypes</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="configurationSchemaId()">
 <h3>configurationSchemaId</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">configurationSchemaId</span>()</div>
+<div class="block">Returns the optional configuration-schema identifier.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>configuration-schema identifier, or <code>null</code> when no schema is defined</dd>
+</dl>
 </section>
 </li>
 </ul>

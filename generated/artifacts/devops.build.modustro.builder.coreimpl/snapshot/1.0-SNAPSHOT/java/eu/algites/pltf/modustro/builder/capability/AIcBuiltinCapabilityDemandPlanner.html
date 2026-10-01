@@ -109,7 +109,9 @@ implements eu.algites.pltf.modustro.builder.model.capability.AIiCapabilityDemand
 <div class="table-header col-first">Constructor</div>
 <div class="table-header col-last">Description</div>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E()" class="member-name-link">AIcBuiltinCapabilityDemandPlanner</a>()</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates the built-in capability demand planner.</div>
+</div>
 </div>
 </section>
 </li>
@@ -128,7 +130,9 @@ implements eu.algites.pltf.modustro.builder.model.capability.AIiCapabilityDemand
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#createDemandGraph(java.lang.String,java.util.Collection,java.util.Collection)" class="member-name-link">createDemandGraph</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aArtifactScopeIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;eu.algites.pltf.modustro.builder.model.output.AIcBuildOutputProductionPlan&gt;&nbsp;aBuildOutputPlans,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemand&gt;&nbsp;aAdditionalDemands)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Creates a deduplicated capability demand graph and expands built-in prerequisites.</div>
+</div>
 </div>
 </div>
 </div>
@@ -150,6 +154,7 @@ implements eu.algites.pltf.modustro.builder.model.capability.AIiCapabilityDemand
 <section class="detail" id="&lt;init&gt;()">
 <h3>AIcBuiltinCapabilityDemandPlanner</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcBuiltinCapabilityDemandPlanner</span>()</div>
+<div class="block">Creates the built-in capability demand planner.</div>
 </section>
 </li>
 </ul>
@@ -166,9 +171,18 @@ implements eu.algites.pltf.modustro.builder.model.capability.AIiCapabilityDemand
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemandGraph</span>&nbsp;<span class="element-name">createDemandGraph</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aArtifactScopeIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;eu.algites.pltf.modustro.builder.model.output.AIcBuildOutputProductionPlan&gt;&nbsp;aBuildOutputPlans,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemand&gt;&nbsp;aAdditionalDemands)</span></div>
+<div class="block">Creates a deduplicated capability demand graph and expands built-in prerequisites.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code>createDemandGraph</code>&nbsp;in interface&nbsp;<code>eu.algites.pltf.modustro.builder.model.capability.AIiCapabilityDemandPlanner</code></dd>
+<dt>Parameters:</dt>
+<dd><code>aArtifactScopeIdentity</code> - stable identity of the artifact scope</dd>
+<dd><code>aBuildOutputPlans</code> - build-output production plans</dd>
+<dd><code>aAdditionalDemands</code> - additional explicit capability demands</dd>
+<dt>Returns:</dt>
+<dd>validated capability demand graph</dd>
+<dt>Throws:</dt>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/IllegalArgumentException.html" title="class or interface in java.lang" class="external-link">IllegalArgumentException</a></code> - if a demand is invalid or the resulting graph is inconsistent</dd>
 </dl>
 </section>
 </li>

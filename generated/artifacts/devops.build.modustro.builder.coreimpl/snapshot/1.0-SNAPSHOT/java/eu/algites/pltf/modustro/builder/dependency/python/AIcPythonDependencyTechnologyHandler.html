@@ -112,16 +112,24 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color"><code><a href="#BUILD_SOURCE_PROCESSING" class="member-name-link">BUILD_SOURCE_PROCESSING</a></code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Native Python role for dependencies required only while preparing/building sources.</div>
+</div>
 <div class="col-first odd-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#DEVELOPMENT" class="member-name-link">DEVELOPMENT</a></code></div>
-<div class="col-last odd-row-color">&nbsp;</div>
+<div class="col-last odd-row-color">
+<div class="block">Native Python role for development-only dependencies.</div>
+</div>
 <div class="col-first even-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color"><code><a href="#NO_OP" class="member-name-link">NO_OP</a></code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Marker for a portable usage that intentionally has no native Python dependency action.</div>
+</div>
 <div class="col-first odd-row-color"><code>static final <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color"><code><a href="#PACKAGE_RUNTIME" class="member-name-link">PACKAGE_RUNTIME</a></code></div>
-<div class="col-last odd-row-color">&nbsp;</div>
+<div class="col-last odd-row-color">
+<div class="block">Native Python role for published/runtime package dependencies.</div>
+</div>
 </div>
 </section>
 </li>
@@ -134,7 +142,9 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-first">Constructor</div>
 <div class="table-header col-last">Description</div>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E(java.lang.String)" class="member-name-link">AIcPythonDependencyTechnologyHandler</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aDependencyKind)</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates an <code>AIcPythonDependencyTechnologyHandler</code> instance.</div>
+</div>
 </div>
 </section>
 </li>
@@ -151,16 +161,22 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#dependencyKind()" class="member-name-link">dependencyKind</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the DependencyKind identifier handled by this object.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>protected void</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#mapUsage(eu.algites.pltf.modustro.builder.model.dependency.AIcDependencyIdentity,eu.algites.pltf.modustro.builder.model.dependency.AInDependencyUsage,java.util.Map,java.util.List)" class="member-name-link">mapUsage</a><wbr>(eu.algites.pltf.modustro.builder.model.dependency.AIcDependencyIdentity&nbsp;aIdentity,
  eu.algites.pltf.modustro.builder.model.dependency.AInDependencyUsage&nbsp;aUsage,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a>&lt;eu.algites.pltf.modustro.builder.model.dependency.AInDependencyUsage,<wbr><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aMappings,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;eu.algites.pltf.modustro.builder.model.dependency.resolution.AIcDependencyResolutionDiagnostic&gt;&nbsp;aDiagnostics)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Maps one portable dependency usage to a technology-native usage identifier.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#technologyKind()" class="member-name-link">technologyKind</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the TechnologyKind identifier.</div>
+</div>
 </div>
 </div>
 </div>
@@ -185,6 +201,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="PACKAGE_RUNTIME">
 <h3>PACKAGE_RUNTIME</h3>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">PACKAGE_RUNTIME</span></div>
+<div class="block">Native Python role for published/runtime package dependencies.</div>
 <dl class="notes">
 <dt>See Also:</dt>
 <dd>
@@ -199,6 +216,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="BUILD_SOURCE_PROCESSING">
 <h3>BUILD_SOURCE_PROCESSING</h3>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">BUILD_SOURCE_PROCESSING</span></div>
+<div class="block">Native Python role for dependencies required only while preparing/building sources.</div>
 <dl class="notes">
 <dt>See Also:</dt>
 <dd>
@@ -213,6 +231,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="DEVELOPMENT">
 <h3>DEVELOPMENT</h3>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">DEVELOPMENT</span></div>
+<div class="block">Native Python role for development-only dependencies.</div>
 <dl class="notes">
 <dt>See Also:</dt>
 <dd>
@@ -227,6 +246,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="NO_OP">
 <h3>NO_OP</h3>
 <div class="member-signature"><span class="modifiers">public static final</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">NO_OP</span></div>
+<div class="block">Marker for a portable usage that intentionally has no native Python dependency action.</div>
 <dl class="notes">
 <dt>See Also:</dt>
 <dd>
@@ -249,6 +269,11 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="&lt;init&gt;(java.lang.String)">
 <h3>AIcPythonDependencyTechnologyHandler</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcPythonDependencyTechnologyHandler</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aDependencyKind)</span></div>
+<div class="block">Creates an <code>AIcPythonDependencyTechnologyHandler</code> instance.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aDependencyKind</code> - DependencyKind identifier</dd>
+</dl>
 </section>
 </li>
 </ul>
@@ -263,12 +288,22 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="dependencyKind()">
 <h3>dependencyKind</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">dependencyKind</span>()</div>
+<div class="block">Returns the DependencyKind identifier handled by this object.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>DependencyKind identifier</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="technologyKind()">
 <h3>technologyKind</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">technologyKind</span>()</div>
+<div class="block">Returns the TechnologyKind identifier.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>TechnologyKind identifier</dd>
+</dl>
 </section>
 </li>
 <li>
@@ -278,9 +313,15 @@ loadScripts(document, 'script');</script>
  eu.algites.pltf.modustro.builder.model.dependency.AInDependencyUsage&nbsp;aUsage,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Map.html" title="class or interface in java.util" class="external-link">Map</a>&lt;eu.algites.pltf.modustro.builder.model.dependency.AInDependencyUsage,<wbr><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aMappings,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;eu.algites.pltf.modustro.builder.model.dependency.resolution.AIcDependencyResolutionDiagnostic&gt;&nbsp;aDiagnostics)</span></div>
+<div class="block">Maps one portable dependency usage to a technology-native usage identifier.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code><a href="../AIcDependencyTechnologyHandlerSupport.html#mapUsage(eu.algites.pltf.modustro.builder.model.dependency.AIcDependencyIdentity,eu.algites.pltf.modustro.builder.model.dependency.AInDependencyUsage,java.util.Map,java.util.List)">mapUsage</a></code>&nbsp;in class&nbsp;<code><a href="../AIcDependencyTechnologyHandlerSupport.html" title="class in eu.algites.pltf.modustro.builder.dependency">AIcDependencyTechnologyHandlerSupport</a></code></dd>
+<dt>Parameters:</dt>
+<dd><code>aIdentity</code> - dependency or item identity</dd>
+<dd><code>aUsage</code> - portable dependency usage</dd>
+<dd><code>aMappings</code> - technology-native usage mappings</dd>
+<dd><code>aDiagnostics</code> - resolution diagnostics</dd>
 </dl>
 </section>
 </li>

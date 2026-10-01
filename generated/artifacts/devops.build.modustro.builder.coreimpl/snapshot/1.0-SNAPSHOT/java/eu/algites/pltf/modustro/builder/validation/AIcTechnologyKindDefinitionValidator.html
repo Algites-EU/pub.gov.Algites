@@ -109,7 +109,9 @@ implements eu.algites.pltf.modustro.builder.model.technology.AIiTechnologyKindDe
 <div class="table-header col-first">Constructor</div>
 <div class="table-header col-last">Description</div>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E()" class="member-name-link">AIcTechnologyKindDefinitionValidator</a>()</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates the built-in TechnologyKind definition validator.</div>
+</div>
 </div>
 </section>
 </li>
@@ -126,7 +128,9 @@ implements eu.algites.pltf.modustro.builder.model.technology.AIiTechnologyKindDe
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>void</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#validate(eu.algites.pltf.modustro.builder.model.technology.AIcTechnologyKindDefinition)" class="member-name-link">validate</a><wbr>(eu.algites.pltf.modustro.builder.model.technology.AIcTechnologyKindDefinition&nbsp;aDefinition)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Validates cross-reference and invariant rules of a TechnologyKind definition.</div>
+</div>
 </div>
 </div>
 </div>
@@ -148,6 +152,7 @@ implements eu.algites.pltf.modustro.builder.model.technology.AIiTechnologyKindDe
 <section class="detail" id="&lt;init&gt;()">
 <h3>AIcTechnologyKindDefinitionValidator</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcTechnologyKindDefinitionValidator</span>()</div>
+<div class="block">Creates the built-in TechnologyKind definition validator.</div>
 </section>
 </li>
 </ul>
@@ -162,9 +167,14 @@ implements eu.algites.pltf.modustro.builder.model.technology.AIiTechnologyKindDe
 <section class="detail" id="validate(eu.algites.pltf.modustro.builder.model.technology.AIcTechnologyKindDefinition)">
 <h3>validate</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">void</span>&nbsp;<span class="element-name">validate</span><wbr><span class="parameters">(eu.algites.pltf.modustro.builder.model.technology.AIcTechnologyKindDefinition&nbsp;aDefinition)</span></div>
+<div class="block">Validates cross-reference and invariant rules of a TechnologyKind definition.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code>validate</code>&nbsp;in interface&nbsp;<code>eu.algites.pltf.modustro.builder.model.technology.AIiTechnologyKindDefinitionValidator</code></dd>
+<dt>Parameters:</dt>
+<dd><code>aDefinition</code> - TechnologyKind definition</dd>
+<dt>Throws:</dt>
+<dd><code>eu.algites.pltf.modustro.builder.model.AIxModelValidationException</code> - if the definition violates a model invariant</dd>
 </dl>
 </section>
 </li>

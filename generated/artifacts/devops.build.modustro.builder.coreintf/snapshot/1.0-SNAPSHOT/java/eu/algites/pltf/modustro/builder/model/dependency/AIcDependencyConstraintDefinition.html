@@ -106,7 +106,9 @@ loadScripts(document, 'script');</script>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E(eu.algites.pltf.modustro.builder.model.dependency.AIcDependencyIdentity,java.util.Set,eu.algites.pltf.modustro.builder.model.dependency.AIcVersionRequirement)" class="member-name-link">AIcDependencyConstraintDefinition</a><wbr>(<a href="AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a>&nbsp;aIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInDependencyUsage.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency">AInDependencyUsage</a>&gt;&nbsp;aUsages,
  <a href="AIcVersionRequirement.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcVersionRequirement</a>&nbsp;aVersionRequirement)</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates an <code>AIcDependencyConstraintDefinition</code> instance.</div>
+</div>
 </div>
 </section>
 </li>
@@ -123,13 +125,19 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#identity()" class="member-name-link">identity</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the dependency identity.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a><wbr>&lt;<a href="AInDependencyUsage.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency">AInDependencyUsage</a>&gt;</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#usages()" class="member-name-link">usages</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the portable dependency usages.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="AIcVersionRequirement.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcVersionRequirement</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#versionRequirement()" class="member-name-link">versionRequirement</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the effective version requirement.</div>
+</div>
 </div>
 </div>
 </div>
@@ -153,6 +161,13 @@ loadScripts(document, 'script');</script>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcDependencyConstraintDefinition</span><wbr><span class="parameters">(<a href="AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a>&nbsp;aIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInDependencyUsage.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency">AInDependencyUsage</a>&gt;&nbsp;aUsages,
  <a href="AIcVersionRequirement.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcVersionRequirement</a>&nbsp;aVersionRequirement)</span></div>
+<div class="block">Creates an <code>AIcDependencyConstraintDefinition</code> instance.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aIdentity</code> - dependency or item identity</dd>
+<dd><code>aUsages</code> - portable dependency usages</dd>
+<dd><code>aVersionRequirement</code> - version requirement</dd>
+</dl>
 </section>
 </li>
 </ul>
@@ -167,18 +182,33 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="identity()">
 <h3>identity</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a></span>&nbsp;<span class="element-name">identity</span>()</div>
+<div class="block">Returns the dependency identity.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>dependency identity</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="usages()">
 <h3>usages</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="AInDependencyUsage.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency">AInDependencyUsage</a>&gt;</span>&nbsp;<span class="element-name">usages</span>()</div>
+<div class="block">Returns the portable dependency usages.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>immutable dependency-usage set</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="versionRequirement()">
 <h3>versionRequirement</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="AIcVersionRequirement.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcVersionRequirement</a></span>&nbsp;<span class="element-name">versionRequirement</span>()</div>
+<div class="block">Returns the effective version requirement.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>effective non-null version requirement</dd>
+</dl>
 </section>
 </li>
 </ul>

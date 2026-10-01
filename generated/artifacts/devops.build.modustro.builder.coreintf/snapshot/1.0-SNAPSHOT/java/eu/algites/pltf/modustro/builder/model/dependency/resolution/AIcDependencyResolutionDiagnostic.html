@@ -107,7 +107,9 @@ loadScripts(document, 'script');</script>
  <a href="AInDependencyResolutionDiagnosticSeverity.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency.resolution">AInDependencyResolutionDiagnosticSeverity</a>&nbsp;aSeverity,
  <a href="../AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a>&nbsp;aDependencyIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aMessage)</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates an <code>AIcDependencyResolutionDiagnostic</code> instance.</div>
+</div>
 </div>
 </section>
 </li>
@@ -124,16 +126,24 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#code()" class="member-name-link">code</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the stable diagnostic code.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="../AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a></code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#dependencyIdentity()" class="member-name-link">dependencyIdentity</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the dependency identity associated with this diagnostic.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#message()" class="member-name-link">message</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the human-readable diagnostic message.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="AInDependencyResolutionDiagnosticSeverity.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency.resolution">AInDependencyResolutionDiagnosticSeverity</a></code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#severity()" class="member-name-link">severity</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the diagnostic severity.</div>
+</div>
 </div>
 </div>
 </div>
@@ -158,6 +168,14 @@ loadScripts(document, 'script');</script>
  <a href="AInDependencyResolutionDiagnosticSeverity.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency.resolution">AInDependencyResolutionDiagnosticSeverity</a>&nbsp;aSeverity,
  <a href="../AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a>&nbsp;aDependencyIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aMessage)</span></div>
+<div class="block">Creates an <code>AIcDependencyResolutionDiagnostic</code> instance.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aCode</code> - diagnostic code</dd>
+<dd><code>aSeverity</code> - diagnostic severity</dd>
+<dd><code>aDependencyIdentity</code> - dependency identity associated with the diagnostic</dd>
+<dd><code>aMessage</code> - diagnostic message</dd>
+</dl>
 </section>
 </li>
 </ul>
@@ -172,24 +190,44 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="code()">
 <h3>code</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">code</span>()</div>
+<div class="block">Returns the stable diagnostic code.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>diagnostic code</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="severity()">
 <h3>severity</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="AInDependencyResolutionDiagnosticSeverity.html" title="enum class in eu.algites.pltf.modustro.builder.model.dependency.resolution">AInDependencyResolutionDiagnosticSeverity</a></span>&nbsp;<span class="element-name">severity</span>()</div>
+<div class="block">Returns the diagnostic severity.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>diagnostic severity</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="dependencyIdentity()">
 <h3>dependencyIdentity</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="../AIcDependencyIdentity.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyIdentity</a></span>&nbsp;<span class="element-name">dependencyIdentity</span>()</div>
+<div class="block">Returns the dependency identity associated with this diagnostic.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>dependency identity</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="message()">
 <h3>message</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">message</span>()</div>
+<div class="block">Returns the human-readable diagnostic message.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>diagnostic message</dd>
+</dl>
 </section>
 </li>
 </ul>

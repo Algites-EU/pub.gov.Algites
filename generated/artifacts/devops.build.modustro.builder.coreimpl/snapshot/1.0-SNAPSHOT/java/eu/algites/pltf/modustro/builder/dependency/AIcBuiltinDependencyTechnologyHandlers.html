@@ -104,7 +104,9 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-first">Constructor</div>
 <div class="table-header col-last">Description</div>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E()" class="member-name-link">AIcBuiltinDependencyTechnologyHandlers</a>()</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates the registry of built-in dependency technology handlers.</div>
+</div>
 </div>
 </section>
 </li>
@@ -122,7 +124,9 @@ loadScripts(document, 'script');</script>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>eu.algites.pltf.modustro.builder.model.dependency.resolution.AIiDependencyTechnologyHandler</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#require(java.lang.String,java.lang.String)" class="member-name-link">require</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aDependencyKind,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aTechnologyKind)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the registered dependency technology handler for the requested identifiers.</div>
+</div>
 </div>
 </div>
 </div>
@@ -144,6 +148,7 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="&lt;init&gt;()">
 <h3>AIcBuiltinDependencyTechnologyHandlers</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcBuiltinDependencyTechnologyHandlers</span>()</div>
+<div class="block">Creates the registry of built-in dependency technology handlers.</div>
 </section>
 </li>
 </ul>
@@ -159,6 +164,16 @@ loadScripts(document, 'script');</script>
 <h3>require</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type">eu.algites.pltf.modustro.builder.model.dependency.resolution.AIiDependencyTechnologyHandler</span>&nbsp;<span class="element-name">require</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aDependencyKind,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aTechnologyKind)</span></div>
+<div class="block">Returns the registered dependency technology handler for the requested identifiers.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aDependencyKind</code> - DependencyKind identifier</dd>
+<dd><code>aTechnologyKind</code> - TechnologyKind identifier</dd>
+<dt>Returns:</dt>
+<dd>registered dependency technology handler</dd>
+<dt>Throws:</dt>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/IllegalArgumentException.html" title="class or interface in java.lang" class="external-link">IllegalArgumentException</a></code> - if no matching dependency technology handler is registered</dd>
+</dl>
 </section>
 </li>
 </ul>

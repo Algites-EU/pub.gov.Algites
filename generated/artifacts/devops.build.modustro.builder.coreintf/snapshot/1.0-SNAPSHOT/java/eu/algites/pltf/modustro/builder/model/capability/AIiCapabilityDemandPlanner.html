@@ -106,7 +106,9 @@ loadScripts(document, 'script');</script>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#createDemandGraph(java.lang.String,java.util.Collection,java.util.Collection)" class="member-name-link">createDemandGraph</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aArtifactScopeIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;<a href="../output/AIcBuildOutputProductionPlan.html" title="class in eu.algites.pltf.modustro.builder.model.output">AIcBuildOutputProductionPlan</a>&gt;&nbsp;aBuildOutputPlans,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;<a href="AIcCapabilityDemand.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemand</a>&gt;&nbsp;aAdditionalDemands)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Builds a deduplicated capability demand graph for one artifact scope.</div>
+</div>
 </div>
 </div>
 </div>
@@ -127,6 +129,15 @@ loadScripts(document, 'script');</script>
 <div class="member-signature"><span class="return-type"><a href="AIcCapabilityDemandGraph.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandGraph</a></span>&nbsp;<span class="element-name">createDemandGraph</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aArtifactScopeIdentity,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;<a href="../output/AIcBuildOutputProductionPlan.html" title="class in eu.algites.pltf.modustro.builder.model.output">AIcBuildOutputProductionPlan</a>&gt;&nbsp;aBuildOutputPlans,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Collection.html" title="class or interface in java.util" class="external-link">Collection</a>&lt;<a href="AIcCapabilityDemand.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemand</a>&gt;&nbsp;aAdditionalDemands)</span></div>
+<div class="block">Builds a deduplicated capability demand graph for one artifact scope.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aArtifactScopeIdentity</code> - stable identity of the artifact scope</dd>
+<dd><code>aBuildOutputPlans</code> - selected build-output production plans</dd>
+<dd><code>aAdditionalDemands</code> - additional explicit capability demands</dd>
+<dt>Returns:</dt>
+<dd>validated capability demand graph</dd>
+</dl>
 </section>
 </li>
 </ul>

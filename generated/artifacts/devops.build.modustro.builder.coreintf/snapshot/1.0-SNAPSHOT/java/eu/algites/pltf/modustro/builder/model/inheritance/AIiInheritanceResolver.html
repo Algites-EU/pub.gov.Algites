@@ -107,18 +107,24 @@ K&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#mergeOnlyItems(java.util.List,java.util.List,eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity)" class="member-name-link">mergeOnlyItems</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aInheritedItems,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aLocalItems,
  <a href="AIiItemIdentity.html" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemIdentity</a>&lt;T,<wbr>K&gt;&nbsp;aIdentity)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Merges keyed local items into inherited items without removing inherited-only members.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code>&lt;T,<wbr>
 K&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a><wbr>&lt;T&gt;</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#resolveItems(java.util.List,eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedItems,eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity,eu.algites.pltf.modustro.builder.model.inheritance.AIiItemMerger)" class="member-name-link">resolveItems</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aInheritedItems,
  <a href="AIcInheritedItems.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedItems</a>&lt;T&gt;&nbsp;aLocalItems,
  <a href="AIiItemIdentity.html" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemIdentity</a>&lt;T,<wbr>K&gt;&nbsp;aIdentity,
  <a href="AIiItemMerger.html" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemMerger</a>&lt;T&gt;&nbsp;aMerger)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Resolves a keyed local item collection against inherited items.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code>&lt;T&gt;&nbsp;<a href="AIcInheritedValue.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedValue</a><wbr>&lt;T&gt;</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#resolveScalar(eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue,eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue)" class="member-name-link">resolveScalar</a><wbr>(<a href="AIcInheritedValue.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedValue</a>&lt;T&gt;&nbsp;aInheritedValue,
  <a href="AIcInheritedValue.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedValue</a>&lt;T&gt;&nbsp;aLocalValue)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Resolves a local tri-state scalar contribution against an inherited value.</div>
+</div>
 </div>
 </div>
 </div>
@@ -138,6 +144,16 @@ K&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <h3>resolveScalar</h3>
 <div class="member-signature"><span class="type-parameters">&lt;T&gt;</span>&nbsp;<span class="return-type"><a href="AIcInheritedValue.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedValue</a>&lt;T&gt;</span>&nbsp;<span class="element-name">resolveScalar</span><wbr><span class="parameters">(<a href="AIcInheritedValue.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedValue</a>&lt;T&gt;&nbsp;aInheritedValue,
  <a href="AIcInheritedValue.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedValue</a>&lt;T&gt;&nbsp;aLocalValue)</span></div>
+<div class="block">Resolves a local tri-state scalar contribution against an inherited value.</div>
+<dl class="notes">
+<dt>Type Parameters:</dt>
+<dd><code>T</code> - scalar value type</dd>
+<dt>Parameters:</dt>
+<dd><code>aInheritedValue</code> - inherited scalar contribution</dd>
+<dd><code>aLocalValue</code> - local scalar contribution</dd>
+<dt>Returns:</dt>
+<dd>effective scalar contribution</dd>
+</dl>
 </section>
 </li>
 <li>
@@ -148,6 +164,19 @@ K&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/
  <a href="AIcInheritedItems.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedItems</a>&lt;T&gt;&nbsp;aLocalItems,
  <a href="AIiItemIdentity.html" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemIdentity</a>&lt;T,<wbr>K&gt;&nbsp;aIdentity,
  <a href="AIiItemMerger.html" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemMerger</a>&lt;T&gt;&nbsp;aMerger)</span></div>
+<div class="block">Resolves a keyed local item collection against inherited items.</div>
+<dl class="notes">
+<dt>Type Parameters:</dt>
+<dd><code>T</code> - item type</dd>
+<dd><code>K</code> - stable item-identity type</dd>
+<dt>Parameters:</dt>
+<dd><code>aInheritedItems</code> - inherited items</dd>
+<dd><code>aLocalItems</code> - local item contribution including membership policy</dd>
+<dd><code>aIdentity</code> - stable item-identity resolver</dd>
+<dd><code>aMerger</code> - merger for same-identity inherited and local items</dd>
+<dt>Returns:</dt>
+<dd>immutable effective item list</dd>
+</dl>
 </section>
 </li>
 <li>
@@ -157,6 +186,18 @@ K&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/
 K&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;</span>&nbsp;<span class="element-name">mergeOnlyItems</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aInheritedItems,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aLocalItems,
  <a href="AIiItemIdentity.html" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemIdentity</a>&lt;T,<wbr>K&gt;&nbsp;aIdentity)</span></div>
+<div class="block">Merges keyed local items into inherited items without removing inherited-only members.</div>
+<dl class="notes">
+<dt>Type Parameters:</dt>
+<dd><code>T</code> - item type</dd>
+<dd><code>K</code> - stable item-identity type</dd>
+<dt>Parameters:</dt>
+<dd><code>aInheritedItems</code> - inherited items</dd>
+<dd><code>aLocalItems</code> - local items</dd>
+<dd><code>aIdentity</code> - stable item-identity resolver</dd>
+<dt>Returns:</dt>
+<dd>immutable merged item list</dd>
+</dl>
 </section>
 </li>
 </ul>

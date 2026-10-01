@@ -111,7 +111,9 @@ loadScripts(document, 'script');</script>
  eu.algites.pltf.modustro.builder.model.dependency.AIcVersionRequirement&nbsp;aRequirement,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aTechnologyKind,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;eu.algites.pltf.modustro.builder.model.dependency.resolution.AIcDependencyResolutionDiagnostic&gt;&nbsp;aDiagnostics)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab1 method-summary-table-tab4">
+<div class="block">Translates a portable version requirement into technology-specific canonical version semantics.</div>
+</div>
 </div>
 </div>
 </div>
@@ -136,6 +138,18 @@ loadScripts(document, 'script');</script>
  eu.algites.pltf.modustro.builder.model.dependency.AIcVersionRequirement&nbsp;aRequirement,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&nbsp;aTechnologyKind,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;eu.algites.pltf.modustro.builder.model.dependency.resolution.AIcDependencyResolutionDiagnostic&gt;&nbsp;aDiagnostics)</span></div>
+<div class="block">Translates a portable version requirement into technology-specific canonical version semantics.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aIdentity</code> - dependency or item identity</dd>
+<dd><code>aRequirement</code> - portable version requirement</dd>
+<dd><code>aTechnologyKind</code> - TechnologyKind identifier</dd>
+<dd><code>aDiagnostics</code> - resolution diagnostics</dd>
+<dt>Returns:</dt>
+<dd>normalized version requirement, or <code>null</code> when <code>aRequirement</code> is <code>null</code></dd>
+<dt>Throws:</dt>
+<dd><code>eu.algites.pltf.modustro.builder.model.AIxModelValidationException</code> - if the requirement cannot be represented by the target technology</dd>
+</dl>
 </section>
 </li>
 </ul>

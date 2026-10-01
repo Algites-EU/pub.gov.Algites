@@ -104,13 +104,19 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#buildOutputType()" class="member-name-link">buildOutputType</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Returns the concrete BuildOutputType produced by this producer.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="AIcBuildOutputProductionPlan.html" title="class in eu.algites.pltf.modustro.builder.model.output">AIcBuildOutputProductionPlan</a></code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#createProductionPlan(eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet)" class="member-name-link">createProductionPlan</a><wbr>(<a href="../source/AIcPreparedSourceSet.html" title="class in eu.algites.pltf.modustro.builder.model.source">AIcPreparedSourceSet</a>&nbsp;aPreparedSourceSet)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Creates a portable production plan for prepared sources.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#technologyKind()" class="member-name-link">technologyKind</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Returns the TechnologyKind supported by this producer.</div>
+</div>
 </div>
 </div>
 </div>
@@ -129,18 +135,35 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="technologyKind()">
 <h3>technologyKind</h3>
 <div class="member-signature"><span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">technologyKind</span>()</div>
+<div class="block">Returns the TechnologyKind supported by this producer.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>TechnologyKind identifier</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="buildOutputType()">
 <h3>buildOutputType</h3>
 <div class="member-signature"><span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">buildOutputType</span>()</div>
+<div class="block">Returns the concrete BuildOutputType produced by this producer.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>BuildOutputType identifier</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="createProductionPlan(eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet)">
 <h3>createProductionPlan</h3>
 <div class="member-signature"><span class="return-type"><a href="AIcBuildOutputProductionPlan.html" title="class in eu.algites.pltf.modustro.builder.model.output">AIcBuildOutputProductionPlan</a></span>&nbsp;<span class="element-name">createProductionPlan</span><wbr><span class="parameters">(<a href="../source/AIcPreparedSourceSet.html" title="class in eu.algites.pltf.modustro.builder.model.source">AIcPreparedSourceSet</a>&nbsp;aPreparedSourceSet)</span></div>
+<div class="block">Creates a portable production plan for prepared sources.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aPreparedSourceSet</code> - prepared source set for the producer TechnologyKind</dd>
+<dt>Returns:</dt>
+<dd>build-output production plan</dd>
+</dl>
 </section>
 </li>
 </ul>

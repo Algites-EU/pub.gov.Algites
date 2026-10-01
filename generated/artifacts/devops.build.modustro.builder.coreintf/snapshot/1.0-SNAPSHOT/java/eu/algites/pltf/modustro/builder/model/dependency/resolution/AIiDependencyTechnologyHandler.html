@@ -106,13 +106,19 @@ loadScripts(document, 'script');</script>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#createResolutionPlan(java.util.List,java.util.List,eu.algites.pltf.modustro.builder.model.technology.AIcTechnologyKindDefinition)" class="member-name-link">createResolutionPlan</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;<a href="../AIcDependencyDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyDefinition</a>&gt;&nbsp;aDependencies,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;<a href="../AIcDependencyConstraintDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyConstraintDefinition</a>&gt;&nbsp;aConstraints,
  <a href="../../technology/AIcTechnologyKindDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.technology">AIcTechnologyKindDefinition</a>&nbsp;aTechnologyDefinition)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Translates portable dependencies and constraints into a technology-native logical plan.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#dependencyKind()" class="member-name-link">dependencyKind</a>()</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Returns the DependencyKind translated by this handler.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3"><code><a href="#technologyKind()" class="member-name-link">technologyKind</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab3">
+<div class="block">Returns the target TechnologyKind.</div>
+</div>
 </div>
 </div>
 </div>
@@ -131,12 +137,22 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="dependencyKind()">
 <h3>dependencyKind</h3>
 <div class="member-signature"><span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">dependencyKind</span>()</div>
+<div class="block">Returns the DependencyKind translated by this handler.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>DependencyKind identifier</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="technologyKind()">
 <h3>technologyKind</h3>
 <div class="member-signature"><span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a></span>&nbsp;<span class="element-name">technologyKind</span>()</div>
+<div class="block">Returns the target TechnologyKind.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>TechnologyKind identifier</dd>
+</dl>
 </section>
 </li>
 <li>
@@ -145,6 +161,15 @@ loadScripts(document, 'script');</script>
 <div class="member-signature"><span class="return-type"><a href="AIcDependencyTechnologyResolutionPlan.html" title="class in eu.algites.pltf.modustro.builder.model.dependency.resolution">AIcDependencyTechnologyResolutionPlan</a></span>&nbsp;<span class="element-name">createResolutionPlan</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;<a href="../AIcDependencyDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyDefinition</a>&gt;&nbsp;aDependencies,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;<a href="../AIcDependencyConstraintDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.dependency">AIcDependencyConstraintDefinition</a>&gt;&nbsp;aConstraints,
  <a href="../../technology/AIcTechnologyKindDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.technology">AIcTechnologyKindDefinition</a>&nbsp;aTechnologyDefinition)</span></div>
+<div class="block">Translates portable dependencies and constraints into a technology-native logical plan.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aDependencies</code> - effective dependencies</dd>
+<dd><code>aConstraints</code> - effective dependency constraints</dd>
+<dd><code>aTechnologyDefinition</code> - target TechnologyKind definition</dd>
+<dt>Returns:</dt>
+<dd>technology-specific logical resolution plan</dd>
+</dl>
 </section>
 </li>
 </ul>

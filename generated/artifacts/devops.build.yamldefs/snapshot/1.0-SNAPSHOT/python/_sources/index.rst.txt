@@ -1,4 +1,4 @@
 devops.build.yamldefs
 =====================
 
-No Python API source files were found below ``src/product/python`` or ``src/product/python.gen`` for this artifact.
+No Python API source files were found in the canonical Python product source roots for this artifact.

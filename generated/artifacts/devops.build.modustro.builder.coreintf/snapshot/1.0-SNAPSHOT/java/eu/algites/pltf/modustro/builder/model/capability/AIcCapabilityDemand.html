@@ -105,7 +105,9 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E(eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemandKey,java.util.Set)" class="member-name-link">AIcCapabilityDemand</a><wbr>(<a href="AIcCapabilityDemandKey.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandKey</a>&nbsp;aKey,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aReasons)</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates an <code>AIcCapabilityDemand</code> instance.</div>
+</div>
 </div>
 </section>
 </li>
@@ -122,13 +124,19 @@ loadScripts(document, 'script');</script>
 <div class="table-header col-last">Description</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="AIcCapabilityDemandKey.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandKey</a></code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#key()" class="member-name-link">key</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the stable key of this capability demand.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="AIcCapabilityDemand.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemand</a></code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#merge(eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemand)" class="member-name-link">merge</a><wbr>(<a href="AIcCapabilityDemand.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemand</a>&nbsp;aOther)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Merges another demand for the same key into this demand.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a><wbr>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#reasons()" class="member-name-link">reasons</a>()</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Returns the reasons that requested this capability.</div>
+</div>
 </div>
 </div>
 </div>
@@ -151,6 +159,12 @@ loadScripts(document, 'script');</script>
 <h3>AIcCapabilityDemand</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcCapabilityDemand</span><wbr><span class="parameters">(<a href="AIcCapabilityDemandKey.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandKey</a>&nbsp;aKey,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;&nbsp;aReasons)</span></div>
+<div class="block">Creates an <code>AIcCapabilityDemand</code> instance.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aKey</code> - capability-demand key</dd>
+<dd><code>aReasons</code> - reasons that requested the capability</dd>
+</dl>
 </section>
 </li>
 </ul>
@@ -165,18 +179,37 @@ loadScripts(document, 'script');</script>
 <section class="detail" id="key()">
 <h3>key</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="AIcCapabilityDemandKey.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandKey</a></span>&nbsp;<span class="element-name">key</span>()</div>
+<div class="block">Returns the stable key of this capability demand.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>capability-demand key</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="reasons()">
 <h3>reasons</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/Set.html" title="class or interface in java.util" class="external-link">Set</a>&lt;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/String.html" title="class or interface in java.lang" class="external-link">String</a>&gt;</span>&nbsp;<span class="element-name">reasons</span>()</div>
+<div class="block">Returns the reasons that requested this capability.</div>
+<dl class="notes">
+<dt>Returns:</dt>
+<dd>immutable set of demand reasons</dd>
+</dl>
 </section>
 </li>
 <li>
 <section class="detail" id="merge(eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemand)">
 <h3>merge</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="return-type"><a href="AIcCapabilityDemand.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemand</a></span>&nbsp;<span class="element-name">merge</span><wbr><span class="parameters">(<a href="AIcCapabilityDemand.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemand</a>&nbsp;aOther)</span></div>
+<div class="block">Merges another demand for the same key into this demand.</div>
+<dl class="notes">
+<dt>Parameters:</dt>
+<dd><code>aOther</code> - other value to compare or merge</dd>
+<dt>Returns:</dt>
+<dd>new demand containing the union of reasons</dd>
+<dt>Throws:</dt>
+<dd><code><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/IllegalArgumentException.html" title="class or interface in java.lang" class="external-link">IllegalArgumentException</a></code> - if the demand keys differ</dd>
+</dl>
 </section>
 </li>
 </ul>

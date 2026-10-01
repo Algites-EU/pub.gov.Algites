@@ -109,7 +109,9 @@ implements eu.algites.pltf.modustro.builder.model.inheritance.AIiInheritanceReso
 <div class="table-header col-first">Constructor</div>
 <div class="table-header col-last">Description</div>
 <div class="col-constructor-name even-row-color"><code><a href="#%3Cinit%3E()" class="member-name-link">AIcDefaultInheritanceResolver</a>()</code></div>
-<div class="col-last even-row-color">&nbsp;</div>
+<div class="col-last even-row-color">
+<div class="block">Creates the default inheritance resolver.</div>
+</div>
 </div>
 </section>
 </li>
@@ -129,18 +131,24 @@ K&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#mergeOnlyItems(java.util.List,java.util.List,eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity)" class="member-name-link">mergeOnlyItems</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aInheritedItems,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aLocalItems,
  eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity&lt;T,<wbr>K&gt;&nbsp;aIdentity)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Merges keyed local items into inherited items without removing missing inherited entries.</div>
+</div>
 <div class="col-first odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T,<wbr>
 K&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a><wbr>&lt;T&gt;</code></div>
 <div class="col-second odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#resolveItems(java.util.List,eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedItems,eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity,eu.algites.pltf.modustro.builder.model.inheritance.AIiItemMerger)" class="member-name-link">resolveItems</a><wbr>(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aInheritedItems,
  eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedItems&lt;T&gt;&nbsp;aLocalItems,
  eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity&lt;T,<wbr>K&gt;&nbsp;aIdentity,
  eu.algites.pltf.modustro.builder.model.inheritance.AIiItemMerger&lt;T&gt;&nbsp;aMerger)</code></div>
-<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last odd-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Resolves keyed local items against inherited items according to the local inheritance policy.</div>
+</div>
 <div class="col-first even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code>&lt;T&gt;&nbsp;eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue<wbr>&lt;T&gt;</code></div>
 <div class="col-second even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4"><code><a href="#resolveScalar(eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue,eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue)" class="member-name-link">resolveScalar</a><wbr>(eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue&lt;T&gt;&nbsp;aInheritedValue,
  eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue&lt;T&gt;&nbsp;aLocalValue)</code></div>
-<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">&nbsp;</div>
+<div class="col-last even-row-color method-summary-table method-summary-table-tab2 method-summary-table-tab4">
+<div class="block">Resolves a local tri-state scalar contribution against its inherited value.</div>
+</div>
 </div>
 </div>
 </div>
@@ -162,6 +170,7 @@ K&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <section class="detail" id="&lt;init&gt;()">
 <h3>AIcDefaultInheritanceResolver</h3>
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="element-name">AIcDefaultInheritanceResolver</span>()</div>
+<div class="block">Creates the default inheritance resolver.</div>
 </section>
 </li>
 </ul>
@@ -178,9 +187,15 @@ K&gt;&nbsp;<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base
 <div class="member-signature"><span class="modifiers">public</span>&nbsp;<span class="type-parameters">&lt;T&gt;</span>
 <span class="return-type">eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue&lt;T&gt;</span>&nbsp;<span class="element-name">resolveScalar</span><wbr><span class="parameters">(eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue&lt;T&gt;&nbsp;aInheritedValue,
  eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedValue&lt;T&gt;&nbsp;aLocalValue)</span></div>
+<div class="block">Resolves a local tri-state scalar contribution against its inherited value.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code>resolveScalar</code>&nbsp;in interface&nbsp;<code>eu.algites.pltf.modustro.builder.model.inheritance.AIiInheritanceResolver</code></dd>
+<dt>Parameters:</dt>
+<dd><code>aInheritedValue</code> - inherited scalar contribution</dd>
+<dd><code>aLocalValue</code> - local scalar contribution</dd>
+<dt>Returns:</dt>
+<dd>effective scalar contribution</dd>
 </dl>
 </section>
 </li>
@@ -192,9 +207,17 @@ K&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/
  eu.algites.pltf.modustro.builder.model.inheritance.AIcInheritedItems&lt;T&gt;&nbsp;aLocalItems,
  eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity&lt;T,<wbr>K&gt;&nbsp;aIdentity,
  eu.algites.pltf.modustro.builder.model.inheritance.AIiItemMerger&lt;T&gt;&nbsp;aMerger)</span></div>
+<div class="block">Resolves keyed local items against inherited items according to the local inheritance policy.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code>resolveItems</code>&nbsp;in interface&nbsp;<code>eu.algites.pltf.modustro.builder.model.inheritance.AIiInheritanceResolver</code></dd>
+<dt>Parameters:</dt>
+<dd><code>aInheritedItems</code> - inherited items</dd>
+<dd><code>aLocalItems</code> - local item contribution</dd>
+<dd><code>aIdentity</code> - dependency or item identity</dd>
+<dd><code>aMerger</code> - same-identity item merger</dd>
+<dt>Returns:</dt>
+<dd>immutable effective item list</dd>
 </dl>
 </section>
 </li>
@@ -205,9 +228,16 @@ K&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/
 K&gt;</span>&nbsp;<span class="return-type"><a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;</span>&nbsp;<span class="element-name">mergeOnlyItems</span><wbr><span class="parameters">(<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aInheritedItems,
  <a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/List.html" title="class or interface in java.util" class="external-link">List</a>&lt;T&gt;&nbsp;aLocalItems,
  eu.algites.pltf.modustro.builder.model.inheritance.AIiItemIdentity&lt;T,<wbr>K&gt;&nbsp;aIdentity)</span></div>
+<div class="block">Merges keyed local items into inherited items without removing missing inherited entries.</div>
 <dl class="notes">
 <dt>Specified by:</dt>
 <dd><code>mergeOnlyItems</code>&nbsp;in interface&nbsp;<code>eu.algites.pltf.modustro.builder.model.inheritance.AIiInheritanceResolver</code></dd>
+<dt>Parameters:</dt>
+<dd><code>aInheritedItems</code> - inherited items</dd>
+<dd><code>aLocalItems</code> - local item contribution</dd>
+<dd><code>aIdentity</code> - dependency or item identity</dd>
+<dt>Returns:</dt>
+<dd>immutable merged item list</dd>
 </dl>
 </section>
 </li>
