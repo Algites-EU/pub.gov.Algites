@@ -2188,13 +2188,19 @@ subprojects {
     }
 
     if ("java" in locEffectiveTechnologyKinds && locHasCapabilityDemand("java", "dependency_resolution")) {
-        tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach { locTask ->
-            rootProject.tasks.named("algitesDependencyPreflight").configure { dependsOn(locTask) }
+        tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach {
+            val locDependencyResolutionTask = this
+            rootProject.tasks.named("algitesDependencyPreflight").configure {
+                dependsOn(locDependencyResolutionTask)
+            }
         }
     }
     if ("python" in locEffectiveTechnologyKinds && locHasCapabilityDemand("python", "dependency_resolution")) {
-        tasks.matching { locTask -> locTask.name == "resolvePythonDependencies" }.configureEach { locTask ->
-            rootProject.tasks.named("algitesDependencyPreflight").configure { dependsOn(locTask) }
+        tasks.matching { locTask -> locTask.name == "resolvePythonDependencies" }.configureEach {
+            val locDependencyResolutionTask = this
+            rootProject.tasks.named("algitesDependencyPreflight").configure {
+                dependsOn(locDependencyResolutionTask)
+            }
         }
     }
 
@@ -2284,8 +2290,8 @@ subprojects {
             if (locHasCapabilityDemand("java", "source_native_processing")) {
                 tasks.matching { locTask ->
                     locTask.name in setOf("compileJava", "processResources", "sourcesJar", "javadoc", "javadocJar")
-                }.configureEach { locTask ->
-                    locJavaSourceProcessingTask?.let { locSourceProcessingTask -> locTask.dependsOn(locSourceProcessingTask) }
+                }.configureEach {
+                    locJavaSourceProcessingTask?.let { locSourceProcessingTask -> dependsOn(locSourceProcessingTask) }
                 }
             }
             if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
