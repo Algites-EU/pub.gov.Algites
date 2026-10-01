@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-resource-endpoints_1.yamldef.schema.json",
+  "title": "Algites ResourceEndpoints v1",
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "stableResourceEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^algites-[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Url": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1
+        },
+        "CredentialProfile": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Enabled": {
+          "type": "boolean"
+        },
+        "ResourceEndpointProviderAdapter": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Stability": {
+          "type": "string",
+          "enum": [
+            "release",
+            "snapshot"
+          ]
+        }
+      },
+      "required": [
+        "Id",
+        "Stability"
+      ],
+      "minProperties": 2
+    },
+    "unstableResourceEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^algites-[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Url": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1
+        },
+        "CredentialProfile": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Enabled": {
+          "type": "boolean"
+        },
+        "ResourceEndpointProviderAdapter": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "minProperties": 1
+    },
+    "stableResourceEndpointList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/stableResourceEndpoint"
+      }
+    },
+    "unstableResourceEndpointList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/unstableResourceEndpoint"
+      }
+    },
+    "stableActionMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "download": {
+          "$ref": "#/$defs/stableResourceEndpointList"
+        },
+        "upload": {
+          "$ref": "#/$defs/stableResourceEndpointList"
+        },
+        "manage": {
+          "$ref": "#/$defs/stableResourceEndpointList"
+        }
+      },
+      "minProperties": 1
+    },
+    "unstableActionMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "download": {
+          "$ref": "#/$defs/unstableResourceEndpointList"
+        },
+        "upload": {
+          "$ref": "#/$defs/unstableResourceEndpointList"
+        },
+        "manage": {
+          "$ref": "#/$defs/unstableResourceEndpointList"
+        }
+      },
+      "minProperties": 1
+    },
+    "stableVisibilityMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "public": {
+          "$ref": "#/$defs/stableActionMatrix"
+        },
+        "private": {
+          "$ref": "#/$defs/stableActionMatrix"
+        }
+      },
+      "minProperties": 1
+    },
+    "unstableVisibilityMatrix": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "public": {
+          "$ref": "#/$defs/unstableActionMatrix"
+        },
+        "private": {
+          "$ref": "#/$defs/unstableActionMatrix"
+        }
+      },
+      "minProperties": 1
+    },
+    "nativeBuildOutputResourceKinds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "native_build_output": {
+          "$ref": "#/$defs/stableVisibilityMatrix"
+        }
+      },
+      "minProperties": 1
+    },
+    "modustroResourceKinds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "docs_site": {
+          "$ref": "#/$defs/stableVisibilityMatrix"
+        },
+        "schema_site": {
+          "$ref": "#/$defs/unstableVisibilityMatrix"
+        }
+      },
+      "minProperties": 1
+    },
+    "DocumentContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "java": {
+          "$ref": "#/$defs/nativeBuildOutputResourceKinds"
+        },
+        "python": {
+          "$ref": "#/$defs/nativeBuildOutputResourceKinds"
+        },
+        "mps": {
+          "$ref": "#/$defs/nativeBuildOutputResourceKinds"
+        },
+        "modustro": {
+          "$ref": "#/$defs/modustroResourceKinds"
+        }
+      },
+      "minProperties": 1
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
+}

@@ -130,6 +130,10 @@ jobs:
           if [[ "${{ inputs.private-repository-defaults-enabled }}" == "true" ]]; then
             locPrivateRoot="${RUNNER_TEMP}/algites-private-licensing-governance"
             rm -rf "${locPrivateRoot}"
+
+            # The subsequent sparse-checkout may lazy-fetch blobs from the partial-clone
+            # promisor remote, so plain git must use the same authenticated GitHub CLI credentials.
+            gh auth setup-git --hostname github.com
             gh repo clone Algites-EU/priv.gov.Algites "${locPrivateRoot}" -- --depth 1 --filter=blob:none --sparse
             git -C "${locPrivateRoot}" sparse-checkout set licensing
             echo "ALGITES_LICENSING_PRIVATE_GOVERNANCE_DIRECTORY=${locPrivateRoot}/licensing" >> "${GITHUB_ENV}"

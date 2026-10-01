@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:yamldef:model:resource:resource-endpoint:1",
+  "x-algites-definition-version": 1,
+  "title": "ResourceEndpoint Definition v1",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "TechnologyKind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "ResourceKind": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "Visibility": {
+      "type": "string",
+      "enum": [
+        "public",
+        "private"
+      ]
+    },
+    "Action": {
+      "type": "string",
+      "enum": [
+        "download",
+        "upload",
+        "manage"
+      ]
+    },
+    "Id": {
+      "type": "string",
+      "pattern": "^algites-[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "Url": {
+      "type": "string",
+      "format": "uri",
+      "minLength": 1
+    },
+    "CredentialProfile": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    },
+    "Enabled": {
+      "type": "boolean"
+    },
+    "Stability": {
+      "type": "string",
+      "enum": [
+        "release",
+        "snapshot"
+      ]
+    },
+    "ResourceEndpointProviderAdapter": {
+      "type": "string",
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+    }
+  },
+  "required": [
+    "TechnologyKind",
+    "ResourceKind",
+    "Visibility",
+    "Action",
+    "Id",
+    "Url",
+    "Enabled"
+  ]
+}

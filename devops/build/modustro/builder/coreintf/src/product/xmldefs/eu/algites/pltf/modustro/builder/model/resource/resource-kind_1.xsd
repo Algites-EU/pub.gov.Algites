@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:annotation><xs:documentation>ResourceKind Definition v1</xs:documentation></xs:annotation>
+  <xs:complexType name="DocumentContentType">
+    <xs:sequence>
+      <xs:element name="ResourceKind" minOccurs="1" maxOccurs="1" type="xs:string"/>
+      <xs:element name="TechnologyKinds" minOccurs="1" maxOccurs="1" type="xs:anyType"/>
+      <xs:element name="Actions" minOccurs="1" maxOccurs="1" type="xs:anyType"/>
+      <xs:element name="StabilityRequirement" minOccurs="1" maxOccurs="1" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="ResourceModel" type="DocumentContentType"/>
+</xs:schema>

@@ -27,6 +27,7 @@ val locAlgitesArtifactMetadata = locAlgitesResolvedArtifactDirectories.map { loc
         "relativePath" to locArtifactDirectory["path"],
         "hasGradleBuild" to locArtifactDirectory["hasGradleBuild"],
         "projectPath" to locArtifactDirectory["gradleProjectPath"],
+        "resourceEndpoints" to locArtifactDirectory["resourceEndpoints"],
         "repositories" to locArtifactDirectory["repositories"],
         "dependencies" to locArtifactDirectory["dependencies"],
         "dependencyConstraints" to locArtifactDirectory["dependencyConstraints"],

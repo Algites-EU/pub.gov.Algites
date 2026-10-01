@@ -187,7 +187,8 @@ Version:
 | `SourceRepository.Id` | yes | Canonical source repository identity. |
 | `SourceRepository.Name` | no | Human-readable repository name. |
 | `SourceRepository.Visibility` | no | Explicit `pub` or `priv` visibility when needed. Normally repository identity/naming and governance determine visibility. |
-| `SourceRepository.Repositories` | no | Repository matrix declared at repository scope. |
+| `SourceRepository.ResourceEndpoints` | no | General ResourceEndpoint contribution at repository scope. New metadata should use this field. |
+| `SourceRepository.Repositories` | no | Legacy native-build-output repository matrix accepted during migration and normalized to `ResourceEndpoints`. |
 
 Wire names in all examples below follow the Algites structured-data naming convention from the Development Structure Specification: Algites fields use `UpperCamelCase` and symbolic values use `lower_snake_case`.
 
@@ -230,7 +231,8 @@ PublicationReadiness:
 | `ArtifactSet.Name` | no | Human-readable set name. |
 | `ArtifactSet.Description` | no | Free-form description. |
 | `ArtifactSet.TechnologyKinds` | no | TechnologyKinds made available to descendants as structural metadata. Allowed values currently include `java`, `python`, `mps`, and `modustro`. |
-| `ArtifactSet.Repositories` | no | Repository matrix contribution at this container. |
+| `ArtifactSet.ResourceEndpoints` | no | General ResourceEndpoint contribution at this container. New metadata should use this field. |
+| `ArtifactSet.Repositories` | no | Legacy native-build-output repository matrix contribution accepted during migration. |
 | `ArtifactSet.Version` | no | Version-context contribution at this container. |
 
 Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
@@ -256,7 +258,8 @@ Artifact:
 | `Artifact.Name` | no | Human-readable artifact name. |
 | `Artifact.Description` | no | Free-form description. |
 | `Artifact.VariantId` | no | Optional lowercase dash-separated variant identity appended to native artifact/distribution identity. |
-| `Artifact.Repositories` | no | Repository matrix contribution for this artifact. |
+| `Artifact.ResourceEndpoints` | no | General ResourceEndpoint contribution for this artifact. New metadata should use this field. |
+| `Artifact.Repositories` | no | Legacy native-build-output repository matrix contribution accepted during migration. |
 | `Artifact.Version` | no | Version-context contribution for this artifact. |
 
 Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
@@ -453,16 +456,16 @@ Different properties use different merge semantics. Do not assume every field fo
  GroupId: eu.algites.lib.specialized
 ```
 
-### 8.2 Repository endpoint lists
+### 8.2 ResourceEndpoint lists
 
-Repository endpoints merge by stable endpoint `id` within the same matrix cell. A descendant can modify or disable an inherited endpoint without repeating every property.
+ResourceEndpoints merge by stable endpoint `Id` within the same `TechnologyKind / ResourceKind / visibility / action` cell. A descendant can modify or disable an inherited endpoint without repeating every property.
 
 ```yaml
 Artifact:
-  Repositories:
+  ResourceEndpoints:
     java:
-      public:
-        snapshot:
+      native_build_output:
+        public:
           download:
             - Id: algites-java-public-snapshot-download
               Enabled: false
@@ -528,31 +531,34 @@ A version declaration is container-scoped and may be overridden at a lower struc
 
 The effective version is resolved by Algites infrastructure; technology adapters map it into ecosystem-specific publication versions.
 
-## 11. Repository matrix
+## 11. ResourceEndpoints
 
-Repository metadata is organized on four independent axes:
+`ResourceEndpoints` generalizes native package repositories and future deployment/publication targets. Endpoint selection uses:
 
 ```text
-TechnologyKind -> visibility -> stability -> usage -> endpoint list
+TechnologyKind -> ResourceKind -> visibility -> action -> endpoint list
 ```
 
-Current axis values:
+The four structural dimensions are:
 
-- TechnologyKind: `java`, `python`, `mps`
-- visibility: `public`, `private`
-- stability: `release`, `snapshot`
-- usage: `download`, `upload`, `manage`
+- TechnologyKind: `java`, `python`, `mps`, `modustro`;
+- ResourceKind: initially `native_build_output`, `docs_site`, `schema_site`;
+- visibility: `public`, `private`;
+- action: `download`, `upload`, `manage`.
+
+`Stability` is an endpoint property, not a structural axis. `native_build_output` and `docs_site` require `release` or `snapshot`; `schema_site` forbids Stability because draft/release state belongs to deployed schema metadata rather than endpoint channel selection.
 
 Example:
 
 ```yaml
-Repositories:
+ResourceEndpoints:
   java:
-    public:
-      snapshot:
+    native_build_output:
+      public:
         download:
           - Id: algites-java-public-snapshot-download
             Url: https://example.invalid/maven/snapshots/
+            Stability: snapshot
 ```
 
 ### 11.1 Endpoint fields
@@ -560,16 +566,27 @@ Repositories:
 | Field | Required | Meaning |
 | --- | ---: | --- |
 | `Id` | yes | Stable canonical endpoint id. |
-| `Url` | no for an inherited amendment; normally yes for a concrete endpoint | Repository/package-manager URL. |
+| `Url` | no for an inherited amendment; normally yes for a concrete endpoint | Resource endpoint URL. |
 | `CredentialProfile` | no | Non-secret credential profile id. |
 | `Enabled` | no | Defaults to enabled; lower levels can disable an inherited endpoint. |
-| `UsageProviderAdapter` | no | Provider adapter used for management operations such as package deletion. |
+| `Stability` | ResourceKind-specific | `release` or `snapshot` where the ResourceKind uses stability channels. |
+| `ResourceEndpointProviderAdapter` | no | Provider-specific adapter when standard TechnologyKind/ResourceKind/action behavior is insufficient. |
 
-Public **download** defaults are maintained in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`. Upload/manage governance is intentionally not part of the ordinary public artifact-author configuration.
+New endpoint ids SHOULD encode the dimensional suffix as:
+
+```text
+algites-<technology-kind>-<resource-kind>-<visibility>-[<stability>-]<action>
+```
+
+Legacy native-build-output ids without the explicit `native-build-output` segment remain accepted during the Phase-5 migration so inherited overrides do not change identity.
+
+Public **download** defaults are maintained in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`. The historical filename and `ALGITES_REPOSITORY_*` environment-variable names are retained for workflow compatibility; the contained canonical metadata now uses `ResourceEndpoints`.
+
+The legacy `Repositories` shape remains accepted as input and is normalized to ResourceKind `native_build_output`. New descriptors SHOULD use `ResourceEndpoints`. `UsageProviderAdapter` in legacy metadata maps to `ResourceEndpointProviderAdapter`.
 
 ### 11.2 Public governance resolution for local builds
 
-Normal local builds do not need a checkout-specific configuration for public repository defaults. When `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` is not set, the resolver loads the published defaults from `Algites-EU/pub.gov.Algites/main` on GitHub and materializes them under the Gradle user-home cache.
+Normal local builds do not need a checkout-specific configuration for public ResourceEndpoint defaults. When `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` is not set, the resolver loads the published defaults from `Algites-EU/pub.gov.Algites/main` on GitHub and materializes them under the Gradle user-home cache.
 
 Set `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` to a local file when developing governance itself, testing unpublished changes, or intentionally pinning the build to a locally materialized copy. CI may also set it explicitly to the governance material prepared by the workflow. Governed public upload/manage overlays and private defaults are never fetched through this public fallback; they remain explicit governance inputs.
 
@@ -578,11 +595,15 @@ The precedence is therefore:
 1. explicit `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`;
 2. otherwise the published public GitHub defaults.
 
+### 11.3 Publication destinations
+
+`PublicationDestinations` in a publication capability configuration is a list of ResourceEndpoint IDs. It narrows the effective matching endpoints; it never embeds URLs, credentials, provider state, or deployment metadata. Phase 6 activates this for `docs_site` and `schema_site`.
+
 ## 12. Credential profiles vs credential values
 
-Repository metadata never contains passwords, tokens, certificates, or other secret values.
+ResourceEndpoint metadata never contains passwords, tokens, certificates, or other secret values.
 
-A repository endpoint references a non-secret profile:
+A ResourceEndpoint references a non-secret profile:
 
 ```yaml
 CredentialProfiles:
@@ -590,13 +611,14 @@ CredentialProfiles:
     Type: basic
 
 Artifact:
-  Repositories:
+  ResourceEndpoints:
     java:
-      private:
-        release:
+      native_build_output:
+        private:
           download:
-            - Id: example-download
+            - Id: algites-example-java-native-build-output-private-release-download
               Url: https://example.invalid/maven/
+              Stability: release
               CredentialProfile: example-download
 ```
 
@@ -622,7 +644,7 @@ Actual values are supplied through the universal `ALGITES_DEVOPS_BUILD_REPOSITOR
 
 The `_CONTENT` suffix describes what is obtained after resolution. For example, `file_content` `Value` is a path, not literal file content.
 
-For a normal public developer build, upload/manage credentials are not required. The framework resolves only credentials needed for the requested repository contexts. Credential preflight is fail-fast when no effective declared `Artifact.TechnologyKinds` remain after applying any optional TechnologyKind selection; an empty TechnologyKind set never means "all repository technologies".
+For a normal public developer build, upload/manage credentials are not required. The framework resolves only credentials needed for the requested ResourceEndpoint contexts. Credential preflight is fail-fast when no effective declared `Artifact.TechnologyKinds` remain after applying any optional TechnologyKind selection; an empty TechnologyKind set never means "all ResourceEndpoint technologies".
 
 ## 13. Licensing
 
@@ -974,7 +996,7 @@ Read the blocking declaration(s) printed by the task. The error identifies descr
 
 ### Missing or unresolved TechnologyKind during credential preflight
 
-If `resolveAlgitesRequiredCredentials` reports that no TechnologyKinds were resolved, verify that each distributable artifact uses the current `Artifact.TechnologyKinds` declaration. Legacy keys such as `Artifact.Type` are not a TechnologyKind declaration. An explicit TechnologyKind selection only narrows declared artifact technologies; it does not create missing declarations. An accidental empty resolution is rejected rather than expanded to all repository technologies.
+If `resolveAlgitesRequiredCredentials` reports that no TechnologyKinds were resolved, verify that each distributable artifact uses the current `Artifact.TechnologyKinds` declaration. Legacy keys such as `Artifact.Type` are not a TechnologyKind declaration. An explicit TechnologyKind selection only narrows declared artifact technologies; it does not create missing declarations. An accidental empty resolution is rejected rather than expanded to all ResourceEndpoint technologies.
 
 ### Missing repository credentials
 

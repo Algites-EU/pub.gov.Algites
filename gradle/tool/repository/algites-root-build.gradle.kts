@@ -706,8 +706,8 @@ abstract class AIcPublishPythonTask : DefaultTask() {
         }
         if (endpointDefinitions.get().isEmpty()) {
             throw GradleException(
-                "No enabled Python ${publicationStability.get()} upload repository endpoint is configured for project '${projectPathValue.get()}'. " +
-                    "Configure repositories.python.${repositoryVisibility.get()}.${publicationStability.get()}.upload in Algites metadata or its inherited defaults."
+                "No enabled Python native_build_output ${publicationStability.get()} upload ResourceEndpoint is configured for project '${projectPathValue.get()}'. " +
+                    "Configure ResourceEndpoints.python.native_build_output.${repositoryVisibility.get()}.upload with Stability=${publicationStability.get()} in Algites metadata or its inherited defaults."
             )
         }
         val locDistributionFiles = distributionDirectory.get().asFile.listFiles()?.filter(File::isFile)?.sortedBy(File::getName) ?: emptyList()
@@ -868,12 +868,13 @@ fun AIcAlgitesPreparedSourceSet(aProject: Project, aTechnologyKind: String): AIc
     }
 }
 
-data class AIcdAlgitesRepositoryEndpoint(
+data class AIcdAlgitesResourceEndpoint(
     val cell: String,
     val id: String,
     val url: String,
     val credentialProfile: String?,
-    val usageProviderAdapter: String?
+    val stability: String?,
+    val resourceEndpointProviderAdapter: String?
 )
 
 data class AIcdAlgitesCredentialProfile(
@@ -883,9 +884,9 @@ data class AIcdAlgitesCredentialProfile(
 )
 
 @Suppress("UNCHECKED_CAST")
-fun AIcAlgitesRepositoryEndpoints(aValue: Any?, aCell: String): List<AIcdAlgitesRepositoryEndpoint> {
-    val locRepositories = aValue as? Map<*, *> ?: return emptyList()
-    val locItems = locRepositories[aCell] as? List<*> ?: return emptyList()
+fun AIcAlgitesResourceEndpoints(aValue: Any?, aCell: String, aStability: String? = null): List<AIcdAlgitesResourceEndpoint> {
+    val locResourceEndpoints = aValue as? Map<*, *> ?: return emptyList()
+    val locItems = locResourceEndpoints[aCell] as? List<*> ?: return emptyList()
     return locItems.mapNotNull { locItem ->
         val locMap = locItem as? Map<*, *> ?: return@mapNotNull null
         val locEnabled = locMap["enabled"]?.toString()?.toBooleanStrictOrNull() ?: true
@@ -893,8 +894,10 @@ fun AIcAlgitesRepositoryEndpoints(aValue: Any?, aCell: String): List<AIcdAlgites
         val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
         val locCredentialProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-        val locUsageProviderAdapter = locMap["usageProviderAdapter"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
-        AIcdAlgitesRepositoryEndpoint(aCell, locId, locUrl, locCredentialProfile, locUsageProviderAdapter)
+        val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
+        if (aStability != null && locStability != aStability) return@mapNotNull null
+        val locResourceEndpointProviderAdapter = locMap["resourceEndpointProviderAdapter"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
+        AIcdAlgitesResourceEndpoint(aCell, locId, locUrl, locCredentialProfile, locStability, locResourceEndpointProviderAdapter)
     }
 }
 
@@ -1005,7 +1008,7 @@ fun AIcAlgitesSnapshotVersionForTechnology(aReleaseVersion: String, aTechnology:
     else -> "$aReleaseVersion-SNAPSHOT"
 }
 
-fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcdAlgitesRepositoryEndpoint, aProfiles: Map<String, AIcdAlgitesCredentialProfile>): Map<String, String> {
+fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcdAlgitesResourceEndpoint, aProfiles: Map<String, AIcdAlgitesCredentialProfile>): Map<String, String> {
     val locProfileId = aEndpoint.credentialProfile
         ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id}' requires a credentialProfile.")
     val locProfile = aProfiles[locProfileId]
@@ -1092,7 +1095,7 @@ fun AIcAlgitesRepsyLoginUrl(aEndpointUrl: String): String {
 
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesRepsyHeaders(
-    aEndpoint: AIcdAlgitesRepositoryEndpoint,
+    aEndpoint: AIcdAlgitesResourceEndpoint,
     aProfiles: Map<String, AIcdAlgitesCredentialProfile>
 ): Map<String, String> {
     val locProfileId = aEndpoint.credentialProfile
@@ -1130,7 +1133,7 @@ fun AIcAlgitesRepsyHeaders(
 }
 
 fun AIcAlgitesDeleteRepsySnapshot(
-    aEndpoint: AIcdAlgitesRepositoryEndpoint,
+    aEndpoint: AIcdAlgitesResourceEndpoint,
     aProfiles: Map<String, AIcdAlgitesCredentialProfile>,
     aPackageName: String,
     aVersion: String,
@@ -1175,7 +1178,7 @@ fun AIcAlgitesDeleteRepsySnapshot(
 
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesDeleteCloudsmithSnapshot(
-    aEndpoint: AIcdAlgitesRepositoryEndpoint,
+    aEndpoint: AIcdAlgitesResourceEndpoint,
     aProfiles: Map<String, AIcdAlgitesCredentialProfile>,
     aPackageName: String,
     aVersionSelector: String,
@@ -2039,40 +2042,43 @@ val locAlgitesRequiredCredentialsPlan = run {
     } else {
         locDeclaredOperationTechnologyKinds
     }
-    val locRepositories = linkedMapOf<String, Map<String, String?>>()
+    val locResourceEndpoints = linkedMapOf<String, Map<String, String?>>()
     val locCredentials = linkedMapOf<String, Map<String, String>>()
 
     fun AIcCollect(aMetadata: Map<String, Any?>, aScope: String) {
         val locScopeTechnologyKinds = AIcAlgitesStringList(aMetadata["technologyKinds"]).toSet()
-        val locRepositoryMap = aMetadata["repositories"] as? Map<*, *> ?: return
+        val locResourceEndpointMap = aMetadata["resourceEndpoints"] as? Map<*, *> ?: return
         val locProfiles = AIcAlgitesCredentialProfiles(aMetadata["credentialProfiles"])
 
-        locRepositoryMap.keys.mapNotNull { it?.toString() }.sorted().forEach { locCell ->
+        locResourceEndpointMap.keys.mapNotNull { it?.toString() }.sorted().forEach resourceEndpointCellLoop@ { locCell ->
             val locSegments = locCell.split('.')
-            if (locSegments.size != 4) return@forEach
-            val (locTechnology, locVisibility, locStability, locUsage) = locSegments
-            if (locUsage !in locRequestedUsages) return@forEach
-            if (locUsage == "download" && locVisibility !in locDownloadVisibilities) return@forEach
-            if (locUsage == "upload" && locVisibility !in locUploadVisibilities) return@forEach
-            if (locUsage == "manage" && locVisibility !in locManageVisibilities) return@forEach
-            if (locUsage == "download" && locStability !in locDownloadStabilities) return@forEach
-            if (locUsage == "upload" && locStability !in locUploadStabilities) return@forEach
-            if (locUsage == "manage" && locStability !in locManageStabilities) return@forEach
-            if (locUsage == "manage" && aScope == "repository") return@forEach
-            if (locUsage == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@forEach
-            if (locTechnology !in locOperationTechnologyKinds) return@forEach
-            if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@forEach
+            if (locSegments.size != 4) return@resourceEndpointCellLoop
+            val (locTechnology, locResourceKind, locVisibility, locAction) = locSegments
+            if (locResourceKind != "native_build_output") return@resourceEndpointCellLoop
+            if (locAction !in locRequestedUsages) return@resourceEndpointCellLoop
+            if (locAction == "download" && locVisibility !in locDownloadVisibilities) return@resourceEndpointCellLoop
+            if (locAction == "upload" && locVisibility !in locUploadVisibilities) return@resourceEndpointCellLoop
+            if (locAction == "manage" && locVisibility !in locManageVisibilities) return@resourceEndpointCellLoop
+            if (locAction == "manage" && aScope == "repository") return@resourceEndpointCellLoop
+            if (locAction == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@resourceEndpointCellLoop
+            if (locTechnology !in locOperationTechnologyKinds) return@resourceEndpointCellLoop
+            if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@resourceEndpointCellLoop
 
-            AIcAlgitesRepositoryEndpoints(aMetadata["repositories"], locCell).forEach { locEndpoint ->
+            AIcAlgitesResourceEndpoints(aMetadata["resourceEndpoints"], locCell).forEach resourceEndpointLoop@ { locEndpoint ->
+                val locStability = locEndpoint.stability ?: return@resourceEndpointLoop
+                if (locAction == "download" && locStability !in locDownloadStabilities) return@resourceEndpointLoop
+                if (locAction == "upload" && locStability !in locUploadStabilities) return@resourceEndpointLoop
+                if (locAction == "manage" && locStability !in locManageStabilities) return@resourceEndpointLoop
                 val locProfileId = locEndpoint.credentialProfile
                 val locProfile = if (locProfileId.isNullOrBlank()) null else locProfiles[locProfileId]
                     ?: throw GradleException(
-                        "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
+                        "ResourceEndpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
                     )
-                val locRepositoryKey = "$aScope|$locCell|${locEndpoint.id}"
-                locRepositories[locRepositoryKey] = linkedMapOf(
+                val locEndpointKey = "$aScope|$locCell|$locStability|${locEndpoint.id}"
+                locResourceEndpoints[locEndpointKey] = linkedMapOf(
                     "scope" to aScope,
                     "cell" to locCell,
+                    "stability" to locStability,
                     "id" to locEndpoint.id,
                     "credentialProfile" to locProfileId,
                     "credentialType" to locProfile?.type
@@ -2094,7 +2100,8 @@ val locAlgitesRequiredCredentialsPlan = run {
     }
 
     val locPlan = linkedMapOf<String, Any>(
-        "repositories" to locRepositories.values.toList(),
+        "resourceEndpoints" to locResourceEndpoints.values.toList(),
+        "repositories" to locResourceEndpoints.values.toList(),
         "credentials" to locCredentials.values.toList()
     )
     Triple(JsonOutput.toJson(locPlan), locCredentials.size, locOperationTechnologyKinds.sorted())
@@ -2102,7 +2109,7 @@ val locAlgitesRequiredCredentialsPlan = run {
 
 val algitesResolveRequiredCredentials = tasks.register<AIcResolveAlgitesRequiredCredentialsTask>("resolveAlgitesRequiredCredentials") {
     group = "algites"
-    description = "Resolves enabled repository endpoints and the credential profiles required by the selected repository context."
+    description = "Resolves enabled ResourceEndpoints and the credential profiles required by the selected operation context."
 
     planJson.set(locAlgitesRequiredCredentialsPlan.first)
     credentialCount.set(locAlgitesRequiredCredentialsPlan.second)
@@ -2224,7 +2231,7 @@ subprojects {
     val locAlgitesEffectiveArtifactId = AIcAlgitesEffectiveArtifactId(locAlgitesCanonicalArtifactId, locAlgitesVariantId)
     val locAlgitesProjectVersion = project.version.toString()
 
-    val locEffectiveRepositories = locAlgitesArtifactDirectory?.get("repositories")
+    val locEffectiveResourceEndpoints = locAlgitesArtifactDirectory?.get("resourceEndpoints")
     val locEffectiveCredentialProfiles = AIcAlgitesCredentialProfiles(locAlgitesArtifactDirectory?.get("credentialProfiles"))
 
     val locAlgitesArtifactDirectoryPath = locAlgitesArtifactDirectory?.get("path")?.toString()?.takeIf { it.isNotBlank() } ?: "."
@@ -2367,8 +2374,8 @@ subprojects {
                 repositories {
                     val locIsSnapshot = locAlgitesProjectVersion.endsWith("SNAPSHOT", ignoreCase = true)
                     val locStability = if (locIsSnapshot) "snapshot" else "release"
-                    val locCell = "java.$algitesPublicationRepositoryVisibility.$locStability.upload"
-                    val locEndpoints = AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locCell)
+                    val locCell = "java.native_build_output.$algitesPublicationRepositoryVisibility.upload"
+                    val locEndpoints = AIcAlgitesResourceEndpoints(locEffectiveResourceEndpoints, locCell, locStability)
 
                     locEndpoints.forEach { locEndpoint ->
                         maven {
@@ -2530,11 +2537,9 @@ subprojects {
         }
 
         val locPythonDownloadEndpoints = listOf(
-            "python.public.release.download",
-            "python.public.snapshot.download",
-            "python.private.release.download",
-            "python.private.snapshot.download"
-        ).flatMap { locCell -> AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locCell) }
+            "python.native_build_output.public.download",
+            "python.native_build_output.private.download"
+        ).flatMap { locCell -> AIcAlgitesResourceEndpoints(locEffectiveResourceEndpoints, locCell) }
         val locPythonDownloadEndpointDefinitions = locPythonDownloadEndpoints.map { locEndpoint ->
             val locProfileId = locEndpoint.credentialProfile.orEmpty()
             val locProfileType = if (locProfileId.isBlank()) "" else locEffectiveCredentialProfiles[locProfileId]?.type.orEmpty()
@@ -2766,8 +2771,8 @@ subprojects {
         }
 
         val locPythonPublishStability = if (locAlgitesProjectVersion.endsWith("SNAPSHOT", ignoreCase = true)) "snapshot" else "release"
-        val locPythonPublishCell = "python.$algitesPublicationRepositoryVisibility.$locPythonPublishStability.upload"
-        val locPythonPublishEndpoints = AIcAlgitesRepositoryEndpoints(locEffectiveRepositories, locPythonPublishCell)
+        val locPythonPublishCell = "python.native_build_output.$algitesPublicationRepositoryVisibility.upload"
+        val locPythonPublishEndpoints = AIcAlgitesResourceEndpoints(locEffectiveResourceEndpoints, locPythonPublishCell, locPythonPublishStability)
         val locPythonPublishEndpointDefinitions = locPythonPublishEndpoints.map { locEndpoint ->
             val locProfileId = locEndpoint.credentialProfile.orEmpty()
             val locProfileType = if (locProfileId.isBlank()) "" else locEffectiveCredentialProfiles[locProfileId]?.type.orEmpty()
@@ -2831,7 +2836,7 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
             if (locReleaseVersion.endsWith("SNAPSHOT", ignoreCase = true)) {
                 throw GradleException("Released-snapshot cleanup requires a release version, but '$locProjectPath' resolved '$locReleaseVersion'.")
             }
-            val locRepositories = locMetadata["repositories"]
+            val locResourceEndpoints = locMetadata["resourceEndpoints"]
             val locProfiles = AIcAlgitesCredentialProfiles(locMetadata["credentialProfiles"])
             val locGroupId = locMetadata["groupId"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
             val locArtifactBaseId = AIcAlgitesCanonicalArtifactId(locProjectPath)
@@ -2839,8 +2844,8 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
             val locArtifactId = AIcAlgitesEffectiveArtifactId(locArtifactBaseId, locVariantId)
 
             locTechnologyKinds.sorted().forEach { locTechnology ->
-                val locCell = "$locTechnology.$algitesPublicationRepositoryVisibility.snapshot.manage"
-                val locEndpoints = AIcAlgitesRepositoryEndpoints(locRepositories, locCell)
+                val locCell = "$locTechnology.native_build_output.$algitesPublicationRepositoryVisibility.manage"
+                val locEndpoints = AIcAlgitesResourceEndpoints(locResourceEndpoints, locCell, "snapshot")
                 if (locEndpoints.isEmpty()) {
                     logger.lifecycle("No enabled $locTechnology snapshot manage endpoint is configured for '$locProjectPath'; cleanup is skipped for this TechnologyKind.")
                     return@forEach
@@ -2862,7 +2867,7 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
 
                 locEndpoints.forEach { locEndpoint ->
                     locConfiguredTargets++
-                    val locDeleted = when (locEndpoint.usageProviderAdapter) {
+                    val locDeleted = when (locEndpoint.resourceEndpointProviderAdapter) {
                         "cloudsmith" -> AIcAlgitesDeleteCloudsmithSnapshot(
                             locEndpoint,
                             locProfiles,
@@ -2890,9 +2895,9 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
                                 )
                             }
                         }
-                        null -> throw GradleException("Manage endpoint '${locEndpoint.id}' has no usageProviderAdapter.")
+                        null -> throw GradleException("Manage endpoint '${locEndpoint.id}' has no ResourceEndpointProviderAdapter.")
                         else -> throw GradleException(
-                            "Manage endpoint '${locEndpoint.id}' uses unsupported usageProviderAdapter '${locEndpoint.usageProviderAdapter}'."
+                            "Manage endpoint '${locEndpoint.id}' uses unsupported ResourceEndpointProviderAdapter '${locEndpoint.resourceEndpointProviderAdapter}'."
                         )
                     }
                     locDeletedPackages += locDeleted
@@ -2922,8 +2927,8 @@ tasks.register("printAlgitesDeploymentPlan") {
         algitesResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { locEntry ->
             val locMetadata = locEntry.value
             println(" - ${locEntry.key}: technologyKinds=${AIcAlgitesStringList(locMetadata["technologyKinds"])}")
-            val locRepositories = locMetadata["repositories"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
-            locRepositories.toSortedMap(compareBy { it.toString() }).forEach { (locCell, locEndpoints) ->
+            val locResourceEndpoints = locMetadata["resourceEndpoints"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+            locResourceEndpoints.toSortedMap(compareBy { it.toString() }).forEach { (locCell, locEndpoints) ->
                 println("     $locCell=$locEndpoints")
             }
         }

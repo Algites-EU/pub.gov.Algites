@@ -7,8 +7,12 @@
     "DocumentContent": {
       "type": "object",
       "properties": {
+        "ResourceEndpoints": {
+          "$ref": "algites-resource-endpoints_1.yamldef.schema.json#EmbeddedContent"
+        },
         "Repositories": {
-          "$ref": "algites-repository-matrix_1.yamldef.schema.json#EmbeddedContent"
+          "$ref": "algites-repository-matrix_1.yamldef.schema.json#EmbeddedContent",
+          "deprecated": true
         },
         "CredentialProfiles": {
           "$ref": "algites-credential-profiles_1.yamldef.schema.json#EmbeddedContent"

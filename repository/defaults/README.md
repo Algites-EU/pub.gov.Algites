@@ -1,11 +1,12 @@
-# Algites public repository defaults
+# Algites public ResourceEndpoint defaults
 
-This directory contains public repository-default governance data consumed by the common Algites repository resolver.
+This directory contains public ResourceEndpoint-default governance data consumed by the common Algites resolver.
 
-- `algites-repository-download-defaults-public.yml` contains canonical public **download** endpoints for all standard TechnologyKinds (`java`, `python`, `mps`).
+- `algites-repository-download-defaults-public.yml` retains its historical filesystem name for workflow compatibility, but its document now uses the generalized `ResourceEndpoints` model.
+- The public defaults currently define `native_build_output` **download** endpoints for the standard Java, Python, and MPS TechnologyKinds.
 
-The resolver implementation contains only repository-resolution mechanics; concrete public repository URLs are defined here. Explicit `dummy.invalid` URLs are intentional placeholders for cells whose current endpoint has not yet been confirmed. Replace them before using the corresponding TechnologyKind in production.
+A ResourceEndpoint is selected by `TechnologyKind`, `ResourceKind`, visibility, and action. `Stability` is endpoint data rather than a fixed matrix axis. The built-in `native_build_output` and `docs_site` ResourceKinds require `Stability`; `schema_site` forbids it.
 
-CI exposes this file to the resolver through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`. A local build may point the same environment variable at a checkout/copy of this file.
+CI exposes this file through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`. A local build may point the same environment variable at a checkout/copy of the file. The historical environment-variable name remains supported during the migration because it identifies the governance input file, not the metadata model contained in it.
 
-Private-governance automation may additionally supply `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` for the combined public upload/manage overlay, or `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` for the combined private download/upload/manage overlay. Public repository resolution never loads the private overlay.
+Private-governance automation may additionally supply `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` for the combined public upload/manage overlay, or `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` for private download/upload/manage endpoints. Legacy defaults that still contain `Repositories` are normalized to `native_build_output` ResourceEndpoints by the Phase-5 resolver.

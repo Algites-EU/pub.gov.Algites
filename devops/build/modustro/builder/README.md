@@ -15,3 +15,11 @@ The package namespace is `eu.algites.pltf.modustro.builder`.
 ## Phase 4 capability planning
 
 Phase 4 adds the Gradle-independent capability demand graph and TechnologyKind-specific capability configuration contracts. Build-output production plans declare required capabilities; the built-in planner deduplicates them and expands prerequisites. Phase 4A published that portable model as a bootstrap stage. Phase 4B activates it in the Gradle adapter and documentation generation: dependency-resolution preflight is demand-driven, source-native processing has one shared lifecycle boundary per TechnologyKind/artifact, and native documentation expands through the same prerequisite graph.
+
+## Phase 5 ResourceEndpoints
+
+Phase 5 generalizes external build/publication targets from the native-package-only `Repositories` matrix to `ResourceEndpoints`. The portable model defines ResourceKinds, endpoint actions, ResourceKind-specific stability rules, effective endpoint definitions, and validation independent of Gradle.
+
+The canonical selection dimensions are `TechnologyKind / ResourceKind / Visibility / Action`. `Stability` is endpoint data: `native_build_output` and `docs_site` require it, while `schema_site` forbids it. Provider-specific behavior uses the generic `ResourceEndpointProviderAdapter` name.
+
+The active Gradle adapter consumes canonical `resourceEndpoints` for Java/Python native dependency resolution, publication, credential preflight, and released-snapshot cleanup. Legacy `Repositories` input remains accepted and is normalized to `native_build_output` so existing governance overlays can migrate independently. Phase 6 will activate `docs_site` and `schema_site` generation/publication on the same endpoint model.

@@ -82,11 +82,12 @@ data class AIcdSettingsCredentialProfile(
     val configuration: Map<String, String>
 )
 
-data class AIcdSettingsRepositoryEndpoint(
+data class AIcdSettingsResourceEndpoint(
     val cell: String,
     val id: String,
     val url: String,
     val credentialProfile: String?,
+    val stability: String,
     val profiles: Map<String, AIcdSettingsCredentialProfile>
 )
 
@@ -106,53 +107,51 @@ fun AIcSettingsCredentialProfiles(aValue: Any?): Map<String, AIcdSettingsCredent
 }
 
 @Suppress("UNCHECKED_CAST")
-fun AIcCollectJavaDownloadRepositories(
-    aRepositories: Any?,
+fun AIcCollectJavaDownloadResourceEndpoints(
+    aResourceEndpoints: Any?,
     aCredentialProfiles: Any?,
-    aTarget: MutableMap<String, AIcdSettingsRepositoryEndpoint>
+    aTarget: MutableMap<String, AIcdSettingsResourceEndpoint>
 ) {
-    val locRepositories = aRepositories as? Map<*, *> ?: return
+    val locResourceEndpoints = aResourceEndpoints as? Map<*, *> ?: return
     val locProfiles = AIcSettingsCredentialProfiles(aCredentialProfiles)
-    locAllowedDownloadVisibilities.forEach { locVisibility ->
-        listOf("release", "snapshot").forEach { locStability ->
-            val locCell = "java.$locVisibility.$locStability.download"
-            val locItems = locRepositories[locCell] as? List<*> ?: return@forEach
-            locItems.forEach { locItem ->
-                val locMap = locItem as? Map<*, *> ?: return@forEach
-                val locEnabled = locMap["enabled"]?.toString()?.toBooleanStrictOrNull() ?: true
-                if (!locEnabled) return@forEach
-                val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@forEach
-                val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@forEach
-                val locProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-                val locEndpoint = AIcdSettingsRepositoryEndpoint(locCell, locId, locUrl, locProfile, locProfiles)
-                val locPrevious = aTarget[locId]
-                if (locPrevious != null && locPrevious != locEndpoint) {
-                    error("Repository endpoint '$locId' resolves inconsistently across the repository build.")
-                }
-                aTarget[locId] = locEndpoint
+    locAllowedDownloadVisibilities.forEach visibilityLoop@ { locVisibility ->
+        val locCell = "java.native_build_output.$locVisibility.download"
+        val locItems = locResourceEndpoints[locCell] as? List<*> ?: return@visibilityLoop
+        locItems.forEach endpointLoop@ { locItem ->
+            val locMap = locItem as? Map<*, *> ?: return@endpointLoop
+            val locEnabled = locMap["enabled"]?.toString()?.toBooleanStrictOrNull() ?: true
+            if (!locEnabled) return@endpointLoop
+            val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@endpointLoop
+            val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@endpointLoop
+            val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()?.takeIf { it in setOf("release", "snapshot") } ?: return@endpointLoop
+            val locProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
+            val locEndpoint = AIcdSettingsResourceEndpoint(locCell, locId, locUrl, locProfile, locStability, locProfiles)
+            val locPrevious = aTarget[locId]
+            if (locPrevious != null && locPrevious != locEndpoint) {
+                error("ResourceEndpoint '$locId' resolves inconsistently across the repository build.")
             }
+            aTarget[locId] = locEndpoint
         }
     }
 }
 
-val locJavaDownloadRepositories = linkedMapOf<String, AIcdSettingsRepositoryEndpoint>()
-AIcCollectJavaDownloadRepositories(
-    locAlgitesRepositoryMetadata["repositories"],
+val locJavaDownloadResourceEndpoints = linkedMapOf<String, AIcdSettingsResourceEndpoint>()
+AIcCollectJavaDownloadResourceEndpoints(
+    locAlgitesRepositoryMetadata["resourceEndpoints"],
     locAlgitesRepositoryMetadata["credentialProfiles"],
-    locJavaDownloadRepositories
+    locJavaDownloadResourceEndpoints
 )
 locAlgitesArtifactDirectories.forEach { locArtifactDirectory ->
-    AIcCollectJavaDownloadRepositories(
-        locArtifactDirectory["repositories"],
+    AIcCollectJavaDownloadResourceEndpoints(
+        locArtifactDirectory["resourceEndpoints"],
         locArtifactDirectory["credentialProfiles"],
-        locJavaDownloadRepositories
+        locJavaDownloadResourceEndpoints
     )
 }
 
 dependencyResolutionManagement.repositories {
-    locJavaDownloadRepositories.values.forEach { locEndpoint ->
-        val locSegments = locEndpoint.cell.split('.')
-        val locStability = locSegments[2]
+    locJavaDownloadResourceEndpoints.values.forEach { locEndpoint ->
+        val locStability = locEndpoint.stability
         maven {
             name = locEndpoint.id.replace('-', '_')
             url = uri(locEndpoint.url)
@@ -162,7 +161,7 @@ dependencyResolutionManagement.repositories {
             val locProfileId = locEndpoint.credentialProfile
             if (!locProfileId.isNullOrBlank() && !locAlgitesCredentialPreflight) {
                 val locProfile = locEndpoint.profiles[locProfileId]
-                    ?: error("Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'.")
+                    ?: error("ResourceEndpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'.")
                 when (locProfile.type) {
                     "basic" -> {
                         val locUsername = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "Username", rootDir)
@@ -215,5 +214,5 @@ dependencyResolutionManagement.repositories {
 
 println(
     "Algites settings discovery included ${locIncludedProjectPaths.size} Gradle artifact project(s) and " +
-        "${locJavaDownloadRepositories.size} resolved Java download repository endpoint(s)."
+        "${locJavaDownloadResourceEndpoints.size} resolved Java native-build-output download ResourceEndpoint(s)."
 )

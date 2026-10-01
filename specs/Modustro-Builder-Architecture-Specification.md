@@ -270,7 +270,67 @@ Every concrete `AIcBuildOutputProductionPlan` carries the capability IDs require
 
 Phase 4A was the bootstrap stage in which the graph/model and configuration schemas were published without changing active orchestration. Phase 4B consumes the graph in the Gradle adapter. Build-output demands now control whether technology dependency-resolution preflight is required, and `source_native_processing` is materialized as one lifecycle boundary per TechnologyKind/artifact. The built-in Python implementation also owns the standard resource-to-package transformation: `jsondefs`, `yamldefs`, `xmldefs`, and `config` product roots are staged beneath the derived artifact import namespace in the disposable run workspace, so individual artifacts must not implement equivalent Gradle copy tasks. Documentation generation adds an explicit `generation_of_native_documentation` demand; the planner expands it to `source_native_processing` and `dependency_resolution`, and Gradle task dependency deduplication ensures that shared prerequisites execute once even when multiple outputs or documentation consumers require them. The documentation site itself is represented by repository-scoped `publication_of_docs_site` and scoped `docs_site_content` demands. Global-schema publication remains dormant until the `schema_site` work in Phase 6.
 
-## 9. Canonical definitions and global publication metadata
+## 9. Phase-5 generalized ResourceEndpoints
+
+Phase 5 replaces the native-package-only repository matrix as the canonical endpoint model with generalized **ResourceEndpoints**. The endpoint selection key has four structural dimensions:
+
+```text
+TechnologyKind / ResourceKind / Visibility / Action
+```
+
+`Stability` is deliberately not a fifth mandatory matrix dimension. It is endpoint data whose presence is governed by the selected ResourceKind. This lets one endpoint model serve both native package repositories and publication resources whose lifecycle is not meaningfully split into release/snapshot channels.
+
+The initial built-in ResourceKinds are:
+
+| ResourceKind | TechnologyKinds | Stability | Phase-5 status |
+| --- | --- | --- | --- |
+| `native_build_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | active for download/upload/manage |
+| `docs_site` | `modustro` | required (`release` / `snapshot`) | selectable infrastructure; generation/publication activates in Phase 6 |
+| `schema_site` | `modustro` | forbidden | selectable infrastructure; generation/publication activates in Phase 6 |
+
+A canonical endpoint declaration therefore has the shape:
+
+```yaml
+ResourceEndpoints:
+  java:
+    native_build_output:
+      public:
+        upload:
+          - Id: algites-java-native-build-output-public-snapshot-upload
+            Url: https://example.invalid/maven/
+            Stability: snapshot
+            CredentialProfile: algites-java-public-snapshot-upload
+```
+
+A schema-site endpoint intentionally omits Stability:
+
+```yaml
+ResourceEndpoints:
+  modustro:
+    schema_site:
+      public:
+        upload:
+          - Id: algites-modustro-schema-site-public-upload
+            Url: https://example.invalid/schema-site/
+```
+
+Each endpoint may define `Id`, `Url`, `CredentialProfile`, `Enabled`, `Stability` when permitted/required by its ResourceKind, and optional `ResourceEndpointProviderAdapter`. `Enabled` defaults to true. Inheritance merges endpoints by `Id` inside the same four-dimensional cell, so a descendant can change one property or disable an inherited endpoint without copying the remaining endpoint definition.
+
+`ResourceEndpointProviderAdapter` is the generalized name for provider-specific behavior. The TechnologyKind/ResourceKind/Action combination owns default protocol behavior; a provider adapter is used only when a provider requires behavior outside that default contract. Current native-build-output management adapters remain `cloudsmith` and `repsy`. Phase 6 may add deployment adapters for documentation or schema storage without changing the ResourceEndpoint model.
+
+The source-repository visibility policy is preserved:
+
+- public source repositories may consume and publish only public ResourceEndpoints;
+- private source repositories may consume public and private ResourceEndpoints, but publish/manage their own resources only through private ResourceEndpoints.
+
+The former `Repositories` document shape remains a migration input during Phase 5. The resolver normalizes each legacy
+`TechnologyKind / Visibility / Stability / Usage` cell to a `native_build_output` ResourceEndpoint cell and moves the legacy stability axis onto the endpoint. Legacy `UsageProviderAdapter` is normalized to `ResourceEndpointProviderAdapter`. New metadata SHOULD use `ResourceEndpoints`; resolved metadata exposes the generalized form and retains a legacy native-build-output projection for compatibility with older adapters during migration.
+
+`PublicationDestinations` in publication capability configuration denotes an optional set of ResourceEndpoint IDs. It does not contain URLs, credentials, or provider-specific state. When omitted, the publication adapter may select all enabled endpoints matching the capability's TechnologyKind/ResourceKind/visibility/action context. Phase 6 activates this selection for `docs_site` and `schema_site`.
+
+Resource endpoint selection and credential materialization remain separate. Endpoints contain only a `CredentialProfile` reference; secret values continue to be resolved by the existing provider-independent credential document and trusted CI bridge.
+
+## 10. Canonical definitions and global publication metadata
 
 `coreintf` publishes representation-specific canonical definitions below `yamldefs`, `jsondefs`, and `xmldefs` source roots. The representations model the same logical contract but MAY differ where the target representation or its schema technology supports different constraints. Versioned definition files use `_1` and also contain an internal definition version.
 
@@ -290,7 +350,7 @@ This split is a trust-boundary rule, not merely a serialization preference: a pu
 
 A later schema-site phase will make a valid user sidecar mandatory for every selected publication source. Automatic user-sidecar generation will be an explicit task; an ordinary build will validate rather than mutate source metadata. Deploy sidecars are generated only by publication/deployment infrastructure and are not committed to the source repository.
 
-## 10. Planned continuation
+## 11. Planned continuation
 
 The staged continuation is:
 
@@ -298,7 +358,7 @@ The staged continuation is:
 2. dependency model and Java/Python native-resolution bridges (complete);
 3. concrete BuildOutputType producers, `PreparedSourceSet`, effective output selection, and Gradle adapter activation (complete);
 4. technology capabilities and demand-driven build graph (complete);
-5. generalized ResourceEndpoints and publication/deployment infrastructure;
+5. generalized ResourceEndpoints and publication/deployment infrastructure (complete);
 6. `docs_site` and `schema_site` generation/publication;
 7. additional producers, including `python_aws_lambda_zip`, and gradual removal of business logic from Gradle scripts;
 8. later producer/plugin discovery through AAC capabilities/providers.

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:annotation><xs:documentation>ResourceEndpoint Definition v1</xs:documentation></xs:annotation>
+  <xs:complexType name="DocumentContentType">
+    <xs:sequence>
+      <xs:element name="TechnologyKind" minOccurs="1" maxOccurs="1" type="xs:string"/>
+      <xs:element name="ResourceKind" minOccurs="1" maxOccurs="1" type="xs:string"/>
+      <xs:element name="Visibility" minOccurs="1" maxOccurs="1" type="xs:string"/>
+      <xs:element name="Action" minOccurs="1" maxOccurs="1" type="xs:string"/>
+      <xs:element name="Id" minOccurs="1" maxOccurs="1" type="xs:string"/>
+      <xs:element name="Url" minOccurs="1" maxOccurs="1" type="xs:anyURI"/>
+      <xs:element name="CredentialProfile" minOccurs="0" maxOccurs="1" type="xs:string"/>
+      <xs:element name="Enabled" minOccurs="1" maxOccurs="1" type="xs:boolean"/>
+      <xs:element name="Stability" minOccurs="0" maxOccurs="1" type="xs:string"/>
+      <xs:element name="ResourceEndpointProviderAdapter" minOccurs="0" maxOccurs="1" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:element name="ResourceModel" type="DocumentContentType"/>
+</xs:schema>

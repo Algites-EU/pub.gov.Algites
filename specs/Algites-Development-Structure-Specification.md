@@ -35,7 +35,7 @@ The goals are:
 ### 2.2. Terminology
 
 - **Visibility** – governance scope of a repository or artifact (`pub` or `priv`).
-- **Role** – technical role of a repository or artifact (`pltf`, `app`, `lib`, `tool`, `ops`, `frmw`, etc.).
+- **Role** – technical role of a repository or artifact (`pltf`, `app`, `lib`, `tool`, `frmw`, etc.).
 - **BusinessName** – PascalCase domain or product/application concept (e.g., `Modustro`, `MyGreatProduct`).
 - **RepoSubname** – optional lowercase technical qualifier of a repository (e.g., `common`, `core`, `backend`).
 - **Module Path** – dot-separated identifier of a module or component within a repository.
@@ -633,9 +633,8 @@ Common roles include:
 - `app` – application - concrete applications
 - `lib` – reusable libraries
 - `tool` – build and development tools
-- `frmw` – framework – generic frameworks
+- `frmw` - framework – generic frameworks
 - `lab` – laboratory - experimental or laboratory work
-- `ops` – operations – data connected with the running infrastructure, etc. Configurations without secrets, scripts, ...
 
 New roles MAY be introduced but MUST be lowercase and documented.
 
@@ -649,7 +648,7 @@ Build and publication automation MUST:
 - enforce that `ArtifactCoordinateId` starts with the same visibility prefix and follows the `_` separator rule,
 - enforce variant rules, including the terminal nature of `-tests`,
 - validate every declared TechnologyKind against the supported TechnologyKind registry,
-- resolve the effective publication repository matrix for the selected TechnologyKinds,
+- resolve the effective ResourceEndpoints for the selected TechnologyKinds and ResourceKinds,
 - publish each technology-specific output only to a target permitted by repository visibility and the effective publication configuration.
 
 Java/Maven `GroupId` remains identical for public and private variants within the same domain. Other TechnologyKinds MUST define equivalent visibility-safe publication mappings in their TechnologyKind adapters.
@@ -1085,7 +1084,7 @@ Different ecosystems expose different dependency, packaging, and source-processi
 
 ---
 
-### 3.9. Repository Structure, SourceTypes, TechnologyKinds, and Publication Repositories
+### 3.9. Repository Structure, SourceTypes, TechnologyKinds, and ResourceEndpoints
 
 #### 3.9.1 Canonical source layout
 
@@ -1246,89 +1245,89 @@ repository top-level groupId
 
 If a descendant metadata file declares its own top-level `GroupId`, that value replaces the inherited value for that node and all descendants until another override is encountered. An artifact that does not declare `GroupId` therefore receives the nearest ancestor value. This inheritance is independent of `SourceRepository`, `ArtifactSet`, and `artifact` fields and independent of `TechnologyKinds`, repository configuration, and version context.
 
-#### 3.9.5 Publication repository matrix
+#### 3.9.5 ResourceEndpoints
 
-Artifact repositories are resolved on four independent axes:
+External build and publication targets are modeled by `ResourceEndpoints`. A ResourceEndpoint is selected on four structural axes:
 
-1. **TechnologyKind / technology** — e.g. `java`, `python`, `mps`;
-2. **visibility** — `public` or `private`;
-3. **stability** — `release` or `snapshot`;
-4. **usage** — `download`, `upload`, or `manage`.
+1. **TechnologyKind** — the adapter/protocol family, initially `java`, `python`, `mps`, or `modustro`;
+2. **ResourceKind** — the logical resource exposed by the endpoint;
+3. **visibility** — `public` or `private`;
+4. **action** — `download`, `upload`, or `manage`.
 
-A matrix cell contains an ordered list of repository endpoints rather than a single URL. Each endpoint has a stable `id` so inherited endpoints can be amended, disabled, re-enabled, or supplemented without identifying them by URL.
+`Stability` is endpoint data rather than a fixed matrix axis. The ResourceKind contract decides whether Stability is required, optional, or forbidden. Initial built-in ResourceKinds are:
+
+| ResourceKind | TechnologyKinds | Stability |
+| --- | --- | --- |
+| `native_build_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `docs_site` | `modustro` | required: `release` or `snapshot` |
+| `schema_site` | `modustro` | forbidden |
+
+For example:
 
 ```yaml
-Repositories:
+ResourceEndpoints:
   java:
-    private:
-      release:
+    native_build_output:
+      private:
         download:
-          - Id: algites-java-private-release-download
+          - Id: algites-java-native-build-output-private-release-download
             Url: https://example.invalid/maven/private/releases/
+            Stability: release
             CredentialProfile: algites-java-private-release-download
 
-          - Id: algites-acme-java-private-release-download
-            Url: https://acme.example.invalid/maven/
-            CredentialProfile: algites-acme-java-private-release-download
-            Enabled: true
-
         upload:
-          - Id: algites-java-private-release-upload
+          - Id: algites-java-native-build-output-private-release-upload
             Url: https://example.invalid/maven/private/releases/upload/
+            Stability: release
             CredentialProfile: algites-java-private-release-upload
 
         manage:
-          - Id: algites-java-private-release-manage
-            Url: https://manager.example.invalid/api/packages/private/releases/
-            CredentialProfile: algites-java-private-release-manage
-            UsageProviderAdapter: cloudsmith
+          - Id: algites-java-native-build-output-private-snapshot-manage
+            Url: https://manager.example.invalid/api/packages/private/snapshots/
+            Stability: snapshot
+            CredentialProfile: algites-java-private-snapshot-manage
+            ResourceEndpointProviderAdapter: cloudsmith
 ```
 
-`Enabled` defaults to `true`. A descendant may therefore disable an inherited endpoint without restating its URL or credential profile:
+`Enabled` defaults to `true`. A descendant may disable an inherited endpoint without restating its URL, Stability, credential profile, or provider adapter:
 
 ```yaml
-Repositories:
+ResourceEndpoints:
   java:
-    private:
-      release:
+    native_build_output:
+      private:
         download:
-          - Id: algites-java-private-release-download
+          - Id: algites-java-native-build-output-private-release-download
             Enabled: false
 ```
 
-Repository endpoint inheritance is a merge by endpoint `id` within the same four-dimensional matrix cell. Properties omitted by the lower level remain inherited. New endpoint ids append additional repository targets.
+ResourceEndpoint inheritance is a merge by endpoint `Id` within the same `TechnologyKind / ResourceKind / visibility / action` cell. Properties omitted by the lower level remain inherited. New endpoint IDs append additional targets.
 
-Standard Algites endpoint ids MUST start with `algites-` and encode all four dimensions in this order:
-
-```text
-algites-<technology-kind>-<visibility>-<stability>-<usage>
-```
-
-A qualified external endpoint MAY insert an additional owner/provider qualifier while retaining the four-dimensional suffix, for example:
+Standard new endpoint IDs SHOULD encode their dimensions in this order:
 
 ```text
-algites-acme-java-private-release-download
+algites-<technology-kind>-<resource-kind>-<visibility>-[<stability>-]<action>
 ```
 
-Repository visibility is distinct from source-repository visibility, but source-repository visibility constrains which repository branches may be used:
+The stability segment is present exactly when the ResourceKind uses Stability. Qualified external endpoint IDs MAY insert an additional owner/provider qualifier before the dimensional suffix. During the Phase-5 migration, existing `native_build_output` endpoint IDs in the legacy form `algites-<technology-kind>-<visibility>-<stability>-<action>` remain valid so lower-level overrides keep the same identity.
 
-- artifacts from a `pub` source repository MUST resolve dependencies only from `public` repository cells, MUST publish only to `public` upload cells, and MUST manage only `public` manage cells;
-- artifacts from a `priv` source repository MAY resolve dependencies from both `public` and `private` repository cells and MUST publish/manage their own outputs only through `private` upload/manage cells.
+ResourceEndpoint visibility is distinct from source-repository visibility, but source-repository visibility constrains which endpoint branches may be used:
 
-This asymmetry allows private artifacts to depend on public artifacts while preventing public artifacts from acquiring a dependency on private infrastructure or private-only artifacts.
+- artifacts from a `pub` source repository MUST resolve dependencies only from public ResourceEndpoints, MUST publish only to public upload ResourceEndpoints, and MUST manage only public manage ResourceEndpoints;
+- artifacts from a `priv` source repository MAY resolve dependencies from public and private ResourceEndpoints and MUST publish/manage their own resources only through private upload/manage ResourceEndpoints.
 
-The default protocol/client behaviour for each usage is defined by the corresponding TechnologyKind adapter. Any repository endpoint MAY additionally declare an optional `UsageProviderAdapter` when that specific provider requires behaviour that cannot be expressed by the standard TechnologyKind/usage mechanism. Adapter identity is therefore attached to the individual `download`, `upload`, or `manage` endpoint rather than being a management-only concept. If `UsageProviderAdapter` is absent, the standard TechnologyKind implementation is used. An adapter value is valid only when the implementation supports that adapter for the endpoint's usage.
+The default protocol/client behavior is owned by the effective TechnologyKind/ResourceKind/action adapter. Any endpoint MAY additionally declare `ResourceEndpointProviderAdapter` when a concrete provider needs behavior that cannot be expressed by the standard adapter. Adapter identity belongs to the individual endpoint. `manage` remains deliberately distinct because management operations such as package deletion do not have a technology-wide standard. An enabled native-build-output `manage` endpoint currently MUST declare a supported provider adapter; the generic lifecycle never infers that an upload URL accepts a generic HTTP `DELETE`.
 
-`manage` is deliberately a separate usage because repository-management operations such as package deletion do not have a technology-wide Maven or Python standard. Consequently an enabled `manage` endpoint currently MUST declare a `UsageProviderAdapter`; Algites MUST NOT infer that a manage URL accepts a generic HTTP `DELETE`. Provider-specific upload adapters (for example a future Maven Central Publisher API adapter) can be added without changing the repository matrix model. No provider-specific `download` or `upload` adapter is implemented by the current revision.
+Supported native-build-output management provider adapters remain:
 
-Supported `manage` provider adapters are currently:
+- `cloudsmith`: package-management API lookup/delete adapter supporting exact versions and version-prefix selection;
+- `repsy`: Repsy management API adapter supporting exact Maven/PyPI version deletion as documented by the lifecycle specification.
 
-- `cloudsmith`: `url` is the Cloudsmith package-management API collection URL, for example `https://api.cloudsmith.io/v1/packages/<owner>/<repository>/`. The adapter resolves the requested package/version through the Cloudsmith API before deleting the matching package records. It supports both an exact version selector and a version-prefix selector used for timestamped Python snapshot series. Credential types `api_key` and `bearer` are supported.
-- `repsy`: `url` identifies the concrete Repsy management resource for the repository and TechnologyKind. For Java/Maven it MUST have the form `<api-base>/api/mvn/artifacts/<repoName>`; for Python/PyPI it MUST have the form `<api-base>/api/pypi/packages/<repoName>`. The current adapter deletes an exact Maven artifact version or PyPI release through the Repsy management API. Credential type `basic` authenticates through `<api-base>/api/auth/login` and uses the returned JWT for the delete request; credential type `bearer` supplies an already obtained JWT directly. Until a Repsy release-list API endpoint is confirmed and implemented, timestamp-series Python cleanup is reported for manual remediation rather than guessed from an undocumented API.
+`PublicationDestinations` on publication capability configuration is an optional list of ResourceEndpoint IDs. It narrows endpoint selection but never embeds URLs, credentials, or provider-specific state. Phase 6 activates this mechanism for `docs_site` and `schema_site` publication.
 
-For Repsy, the management API URL is deliberately distinct from the package-consumption/deployment URL such as `https://repo.repsy.io/mvn/<owner>/<repoName>`. Hosted and self-hosted Repsy deployments MAY expose their backend API on different hosts, so the actual management API base is always configured explicitly in the `manage.url` value rather than inferred from download/upload URLs.
+The legacy `Repositories` shape remains accepted as a migration input. A legacy `TechnologyKind / visibility / stability / usage` cell is normalized to ResourceKind `native_build_output`; `stability` becomes endpoint `Stability`, `usage` becomes action, and legacy `UsageProviderAdapter` becomes `ResourceEndpointProviderAdapter`. New metadata SHOULD use `ResourceEndpoints`. Resolved metadata exposes `resourceEndpoints` as the canonical form and retains a legacy native-build-output `repositories` projection temporarily for older consumers.
 
-A repository MAY configure targets for TechnologyKinds that are not currently produced by any artifact; `TechnologyKinds` controls what an artifact builds, while the repository matrix controls where a selected technology kind resolves, publishes, or is managed.
+A repository MAY configure ResourceEndpoints for TechnologyKinds or ResourceKinds that are not currently selected by an artifact. `TechnologyKinds` controls artifact build participation; ResourceEndpoints define available external resource targets.
 
 #### 3.9.6 Released snapshot lifecycle
 
@@ -1338,26 +1337,27 @@ A repository MAY configure targets for TechnologyKinds that are not currently pr
 DeleteSnapshotWhenReleased: false
 ```
 
-When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `snapshot.manage` endpoints. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
+When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `native_build_output` manage ResourceEndpoints with `Stability: snapshot`. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
 
 For example, release `1.4.0` targets only the corresponding snapshot line. For Java that is the exact `1.4.0-SNAPSHOT` version; for Python it is every immutable development release whose version starts with `1.4.0.dev`. It MUST NOT remove later snapshot lines such as Java `1.4.1-SNAPSHOT` / `1.5.0-SNAPSHOT` or Python `1.4.1.dev*` / `1.5.0.dev*`. A multi-TechnologyKind artifact is cleaned only after all release publication processing has completed, and only TechnologyKinds actually selected for that release are eligible for cleanup.
 
 #### 3.9.7 Credential profiles
 
-Repository endpoints never contain secret credential values. An endpoint MAY instead reference a named `CredentialProfile`:
+ResourceEndpoints never contain secret credential values. An endpoint MAY instead reference a named `CredentialProfile`:
 
 ```yaml
 CredentialProfiles:
   algites-java-private-release-download:
     Type: basic
 
-Repositories:
+ResourceEndpoints:
   java:
-    private:
-      release:
+    native_build_output:
+      private:
         download:
           - Id: algites-java-private-release-download
             Url: https://example.invalid/maven/private/releases/
+            Stability: release
             CredentialProfile: algites-java-private-release-download
 ```
 
@@ -1370,7 +1370,7 @@ built-in / governance profiles
         -> artifact
 ```
 
-A lower level MAY redefine only the profile `type`, only non-secret `configuration`, or both. If a profile id did not previously exist, declaring it creates a new profile. Changing a profile type does not require changing the repository endpoint that references the profile.
+A lower level MAY redefine only the profile `type`, only non-secret `configuration`, or both. If a profile id did not previously exist, declaring it creates a new profile. Changing a profile type does not require changing the ResourceEndpoint that references the profile.
 
 Credential type is a closed, implementation-supported enum because each type defines its field contract and application semantics:
 
@@ -1431,7 +1431,7 @@ Credential-type support in `coreintf` is distinct from authentication support in
 | Python download | not yet implemented | Python dependency repository consumption adapter remains to be defined |
 | MPS repository access | not yet implemented | declaration of `mps` alone does not provide a repository adapter |
 
-GitHub Actions performs credential selection in two phases. The Gradle task `resolveAlgitesRequiredCredentials` evaluates enabled repository endpoints for the requested technology/visibility/stability/usage context without requiring their secret values. The trusted bridge then filters `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` to the union of profile/type pairs returned by that plan and materializes all retained fields to `direct_value` before the actual Gradle processing starts.
+GitHub Actions performs credential selection in two phases. The Gradle task `resolveAlgitesRequiredCredentials` evaluates enabled native-build-output ResourceEndpoints for the requested technology/visibility/stability/action context without requiring their secret values. The trusted bridge then filters `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` to the union of profile/type pairs returned by that plan and materializes all retained fields to `direct_value` before the actual Gradle processing starts.
 
 The bridge is intentionally trusted with the complete GitHub secret context: its purpose is to select and materialize the minimum credential subset passed downstream. The final build/publish processing therefore does not receive unrelated credentials.
 
@@ -1447,11 +1447,12 @@ Algites public-governance download defaults
         -> descendant algites-artifact-set.yml / algites-artifact.yml
 ```
 
-Public governance MUST contain only repository information safe to expose publicly. Canonical private repository endpoints and canonical upload endpoints MUST NOT be embedded in `pub.gov.Algites`. Private governance supplies them as authorized overlays.
+Public governance MUST contain only ResourceEndpoint information safe to expose publicly. Canonical private ResourceEndpoints and canonical upload ResourceEndpoints MUST NOT be embedded in `pub.gov.Algites`. Private governance supplies them as authorized overlays.
 
-Private-governance overlay files use `algites-repository-defaults_1.yamldef.schema.json` and MAY contain both:
+Private-governance overlay files use `algites-repository-defaults_1.yamldef.schema.json` and MAY contain:
 
-- `Repositories` — endpoint-list overrides for selected matrix cells;
+- `ResourceEndpoints` — canonical endpoint-list overrides for selected ResourceEndpoint cells;
+- legacy `Repositories` — native-build-output endpoint-list overrides accepted during migration and normalized to `ResourceEndpoints`;
 - `CredentialProfiles` — non-secret profile definitions referenced by those endpoints.
 
 Actual credential values MUST NOT be stored in governance YAML. Upload credential values likewise MUST NOT be made available to ordinary target-repository builds. Provider implementations SHOULD keep publication workers in the private-governance execution context and pass only non-secret target identity/revision information from target repositories.
@@ -2115,7 +2116,7 @@ This section is intentionally placed at the end and is **temporary**.
     - parent edges define baseline dependency intents.
 - Legacy `javagen` and `javaextgen` directories migrate respectively to `java.gen` and `java.extgen`; equivalent suffix rules apply to all SourceTypes.
 - Existing Java/Maven publication coordinates remain valid as the Java mapping of the logical artifact identity. Other technologies add parallel publication mappings rather than redefining the logical artifact.
-- Legacy repository configuration that assumes only Maven repositories should be normalized into the TechnologyKind x visibility x stability x usage repository matrix.
+- Legacy repository configuration that assumes only Maven repositories should be normalized into `ResourceEndpoints` with ResourceKind `native_build_output`.
 
 [[/PROPOSAL]]
 
