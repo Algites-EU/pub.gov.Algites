@@ -7,5 +7,13 @@ package eu.algites.pltf.modustro.builder.model.inheritance;
  */
 @FunctionalInterface
 public interface AIiItemMerger<T> {
+
+    /**
+     * Merges inherited and local definitions of the same item identity.
+     *
+     * @param aInheritedItem inherited item
+     * @param aLocalItem local item
+     * @return merged item
+     */
     T merge(T aInheritedItem, T aLocalItem);
 }

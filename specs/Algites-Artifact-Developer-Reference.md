@@ -147,6 +147,20 @@ Each `DependencyKind` group may set `ItemsInheritancePolicy` to `merge_missing_i
 
 For Python dependency preflight the portable policy is evaluated in at most three global phases: `PREFERRED`, `NON_STRICT_MAXIMUMS`, and `STRICT_MAXIMUMS`. `PREFERRED` attempts preferred candidates, `NON_STRICT_MAXIMUMS` retains relaxable upper bounds, and `STRICT_MAXIMUMS` removes only non-strict upper bounds. The build always delegates the actual graph solution to the native Python resolver.
 
+### 3.2 Canonical definitions and publication sidecars
+
+Canonical machine-readable definitions belong under representation-specific source roots such as `src/product/yamldefs`, `src/product/jsondefs`, and `src/product/xmldefs`. Definition filenames are versioned (`..._1...`) so a changed contract does not silently replace an older one. YAML- and JSON-oriented definitions expressed as JSON Schema retain the target representation in the logical filename, for example `name_1.yamldef.schema.json` and `name_1.jsondef.schema.json`; XML definitions use their normal `.xsd` filename.
+
+Every canonical definition that participates in global publication carries a sibling `<definition-file>.meta.yml` **user sidecar**. Its contract is `global-publication-user-metadata_1` and its only business field is `GlobalPublicationPathId`. The sidecar is author-controlled input to publication; deployment state, timestamps, revisions, publisher identity, and other server-controlled fields are forbidden by the user-metadata schema rather than ignored.
+
+`GlobalPublicationPathId` is the logical path below the canonical definition source root. It therefore excludes technical segments such as `src/product/yamldefs` itself and must not insert an artificial representation directory; the publication endpoint already distinguishes `/api/yamldefs/`, `/api/jsondefs/`, and `/api/xmldefs/`.
+
+The publication service validates the user sidecar and generates a separate `global-publication-deploy-metadata_1` sidecar for deployed content. Deploy metadata carries the validated `GlobalPublicationPathId` plus server-controlled `PublicationState` (`draft` or `release`), `PublicationRevision`, `FirstPublishedAt`, `PublishedAt`, optional `ReleasedAt`, and optional trusted `PublishedBy`. `PublicationRevision` is controlled by the publisher and monotonically increases when deployed draft content is replaced. Transitioning a definition to `release` freezes that content revision; a released `GlobalPublicationPathId` is immutable and must never transition back to `draft`. If `PublishedBy` is present, the deployment adapter must derive it from authenticated/trusted execution context and must never copy it from repository metadata or another author-controlled input.
+
+The planned automatic definition `SystemId` follows the same logical-path rule: it is derived from the effective `GroupId`, the artifact-local logical path, the definition-relative directory path inside its canonical definition source root, and the logical filename. Source-root implementation segments are not part of that identity. Ordinary builds validate source metadata; automatic user-sidecar creation is reserved for an explicit generation task rather than silently mutating authored sources. Deploy sidecars are never generated in the source repository; they are created only at the publication trust boundary.
+
+Root YAML/JSON documents may expose `$schema` as technical document metadata. For generated YAML roots the comment form used by YAML language servers, the commented `$schema` hint, and the actual `$schema` property should identify the same schema URI. Embedded contracts keep `$schema` at the document root rather than forcing it into embedded business objects.
+
 ## 4. `algites-source-repository.yml`
 
 A source repository begins with a root descriptor.
@@ -229,9 +243,9 @@ Every artifact leaf has an artifact descriptor.
 
 ```yaml
 Artifact:
-  TechnologyKinds: [java, python]
   Name: Example definitions
   Description: Shared definitions published for both Java and Python consumers.
+  TechnologyKinds: [java, python]
 ```
 
 ### 6.1 `artifact` attributes
@@ -246,6 +260,8 @@ Artifact:
 | `Artifact.Version` | no | Version-context contribution for this artifact. |
 
 Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
+
+For readability, when `Name`, `Description`, and `TechnologyKinds` are present in an `Artifact` or `ArtifactSet` object, keep them in this order: `Name`, `Description`, `TechnologyKinds`. This is an authoring convention rather than YAML semantics.
 
 `TechnologyKinds` is the normative declaration of build/publication technologies. Source directory names alone do not select a TechnologyKind.
 
@@ -282,7 +298,25 @@ The built-in defaults currently are:
 
 `TechnologyKinds.ItemsInheritancePolicy` and nested `BuildOutputTypes.ItemsInheritancePolicy` accept `merge_missing_items` (default) and `remove_missing_items`. Omitting `BuildOutputTypes` inherits a selection from an ancestor if present; otherwise the built-in default applies. An explicit `BuildOutputTypes: { Items: [] }` retains the TechnologyKind while requesting no packaging output for it.
 
-Phase 3B actively applies these selections: Java maps to `jar`, `sourcesJar`, and optional `javadocJar`; Python maps to wheel and/or sdist production. Phase 4B additionally derives the required capability DAG from those production plans. In particular, dependency-resolution preflight is wired only when an effective output or documentation demand requires the `dependency_resolution` capability, while shared prerequisites are deduplicated by the capability planner.
+The active build applies these selections through Gradle-independent production plans: Java maps to classes JAR, sources JAR, and optional Javadoc JAR production, while Python maps to wheel and/or sdist production. The selected production plans then contribute their required capabilities to the capability demand graph. Dependency-resolution preflight is wired only when an effective output or documentation demand requires `dependency_resolution`, while shared prerequisites are deduplicated by the capability planner.
+
+### 6.1.2 `PreparedSourceSet`, production plans, and capability demands
+
+`AIcPreparedSourceSet` is the portable boundary between source discovery/preparation and output production. For one TechnologyKind it carries three deterministic root groups: native handwritten source roots, generated source roots, and resource/definition roots. Build-output producers consume this prepared description and return an `AIcBuildOutputProductionPlan`; the producer does not execute Gradle tasks itself.
+
+A production plan identifies the concrete `BuildOutputType`, its built-in production primitive, additional logical inputs, and the capability IDs that must be satisfied first. The current built-in mappings are:
+
+| BuildOutputType | Required capabilities |
+| --- | --- |
+| `java_classes_jar` | `source_native_processing`, `dependency_resolution` |
+| `java_sources_jar` | `source_native_processing` |
+| `java_javadoc_jar` | `generation_of_native_documentation` |
+| `python_wheel` | `source_native_processing`, `dependency_resolution` |
+| `python_sdist` | `source_native_processing` |
+
+`generation_of_native_documentation` expands to `source_native_processing` plus `dependency_resolution` for Java and Python. Capability demands are deduplicated by `(TechnologyKind, Capability, Scope, ScopeIdentity)` and assembled into a prerequisite-before-dependent DAG. This lets multiple outputs and documentation consumers share one prerequisite without each wiring an independent Gradle dependency chain.
+
+For artifact-local source generators, `source_native_processing` is the supported integration boundary. A generator that materializes files consumed as native/generated sources should make the corresponding `processAlgitesJavaNativeSources` or `processAlgitesPythonNativeSources` task depend on the generator. It SHOULD NOT additionally wire itself directly to downstream tasks such as `preparePythonBuildProject`, `buildPython`, `compileJava`, or packaging tasks; the common adapter owns those downstream dependencies from the capability graph. The `devops/build/yamldefs` artifact is the reference example: its local Gradle script only generates the artifact-specific Python package layout and attaches that generator to `processAlgitesPythonNativeSources`.
 
 ### 6.2 Environment requirements
 
@@ -347,11 +381,11 @@ src/develop/java
 src/develop/python.gen
 ```
 
-A multi-technology artifact does not have to contain handwritten source directories for every output. `pub.gov.Algites/devops/build/yamldefs` is an example: common YAML-definition sources are transformed into a generated Python package while the same logical artifact is also published for Java.
+A multi-technology artifact does not have to contain handwritten source directories for every output. `pub.gov.Algites/devops/build/yamldefs` is an example: common YAML-definition sources are packaged for Python by the generic TechnologyKind adapter while the same logical artifact is also published for Java. No artifact-specific Gradle staging code is required.
 
 `schema` is not a canonical SourceType. Use `jsondefs`, `yamldefs`, or `xmldefs` for definitions according to their semantic representation, and use `config` for concrete configuration instances regardless of serialization format. The source-root name is not repeated inside the business-relative path.
 
-For Python artifacts, the Algites adapter stages `jsondefs`, `yamldefs`, `xmldefs`, and `config` product roots into the wheel/sdist build tree while preserving the path below the source root. Multiple distributions may therefore share a package prefix only through PEP 420 namespace packages. Exact module/resource path collisions are build errors, and a shared cross-distribution prefix must not contain `__init__.py` in any contributing distribution.
+For Python artifacts, the Algites adapter automatically stages `jsondefs`, `yamldefs`, `xmldefs`, and `config` product roots into the artifact's derived Python import namespace, preserving the path below each canonical source root. The generic `source_native_processing` implementation materializes these package resources in the disposable Algites run workspace; `preparePythonBuildProject` then places them below `src/product/python.gen` in the staged Python project. An artifact must not contain a custom Gradle copy task for this standard mapping. Native/generated Python source roots and staged resources are merged with collision detection. Shared package prefixes remain PEP 420 namespace packages, and the framework does not generate shared-parent `__init__.py` files.
 
 The supported Python build entry point is the Algites Gradle lifecycle. The Python adapter prepares the staging project before invoking Python packaging tools, so an artifact MUST NOT introduce artifact-local `setup.py` or `MANIFEST.in` workarounds merely to copy or include `jsondefs`, `yamldefs`, `xmldefs`, or `config` product sources. A `pyproject.toml` may still describe Python distribution metadata, but direct `python -m build` execution against the unstaged repository source tree is not a supported Algites build mode. Only the Gradle adapter can coordinate the complete multi-TechnologyKind build and validate cross-distribution path collisions.
 
@@ -385,6 +419,12 @@ build/run/aac/coreintf/run/bld/algites-docs/...
 ```
 
 This preserves the artifact-relative `run/...` convention while keeping it outside the source hierarchy. The repository root project uses `build/run/...` without an additional mirrored artifact path. A normal `./gradlew clean` removes the Algites run workspace. Derived development metadata intentionally maintained for IDE use, such as generated `pyproject.toml`, remains governed by the development lifecycle rather than by this build-output relocation.
+
+### 7.4 Java API documentation
+
+New Algites Java product types must carry class/interface/enum Javadoc. Every declared `public` or `protected` constructor and method must also be documented, including `@param`, `@return`, and `@throws` tags where they are part of the contract. Overriding methods may use inherited API semantics, but their source should still have an explicit Javadoc block when the implementation is part of an Algites public/protected type. Private helpers need documentation only when their purpose, assumptions, or failure modes are not evident from the code.
+
+Java source comments use Javadoc (`/** ... */`) or block comments (`/* ... */`); line comments are not used in Algites Java sources. Documentation should describe semantic contracts and invariants rather than merely restating identifiers.
 
 ## 8. Inheritance and effective metadata
 
@@ -862,8 +902,8 @@ Artifact authors normally do not embed upload/manage repository secrets or centr
 
 ```yaml
 Artifact:
-  TechnologyKinds: [java]
   Name: Example API
+  TechnologyKinds: [java]
 ```
 
 3. Add the Gradle project/build file.
@@ -874,8 +914,8 @@ Artifact:
 
 ```yaml
 Artifact:
-  TechnologyKinds: [java, python]
   Name: Shared definitions
+  TechnologyKinds: [java, python]
 ```
 
 A single logical artifact/version may produce technology-specific outputs. Shared neutral source can live in a SourceType such as `yamldefs`; adapters may generate language-specific packaging input under `*.gen`.

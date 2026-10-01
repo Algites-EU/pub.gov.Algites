@@ -12,16 +12,36 @@ import java.util.Set;
  */
 public final class AIcPythonWheelBuildOutputProducer implements AIiBuildOutputProducer {
 
+    /**
+     * Creates the built-in Python wheel producer.
+     */
+    public AIcPythonWheelBuildOutputProducer() {
+    }
+
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     @Override
     public String technologyKind() {
         return "python";
     }
 
+    /**
+     * Returns the BuildOutputType identifier.
+     * @return BuildOutputType identifier
+     */
     @Override
     public String buildOutputType() {
         return "python_wheel";
     }
 
+    /**
+     * Creates the portable production plan for the supplied prepared sources.
+     *
+     * @param aPreparedSourceSet prepared source set
+     * @return build-output production plan
+     */
     @Override
     public AIcBuildOutputProductionPlan createProductionPlan(AIcPreparedSourceSet aPreparedSourceSet) {
         return new AIcBuildOutputProductionPlan(

@@ -24,6 +24,16 @@ public final class AIcDependencyVersionTechnologyBridge {
     private AIcDependencyVersionTechnologyBridge() {
     }
 
+    /**
+     * Translates a portable version requirement into technology-specific canonical version semantics.
+     *
+     * @param aIdentity dependency or item identity
+     * @param aRequirement portable version requirement
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aDiagnostics resolution diagnostics
+     * @return normalized version requirement, or {@code null} when {@code aRequirement} is {@code null}
+     * @throws AIxModelValidationException if the requirement cannot be represented by the target technology
+     */
     public static AIcVersionRequirement normalize(
         AIcDependencyIdentity aIdentity,
         AIcVersionRequirement aRequirement,

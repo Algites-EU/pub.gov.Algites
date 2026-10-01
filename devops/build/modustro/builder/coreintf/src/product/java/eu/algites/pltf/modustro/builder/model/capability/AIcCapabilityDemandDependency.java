@@ -10,6 +10,12 @@ public final class AIcCapabilityDemandDependency {
     private final AIcCapabilityDemandKey prerequisite;
     private final AIcCapabilityDemandKey dependent;
 
+    /**
+     * Creates an {@code AIcCapabilityDemandDependency} instance.
+     *
+     * @param aPrerequisite prerequisite capability-demand key
+     * @param aDependent dependent capability-demand key
+     */
     public AIcCapabilityDemandDependency(AIcCapabilityDemandKey aPrerequisite, AIcCapabilityDemandKey aDependent) {
         prerequisite = Objects.requireNonNull(aPrerequisite, "prerequisite");
         dependent = Objects.requireNonNull(aDependent, "dependent");
@@ -18,14 +24,25 @@ public final class AIcCapabilityDemandDependency {
         }
     }
 
+    /**
+     * Returns the prerequisite capability-demand key.
+     * @return prerequisite key
+     */
     public AIcCapabilityDemandKey prerequisite() {
         return prerequisite;
     }
 
+    /**
+     * Returns the dependent capability-demand key.
+     * @return dependent key
+     */
     public AIcCapabilityDemandKey dependent() {
         return dependent;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean equals(Object aOther) {
         if (this == aOther) {
@@ -37,6 +54,9 @@ public final class AIcCapabilityDemandDependency {
         return prerequisite.equals(locOther.prerequisite) && dependent.equals(locOther.dependent);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int hashCode() {
         return Objects.hash(prerequisite, dependent);

@@ -23,11 +23,26 @@ import java.util.Set;
  */
 public final class AIcBuiltinCapabilityDemandPlanner implements AIiCapabilityDemandPlanner {
 
+    /**
+     * Creates the built-in capability demand planner.
+     */
+    public AIcBuiltinCapabilityDemandPlanner() {
+    }
+
     private static final Map<String, Set<String>> PREREQUISITES = Map.of(
         key("java", "generation_of_native_documentation"), Set.of("source_native_processing", "dependency_resolution"),
         key("python", "generation_of_native_documentation"), Set.of("source_native_processing", "dependency_resolution")
     );
 
+    /**
+     * Creates a deduplicated capability demand graph and expands built-in prerequisites.
+     *
+     * @param aArtifactScopeIdentity stable identity of the artifact scope
+     * @param aBuildOutputPlans build-output production plans
+     * @param aAdditionalDemands additional explicit capability demands
+     * @return validated capability demand graph
+     * @throws IllegalArgumentException if a demand is invalid or the resulting graph is inconsistent
+     */
     @Override
     public AIcCapabilityDemandGraph createDemandGraph(
         String aArtifactScopeIdentity,

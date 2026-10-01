@@ -13,6 +13,13 @@ public final class AIcDependencyConstraintDefinition {
     private final Set<AInDependencyUsage> usages;
     private final AIcVersionRequirement versionRequirement;
 
+    /**
+     * Creates an {@code AIcDependencyConstraintDefinition} instance.
+     *
+     * @param aIdentity dependency or item identity
+     * @param aUsages portable dependency usages
+     * @param aVersionRequirement version requirement
+     */
     public AIcDependencyConstraintDefinition(
         AIcDependencyIdentity aIdentity,
         Set<AInDependencyUsage> aUsages,
@@ -23,14 +30,26 @@ public final class AIcDependencyConstraintDefinition {
         versionRequirement = Objects.requireNonNull(aVersionRequirement, "versionRequirement");
     }
 
+    /**
+     * Returns the dependency identity.
+     * @return dependency identity
+     */
     public AIcDependencyIdentity identity() {
         return identity;
     }
 
+    /**
+     * Returns the portable dependency usages.
+     * @return immutable dependency-usage set
+     */
     public Set<AInDependencyUsage> usages() {
         return usages;
     }
 
+    /**
+     * Returns the effective version requirement.
+     * @return effective non-null version requirement
+     */
     public AIcVersionRequirement versionRequirement() {
         return versionRequirement;
     }

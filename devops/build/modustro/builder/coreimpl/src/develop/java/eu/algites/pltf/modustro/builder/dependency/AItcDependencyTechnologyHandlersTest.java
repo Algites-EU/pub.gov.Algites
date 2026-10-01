@@ -22,6 +22,15 @@ import org.testng.annotations.Test;
  */
 public final class AItcDependencyTechnologyHandlersTest {
 
+    /**
+     * Creates a test instance.
+     */
+    public AItcDependencyTechnologyHandlersTest() {
+    }
+
+    /**
+     * Verifies that modustro java usages map directly to standard gradle configuration names.
+     */
     @Test
     public void modustroJavaUsagesMapDirectlyToStandardGradleConfigurationNames() {
         AIcDependencyDefinition locDependency = dependency(
@@ -50,6 +59,9 @@ public final class AItcDependencyTechnologyHandlersTest {
         Assert.assertTrue(locPlan.diagnostics().isEmpty());
     }
 
+    /**
+     * Verifies that native java does not use modustro dependency output defaults.
+     */
     @Test
     public void nativeJavaDoesNotUseModustroDependencyOutputDefaults() {
         AIcDependencyDefinition locDependency = dependency(
@@ -66,6 +78,9 @@ public final class AItcDependencyTechnologyHandlersTest {
         Assert.assertEquals(locPlan.entries().get(0).nativeUsageMappings().get(AInDependencyUsage.PRODUCT_IMPLEMENTATION), "implementation");
     }
 
+    /**
+     * Verifies that modustro python usages use lossy mappings and produce diagnostics.
+     */
     @Test
     public void modustroPythonUsagesUseLossyMappingsAndProduceDiagnostics() {
         AIcDependencyDefinition locDependency = dependency(
@@ -100,6 +115,9 @@ public final class AItcDependencyTechnologyHandlersTest {
         Assert.assertEquals(locPlan.diagnostics().size(), 4);
     }
 
+    /**
+     * Verifies that native python does not use modustro dependency output defaults.
+     */
     @Test
     public void nativePythonDoesNotUseModustroDependencyOutputDefaults() {
         AIcDependencyDefinition locDependency = dependency(
@@ -119,6 +137,9 @@ public final class AItcDependencyTechnologyHandlersTest {
         );
     }
 
+    /**
+     * Verifies that built in registry is keyed by dependency kind and technology kind.
+     */
     @Test
     public void builtInRegistryIsKeyedByDependencyKindAndTechnologyKind() {
         AIcBuiltinDependencyTechnologyHandlers locRegistry = new AIcBuiltinDependencyTechnologyHandlers();
@@ -128,11 +149,17 @@ public final class AItcDependencyTechnologyHandlersTest {
         Assert.assertEquals(locRegistry.require("python", "python").dependencyKind(), "python");
     }
 
+    /**
+     * Verifies that built in registry rejects unsupported pair.
+     */
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void builtInRegistryRejectsUnsupportedPair() {
         new AIcBuiltinDependencyTechnologyHandlers().require("java", "python");
     }
 
+    /**
+     * Verifies that handler rejects mismatched dependency kind.
+     */
     @Test(expectedExceptions = AIxModelValidationException.class)
     public void handlerRejectsMismatchedDependencyKind() {
         AIcDependencyDefinition locDependency = dependency(
@@ -147,6 +174,9 @@ public final class AItcDependencyTechnologyHandlersTest {
         );
     }
 
+    /**
+     * Verifies that dependency cannot request non consumable output.
+     */
     @Test(expectedExceptions = AIxModelValidationException.class)
     public void dependencyCannotRequestNonConsumableOutput() {
         AIcDependencyDefinition locDependency = dependency(
@@ -168,6 +198,9 @@ public final class AItcDependencyTechnologyHandlersTest {
         );
     }
 
+    /**
+     * Verifies that exact version wins over inherited preference and produces info diagnostic.
+     */
     @Test
     public void exactVersionWinsOverInheritedPreferenceAndProducesInfoDiagnostic() {
         AIcDependencyDefinition locDependency = new AIcDependencyDefinition(
@@ -196,6 +229,9 @@ public final class AItcDependencyTechnologyHandlersTest {
         Assert.assertEquals(locPlan.diagnostics().get(0).severity().name(), "INFO");
     }
 
+    /**
+     * Verifies that exact version outside strict maximum fails technology resolution.
+     */
     @Test(expectedExceptions = AIxModelValidationException.class)
     public void exactVersionOutsideStrictMaximumFailsTechnologyResolution() {
         AIcDependencyDefinition locDependency = new AIcDependencyDefinition(

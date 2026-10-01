@@ -14,6 +14,15 @@ import org.testng.annotations.Test;
  */
 public final class AItcTechnologyKindDefinitionValidatorTest {
 
+    /**
+     * Creates a test instance.
+     */
+    public AItcTechnologyKindDefinitionValidatorTest() {
+    }
+
+    /**
+     * Verifies that built in definitions are valid.
+     */
     @Test
     public void builtInDefinitionsAreValid() {
         AIcTechnologyKindDefinitionValidator locValidator = new AIcTechnologyKindDefinitionValidator();
@@ -22,6 +31,9 @@ public final class AItcTechnologyKindDefinitionValidatorTest {
         locValidator.validate(AIcBuiltinTechnologyKindDefinitions.modustroDefinition());
     }
 
+    /**
+     * Verifies that python distribution is virtual consumable output.
+     */
     @Test
     public void pythonDistributionIsVirtualConsumableOutput() {
         AIcTechnologyKindDefinition locPython = AIcBuiltinTechnologyKindDefinitions.pythonDefinition();
@@ -34,6 +46,9 @@ public final class AItcTechnologyKindDefinitionValidatorTest {
         Assert.assertEquals(locDistribution.dependencyOutputAlternatives(), Set.of("python_wheel", "python_sdist"));
     }
 
+    /**
+     * Verifies that non producible dependency output requires alternatives.
+     */
     @Test(expectedExceptions = AIxModelValidationException.class)
     public void nonProducibleDependencyOutputRequiresAlternatives() {
         AIcTechnologyKindDefinition locDefinition = new AIcTechnologyKindDefinition(

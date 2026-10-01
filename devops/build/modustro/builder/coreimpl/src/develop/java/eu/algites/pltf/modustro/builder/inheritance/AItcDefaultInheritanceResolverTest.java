@@ -13,6 +13,15 @@ import org.testng.annotations.Test;
  */
 public final class AItcDefaultInheritanceResolverTest {
 
+    /**
+     * Creates a test instance.
+     */
+    public AItcDefaultInheritanceResolverTest() {
+    }
+
+    /**
+     * Verifies that inherited scalar is kept when local value is absent.
+     */
     @Test
     public void inheritedScalarIsKeptWhenLocalValueIsAbsent() {
         AIcDefaultInheritanceResolver locResolver = new AIcDefaultInheritanceResolver();
@@ -21,6 +30,9 @@ public final class AItcDefaultInheritanceResolverTest {
         Assert.assertEquals(locResolved.value(), "parent");
     }
 
+    /**
+     * Verifies that explicit null clears inherited scalar.
+     */
     @Test
     public void explicitNullClearsInheritedScalar() {
         AIcDefaultInheritanceResolver locResolver = new AIcDefaultInheritanceResolver();
@@ -29,6 +41,9 @@ public final class AItcDefaultInheritanceResolverTest {
         Assert.assertNull(locResolved.valueOrNull());
     }
 
+    /**
+     * Verifies that merge missing items retains inherited membership and merges matching items.
+     */
     @Test
     public void mergeMissingItemsRetainsInheritedMembershipAndMergesMatchingItems() {
         AIcDefaultInheritanceResolver locResolver = new AIcDefaultInheritanceResolver();
@@ -41,6 +56,9 @@ public final class AItcDefaultInheritanceResolverTest {
         Assert.assertEquals(locResolved, List.of("a:parent+a:local", "c:local", "b:parent"));
     }
 
+    /**
+     * Verifies that remove missing items drops inherited only membership but still merges matching items.
+     */
     @Test
     public void removeMissingItemsDropsInheritedOnlyMembershipButStillMergesMatchingItems() {
         AIcDefaultInheritanceResolver locResolver = new AIcDefaultInheritanceResolver();
@@ -53,6 +71,9 @@ public final class AItcDefaultInheritanceResolverTest {
         Assert.assertEquals(locResolved, List.of("a:parent+a:local"));
     }
 
+    /**
+     * Verifies that merge only items never remove inherited membership.
+     */
     @Test
     public void mergeOnlyItemsNeverRemoveInheritedMembership() {
         AIcDefaultInheritanceResolver locResolver = new AIcDefaultInheritanceResolver();

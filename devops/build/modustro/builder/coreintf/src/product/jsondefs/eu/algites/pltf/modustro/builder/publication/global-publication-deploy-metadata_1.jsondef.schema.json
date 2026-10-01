@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:jsondef:publication:global-publication-deploy-metadata:1",
+  "x-algites-definition-version": 1,
+  "title": "Modustro Global Publication Deploy Metadata v1",
+  "description": "Deployment-controlled publication metadata generated from validated user metadata plus trusted publisher state. This document is not an author input contract.",
+  "x-algites-document-common-metadata": 1,
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "properties": {
+        "GlobalPublicationPathId": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)[A-Za-z0-9._/-]+$",
+          "description": "Stable logical publication path copied from validated user metadata."
+        },
+        "PublicationState": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "release"
+          ],
+          "description": "Server-controlled publication lifecycle state. Released definitions are immutable and cannot transition back to draft."
+        },
+        "PublicationRevision": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Server-controlled monotonically increasing revision of successfully deployed draft content. Release freezes the current content revision."
+        },
+        "FirstPublishedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-generated timestamp of the first successful deployment for this GlobalPublicationPathId."
+        },
+        "PublishedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-generated timestamp of the most recent successful deployment or release transition represented by this metadata."
+        },
+        "ReleasedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server-generated timestamp at which this publication became an immutable release; absent while the publication is a draft."
+        },
+        "PublishedBy": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional trusted publisher identity derived by the deployment adapter from authenticated execution context; never copied from user metadata."
+        }
+      },
+      "required": [
+        "GlobalPublicationPathId",
+        "PublicationState",
+        "PublicationRevision",
+        "FirstPublishedAt",
+        "PublishedAt"
+      ]
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "allOf": [
+        {
+          "$ref": "#/$defs/DocumentContent"
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "$ref": "https://defs.dev.algites.eu/api/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json"
+    },
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "unevaluatedProperties": false
+}

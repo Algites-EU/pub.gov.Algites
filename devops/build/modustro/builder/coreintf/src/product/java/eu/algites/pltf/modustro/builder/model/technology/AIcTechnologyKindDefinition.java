@@ -18,6 +18,15 @@ public final class AIcTechnologyKindDefinition {
     private final Set<String> defaultBuildOutputTypes;
     private final Set<String> defaultDependencyOutputTypes;
 
+    /**
+     * Creates an {@code AIcTechnologyKindDefinition} instance.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aCapabilities capability definitions
+     * @param aBuildOutputTypes build-output type definitions
+     * @param aDefaultBuildOutputTypes default artifact build-output types
+     * @param aDefaultDependencyOutputTypes default dependency output types
+     */
     public AIcTechnologyKindDefinition(
         String aTechnologyKind,
         List<AIcCapabilityDefinition> aCapabilities,
@@ -35,22 +44,42 @@ public final class AIcTechnologyKindDefinition {
         defaultDependencyOutputTypes = Set.copyOf(new LinkedHashSet<>(Objects.requireNonNull(aDefaultDependencyOutputTypes, "defaultDependencyOutputTypes")));
     }
 
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     public String technologyKind() {
         return technologyKind;
     }
 
+    /**
+     * Returns capabilities defined for this TechnologyKind.
+     * @return immutable capability-definition list
+     */
     public List<AIcCapabilityDefinition> capabilities() {
         return capabilities;
     }
 
+    /**
+     * Returns BuildOutputTypes defined for this TechnologyKind.
+     * @return immutable build-output definition list
+     */
     public List<AIcBuildOutputTypeDefinition> buildOutputTypes() {
         return buildOutputTypes;
     }
 
+    /**
+     * Returns the default BuildOutputTypes for a TechnologyKind.
+     * @return immutable default BuildOutputType set
+     */
     public Set<String> defaultBuildOutputTypes() {
         return defaultBuildOutputTypes;
     }
 
+    /**
+     * Returns BuildOutputTypes required by default when depending on this TechnologyKind.
+     * @return immutable default dependency-output set
+     */
     public Set<String> defaultDependencyOutputTypes() {
         return defaultDependencyOutputTypes;
     }

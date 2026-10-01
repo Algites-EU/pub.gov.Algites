@@ -12,6 +12,12 @@ public final class AIcCapabilityDemand {
     private final AIcCapabilityDemandKey key;
     private final Set<String> reasons;
 
+    /**
+     * Creates an {@code AIcCapabilityDemand} instance.
+     *
+     * @param aKey capability-demand key
+     * @param aReasons reasons that requested the capability
+     */
     public AIcCapabilityDemand(AIcCapabilityDemandKey aKey, Set<String> aReasons) {
         key = Objects.requireNonNull(aKey, "key");
         reasons = Set.copyOf(new LinkedHashSet<>(Objects.requireNonNull(aReasons, "reasons")));
@@ -20,14 +26,29 @@ public final class AIcCapabilityDemand {
         }
     }
 
+    /**
+     * Returns the stable key of this capability demand.
+     * @return capability-demand key
+     */
     public AIcCapabilityDemandKey key() {
         return key;
     }
 
+    /**
+     * Returns the reasons that requested this capability.
+     * @return immutable set of demand reasons
+     */
     public Set<String> reasons() {
         return reasons;
     }
 
+    /**
+     * Merges another demand for the same key into this demand.
+     *
+     * @param aOther other value to compare or merge
+     * @return new demand containing the union of reasons
+     * @throws IllegalArgumentException if the demand keys differ
+     */
     public AIcCapabilityDemand merge(AIcCapabilityDemand aOther) {
         Objects.requireNonNull(aOther, "other");
         if (!key.equals(aOther.key)) {

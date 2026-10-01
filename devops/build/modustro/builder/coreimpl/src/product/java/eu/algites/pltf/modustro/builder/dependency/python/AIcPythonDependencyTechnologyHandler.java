@@ -15,6 +15,11 @@ public final class AIcPythonDependencyTechnologyHandler extends AIcDependencyTec
 
     private final String dependencyKind;
 
+    /**
+     * Creates an {@code AIcPythonDependencyTechnologyHandler} instance.
+     *
+     * @param aDependencyKind DependencyKind identifier
+     */
     public AIcPythonDependencyTechnologyHandler(String aDependencyKind) {
         if (!java.util.Set.of("modustro", "python").contains(aDependencyKind)) {
             throw new IllegalArgumentException("Unsupported DependencyKind '" + aDependencyKind + "' for TechnologyKind '" + technologyKind() + "'.");
@@ -22,21 +27,44 @@ public final class AIcPythonDependencyTechnologyHandler extends AIcDependencyTec
         dependencyKind = aDependencyKind;
     }
 
+    /**
+     * Returns the DependencyKind identifier handled by this object.
+     * @return DependencyKind identifier
+     */
     @Override
     public String dependencyKind() {
         return dependencyKind;
     }
 
+    /** Native Python role for published/runtime package dependencies. */
     public static final String PACKAGE_RUNTIME = "package_runtime";
+
+    /** Native Python role for dependencies required only while preparing/building sources. */
     public static final String BUILD_SOURCE_PROCESSING = "build_source_processing";
+
+    /** Native Python role for development-only dependencies. */
     public static final String DEVELOPMENT = "development";
+
+    /** Marker for a portable usage that intentionally has no native Python dependency action. */
     public static final String NO_OP = "no_op";
 
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     @Override
     public String technologyKind() {
         return "python";
     }
 
+    /**
+     * Maps one portable dependency usage to a technology-native usage identifier.
+     *
+     * @param aIdentity dependency or item identity
+     * @param aUsage portable dependency usage
+     * @param aMappings technology-native usage mappings
+     * @param aDiagnostics resolution diagnostics
+     */
     @Override
     protected void mapUsage(
         AIcDependencyIdentity aIdentity,

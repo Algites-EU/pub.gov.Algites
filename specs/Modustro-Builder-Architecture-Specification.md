@@ -268,7 +268,7 @@ Every concrete `AIcBuildOutputProductionPlan` carries the capability IDs require
 
 `generation_of_native_documentation` has built-in prerequisites `source_native_processing` and `dependency_resolution` for Java and Python. `AIcBuiltinCapabilityDemandPlanner` expands these prerequisites and deduplicates demands by `(TechnologyKind, Capability, Scope, ScopeIdentity)`. The resulting graph is a portable DAG and has no Gradle dependency. Additional repository/artifact-set/artifact demands such as `publication_of_docs_site`, `docs_site_content`, and `publication_of_global_schemas` can be added to the same graph.
 
-Phase 4A was the bootstrap stage in which the graph/model and configuration schemas were published without changing active orchestration. Phase 4B consumes the graph in the Gradle adapter. Build-output demands now control whether technology dependency-resolution preflight is required, and `source_native_processing` is materialized as one lifecycle boundary per TechnologyKind/artifact. Documentation generation adds an explicit `generation_of_native_documentation` demand; the planner expands it to `source_native_processing` and `dependency_resolution`, and Gradle task dependency deduplication ensures that shared prerequisites execute once even when multiple outputs or documentation consumers require them. The documentation site itself is represented by repository-scoped `publication_of_docs_site` and scoped `docs_site_content` demands. Global-schema publication remains dormant until the `schema_site` work in Phase 6.
+Phase 4A was the bootstrap stage in which the graph/model and configuration schemas were published without changing active orchestration. Phase 4B consumes the graph in the Gradle adapter. Build-output demands now control whether technology dependency-resolution preflight is required, and `source_native_processing` is materialized as one lifecycle boundary per TechnologyKind/artifact. The built-in Python implementation also owns the standard resource-to-package transformation: `jsondefs`, `yamldefs`, `xmldefs`, and `config` product roots are staged beneath the derived artifact import namespace in the disposable run workspace, so individual artifacts must not implement equivalent Gradle copy tasks. Documentation generation adds an explicit `generation_of_native_documentation` demand; the planner expands it to `source_native_processing` and `dependency_resolution`, and Gradle task dependency deduplication ensures that shared prerequisites execute once even when multiple outputs or documentation consumers require them. The documentation site itself is represented by repository-scoped `publication_of_docs_site` and scoped `docs_site_content` demands. Global-schema publication remains dormant until the `schema_site` work in Phase 6.
 
 ## 9. Canonical definitions and global publication metadata
 
@@ -276,17 +276,19 @@ Phase 4A was the bootstrap stage in which the graph/model and configuration sche
 
 When YAML or JSON definitions are expressed as JSON Schema, the target representation is retained in the logical filename: `<name>_<version>.yamldef.schema.json` below `yamldefs` and `<name>_<version>.jsondef.schema.json` below `jsondefs`. XSD definitions retain the normal `<name>_<version>.xsd` form because the `.xsd` extension already identifies the XML representation. Representation-specific JSON Schema resources MUST also use distinct `$id` values; two representations that happen to have identical schema contents are still independent contracts and may diverge later.
 
-Every canonical definition created by Modustro Builder carries a `<definition-file>.meta.yml` sidecar with:
+Every canonical definition created by Modustro Builder carries a `<definition-file>.meta.yml` **user sidecar** described by `global-publication-user-metadata_1`. The source-side business content is intentionally limited to:
 
 ```yaml
-MetadataVersion: 1
-DefinitionVersion: 1
 GlobalPublicationPathId: ...
 ```
 
-`GlobalPublicationPathId` is deliberately path-oriented: authors should choose a stable identifier that maps transparently to the global publication path rather than an opaque implementation identifier.
+`GlobalPublicationPathId` is deliberately path-oriented: authors should choose a stable identifier that maps transparently to the global publication path rather than an opaque implementation identifier. The source contract is strict: publication state, deployment revision, timestamps, publisher identity, and other deployment-owned values are invalid when supplied by an author.
 
-A later schema-site phase will make a valid sidecar mandatory for every selected publication source. Automatic sidecar generation will be an explicit task; an ordinary build will validate rather than mutate source metadata.
+The user sidecar is only input to publication. At the publication trust boundary the deployment adapter validates it, reads trusted deployment state, and creates a separate `global-publication-deploy-metadata_1` sidecar. The deploy contract contains `GlobalPublicationPathId`, server-controlled `PublicationState` (`draft` or `release`), `PublicationRevision`, `FirstPublishedAt`, `PublishedAt`, optional `ReleasedAt`, and optional `PublishedBy`. Draft replacement increments `PublicationRevision`; release freezes the deployed definition at its current content revision. A released path is immutable and cannot transition back to draft. `PublishedBy`, when available, is derived exclusively from authenticated publisher/CI execution context and must never be accepted from source metadata.
+
+This split is a trust-boundary rule, not merely a serialization preference: a publisher must parse and validate user metadata, discard the input representation, and construct deploy metadata from validated author input plus server-controlled state. It must not copy arbitrary fields from the source sidecar and then append its own fields.
+
+A later schema-site phase will make a valid user sidecar mandatory for every selected publication source. Automatic user-sidecar generation will be an explicit task; an ordinary build will validate rather than mutate source metadata. Deploy sidecars are generated only by publication/deployment infrastructure and are not committed to the source repository.
 
 ## 10. Planned continuation
 

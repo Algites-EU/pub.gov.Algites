@@ -1,6 +1,0 @@
-artifact:
-  technologyKinds: [java]
-  name: Algites DevOps build policy base
-  description: Base Gradle build-policy plugin and publication metadata for Algites build governance.
-
-groupId: eu.algites.tool.build

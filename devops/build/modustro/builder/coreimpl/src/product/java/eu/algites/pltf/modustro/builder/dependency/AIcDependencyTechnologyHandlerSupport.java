@@ -25,6 +25,21 @@ import java.util.Set;
  */
 public abstract class AIcDependencyTechnologyHandlerSupport implements AIiDependencyTechnologyHandler {
 
+    /**
+     * Creates a dependency technology handler support instance.
+     */
+    protected AIcDependencyTechnologyHandlerSupport() {
+    }
+
+    /**
+     * Translates portable dependencies and constraints into a technology-native logical resolution plan.
+     *
+     * @param aDependencies directed prerequisite edges
+     * @param aConstraints dependency constraints
+     * @param aTechnologyDefinition technology definition
+     * @return technology-specific logical resolution plan
+     * @throws IllegalArgumentException if the supplied model cannot be translated for this DependencyKind and TechnologyKind
+     */
     @Override
     public final AIcDependencyTechnologyResolutionPlan createResolutionPlan(
         List<AIcDependencyDefinition> aDependencies,
@@ -147,6 +162,14 @@ public abstract class AIcDependencyTechnologyHandlerSupport implements AIiDepend
         }
     }
 
+    /**
+     * Maps one portable dependency usage to a technology-native usage identifier.
+     *
+     * @param aIdentity dependency or item identity
+     * @param aUsage portable dependency usage
+     * @param aMappings technology-native usage mappings
+     * @param aDiagnostics resolution diagnostics
+     */
     protected abstract void mapUsage(
         AIcDependencyIdentity aIdentity,
         AInDependencyUsage aUsage,

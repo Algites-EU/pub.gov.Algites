@@ -14,6 +14,9 @@ public final class AIcBuiltinDependencyTechnologyHandlers {
 
     private final Map<String, Map<String, AIiDependencyTechnologyHandler>> handlers;
 
+    /**
+     * Creates the registry of built-in dependency technology handlers.
+     */
     public AIcBuiltinDependencyTechnologyHandlers() {
         LinkedHashMap<String, Map<String, AIiDependencyTechnologyHandler>> locByDependencyKind = new LinkedHashMap<>();
         List.of(
@@ -40,6 +43,14 @@ public final class AIcBuiltinDependencyTechnologyHandlers {
         handlers = Map.copyOf(locImmutable);
     }
 
+    /**
+     * Returns the registered dependency technology handler for the requested identifiers.
+     *
+     * @param aDependencyKind DependencyKind identifier
+     * @param aTechnologyKind TechnologyKind identifier
+     * @return registered dependency technology handler
+     * @throws IllegalArgumentException if no matching dependency technology handler is registered
+     */
     public AIiDependencyTechnologyHandler require(String aDependencyKind, String aTechnologyKind) {
         AIiDependencyTechnologyHandler locHandler = handlers
             .getOrDefault(aDependencyKind, Map.of())

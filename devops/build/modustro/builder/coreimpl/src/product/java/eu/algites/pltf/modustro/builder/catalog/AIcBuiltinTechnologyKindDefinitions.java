@@ -15,6 +15,10 @@ public final class AIcBuiltinTechnologyKindDefinitions {
     private AIcBuiltinTechnologyKindDefinitions() {
     }
 
+    /**
+     * Creates the built-in Java TechnologyKind definition.
+     * @return Java TechnologyKind definition
+     */
     public static AIcTechnologyKindDefinition javaDefinition() {
         return new AIcTechnologyKindDefinition(
             "java",
@@ -33,6 +37,10 @@ public final class AIcBuiltinTechnologyKindDefinitions {
         );
     }
 
+    /**
+     * Creates the built-in Python TechnologyKind definition.
+     * @return Python TechnologyKind definition
+     */
     public static AIcTechnologyKindDefinition pythonDefinition() {
         return new AIcTechnologyKindDefinition(
             "python",
@@ -57,6 +65,10 @@ public final class AIcBuiltinTechnologyKindDefinitions {
         );
     }
 
+    /**
+     * Creates the built-in Modustro TechnologyKind definition.
+     * @return Modustro TechnologyKind definition
+     */
     public static AIcTechnologyKindDefinition modustroDefinition() {
         return new AIcTechnologyKindDefinition(
             "modustro",

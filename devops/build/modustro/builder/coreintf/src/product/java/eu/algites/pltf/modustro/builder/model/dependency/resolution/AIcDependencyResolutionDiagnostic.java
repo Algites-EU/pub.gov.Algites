@@ -13,6 +13,14 @@ public final class AIcDependencyResolutionDiagnostic {
     private final AIcDependencyIdentity dependencyIdentity;
     private final String message;
 
+    /**
+     * Creates an {@code AIcDependencyResolutionDiagnostic} instance.
+     *
+     * @param aCode diagnostic code
+     * @param aSeverity diagnostic severity
+     * @param aDependencyIdentity dependency identity associated with the diagnostic
+     * @param aMessage diagnostic message
+     */
     public AIcDependencyResolutionDiagnostic(
         String aCode,
         AInDependencyResolutionDiagnosticSeverity aSeverity,
@@ -33,18 +41,34 @@ public final class AIcDependencyResolutionDiagnostic {
         return locValue;
     }
 
+    /**
+     * Returns the stable diagnostic code.
+     * @return diagnostic code
+     */
     public String code() {
         return code;
     }
 
+    /**
+     * Returns the diagnostic severity.
+     * @return diagnostic severity
+     */
     public AInDependencyResolutionDiagnosticSeverity severity() {
         return severity;
     }
 
+    /**
+     * Returns the dependency identity associated with this diagnostic.
+     * @return dependency identity
+     */
     public AIcDependencyIdentity dependencyIdentity() {
         return dependencyIdentity;
     }
 
+    /**
+     * Returns the human-readable diagnostic message.
+     * @return diagnostic message
+     */
     public String message() {
         return message;
     }

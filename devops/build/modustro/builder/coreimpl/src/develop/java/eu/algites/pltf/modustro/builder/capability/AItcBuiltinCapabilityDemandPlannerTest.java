@@ -15,6 +15,15 @@ import org.testng.annotations.Test;
  */
 public final class AItcBuiltinCapabilityDemandPlannerTest {
 
+    /**
+     * Creates a test instance.
+     */
+    public AItcBuiltinCapabilityDemandPlannerTest() {
+    }
+
+    /**
+     * Verifies that java classes and sources deduplicate source processing demand.
+     */
     @Test
     public void javaClassesAndSourcesDeduplicateSourceProcessingDemand() {
         AIcPreparedSourceSet locPrepared = new AIcPreparedSourceSet(
@@ -45,6 +54,9 @@ public final class AItcBuiltinCapabilityDemandPlannerTest {
         );
     }
 
+    /**
+     * Verifies that native documentation expands source and dependency prerequisites.
+     */
     @Test
     public void nativeDocumentationExpandsSourceAndDependencyPrerequisites() {
         AIcPreparedSourceSet locPrepared = new AIcPreparedSourceSet("java", List.of("src/product/java"), List.of(), List.of());
@@ -62,6 +74,9 @@ public final class AItcBuiltinCapabilityDemandPlannerTest {
         Assert.assertEquals(locGraph.topologicalOrder().get(2).key().capabilityId(), "generation_of_native_documentation");
     }
 
+    /**
+     * Verifies that additional repository demand is retained.
+     */
     @Test
     public void additionalRepositoryDemandIsRetained() {
         AIcCapabilityDemand locDemand = new AIcCapabilityDemand(
@@ -82,6 +97,9 @@ public final class AItcBuiltinCapabilityDemandPlannerTest {
         Assert.assertEquals(locGraph.demands().get(0).key(), locDemand.key());
     }
 
+    /**
+     * Verifies that repository only publication capability rejects artifact scope.
+     */
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void repositoryOnlyPublicationCapabilityRejectsArtifactScope() {
         AIcCapabilityDemand locDemand = new AIcCapabilityDemand(

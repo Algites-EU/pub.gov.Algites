@@ -16,6 +16,11 @@ public final class AIcJavaDependencyTechnologyHandler extends AIcDependencyTechn
 
     private final String dependencyKind;
 
+    /**
+     * Creates an {@code AIcJavaDependencyTechnologyHandler} instance.
+     *
+     * @param aDependencyKind DependencyKind identifier
+     */
     public AIcJavaDependencyTechnologyHandler(String aDependencyKind) {
         if (!java.util.Set.of("modustro", "java").contains(aDependencyKind)) {
             throw new IllegalArgumentException("Unsupported DependencyKind '" + aDependencyKind + "' for TechnologyKind '" + technologyKind() + "'.");
@@ -23,16 +28,32 @@ public final class AIcJavaDependencyTechnologyHandler extends AIcDependencyTechn
         dependencyKind = aDependencyKind;
     }
 
+    /**
+     * Returns the DependencyKind identifier handled by this object.
+     * @return DependencyKind identifier
+     */
     @Override
     public String dependencyKind() {
         return dependencyKind;
     }
 
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     @Override
     public String technologyKind() {
         return "java";
     }
 
+    /**
+     * Maps one portable dependency usage to a technology-native usage identifier.
+     *
+     * @param aIdentity dependency or item identity
+     * @param aUsage portable dependency usage
+     * @param aMappings technology-native usage mappings
+     * @param aDiagnostics resolution diagnostics
+     */
     @Override
     protected void mapUsage(
         AIcDependencyIdentity aIdentity,

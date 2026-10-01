@@ -14,6 +14,14 @@ public final class AIcPreparedSourceSet {
     private final List<String> generatedSourceRoots;
     private final List<String> resourceRoots;
 
+    /**
+     * Creates an {@code AIcPreparedSourceSet} instance.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aNativeSourceRoots native source roots
+     * @param aGeneratedSourceRoots generated source roots
+     * @param aResourceRoots resource roots
+     */
     public AIcPreparedSourceSet(
         String aTechnologyKind,
         List<String> aNativeSourceRoots,
@@ -47,22 +55,42 @@ public final class AIcPreparedSourceSet {
         return locValue;
     }
 
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     public String technologyKind() {
         return technologyKind;
     }
 
+    /**
+     * Returns handwritten/native source roots prepared for this technology.
+     * @return immutable list of native source roots
+     */
     public List<String> nativeSourceRoots() {
         return nativeSourceRoots;
     }
 
+    /**
+     * Returns generated source roots prepared for this technology.
+     * @return immutable list of generated source roots
+     */
     public List<String> generatedSourceRoots() {
         return generatedSourceRoots;
     }
 
+    /**
+     * Returns non-source resource roots prepared for this technology.
+     * @return immutable list of resource roots
+     */
     public List<String> resourceRoots() {
         return resourceRoots;
     }
 
+    /**
+     * Returns native and generated source roots in deterministic order without duplicates.
+     * @return immutable combined source-root list
+     */
     public List<String> allSourceRoots() {
         List<String> locResult = new ArrayList<>(nativeSourceRoots);
         generatedSourceRoots.forEach(locRoot -> {

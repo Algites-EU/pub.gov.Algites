@@ -27,6 +27,9 @@ public final class AIcBuiltinBuildOutputProducers {
     private final Map<String, AIiBuildOutputProducer> producers;
     private final Map<String, AIcTechnologyKindDefinition> technologyDefinitions;
 
+    /**
+     * Creates the registry of built-in build-output producers.
+     */
     public AIcBuiltinBuildOutputProducers() {
         this(
             List.of(
@@ -44,6 +47,12 @@ public final class AIcBuiltinBuildOutputProducers {
         );
     }
 
+    /**
+     * Creates the registry of built-in build-output producers.
+     *
+     * @param aProducers build-output producers
+     * @param aTechnologyDefinitions technology definitions
+     */
     public AIcBuiltinBuildOutputProducers(
         List<AIiBuildOutputProducer> aProducers,
         List<AIcTechnologyKindDefinition> aTechnologyDefinitions
@@ -69,6 +78,14 @@ public final class AIcBuiltinBuildOutputProducers {
         technologyDefinitions = Map.copyOf(locTechnologyDefinitions);
     }
 
+    /**
+     * Returns the registered build-output producer for the requested identifiers.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aBuildOutputType BuildOutputType identifier
+     * @return registered build-output producer
+     * @throws IllegalArgumentException if no matching build-output producer is registered
+     */
     public AIiBuildOutputProducer require(String aTechnologyKind, String aBuildOutputType) {
         AIiBuildOutputProducer locProducer = producers.get(key(aTechnologyKind, aBuildOutputType));
         if (locProducer == null) {
@@ -79,10 +96,23 @@ public final class AIcBuiltinBuildOutputProducers {
         return locProducer;
     }
 
+    /**
+     * Returns the default BuildOutputTypes for a TechnologyKind.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @return immutable default BuildOutputType set
+     */
     public Set<String> defaultBuildOutputTypes(String aTechnologyKind) {
         return technologyDefinition(aTechnologyKind).defaultBuildOutputTypes();
     }
 
+    /**
+     * Creates production plans for all default outputs of a TechnologyKind.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aPreparedSourceSet prepared source set
+     * @return immutable production-plan list
+     */
     public List<AIcBuildOutputProductionPlan> createDefaultProductionPlans(
         String aTechnologyKind,
         AIcPreparedSourceSet aPreparedSourceSet
@@ -90,6 +120,14 @@ public final class AIcBuiltinBuildOutputProducers {
         return createProductionPlans(aTechnologyKind, defaultBuildOutputTypes(aTechnologyKind), aPreparedSourceSet);
     }
 
+    /**
+     * Creates production plans for an explicit BuildOutputType selection.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aBuildOutputTypes BuildOutputType identifiers
+     * @param aPreparedSourceSet prepared source set
+     * @return immutable production-plan list
+     */
     public List<AIcBuildOutputProductionPlan> createProductionPlans(
         String aTechnologyKind,
         Set<String> aBuildOutputTypes,

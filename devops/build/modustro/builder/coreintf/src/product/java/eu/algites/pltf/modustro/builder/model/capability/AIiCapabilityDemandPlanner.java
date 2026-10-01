@@ -8,6 +8,14 @@ import java.util.Collection;
  */
 public interface AIiCapabilityDemandPlanner {
 
+    /**
+     * Builds a deduplicated capability demand graph for one artifact scope.
+     *
+     * @param aArtifactScopeIdentity stable identity of the artifact scope
+     * @param aBuildOutputPlans selected build-output production plans
+     * @param aAdditionalDemands additional explicit capability demands
+     * @return validated capability demand graph
+     */
     AIcCapabilityDemandGraph createDemandGraph(
         String aArtifactScopeIdentity,
         Collection<AIcBuildOutputProductionPlan> aBuildOutputPlans,

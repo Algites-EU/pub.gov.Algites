@@ -16,6 +16,12 @@ public final class AIcCapabilityDemandGraph {
     private final List<AIcCapabilityDemand> demands;
     private final Set<AIcCapabilityDemandDependency> dependencies;
 
+    /**
+     * Creates an {@code AIcCapabilityDemandGraph} instance.
+     *
+     * @param aDemands capability demands
+     * @param aDependencies directed prerequisite edges
+     */
     public AIcCapabilityDemandGraph(
         List<AIcCapabilityDemand> aDemands,
         Set<AIcCapabilityDemandDependency> aDependencies
@@ -40,14 +46,26 @@ public final class AIcCapabilityDemandGraph {
         topologicalOrder();
     }
 
+    /**
+     * Returns all demand nodes in deterministic insertion order.
+     * @return immutable demand list
+     */
     public List<AIcCapabilityDemand> demands() {
         return demands;
     }
 
+    /**
+     * Returns all directed prerequisite edges.
+     * @return immutable prerequisite-edge set
+     */
     public Set<AIcCapabilityDemandDependency> dependencies() {
         return dependencies;
     }
 
+    /**
+     * Returns the demands in prerequisite-before-dependent order.
+     * @return immutable topologically ordered demand list
+     */
     public List<AIcCapabilityDemand> topologicalOrder() {
         Map<AIcCapabilityDemandKey, AIcCapabilityDemand> locByKey = new LinkedHashMap<>();
         Map<AIcCapabilityDemandKey, Integer> locIncoming = new LinkedHashMap<>();

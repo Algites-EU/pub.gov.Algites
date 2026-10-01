@@ -32,7 +32,7 @@ Python import namespace:
 algites.pub.gov.algites.devops.build.yamldefs
 ```
 
-The Python package tree below `src/product/python.gen` is generated during the build and must not be committed.
+Python packaging of these common definition roots is handled entirely by the generic Algites Python TechnologyKind adapter. The generic `source_native_processing` implementation maps the canonical definition resources below the artifact's derived import namespace in the disposable run workspace, and `preparePythonBuildProject` places that result below `src/product/python.gen` in the staged Python project. This artifact therefore has no custom Gradle copy/generation task and does not materialize a resource-only `src/product/python.gen` tree in the source checkout.
 
 
 ## Artifact manifest schema

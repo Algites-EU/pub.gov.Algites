@@ -25,6 +25,16 @@ public final class AIcDependencyTechnologyPlanEntry {
     private final Set<String> requiredBuildOutputTypes;
     private final AIcVersionRequirement versionRequirement;
 
+    /**
+     * Creates an {@code AIcDependencyTechnologyPlanEntry} instance.
+     *
+     * @param aIdentity dependency or item identity
+     * @param aConstraintOnly whether the entry represents a constraint rather than a dependency edge
+     * @param aUsages portable dependency usages
+     * @param aNativeUsageMappings technology-native usage mappings
+     * @param aRequiredBuildOutputTypes required dependency build-output types
+     * @param aVersionRequirement version requirement
+     */
     public AIcDependencyTechnologyPlanEntry(
         AIcDependencyIdentity aIdentity,
         boolean aConstraintOnly,
@@ -41,26 +51,50 @@ public final class AIcDependencyTechnologyPlanEntry {
         versionRequirement = aVersionRequirement;
     }
 
+    /**
+     * Returns the dependency identity.
+     * @return dependency identity
+     */
     public AIcDependencyIdentity identity() {
         return identity;
     }
 
+    /**
+     * Returns whether this entry represents only a dependency constraint.
+     * @return whether the entry is constraint-only
+     */
     public boolean constraintOnly() {
         return constraintOnly;
     }
 
+    /**
+     * Returns the portable dependency usages.
+     * @return immutable dependency-usage set
+     */
     public Set<AInDependencyUsage> usages() {
         return usages;
     }
 
+    /**
+     * Returns the technology-native mapping for each portable usage.
+     * @return immutable usage mapping
+     */
     public Map<AInDependencyUsage, String> nativeUsageMappings() {
         return nativeUsageMappings;
     }
 
+    /**
+     * Returns the dependency build-output types required by the consumer.
+     * @return immutable set of required build-output types
+     */
     public Set<String> requiredBuildOutputTypes() {
         return requiredBuildOutputTypes;
     }
 
+    /**
+     * Returns the effective version requirement.
+     * @return version requirement, or {@code null} when no requirement is declared
+     */
     public AIcVersionRequirement versionRequirement() {
         return versionRequirement;
     }

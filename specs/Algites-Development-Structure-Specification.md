@@ -35,7 +35,7 @@ The goals are:
 ### 2.2. Terminology
 
 - **Visibility** – governance scope of a repository or artifact (`pub` or `priv`).
-- **Role** – technical role of a repository or artifact (`pltf`, `app`, `lib`, `tool`, `frmw`, etc.).
+- **Role** – technical role of a repository or artifact (`pltf`, `app`, `lib`, `tool`, `ops`, `frmw`, etc.).
 - **BusinessName** – PascalCase domain or product/application concept (e.g., `Modustro`, `MyGreatProduct`).
 - **RepoSubname** – optional lowercase technical qualifier of a repository (e.g., `common`, `core`, `backend`).
 - **Module Path** – dot-separated identifier of a module or component within a repository.
@@ -633,8 +633,9 @@ Common roles include:
 - `app` – application - concrete applications
 - `lib` – reusable libraries
 - `tool` – build and development tools
-- `frmw` - framework – generic frameworks
+- `frmw` – framework – generic frameworks
 - `lab` – laboratory - experimental or laboratory work
+- `ops` – operations – data connected with the running infrastructure, etc. Configurations without secrets, scripts, ...
 
 New roles MAY be introduced but MUST be lowercase and documented.
 
@@ -1510,7 +1511,7 @@ The exact schema serialization/extension is defined by the schema TechnologyKind
 
 Schemas for public Algites YAML formats SHOULD be maintained as controlled sources in a dedicated artifact of the public governance repository, so they can be versioned, validated, published, and consumed through the same Algites artifact model as other governed definitions. Such schemas naturally belong to an appropriate definition SourceType such as `yamldefs`.
 
-The canonical public governance artifact for the first implementation is `pub.gov.Algites_devops.build.yamldefs`, located at `devops/build/yamldefs`. Its controlled schema sources are stored under `src/product/yamldefs`. The artifact declares both `java` and `python` technology kinds so the same schema sources can be distributed as Java and Python ecosystem packages without copying the schemas into consumer repositories.
+The canonical public governance artifact for the first implementation is `pub.gov.Algites_devops.build.yamldefs`, located at `devops/build/yamldefs`. Its controlled schema sources are stored under `src/product/yamldefs`. The artifact declares both `java` and `python` technology kinds so the same schema sources can be distributed as Java and Python ecosystem packages without copying the schemas into consumer repositories. Resource-to-Python-package mapping is a generic Python TechnologyKind responsibility: `source_native_processing` stages canonical definition/configuration roots under the artifact's derived import namespace in the disposable run workspace, and the Python project-preparation adapter merges that staged result into the generated source area of the package build project. Artifact-local Gradle copy tasks for this standard mapping are prohibited.
 
 #### 3.9.12 Derived development metadata
 

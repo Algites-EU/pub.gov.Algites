@@ -15,6 +15,18 @@ import java.util.Set;
  */
 public final class AIcTechnologyKindDefinitionValidator implements AIiTechnologyKindDefinitionValidator {
 
+    /**
+     * Creates the built-in TechnologyKind definition validator.
+     */
+    public AIcTechnologyKindDefinitionValidator() {
+    }
+
+    /**
+     * Validates cross-reference and invariant rules of a TechnologyKind definition.
+     *
+     * @param aDefinition TechnologyKind definition
+     * @throws eu.algites.pltf.modustro.builder.model.AIxModelValidationException if the definition violates a model invariant
+     */
     @Override
     public void validate(AIcTechnologyKindDefinition aDefinition) {
         Map<String, AIcCapabilityDefinition> locCapabilities = new LinkedHashMap<>();

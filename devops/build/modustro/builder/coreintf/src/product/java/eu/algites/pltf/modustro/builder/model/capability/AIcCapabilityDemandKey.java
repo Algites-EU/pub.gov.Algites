@@ -13,6 +13,14 @@ public final class AIcCapabilityDemandKey {
     private final AInModelScope scope;
     private final String scopeIdentity;
 
+    /**
+     * Creates an {@code AIcCapabilityDemandKey} instance.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aCapabilityId capability identifier
+     * @param aScope model scope
+     * @param aScopeIdentity stable identity of the concrete scope instance
+     */
     public AIcCapabilityDemandKey(
         String aTechnologyKind,
         String aCapabilityId,
@@ -34,22 +42,41 @@ public final class AIcCapabilityDemandKey {
         return locValue;
     }
 
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     public String technologyKind() {
         return technologyKind;
     }
 
+    /**
+     * Returns the capability identifier.
+     * @return capability identifier
+     */
     public String capabilityId() {
         return capabilityId;
     }
 
+    /**
+     * Returns the model scope of this demand.
+     * @return model scope
+     */
     public AInModelScope scope() {
         return scope;
     }
 
+    /**
+     * Returns the stable identity of the concrete scope instance.
+     * @return scope identity
+     */
     public String scopeIdentity() {
         return scopeIdentity;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public boolean equals(Object aOther) {
         if (this == aOther) {
@@ -64,11 +91,17 @@ public final class AIcCapabilityDemandKey {
             && scopeIdentity.equals(locOther.scopeIdentity);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public int hashCode() {
         return Objects.hash(technologyKind, capabilityId, scope, scopeIdentity);
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public String toString() {
         return technologyKind + ":" + capabilityId + "@" + scope.name().toLowerCase() + ":" + scopeIdentity;

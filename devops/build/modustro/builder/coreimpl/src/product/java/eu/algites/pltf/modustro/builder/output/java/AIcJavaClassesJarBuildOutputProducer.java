@@ -12,16 +12,36 @@ import java.util.Set;
  */
 public final class AIcJavaClassesJarBuildOutputProducer implements AIiBuildOutputProducer {
 
+    /**
+     * Creates the built-in Java classes JAR producer.
+     */
+    public AIcJavaClassesJarBuildOutputProducer() {
+    }
+
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     @Override
     public String technologyKind() {
         return "java";
     }
 
+    /**
+     * Returns the BuildOutputType identifier.
+     * @return BuildOutputType identifier
+     */
     @Override
     public String buildOutputType() {
         return "java_classes_jar";
     }
 
+    /**
+     * Creates the portable production plan for the supplied prepared sources.
+     *
+     * @param aPreparedSourceSet prepared source set
+     * @return build-output production plan
+     */
     @Override
     public AIcBuildOutputProductionPlan createProductionPlan(AIcPreparedSourceSet aPreparedSourceSet) {
         return new AIcBuildOutputProductionPlan(

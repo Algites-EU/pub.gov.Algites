@@ -1,29 +1,22 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:algites:modustro:builder:jsondef:publication:global-publication-metadata:1",
+  "$id": "urn:algites:modustro:builder:jsondef:publication:global-publication-user-metadata:1",
   "x-algites-definition-version": 1,
-  "title": "Modustro Global Publication Metadata v1",
+  "title": "Modustro Global Publication User Metadata v1",
+  "description": "Author-controlled source metadata used as input to global definition publication. Only the logical publication path is accepted; deployment-controlled fields are deliberately forbidden.",
   "x-algites-document-common-metadata": 1,
   "$defs": {
     "DocumentContent": {
       "type": "object",
       "properties": {
-        "MetadataVersion": {
-          "const": 1
-        },
-        "DefinitionVersion": {
-          "type": "integer",
-          "minimum": 1
-        },
         "GlobalPublicationPathId": {
           "type": "string",
           "minLength": 1,
-          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)[A-Za-z0-9._/-]+$"
+          "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*//)[A-Za-z0-9._/-]+$",
+          "description": "Stable logical path selected by the definition author below the canonical definition source root."
         }
       },
       "required": [
-        "MetadataVersion",
-        "DefinitionVersion",
         "GlobalPublicationPathId"
       ]
     },

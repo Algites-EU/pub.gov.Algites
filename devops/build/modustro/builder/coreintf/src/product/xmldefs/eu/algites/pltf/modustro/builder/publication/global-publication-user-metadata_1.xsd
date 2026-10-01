@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:publication:global-publication-user-metadata:1" xmlns="urn:algites:modustro:builder:publication:global-publication-user-metadata:1" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>Author-controlled source metadata used as input to global definition publication. Deployment-controlled fields are not accepted.</xs:documentation>
+    <xs:appinfo><DefinitionVersion>1</DefinitionVersion></xs:appinfo>
+  </xs:annotation>
+  <xs:element name="GlobalPublicationUserMetadata">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="GlobalPublicationPathId" type="xs:string"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>

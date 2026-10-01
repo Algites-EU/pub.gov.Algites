@@ -19,7 +19,7 @@ Phase 2 adds the dependency technology bridge:
 
 Gradle adaptation remains outside this artifact.
 
-Phase 3A adds the bootstrap-safe build-output producer layer without changing the active Gradle orchestration:
+Phase 3 adds the build-output producer layer and activates it in the Gradle adapter:
 
 - hard-wired producers for `java_classes_jar`, `java_sources_jar`, `java_javadoc_jar`, `python_wheel`, and `python_sdist`;
 - a producer registry keyed by `TechnologyKind + BuildOutputType`;
@@ -27,4 +27,4 @@ Phase 3A adds the bootstrap-safe build-output producer layer without changing th
 - built-in default output selection through the existing TechnologyKind definitions;
 - explicit rejection of virtual dependency-only outputs such as `python_distribution` as directly producible outputs.
 
-The active Gradle build still uses the Phase 2 orchestration in Phase 3A. After these classes are published, Phase 3B can switch the Gradle adapter to the producer plans without a bootstrap cycle.
+Phase 4 adds demand-driven capabilities. Production plans declare their capability requirements, `AIcBuiltinCapabilityDemandPlanner` deduplicates them and expands prerequisites, and the active Gradle adapter materializes the resulting source-processing and dependency-resolution boundaries. Native documentation is represented by the same graph rather than by a separate dependency chain.

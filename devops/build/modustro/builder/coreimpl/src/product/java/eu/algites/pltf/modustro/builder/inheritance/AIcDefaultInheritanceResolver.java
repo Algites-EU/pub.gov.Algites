@@ -17,6 +17,19 @@ import java.util.Objects;
  */
 public final class AIcDefaultInheritanceResolver implements AIiInheritanceResolver {
 
+    /**
+     * Creates the default inheritance resolver.
+     */
+    public AIcDefaultInheritanceResolver() {
+    }
+
+    /**
+     * Resolves a local tri-state scalar contribution against its inherited value.
+     *
+     * @param aInheritedValue inherited scalar contribution
+     * @param aLocalValue local scalar contribution
+     * @return effective scalar contribution
+     */
     @Override
     public <T> AIcInheritedValue<T> resolveScalar(AIcInheritedValue<T> aInheritedValue, AIcInheritedValue<T> aLocalValue) {
         Objects.requireNonNull(aInheritedValue, "inheritedValue");
@@ -27,6 +40,15 @@ public final class AIcDefaultInheritanceResolver implements AIiInheritanceResolv
         return aLocalValue;
     }
 
+    /**
+     * Resolves keyed local items against inherited items according to the local inheritance policy.
+     *
+     * @param aInheritedItems inherited items
+     * @param aLocalItems local item contribution
+     * @param aIdentity dependency or item identity
+     * @param aMerger same-identity item merger
+     * @return immutable effective item list
+     */
     @Override
     public <T, K> List<T> resolveItems(
         List<T> aInheritedItems,
@@ -58,6 +80,14 @@ public final class AIcDefaultInheritanceResolver implements AIiInheritanceResolv
         return List.copyOf(locResolved.values());
     }
 
+    /**
+     * Merges keyed local items into inherited items without removing missing inherited entries.
+     *
+     * @param aInheritedItems inherited items
+     * @param aLocalItems local item contribution
+     * @param aIdentity dependency or item identity
+     * @return immutable merged item list
+     */
     @Override
     public <T, K> List<T> mergeOnlyItems(List<T> aInheritedItems, List<T> aLocalItems, AIiItemIdentity<T, K> aIdentity) {
         Objects.requireNonNull(aInheritedItems, "inheritedItems");

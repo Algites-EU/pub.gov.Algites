@@ -15,6 +15,15 @@ public final class AIcBuildOutputTypeDefinition {
     private final Set<String> dependencyOutputAlternatives;
     private final String configurationSchemaId;
 
+    /**
+     * Creates an {@code AIcBuildOutputTypeDefinition} instance.
+     *
+     * @param aBuildOutputType BuildOutputType identifier
+     * @param aCanBeProduced whether this output type can be directly produced
+     * @param aCanBeUsedInDependency whether this output type can be requested by dependencies
+     * @param aDependencyOutputAlternatives concrete alternatives satisfying a virtual dependency output
+     * @param aConfigurationSchemaId optional identifier of the capability configuration schema
+     */
     public AIcBuildOutputTypeDefinition(
         String aBuildOutputType,
         boolean aCanBeProduced,
@@ -45,22 +54,42 @@ public final class AIcBuildOutputTypeDefinition {
         return locValue.isEmpty() ? null : locValue;
     }
 
+    /**
+     * Returns the BuildOutputType identifier.
+     * @return BuildOutputType identifier
+     */
     public String buildOutputType() {
         return buildOutputType;
     }
 
+    /**
+     * Returns whether this BuildOutputType can be produced directly.
+     * @return whether the output is directly producible
+     */
     public boolean canBeProduced() {
         return canBeProduced;
     }
 
+    /**
+     * Returns whether this BuildOutputType may be requested by a dependency.
+     * @return whether the output may be used in dependencies
+     */
     public boolean canBeUsedInDependency() {
         return canBeUsedInDependency;
     }
 
+    /**
+     * Returns concrete outputs that can satisfy this virtual dependency output.
+     * @return immutable set of alternative BuildOutputTypes
+     */
     public Set<String> dependencyOutputAlternatives() {
         return dependencyOutputAlternatives;
     }
 
+    /**
+     * Returns the optional configuration-schema identifier.
+     * @return configuration-schema identifier, or {@code null} when no schema is defined
+     */
     public String configurationSchemaId() {
         return configurationSchemaId;
     }

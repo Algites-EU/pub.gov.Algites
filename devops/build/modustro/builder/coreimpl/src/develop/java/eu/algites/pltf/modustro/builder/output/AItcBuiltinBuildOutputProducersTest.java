@@ -13,6 +13,15 @@ import org.testng.annotations.Test;
  */
 public final class AItcBuiltinBuildOutputProducersTest {
 
+    /**
+     * Creates a test instance.
+     */
+    public AItcBuiltinBuildOutputProducersTest() {
+    }
+
+    /**
+     * Verifies that java defaults produce classes and sources.
+     */
     @Test
     public void javaDefaultsProduceClassesAndSources() {
         AIcPreparedSourceSet locPrepared = new AIcPreparedSourceSet(
@@ -29,6 +38,9 @@ public final class AItcBuiltinBuildOutputProducersTest {
         Assert.assertTrue(locPlans.stream().anyMatch(locPlan -> locPlan.requiredCapabilityIds().contains("dependency_resolution")));
     }
 
+    /**
+     * Verifies that java javadoc uses documentation classpath.
+     */
     @Test
     public void javaJavadocUsesDocumentationClasspath() {
         AIcPreparedSourceSet locPrepared = new AIcPreparedSourceSet("java", List.of("src/product/java"), List.of(), List.of());
@@ -40,6 +52,9 @@ public final class AItcBuiltinBuildOutputProducersTest {
         Assert.assertEquals(locPlan.requiredCapabilityIds(), Set.of("generation_of_native_documentation"));
     }
 
+    /**
+     * Verifies that python defaults produce wheel and sdist.
+     */
     @Test
     public void pythonDefaultsProduceWheelAndSdist() {
         AIcPreparedSourceSet locPrepared = new AIcPreparedSourceSet(
@@ -54,6 +69,9 @@ public final class AItcBuiltinBuildOutputProducersTest {
         Assert.assertTrue(locPlans.stream().anyMatch(locPlan -> locPlan.productionKind() == AInBuildOutputProductionKind.PYTHON_SDIST));
     }
 
+    /**
+     * Verifies that virtual python distribution has no direct producer.
+     */
     @Test(expectedExceptions = IllegalArgumentException.class)
     public void virtualPythonDistributionHasNoDirectProducer() {
         AIcPreparedSourceSet locPrepared = new AIcPreparedSourceSet("python", List.of("src/product/python"), List.of(), List.of());

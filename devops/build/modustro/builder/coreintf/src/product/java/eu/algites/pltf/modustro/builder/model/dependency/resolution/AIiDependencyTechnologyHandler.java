@@ -10,10 +10,28 @@ import java.util.List;
  */
 public interface AIiDependencyTechnologyHandler {
 
+    /**
+     * Returns the DependencyKind translated by this handler.
+     *
+     * @return DependencyKind identifier
+     */
     String dependencyKind();
 
+    /**
+     * Returns the target TechnologyKind.
+     *
+     * @return TechnologyKind identifier
+     */
     String technologyKind();
 
+    /**
+     * Translates portable dependencies and constraints into a technology-native logical plan.
+     *
+     * @param aDependencies effective dependencies
+     * @param aConstraints effective dependency constraints
+     * @param aTechnologyDefinition target TechnologyKind definition
+     * @return technology-specific logical resolution plan
+     */
     AIcDependencyTechnologyResolutionPlan createResolutionPlan(
         List<AIcDependencyDefinition> aDependencies,
         List<AIcDependencyConstraintDefinition> aConstraints,

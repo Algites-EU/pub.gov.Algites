@@ -40,6 +40,7 @@ import org.gradle.api.plugins.BasePluginExtension
 import org.gradle.api.plugins.JavaPluginExtension
 import org.gradle.jvm.toolchain.JavaLanguageVersion
 import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.MapProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.publish.PublishingExtension
 import org.gradle.api.publish.maven.MavenPublication
@@ -506,6 +507,7 @@ abstract class AIcResolvePythonDependenciesTask : DefaultTask() {
 abstract class AIcValidatePythonDistributionPathsTask : DefaultTask() {
     @get:Internal abstract val repositoryDirectory: DirectoryProperty
     @get:Input abstract val pythonArtifactRelativePaths: ListProperty<String>
+    @get:Input abstract val pythonArtifactImportNamespaces: MapProperty<String, String>
 
     private fun AIcSourceKindBase(aName: String): String = aName.substringBefore('.')
 
@@ -534,22 +536,34 @@ abstract class AIcValidatePythonDistributionPathsTask : DefaultTask() {
             return locBase in locPackageSourceKinds && (aName == locBase || aName == "$locBase.gen" || aName == "$locBase.extgen")
         }
 
+        val locImportNamespaces = pythonArtifactImportNamespaces.get()
         pythonArtifactRelativePaths.get().sorted().forEach { locArtifactName ->
             val locProjectDirectory = if (locArtifactName == ".") locRepositoryDirectory else File(locRepositoryDirectory, locArtifactName)
             val locProductSourceDirectory = File(locProjectDirectory, "src/product")
+            val locImportNamespacePath = locImportNamespaces[locArtifactName]
+                ?.replace('.', '/')
+                ?.trim('/')
+                ?.takeIf { it.isNotBlank() }
+                ?: throw GradleException("Missing Python import namespace for Algites artifact '$locArtifactName'.")
             val locLocalOwners = linkedMapOf<String, MutableList<String>>()
             if (locProductSourceDirectory.isDirectory) {
                 locProductSourceDirectory.listFiles()
                     ?.filter { locDirectory -> locDirectory.isDirectory && AIcIsCanonicalSourceRootName(locDirectory.name) }
                     ?.sortedBy { locDirectory -> locDirectory.name }
                     ?.forEach { locSourceRoot ->
+                        val locSourceKind = AIcSourceKindBase(locSourceRoot.name)
                         locSourceRoot.walkTopDown()
                             .filter { locFile -> locFile.isFile && "__pycache__" !in locFile.toPath().map { it.toString() } && locFile.extension.lowercase() !in setOf("pyc", "pyo") }
                             .forEach { locFile ->
                                 val locRelativePath = locSourceRoot.toPath().relativize(locFile.toPath()).toString().replace(File.separatorChar, '/')
-                                locLocalOwners.getOrPut(locRelativePath) { mutableListOf() }.add(locSourceRoot.name)
-                                locPathOwners.getOrPut(locRelativePath) { mutableListOf() }.add(locArtifactName to locSourceRoot.name)
-                                locArtifactFiles.getOrPut(locArtifactName) { linkedSetOf() }.add(locRelativePath)
+                                val locTargetPath = if (locSourceKind == "python") {
+                                    locRelativePath
+                                } else {
+                                    "$locImportNamespacePath/$locRelativePath"
+                                }
+                                locLocalOwners.getOrPut(locTargetPath) { mutableListOf() }.add(locSourceRoot.name)
+                                locPathOwners.getOrPut(locTargetPath) { mutableListOf() }.add(locArtifactName to locSourceRoot.name)
+                                locArtifactFiles.getOrPut(locArtifactName) { linkedSetOf() }.add(locTargetPath)
                             }
                     }
             }
@@ -1856,12 +1870,17 @@ val locAlgitesPythonValidationArtifactPaths = algitesResolvedArtifactDirectories
             }
         }
     }
+val locAlgitesPythonValidationImportNamespaces = locAlgitesPythonValidationArtifactPaths.associateWith { locArtifactPath ->
+    val locModulePath = if (locArtifactPath == ".") "" else locArtifactPath.replace('/', '.')
+    AIcAlgitesPythonImportNamespace(rootProject.name, locModulePath)
+}
 
 val validateAlgitesPythonDistributionPaths = tasks.register<AIcValidatePythonDistributionPathsTask>("validateAlgitesPythonDistributionPaths") {
     group = "verification"
     description = "Validates Python product source roots, package-resource paths, and shared PEP 420 namespaces across distributions."
     repositoryDirectory.set(rootProject.layout.projectDirectory)
     pythonArtifactRelativePaths.set(locAlgitesPythonValidationArtifactPaths)
+    pythonArtifactImportNamespaces.set(locAlgitesPythonValidationImportNamespaces)
 }
 
 algitesBuild.configure {
@@ -2420,6 +2439,25 @@ subprojects {
             AIcAlgitesRunDirectoryRelativePath(project.projectDir)
         )
         val locPythonBuildProjectDirectory = locAlgitesProjectRunDirectory.dir("bld/python/project")
+        val locPythonPreparedPackageResourcesDirectory = locAlgitesProjectRunDirectory.dir(
+            "bld/python/source-native-processing/package-resources"
+        )
+        val locPythonPreparedSourceSet = AIcAlgitesPreparedSourceSet(project, "python")
+        val locPythonImportNamespacePath = locPythonImportNamespace.replace('.', '/')
+        val locStagePythonPackageResources = tasks.register<Sync>("stageAlgitesPythonPackageResources") {
+            group = "algites"
+            description = "Stages prepared Python package resources below the derived artifact import namespace."
+            duplicatesStrategy = DuplicatesStrategy.FAIL
+            into(locPythonPreparedPackageResourcesDirectory)
+            locPythonPreparedSourceSet.resourceRoots().forEach { locSourcePath ->
+                from(project.layout.projectDirectory.dir(locSourcePath)) {
+                    into(locPythonImportNamespacePath)
+                }
+            }
+        }
+        locPythonSourceProcessingTask?.configure {
+            dependsOn(locStagePythonPackageResources)
+        }
 
         val locDeletePythonDevelopmentMetadata = tasks.register("deletePythonDevelopmentMetadata") {
             group = "algites"
@@ -2548,21 +2586,15 @@ subprojects {
             group = "build"
             description = "Stages the Python package project in the repository build workspace."
             dependsOn(locGeneratePythonProjectMetadata)
-            if (locHasCapabilityDemand("python", "source_native_processing")) {
-                locPythonSourceProcessingTask?.let { locSourceProcessingTask -> dependsOn(locSourceProcessingTask) }
-            }
+            locPythonSourceProcessingTask?.let { locSourceProcessingTask -> dependsOn(locSourceProcessingTask) }
 
             duplicatesStrategy = DuplicatesStrategy.FAIL
             into(locPythonBuildProjectDirectory)
             from(project.layout.projectDirectory) {
                 exclude("run/**", "build/**", ".gradle/**", ".kotlin/**", "**/__pycache__/**", "**/*.pyc", "**/*.pyo")
             }
-            listOf("jsondefs", "yamldefs", "xmldefs", "config").forEach { locSourceKind ->
-                locAlgitesResolveSourceRootRelativePaths(project.projectDir, "product", locSourceKind).forEach { locSourcePath ->
-                    from(project.layout.projectDirectory.dir(locSourcePath)) {
-                        into("src/product/python")
-                    }
-                }
+            from(locPythonPreparedPackageResourcesDirectory) {
+                into("src/product/python.gen")
             }
             locAlgitesProductLicenses.forEach { locLicense ->
                 val locLicenseId = locLicense["id"] ?: return@forEach

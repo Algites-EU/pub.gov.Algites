@@ -14,6 +14,14 @@ public final class AIcCapabilityConfiguration {
     private final boolean enabled;
     private final Map<String, String> values;
 
+    /**
+     * Creates an {@code AIcCapabilityConfiguration} instance.
+     *
+     * @param aTechnologyKind TechnologyKind identifier
+     * @param aCapabilityId capability identifier
+     * @param aEnabled whether the capability is enabled
+     * @param aValues effective configuration values
+     */
     public AIcCapabilityConfiguration(
         String aTechnologyKind,
         String aCapabilityId,
@@ -35,18 +43,34 @@ public final class AIcCapabilityConfiguration {
         return locValue;
     }
 
+    /**
+     * Returns the TechnologyKind identifier.
+     * @return TechnologyKind identifier
+     */
     public String technologyKind() {
         return technologyKind;
     }
 
+    /**
+     * Returns the capability identifier.
+     * @return capability identifier
+     */
     public String capabilityId() {
         return capabilityId;
     }
 
+    /**
+     * Returns whether the capability is enabled.
+     * @return whether the capability is enabled
+     */
     public boolean enabled() {
         return enabled;
     }
 
+    /**
+     * Returns the effective capability configuration values.
+     * @return immutable configuration values
+     */
     public Map<String, String> values() {
         return values;
     }
