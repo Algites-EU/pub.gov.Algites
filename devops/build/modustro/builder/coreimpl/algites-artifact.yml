@@ -51,4 +51,6 @@ Dependencies:
         ArtifactId: testng
         Usages: [develop_implementation]
         VersionRequirement:
-          Exact: "7.10.2"
+          Minimum: ">=7.0.0"
+          Maximum: "<8.0.0"
+          MaximumStrict: true
