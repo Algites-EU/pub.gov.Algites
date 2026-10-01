@@ -122,10 +122,6 @@
             "ResourceEndpoints": {
               "$ref": "algites-resource-endpoints_1.yamldef.schema.json#EmbeddedContent"
             },
-            "Repositories": {
-              "$ref": "algites-repository-matrix_1.yamldef.schema.json#EmbeddedContent",
-              "deprecated": true
-            },
             "Version": {
               "$ref": "algites-version_1.yamldef.schema.json"
             }

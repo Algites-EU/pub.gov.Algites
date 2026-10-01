@@ -71,7 +71,6 @@ Supporting reusable schemas include:
 - `algites-dependencies_1.yamldef.schema.json`
 - `algites-version-requirement_1.yamldef.schema.json`
 - `algites-environment-requirements_1.yamldef.schema.json`
-- `algites-repository-matrix_1.yamldef.schema.json`
 - `algites-repository-defaults_1.yamldef.schema.json`
 - `algites-credential-profiles_1.yamldef.schema.json`
 - `algites-credentials_1.yamldef.schema.json`
@@ -188,7 +187,6 @@ Version:
 | `SourceRepository.Name` | no | Human-readable repository name. |
 | `SourceRepository.Visibility` | no | Explicit `pub` or `priv` visibility when needed. Normally repository identity/naming and governance determine visibility. |
 | `SourceRepository.ResourceEndpoints` | no | General ResourceEndpoint contribution at repository scope. New metadata should use this field. |
-| `SourceRepository.Repositories` | no | Legacy native-build-output repository matrix accepted during migration and normalized to `ResourceEndpoints`. |
 
 Wire names in all examples below follow the Algites structured-data naming convention from the Development Structure Specification: Algites fields use `UpperCamelCase` and symbolic values use `lower_snake_case`.
 ResourceEndpoint matrix dimensions are symbolic values used as map keys, so TechnologyKind, ResourceKind, visibility, stability, and action keys such as `modustro`, `native_build_output`, `docs_site`, `public`, `snapshot`, and `upload` intentionally retain their symbolic `lower_snake_case` spelling.
@@ -233,7 +231,6 @@ PublicationReadiness:
 | `ArtifactSet.Description` | no | Free-form description. |
 | `ArtifactSet.TechnologyKinds` | no | TechnologyKinds made available to descendants as structural metadata. Allowed values currently include `java`, `python`, `mps`, and `modustro`. |
 | `ArtifactSet.ResourceEndpoints` | no | General ResourceEndpoint contribution at this container. New metadata should use this field. |
-| `ArtifactSet.Repositories` | no | Legacy native-build-output repository matrix contribution accepted during migration. |
 | `ArtifactSet.Version` | no | Version-context contribution at this container. |
 
 Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
@@ -259,8 +256,8 @@ Artifact:
 | `Artifact.Name` | no | Human-readable artifact name. |
 | `Artifact.Description` | no | Free-form description. |
 | `Artifact.VariantId` | no | Optional lowercase dash-separated variant identity appended to native artifact/distribution identity. |
-| `Artifact.ResourceEndpoints` | no | General ResourceEndpoint contribution for this artifact. New metadata should use this field. |
-| `Artifact.Repositories` | no | Legacy native-build-output repository matrix contribution accepted during migration. |
+| `Artifact.ResourceEndpoints` | no | General ResourceEndpoint contribution for this artifact. |
+| `Artifact.DefinitionCodeGeneration` | no | Artifact-local canonical definitions to generate into Java/Python `.gen` source roots during `source_native_processing`. |
 | `Artifact.Version` | no | Version-context contribution for this artifact. |
 
 Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
@@ -269,7 +266,13 @@ For readability, when `Name`, `Description`, and `TechnologyKinds` are present i
 
 `TechnologyKinds` is the normative declaration of build/publication technologies. Source directory names alone do not select a TechnologyKind.
 
-### 6.1.1 Selecting BuildOutputTypes
+### 6.1.1 Definition-driven generated sources
+
+`Artifact.DefinitionCodeGeneration.Items` connects canonical definitions to the standard `source_native_processing` lifecycle. Each item declares `SourceKind` (`yamldefs`, `jsondefs`, or `xmldefs`), an artifact-relative canonical product `Source` below the matching `src/product/<SourceKind>/` root, one or more `Targets` (`java`, `python`), a target `Package`, and optionally `NamingProfile` (currently `algites`). The standard adapter invokes the reusable Defs Codegen Java API directly; it does not shell out to the CLI.
+
+Generated Java and Python files are materialized under `src/product/java.gen` and `src/product/python.gen` respectively, are reproducible, and MUST NOT be edited manually. The `.gen` roots may be shared by multiple generators: Defs Codegen tracks only its own generated files in disposable `build/run` state, removes stale owned files, and fails on duplicate target paths instead of overwriting them silently. `clean` removes standard `.gen` roots. A generator task attaches only to the corresponding `processAlgites*NativeSources` capability boundary; downstream compile/package/documentation task wiring remains owned by the common adapter.
+
+### 6.1.2 Selecting BuildOutputTypes
 
 The compact form selects technologies and uses inherited/built-in output defaults:
 
@@ -304,7 +307,7 @@ The built-in defaults currently are:
 
 The active build applies these selections through Gradle-independent production plans: Java maps to classes JAR, sources JAR, and optional Javadoc JAR production, while Python maps to wheel and/or sdist production. The selected production plans then contribute their required capabilities to the capability demand graph. Dependency-resolution preflight is wired only when an effective output or documentation demand requires `dependency_resolution`, while shared prerequisites are deduplicated by the capability planner.
 
-### 6.1.2 `PreparedSourceSet`, production plans, and capability demands
+### 6.1.3 `PreparedSourceSet`, production plans, and capability demands
 
 `AIcPreparedSourceSet` is the portable boundary between source discovery/preparation and output production. For one TechnologyKind it carries three deterministic root groups: native handwritten source roots, generated source roots, and resource/definition roots. Build-output producers consume this prepared description and return an `AIcBuildOutputProductionPlan`; the producer does not execute Gradle tasks itself.
 
@@ -583,7 +586,7 @@ Legacy native-build-output ids without the explicit `native-build-output` segmen
 
 Public **download** defaults are maintained in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`. The historical filename and `ALGITES_REPOSITORY_*` environment-variable names are retained for workflow compatibility; the contained canonical metadata now uses `ResourceEndpoints`.
 
-The legacy `Repositories` shape remains accepted as input and is normalized to ResourceKind `native_build_output`. New descriptors SHOULD use `ResourceEndpoints`. `UsageProviderAdapter` in legacy metadata maps to `ResourceEndpointProviderAdapter`.
+Phase 5.1 accepts only the canonical `ResourceEndpoints` shape. Repository-matrix input and its compatibility projection are no longer part of the descriptor/resolver contract.
 
 ### 11.2 Public governance resolution for local builds
 

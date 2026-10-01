@@ -633,6 +633,7 @@ Common roles include:
 - `app` – application - concrete applications
 - `lib` – reusable libraries
 - `tool` – build and development tools
+- `ops` – operations – operational and infrastructure components
 - `frmw` - framework – generic frameworks
 - `lab` – laboratory - experimental or laboratory work
 
@@ -1116,6 +1117,9 @@ When a YAML or JSON definition is itself expressed as JSON Schema, its filename 
 
 #### 3.9.2 Generated and externally generated sources
 
+Artifact-local canonical-definition generation MAY be declared through `Artifact.DefinitionCodeGeneration`. The declaration identifies a canonical product definition below the matching `src/product/<SourceKind>/` root, its definition family, Java/Python generation targets, and the target package/module namespace. The common Builder adapter invokes Defs Codegen during the corresponding `source_native_processing` capability and materializes reproducible source below the applicable `.gen` root. Generated types preserve canonical identity/version provenance and definition documentation.
+
+
 For any source type, the following semantics apply:
 
 ```text
@@ -1325,7 +1329,7 @@ Supported native-build-output management provider adapters remain:
 
 `PublicationDestinations` on publication capability configuration is an optional list of ResourceEndpoint IDs. It narrows endpoint selection but never embeds URLs, credentials, or provider-specific state. Phase 6 activates this mechanism for `docs_site` and `schema_site` publication.
 
-The legacy `Repositories` shape remains accepted as a migration input. A legacy `TechnologyKind / visibility / stability / usage` cell is normalized to ResourceKind `native_build_output`; `stability` becomes endpoint `Stability`, `usage` becomes action, and legacy `UsageProviderAdapter` becomes `ResourceEndpointProviderAdapter`. New metadata SHOULD use `ResourceEndpoints`. Resolved metadata exposes `resourceEndpoints` as the canonical form and retains a legacy native-build-output `repositories` projection temporarily for older consumers.
+Phase 5.1 uses `ResourceEndpoints` as the sole endpoint representation. The superseded repository-matrix input and compatibility projection are removed.
 
 A repository MAY configure ResourceEndpoints for TechnologyKinds or ResourceKinds that are not currently selected by an artifact. `TechnologyKinds` controls artifact build participation; ResourceEndpoints define available external resource targets.
 
@@ -1452,7 +1456,6 @@ Public governance MUST contain only ResourceEndpoint information safe to expose 
 Private-governance overlay files use `algites-repository-defaults_1.yamldef.schema.json` and MAY contain:
 
 - `ResourceEndpoints` — canonical endpoint-list overrides for selected ResourceEndpoint cells;
-- legacy `Repositories` — native-build-output endpoint-list overrides accepted during migration and normalized to `ResourceEndpoints`;
 - `CredentialProfiles` — non-secret profile definitions referenced by those endpoints.
 
 Actual credential values MUST NOT be stored in governance YAML. Upload credential values likewise MUST NOT be made available to ordinary target-repository builds. Provider implementations SHOULD keep publication workers in the private-governance execution context and pass only non-secret target identity/revision information from target repositories.

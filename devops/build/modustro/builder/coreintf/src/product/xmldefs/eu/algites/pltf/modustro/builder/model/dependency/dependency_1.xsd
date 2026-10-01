@@ -1,11 +1,144 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:model:dependency:1" xmlns="urn:algites:modustro:builder:model:dependency:1" elementFormDefault="qualified">
-  <xs:annotation><xs:appinfo><DefinitionVersion>1</DefinitionVersion></xs:appinfo></xs:annotation>
-  <xs:simpleType name="UsageType"><xs:restriction base="xs:string"><xs:enumeration value="product_api"/><xs:enumeration value="product_implementation"/><xs:enumeration value="product_compile_only"/><xs:enumeration value="product_compile_only_api"/><xs:enumeration value="product_runtime_only"/><xs:enumeration value="product_annotation_processor"/><xs:enumeration value="develop_implementation"/><xs:enumeration value="develop_compile_only"/><xs:enumeration value="develop_runtime_only"/><xs:enumeration value="develop_annotation_processor"/></xs:restriction></xs:simpleType>
-  <xs:complexType name="DependencyItemType"><xs:sequence>
-    <xs:element name="GroupId" type="xs:string" minOccurs="0" nillable="true"/><xs:element name="ArtifactId" type="xs:string"/><xs:element name="VariantId" type="xs:string" minOccurs="0" nillable="true"/>
-    <xs:element name="Usage" type="UsageType" minOccurs="0" maxOccurs="unbounded"/><xs:element name="RequiredBuildOutputType" type="xs:string" minOccurs="0" maxOccurs="unbounded"/><xs:element name="VersionRequirement" type="xs:anyType" minOccurs="0" nillable="true"/>
-  </xs:sequence></xs:complexType>
-  <xs:complexType name="DependencyGroupType"><xs:sequence><xs:element name="Item" type="DependencyItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:attribute name="DependencyKind" type="xs:string" use="required"/><xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items"/></xs:complexType>
-  <xs:element name="DependencyModel"><xs:complexType><xs:sequence><xs:element name="Dependencies" type="DependencyGroupType" minOccurs="0" maxOccurs="unbounded"/><xs:element name="DependencyConstraints" type="DependencyGroupType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:model:dependency:1" targetNamespace="urn:algites:modustro:builder:model:dependency:1" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>Defines declared dependencies and dependency constraints before technology-specific resolution.</xs:documentation>
+    <xs:appinfo>
+      <DefinitionVersion>1</DefinitionVersion>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:simpleType name="UsageType">
+    <xs:annotation>
+      <xs:documentation>Enumerates standard Algites dependency usages for product and development source scopes.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="product_api">
+        <xs:annotation>
+          <xs:documentation>Product dependency exported as part of the public API.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="product_implementation">
+        <xs:annotation>
+          <xs:documentation>Product dependency required by the implementation but not exported as API.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="product_compile_only">
+        <xs:annotation>
+          <xs:documentation>Product dependency required only during compilation.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="product_compile_only_api">
+        <xs:annotation>
+          <xs:documentation>Product compile-only dependency whose types may appear in the public API.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="product_runtime_only">
+        <xs:annotation>
+          <xs:documentation>Product dependency required only at runtime.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="product_annotation_processor">
+        <xs:annotation>
+          <xs:documentation>Product dependency used as an annotation processor during compilation.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="develop_implementation">
+        <xs:annotation>
+          <xs:documentation>Development/test implementation dependency.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="develop_compile_only">
+        <xs:annotation>
+          <xs:documentation>Development/test dependency required only during compilation.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="develop_runtime_only">
+        <xs:annotation>
+          <xs:documentation>Development/test dependency required only at runtime.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="develop_annotation_processor">
+        <xs:annotation>
+          <xs:documentation>Development/test dependency used as an annotation processor.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:complexType name="DependencyItemType">
+    <xs:annotation>
+      <xs:documentation>Declares one dependency or dependency constraint item.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="GroupId" type="xs:string" minOccurs="0" nillable="true">
+        <xs:annotation>
+          <xs:documentation>Optional group identifier of the dependency; may be omitted where the dependency kind defines another identity rule.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ArtifactId" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Artifact identifier of the dependency.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="VariantId" type="xs:string" minOccurs="0" nillable="true">
+        <xs:annotation>
+          <xs:documentation>Optional dependency variant identifier.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Usage" type="UsageType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>One usage describing where and how the dependency participates in compilation or runtime.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RequiredBuildOutputType" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Build output type that must be available from the dependency.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="VersionRequirement" type="xs:anyType" minOccurs="0" nillable="true">
+        <xs:annotation>
+          <xs:documentation>Optional version requirement or constraint associated with the dependency.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="DependencyGroupType">
+    <xs:annotation>
+      <xs:documentation>Groups dependency items by DependencyKind and defines collection inheritance behavior.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Item" type="DependencyItemType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>One dependency item within the dependency-kind group.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="DependencyKind" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>Dependency ecosystem or resolver kind shared by the items in this group.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items">
+      <xs:annotation>
+        <xs:documentation>Controls how dependency items missing from a child declaration are inherited from its parent.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:element name="DependencyModel">
+    <xs:annotation>
+      <xs:documentation>Root document containing dependencies and dependency constraints.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Dependencies" type="DependencyGroupType" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Dependency group whose items are consumed as dependencies.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="DependencyConstraints" type="DependencyGroupType" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Dependency group whose items contribute version constraints without necessarily being consumed.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
 </xs:schema>

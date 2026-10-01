@@ -122,16 +122,15 @@
             "ResourceEndpoints": {
               "$ref": "algites-resource-endpoints_1.yamldef.schema.json#EmbeddedContent"
             },
-            "Repositories": {
-              "$ref": "algites-repository-matrix_1.yamldef.schema.json#EmbeddedContent",
-              "deprecated": true
-            },
             "Version": {
               "$ref": "algites-version_1.yamldef.schema.json"
             },
             "VariantId": {
               "type": "string",
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            },
+            "DefinitionCodeGeneration": {
+              "$ref": "algites-definition-code-generation_1.yamldef.schema.json"
             }
           },
           "required": [

@@ -1,5 +1,44 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:model:build-output-type-definition:1" xmlns="urn:algites:modustro:builder:model:build-output-type-definition:1" elementFormDefault="qualified">
-  <xs:annotation><xs:appinfo><DefinitionVersion>1</DefinitionVersion><Note>Cross-field producibility and dependency-alternative invariants are also enforced by Modustro semantic validation.</Note></xs:appinfo></xs:annotation>
-  <xs:element name="BuildOutputTypeDefinition"><xs:complexType><xs:sequence><xs:element name="BuildOutputType" type="xs:string"/><xs:element name="CanBeProduced" type="xs:boolean"/><xs:element name="CanBeUsedInDependency" type="xs:boolean"/><xs:element name="DependencyOutputAlternative" type="xs:string" minOccurs="0" maxOccurs="unbounded"/><xs:element name="ConfigurationSchemaId" type="xs:string" minOccurs="0" nillable="true"/></xs:sequence></xs:complexType></xs:element>
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:model:build-output-type-definition:1" targetNamespace="urn:algites:modustro:builder:model:build-output-type-definition:1" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>Defines one build output type and how that output may be produced or consumed by dependencies.</xs:documentation>
+    <xs:appinfo>
+      <DefinitionVersion>1</DefinitionVersion>
+      <Note>Cross-field producibility and dependency-alternative invariants are also enforced by Modustro semantic validation.</Note>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:element name="BuildOutputTypeDefinition">
+    <xs:annotation>
+      <xs:documentation>Root build-output-type definition document.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="BuildOutputType" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Stable identifier of the build output type.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="CanBeProduced" type="xs:boolean">
+          <xs:annotation>
+            <xs:documentation>Whether Builder may produce this output type for an artifact.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="CanBeUsedInDependency" type="xs:boolean">
+          <xs:annotation>
+            <xs:documentation>Whether another artifact may request this output type from a dependency.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="DependencyOutputAlternative" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Alternative output type that may satisfy a dependency request when this output is unavailable.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="ConfigurationSchemaId" type="xs:string" minOccurs="0" nillable="true">
+          <xs:annotation>
+            <xs:documentation>Optional canonical schema identifier for configuration specific to this output type.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
 </xs:schema>

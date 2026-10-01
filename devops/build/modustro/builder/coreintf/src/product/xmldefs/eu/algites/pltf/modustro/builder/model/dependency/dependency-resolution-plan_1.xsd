@@ -1,51 +1,156 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           targetNamespace="urn:algites:modustro:builder:model:dependency-resolution-plan:1"
-           xmlns="urn:algites:modustro:builder:model:dependency-resolution-plan:1"
-           elementFormDefault="qualified"
-           version="1">
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:model:dependency-resolution-plan:1" targetNamespace="urn:algites:modustro:builder:model:dependency-resolution-plan:1" elementFormDefault="qualified" version="1">
+  <xs:annotation>
+    <xs:documentation>Defines the resolved technology-specific dependency plan produced by Modustro Builder, including native usage mapping, version requirements, required outputs, and diagnostics.</xs:documentation>
+  </xs:annotation>
   <xs:simpleType name="DiagnosticSeverity">
+    <xs:annotation>
+      <xs:documentation>Severity level for non-fatal dependency-resolution diagnostics.</xs:documentation>
+    </xs:annotation>
     <xs:restriction base="xs:string">
-      <xs:enumeration value="info"/>
-      <xs:enumeration value="warning"/>
+      <xs:enumeration value="info">
+        <xs:annotation>
+          <xs:documentation>Informational diagnostic that does not require corrective action.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="warning">
+        <xs:annotation>
+          <xs:documentation>Non-fatal diagnostic that may require attention.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
     </xs:restriction>
   </xs:simpleType>
   <xs:complexType name="StringItems">
+    <xs:annotation>
+      <xs:documentation>Reusable ordered collection of string values.</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
-      <xs:element name="Item" type="xs:string" minOccurs="0" maxOccurs="unbounded"/>
+      <xs:element name="Item" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>One item in the surrounding collection.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
     </xs:sequence>
   </xs:complexType>
   <xs:complexType name="NativeUsageMapping">
-    <xs:attribute name="Usage" type="xs:string" use="required"/>
-    <xs:attribute name="NativeUsage" type="xs:string" use="required"/>
+    <xs:annotation>
+      <xs:documentation>Maps an Algites dependency usage to one or more technology-native dependency usages.</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="Usage" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>Algites dependency usage being mapped.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="NativeUsage" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>Technology-native dependency usage corresponding to the Algites usage.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
   </xs:complexType>
   <xs:complexType name="Entry">
+    <xs:annotation>
+      <xs:documentation>One fully resolved dependency entry for a concrete technology and dependency kind.</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
-      <xs:element name="Usages" type="StringItems"/>
-      <xs:element name="NativeUsageMapping" type="NativeUsageMapping" minOccurs="0" maxOccurs="unbounded"/>
-      <xs:element name="RequiredBuildOutputTypes" type="StringItems"/>
-      <xs:element name="VersionRequirement" type="xs:anyType" minOccurs="0" nillable="true"/>
+      <xs:element name="Usages" type="StringItems">
+        <xs:annotation>
+          <xs:documentation>Resolved Algites dependency usages assigned to the dependency.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="NativeUsageMapping" type="NativeUsageMapping" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>Technology-native usage mapping derived from the resolved Algites usages.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="RequiredBuildOutputTypes" type="StringItems">
+        <xs:annotation>
+          <xs:documentation>Build output types that the dependency must provide for this resolved entry.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="VersionRequirement" type="xs:anyType" minOccurs="0" nillable="true">
+        <xs:annotation>
+          <xs:documentation>Normalized version requirement applied to this dependency.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
     </xs:sequence>
-    <xs:attribute name="DependencyKind" type="xs:string" use="required"/>
-    <xs:attribute name="GroupId" type="xs:string" use="optional"/>
-    <xs:attribute name="ArtifactId" type="xs:string" use="required"/>
-    <xs:attribute name="VariantId" type="xs:string" use="optional"/>
-    <xs:attribute name="ConstraintOnly" type="xs:boolean" use="required"/>
+    <xs:attribute name="DependencyKind" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>Dependency ecosystem or resolver kind, for example modustro or a technology-native dependency kind.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="GroupId" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>Resolved dependency group identifier.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="ArtifactId" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>Resolved dependency artifact identifier.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="VariantId" type="xs:string" use="optional">
+      <xs:annotation>
+        <xs:documentation>Optional resolved dependency variant identifier.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="ConstraintOnly" type="xs:boolean" use="required">
+      <xs:annotation>
+        <xs:documentation>Indicates that the entry contributes only a version constraint and is not a consumable dependency.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
   </xs:complexType>
   <xs:complexType name="Diagnostic">
-    <xs:attribute name="Code" type="xs:string" use="required"/>
-    <xs:attribute name="Severity" type="DiagnosticSeverity" use="required"/>
-    <xs:attribute name="Message" type="xs:string" use="required"/>
+    <xs:annotation>
+      <xs:documentation>One diagnostic emitted while resolving the dependency plan.</xs:documentation>
+    </xs:annotation>
+    <xs:attribute name="Code" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>Stable diagnostic code.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="Severity" type="DiagnosticSeverity" use="required">
+      <xs:annotation>
+        <xs:documentation>Severity assigned to the diagnostic.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+    <xs:attribute name="Message" type="xs:string" use="required">
+      <xs:annotation>
+        <xs:documentation>Human-readable diagnostic message.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
   </xs:complexType>
   <xs:element name="DependencyTechnologyResolutionPlan">
+    <xs:annotation>
+      <xs:documentation>Root resolved dependency plan for one technology/dependency-kind combination.</xs:documentation>
+    </xs:annotation>
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="Entry" type="Entry" minOccurs="0" maxOccurs="unbounded"/>
-        <xs:element name="Diagnostic" type="Diagnostic" minOccurs="0" maxOccurs="unbounded"/>
+        <xs:element name="Entry" type="Entry" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Resolved dependency entry contained in the plan.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="Diagnostic" type="Diagnostic" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Diagnostic produced while creating the plan.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
       </xs:sequence>
-      <xs:attribute name="DependencyKind" type="xs:string" use="required"/>
-      <xs:attribute name="TechnologyKind" type="xs:string" use="required"/>
-      <xs:attribute name="DefinitionVersion" type="xs:positiveInteger" fixed="1"/>
+      <xs:attribute name="DependencyKind" type="xs:string" use="required">
+        <xs:annotation>
+          <xs:documentation>Dependency ecosystem or resolver kind, for example modustro or a technology-native dependency kind.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="TechnologyKind" type="xs:string" use="required">
+        <xs:annotation>
+          <xs:documentation>TechnologyKind for which the plan was resolved.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+      <xs:attribute name="DefinitionVersion" type="xs:positiveInteger" fixed="1">
+        <xs:annotation>
+          <xs:documentation>Version of this resolution-plan definition.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
     </xs:complexType>
   </xs:element>
 </xs:schema>

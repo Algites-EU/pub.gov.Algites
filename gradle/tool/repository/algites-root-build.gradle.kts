@@ -30,6 +30,13 @@ import eu.algites.pltf.modustro.builder.capability.AIcBuiltinCapabilityDemandPla
 import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind
 import eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet
 import eu.algites.pltf.modustro.builder.output.AIcBuiltinBuildOutputProducers
+import eu.algites.lib.naming.convention.AIcAlgitesNamingProfiles
+import eu.algites.tool.codegen.defs.AIcDefaultDefsCodegenService
+import eu.algites.tool.codegen.defs.AIcdCanonicalDefinition
+import eu.algites.tool.codegen.defs.AIcdCodeGenerationRequest
+import eu.algites.tool.codegen.defs.AIcdDefinitionLoadRequest
+import eu.algites.tool.codegen.defs.AInCodeGenerationTarget
+import eu.algites.tool.codegen.defs.AInDefinitionSourceKind
 import org.gradle.api.DefaultTask
 import org.gradle.api.tasks.Delete
 import org.gradle.api.file.ConfigurableFileCollection
@@ -51,7 +58,9 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Classpath
 import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
 import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.LocalState
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.Sync
@@ -81,9 +90,175 @@ buildscript {
         classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:1.0-SNAPSHOT")
         classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
         classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
+        classpath("eu.algites.tool.codegen:pub.tool.General_generators.code.defscodegen.coreintf:1.0-SNAPSHOT")
+        classpath("eu.algites.tool.codegen:pub.tool.General_generators.code.defscodegen.coreimpl:1.0-SNAPSHOT")
+        classpath("eu.algites.lib.naming:pub.lib.General_naming.convention.coreimpl:1.0-SNAPSHOT")
     }
 }
 
+
+/**
+ * Generates configured Java/Python sources from canonical definitions through the reusable Defs Codegen API.
+ *
+ * The standard `.gen` roots are shared by generators, so this task does not claim either root as an exclusive
+ * Gradle output directory. It owns only the files recorded in its artifact-local manifest state and removes stale
+ * files from that ownership set on subsequent executions.
+ */
+abstract class AIcGenerateAlgitesDefinitionSourcesTask : DefaultTask() {
+    @get:Input
+    abstract val entries: ListProperty<String>
+
+    @get:InputFiles
+    abstract val sourceFiles: ConfigurableFileCollection
+
+    @get:Internal
+    abstract val artifactDirectory: DirectoryProperty
+
+    @get:LocalState
+    abstract val manifestDirectory: DirectoryProperty
+
+    @get:Internal
+    abstract val javaOutputDirectory: DirectoryProperty
+
+    @get:Internal
+    abstract val pythonOutputDirectory: DirectoryProperty
+
+    private data class AIcdEntry(
+        val sourceKind: String,
+        val source: String,
+        val targets: List<String>,
+        val packageName: String,
+        val namingProfile: String
+    )
+
+    private data class AIcdPendingSource(
+        val target: String,
+        val relativePath: String,
+        val source: String
+    )
+
+    private fun AIcEntry(aEncoded: String): AIcdEntry {
+        val locParts = aEncoded.split('\t')
+        require(locParts.size == 5) { "Invalid Algites DefinitionCodeGeneration entry '$aEncoded'." }
+        return AIcdEntry(
+            sourceKind = locParts[0],
+            source = locParts[1],
+            targets = locParts[2].split(',').map(String::trim).filter(String::isNotBlank),
+            packageName = locParts[3],
+            namingProfile = locParts[4]
+        )
+    }
+
+    private fun AIcSourceKind(aValue: String): AInDefinitionSourceKind = when (aValue) {
+        "yamldefs" -> AInDefinitionSourceKind.YAMLDEFS
+        "jsondefs" -> AInDefinitionSourceKind.JSONDEFS
+        "xmldefs" -> AInDefinitionSourceKind.XMLDEFS
+        else -> throw GradleException("Unsupported DefinitionCodeGeneration SourceKind '$aValue'.")
+    }
+
+    private fun AIcTarget(aValue: String): AInCodeGenerationTarget = when (aValue) {
+        "java" -> AInCodeGenerationTarget.JAVA
+        "python" -> AInCodeGenerationTarget.PYTHON
+        else -> throw GradleException("Unsupported DefinitionCodeGeneration target '$aValue'.")
+    }
+
+    private fun AIcOutputRoot(aTarget: String): File = when (aTarget) {
+        "java" -> javaOutputDirectory.get().asFile
+        "python" -> pythonOutputDirectory.get().asFile
+        else -> throw GradleException("Unsupported DefinitionCodeGeneration target '$aTarget'.")
+    }
+
+    private fun AIcManifest(aTarget: String): File = File(manifestDirectory.get().asFile, "$aTarget.manifest")
+
+    private fun AIcWriteTarget(aTarget: String, aSources: List<AIcdPendingSource>) {
+        val locOutputRoot = AIcOutputRoot(aTarget)
+        val locManifest = AIcManifest(aTarget)
+        if (aSources.isEmpty() && !locManifest.isFile) return
+        val locExpected = aSources.map { it.relativePath.replace(File.separatorChar, '/') }.toSet()
+        if (locManifest.isFile) {
+            locManifest.readLines(StandardCharsets.UTF_8)
+                .map(String::trim)
+                .filter(String::isNotBlank)
+                .filter { it !in locExpected }
+                .forEach { locStaleRelativePath ->
+                    val locStale = File(locOutputRoot, locStaleRelativePath).canonicalFile
+                    require(locStale.toPath().startsWith(locOutputRoot.canonicalFile.toPath())) {
+                        "Invalid stale generated-source path '$locStaleRelativePath'."
+                    }
+                    if (locStale.isFile) locStale.delete()
+                }
+        }
+        aSources.forEach { locSource ->
+            val locOutput = File(locOutputRoot, locSource.relativePath).canonicalFile
+            require(locOutput.toPath().startsWith(locOutputRoot.canonicalFile.toPath())) {
+                "Generated-source path '${locSource.relativePath}' escapes '$locOutputRoot'."
+            }
+            locOutput.parentFile.mkdirs()
+            locOutput.writeText(locSource.source, StandardCharsets.UTF_8)
+        }
+        if (locExpected.isEmpty()) {
+            if (locManifest.isFile) locManifest.delete()
+        } else {
+            locManifest.parentFile.mkdirs()
+            locManifest.writeText(locExpected.sorted().joinToString("\n", postfix = "\n"), StandardCharsets.UTF_8)
+        }
+    }
+
+    /** Generates configured Java/Python source units from canonical definitions through Defs Codegen. */
+    @TaskAction
+    fun AIcGenerate() {
+        val locArtifactDirectory = artifactDirectory.get().asFile.canonicalFile
+        val locService = AIcDefaultDefsCodegenService()
+        val locPending = mutableListOf<AIcdPendingSource>()
+        entries.get().map(::AIcEntry).forEach { locEntry ->
+            require(locEntry.namingProfile == "algites") {
+                "Unsupported DefinitionCodeGeneration NamingProfile '${locEntry.namingProfile}'."
+            }
+            val locInput = File(locArtifactDirectory, locEntry.source).canonicalFile
+            require(locInput.toPath().startsWith(locArtifactDirectory.toPath())) {
+                "DefinitionCodeGeneration source '${locEntry.source}' escapes artifact '$locArtifactDirectory'."
+            }
+            require(locInput.isFile) { "DefinitionCodeGeneration source does not exist: '$locInput'." }
+            locEntry.targets.forEach { locTargetText ->
+                val locTarget = AIcTarget(locTargetText)
+                val locProfile = when (locTarget) {
+                    AInCodeGenerationTarget.JAVA -> AIcAlgitesNamingProfiles.javaProfile()
+                    AInCodeGenerationTarget.PYTHON -> AIcAlgitesNamingProfiles.pythonProfile()
+                }
+                val locLoadedDefinition = locService.load(
+                    AIcdDefinitionLoadRequest(locInput.toPath(), AIcSourceKind(locEntry.sourceKind), locProfile)
+                )
+                val locDefinition = AIcdCanonicalDefinition(
+                    locLoadedDefinition.identity(),
+                    locLoadedDefinition.version(),
+                    locLoadedDefinition.logicalName(),
+                    locLoadedDefinition.kind(),
+                    locLoadedDefinition.sourceKind(),
+                    locEntry.source,
+                    locLoadedDefinition.description(),
+                    locLoadedDefinition.properties(),
+                    locLoadedDefinition.enumValues()
+                )
+                val locGenerated = locService.generate(
+                    AIcdCodeGenerationRequest(locDefinition, locTarget, locEntry.packageName, locProfile)
+                )
+                val locRelativePath = locGenerated.relativePath().replace('\\', '/')
+                val locCollision = locPending.firstOrNull { locPendingSource ->
+                    locPendingSource.target == locTargetText && locPendingSource.relativePath == locRelativePath
+                }
+                if (locCollision != null) {
+                    throw GradleException(
+                        "DefinitionCodeGeneration produces duplicate $locTargetText source path '$locRelativePath'."
+                    )
+                }
+                locPending.add(AIcdPendingSource(locTargetText, locRelativePath, locGenerated.source()))
+            }
+        }
+        listOf("java", "python").forEach { locTarget ->
+            AIcWriteTarget(locTarget, locPending.filter { it.target == locTarget })
+        }
+    }
+}
 
 abstract class AIcGenerateAlgitesArtifactManifestTask : DefaultTask() {
     @get:Input
@@ -1814,6 +1989,10 @@ allprojects {
     plugins.withId("base") {
         tasks.named<Delete>("clean").configure {
             delete(rootProject.layout.projectDirectory.dir(locAlgitesRunDirectoryRelativePath))
+            delete(project.layout.projectDirectory.dir("src/product/java.gen"))
+            delete(project.layout.projectDirectory.dir("src/product/python.gen"))
+            delete(project.layout.projectDirectory.dir("src/develop/java.gen"))
+            delete(project.layout.projectDirectory.dir("src/develop/python.gen"))
         }
     }
 
@@ -2101,7 +2280,6 @@ val locAlgitesRequiredCredentialsPlan = run {
 
     val locPlan = linkedMapOf<String, Any>(
         "resourceEndpoints" to locResourceEndpoints.values.toList(),
-        "repositories" to locResourceEndpoints.values.toList(),
         "credentials" to locCredentials.values.toList()
     )
     Triple(JsonOutput.toJson(locPlan), locCredentials.size, locOperationTechnologyKinds.sorted())
@@ -2192,6 +2370,62 @@ subprojects {
         }
     } else {
         null
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    val locDefinitionCodeGeneration = (locAlgitesArtifactDirectory?.get("definitionCodeGeneration") as? List<Map<String, Any?>>).orEmpty()
+    val locDefinitionCodeGenerationTargets = locDefinitionCodeGeneration
+        .flatMap { locEntry -> AIcAlgitesStringList(locEntry["targets"]) }
+        .toSet()
+    val locUnsupportedDefinitionCodeGenerationTargets = locDefinitionCodeGenerationTargets - locAlgitesTechnologyKinds.toSet()
+    if (locUnsupportedDefinitionCodeGenerationTargets.isNotEmpty()) {
+        throw GradleException(
+            "Artifact '${project.path}' DefinitionCodeGeneration targets ${locUnsupportedDefinitionCodeGenerationTargets.sorted()} " +
+                "but those TechnologyKinds are not selected by the artifact."
+        )
+    }
+    val locDefinitionCodeGenerationManifestDirectory =
+        rootProject.layout.projectDirectory.dir("$locAlgitesRunDirectoryRelativePath/defscodegen")
+    val locDefinitionCodeGenerationStaleTargets = listOf("java", "python")
+        .filter { locTarget -> locDefinitionCodeGenerationManifestDirectory.file("$locTarget.manifest").asFile.isFile }
+        .toSet()
+    val locDefinitionCodeGenerationExecutionTargets =
+        locDefinitionCodeGenerationTargets + locDefinitionCodeGenerationStaleTargets
+    val locDefinitionCodeGenerationTask = if (locDefinitionCodeGeneration.isNotEmpty() || locDefinitionCodeGenerationStaleTargets.isNotEmpty()) {
+        tasks.register<AIcGenerateAlgitesDefinitionSourcesTask>("generateAlgitesDefinitionSources") {
+            group = "algites"
+            description = "Generates configured native source types from canonical yamldefs/jsondefs/xmldefs definitions."
+            artifactDirectory.set(project.layout.projectDirectory)
+            manifestDirectory.set(locDefinitionCodeGenerationManifestDirectory)
+            javaOutputDirectory.set(project.layout.projectDirectory.dir("src/product/java.gen"))
+            pythonOutputDirectory.set(project.layout.projectDirectory.dir("src/product/python.gen"))
+            entries.set(locDefinitionCodeGeneration.mapIndexed { locIndex, locEntry ->
+                val locSourceKind = locEntry["sourceKind"]?.toString()?.trim()?.lowercase()
+                    ?: throw GradleException("Artifact '${project.path}' DefinitionCodeGeneration[$locIndex] is missing sourceKind.")
+                val locSource = locEntry["source"]?.toString()?.trim()
+                    ?: throw GradleException("Artifact '${project.path}' DefinitionCodeGeneration[$locIndex] is missing source.")
+                val locTargets = AIcAlgitesStringList(locEntry["targets"])
+                val locPackage = locEntry["package"]?.toString()?.trim()
+                    ?: throw GradleException("Artifact '${project.path}' DefinitionCodeGeneration[$locIndex] is missing package.")
+                val locNamingProfile = locEntry["namingProfile"]?.toString()?.trim()?.lowercase() ?: "algites"
+                listOf(locSourceKind, locSource, locTargets.joinToString(","), locPackage, locNamingProfile).joinToString("\t")
+            })
+            sourceFiles.from(locDefinitionCodeGeneration.map { locEntry ->
+                project.file(locEntry["source"]?.toString() ?: "")
+            })
+        }
+    } else {
+        null
+    }
+    if ("java" in locDefinitionCodeGenerationExecutionTargets) {
+        locJavaSourceProcessingTask?.configure {
+            locDefinitionCodeGenerationTask?.let { locTask -> dependsOn(locTask) }
+        }
+    }
+    if ("python" in locDefinitionCodeGenerationExecutionTargets) {
+        locPythonSourceProcessingTask?.configure {
+            locDefinitionCodeGenerationTask?.let { locTask -> dependsOn(locTask) }
+        }
     }
 
     if ("java" in locEffectiveTechnologyKinds && locHasCapabilityDemand("java", "dependency_resolution")) {

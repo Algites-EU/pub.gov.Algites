@@ -1,5 +1,44 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:model:technology-kind-definition:1" xmlns="urn:algites:modustro:builder:model:technology-kind-definition:1" elementFormDefault="qualified">
-  <xs:annotation><xs:appinfo><DefinitionVersion>1</DefinitionVersion><Note>Referenced capability and output definitions are semantically validated by Modustro Builder.</Note></xs:appinfo></xs:annotation>
-  <xs:element name="TechnologyKindDefinition"><xs:complexType><xs:sequence><xs:element name="TechnologyKind" type="xs:string"/><xs:element name="Capability" type="xs:anyType" minOccurs="0" maxOccurs="unbounded"/><xs:element name="BuildOutputType" type="xs:anyType" minOccurs="0" maxOccurs="unbounded"/><xs:element name="DefaultBuildOutputType" type="xs:string" minOccurs="0" maxOccurs="unbounded"/><xs:element name="DefaultDependencyOutputType" type="xs:string" minOccurs="0" maxOccurs="unbounded"/></xs:sequence></xs:complexType></xs:element>
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:model:technology-kind-definition:1" targetNamespace="urn:algites:modustro:builder:model:technology-kind-definition:1" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>Defines a TechnologyKind, its supported capabilities and output types, and default output choices.</xs:documentation>
+    <xs:appinfo>
+      <DefinitionVersion>1</DefinitionVersion>
+      <Note>Referenced capability and output definitions are semantically validated by Modustro Builder.</Note>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:element name="TechnologyKindDefinition">
+    <xs:annotation>
+      <xs:documentation>Root TechnologyKind definition document.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="TechnologyKind" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Stable identifier of the TechnologyKind.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="Capability" type="xs:anyType" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Capability supported by artifacts of this TechnologyKind.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="BuildOutputType" type="xs:anyType" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Build output type supported by this TechnologyKind.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="DefaultBuildOutputType" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Output type produced by default when an artifact does not explicitly select build outputs.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="DefaultDependencyOutputType" type="xs:string" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Output type requested by default when a dependency does not explicitly request an output type.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
 </xs:schema>

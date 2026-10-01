@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:yamldefs:model:resource:resource-stability:1",
+  "x-algites-definition-version": 1,
+  "title": "Resource stability v1",
+  "description": "Selects release or snapshot stability for resource kinds that use a stability dimension.",
+  "type": "string",
+  "enum": [
+    "release",
+    "snapshot"
+  ],
+  "oneOf": [
+    {
+      "const": "release",
+      "description": "Stable released resource intended to be immutable under the release policy."
+    },
+    {
+      "const": "snapshot",
+      "description": "Mutable development snapshot resource that may be replaced by newer snapshot content."
+    }
+  ]
+}

@@ -9,4 +9,4 @@ A ResourceEndpoint is selected by `TechnologyKind`, `ResourceKind`, visibility, 
 
 CI exposes this file through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`. A local build may point the same environment variable at a checkout/copy of the file. The historical environment-variable name remains supported during the migration because it identifies the governance input file, not the metadata model contained in it.
 
-Private-governance automation may additionally supply `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` for the combined public upload/manage overlay, or `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` for private download/upload/manage endpoints. Legacy defaults that still contain `Repositories` are normalized to `native_build_output` ResourceEndpoints by the Phase-5 resolver.
+Private-governance automation may additionally supply `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` for the combined public upload/manage overlay, or `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` for private download/upload/manage endpoints. These defaults use `ResourceEndpoints` exclusively; the superseded repository-matrix input is not accepted.

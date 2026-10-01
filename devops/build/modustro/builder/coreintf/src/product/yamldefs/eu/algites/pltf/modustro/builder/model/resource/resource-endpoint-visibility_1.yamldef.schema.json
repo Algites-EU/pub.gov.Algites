@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:yamldefs:model:resource:resource-endpoint-visibility:1",
+  "x-algites-definition-version": 1,
+  "title": "Resource endpoint visibility v1",
+  "description": "Selects whether an endpoint belongs to the public or private resource namespace.",
+  "type": "string",
+  "enum": [
+    "public",
+    "private"
+  ],
+  "oneOf": [
+    {
+      "const": "public",
+      "description": "Endpoint is intended for public resources and does not require private-resource semantics."
+    },
+    {
+      "const": "private",
+      "description": "Endpoint is intended for private resources and may require authenticated access."
+    }
+  ]
+}

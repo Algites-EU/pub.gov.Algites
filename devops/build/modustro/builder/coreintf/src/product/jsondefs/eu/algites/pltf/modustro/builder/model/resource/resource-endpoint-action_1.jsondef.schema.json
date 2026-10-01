@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:algites:modustro:builder:jsondefs:model:resource:resource-endpoint-action:1",
+  "x-algites-definition-version": 1,
+  "title": "Resource endpoint action v1",
+  "description": "Selects the operation performed through a resource endpoint.",
+  "type": "string",
+  "enum": [
+    "download",
+    "upload",
+    "manage"
+  ],
+  "oneOf": [
+    {
+      "const": "download",
+      "description": "Reads or resolves resources from the endpoint."
+    },
+    {
+      "const": "upload",
+      "description": "Publishes resources to the endpoint."
+    },
+    {
+      "const": "manage",
+      "description": "Performs management operations on endpoint content, such as cleanup or deletion."
+    }
+  ]
+}

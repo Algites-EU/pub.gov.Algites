@@ -413,7 +413,7 @@ New canonical endpoint IDs SHOULD include TechnologyKind, ResourceKind, visibili
 
 `ResourceEndpointProviderAdapter` optionally selects provider-specific behavior when the standard TechnologyKind/ResourceKind/action adapter is insufficient. Native-build-output `manage` currently supports the `cloudsmith` and `repsy` provider adapters and requires an adapter because the lifecycle never assumes that an upload URL also supports package deletion.
 
-The legacy `Repositories` input shape remains accepted in Phase 5 and is normalized to ResourceKind `native_build_output`; legacy `UsageProviderAdapter` maps to `ResourceEndpointProviderAdapter`. New metadata SHOULD use `ResourceEndpoints`.
+Phase 5.1 uses `ResourceEndpoints` exclusively. The superseded repository-matrix input and compatibility projection are not part of the active lifecycle contract.
 
 Credential profiles remain independent inherited metadata. A ResourceEndpoint contains only a non-secret `CredentialProfile` reference. Secret values use the provider-independent `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document governed by `algites-credentials_1.yamldef.schema.json`. Provider adapters may materialize only the profile/type pairs selected by credential preflight and MUST preserve the same credential-document schema.
 
@@ -554,7 +554,7 @@ The release operation MUST:
 8. record which TechnologyKind-specific publications actually exist for the logical version; when an incomplete release was explicitly allowed, omitted TechnologyKinds remain permanently absent from that release version,
 9. after all required release processing succeeds, perform best-effort cleanup only for snapshot packages corresponding to TechnologyKinds that were actually selected/released, through the visibility-specific `snapshot.manage` endpoints when the effective `deleteSnapshotWhenReleased` policy is `true`.
 
-Ordinary repository builds do not receive upload or management overlays. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. The release publication phase materializes only download/upload credentials; the final cleanup phase separately materializes only management credentials. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible for deterministic repository-matrix resolution.
+Ordinary repository builds do not receive upload or management overlays. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. The release publication phase materializes only download/upload credentials; the final cleanup phase separately materializes only management credentials. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible for deterministic ResourceEndpoint resolution.
 
 ##### 3.1.5.1 Release identity/tag naming
 

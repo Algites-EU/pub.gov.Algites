@@ -1,25 +1,69 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:publication:global-publication-deploy-metadata:1" xmlns="urn:algites:modustro:builder:publication:global-publication-deploy-metadata:1" elementFormDefault="qualified">
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:publication:global-publication-deploy-metadata:1" targetNamespace="urn:algites:modustro:builder:publication:global-publication-deploy-metadata:1" elementFormDefault="qualified">
   <xs:annotation>
     <xs:documentation>Deployment-controlled publication metadata generated from validated user metadata and trusted publisher state.</xs:documentation>
-    <xs:appinfo><DefinitionVersion>1</DefinitionVersion></xs:appinfo>
+    <xs:appinfo>
+      <DefinitionVersion>1</DefinitionVersion>
+    </xs:appinfo>
   </xs:annotation>
   <xs:simpleType name="PublicationStateType">
+    <xs:annotation>
+      <xs:documentation>Lifecycle state of a globally published definition.</xs:documentation>
+    </xs:annotation>
     <xs:restriction base="xs:string">
-      <xs:enumeration value="draft"/>
-      <xs:enumeration value="release"/>
+      <xs:enumeration value="draft">
+        <xs:annotation>
+          <xs:documentation>Mutable publication state in which successful deployments advance PublicationRevision.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="release">
+        <xs:annotation>
+          <xs:documentation>Immutable released publication state; released content cannot transition back to draft.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
     </xs:restriction>
   </xs:simpleType>
   <xs:element name="GlobalPublicationDeployMetadata">
+    <xs:annotation>
+      <xs:documentation>Root deployment-controlled global-publication metadata document.</xs:documentation>
+    </xs:annotation>
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="GlobalPublicationPathId" type="xs:string"/>
-        <xs:element name="PublicationState" type="PublicationStateType"/>
-        <xs:element name="PublicationRevision" type="xs:positiveInteger"/>
-        <xs:element name="FirstPublishedAt" type="xs:dateTime"/>
-        <xs:element name="PublishedAt" type="xs:dateTime"/>
-        <xs:element name="ReleasedAt" type="xs:dateTime" minOccurs="0"/>
-        <xs:element name="PublishedBy" type="xs:string" minOccurs="0"/>
+        <xs:element name="GlobalPublicationPathId" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Stable logical publication path copied from validated user metadata.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="PublicationState" type="PublicationStateType">
+          <xs:annotation>
+            <xs:documentation>Server-controlled publication lifecycle state. Released definitions are immutable and cannot transition back to draft.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="PublicationRevision" type="xs:positiveInteger">
+          <xs:annotation>
+            <xs:documentation>Server-controlled monotonically increasing revision of successfully deployed draft content. Release freezes the current content revision.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="FirstPublishedAt" type="xs:dateTime">
+          <xs:annotation>
+            <xs:documentation>Server-generated timestamp of the first successful deployment for this GlobalPublicationPathId.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="PublishedAt" type="xs:dateTime">
+          <xs:annotation>
+            <xs:documentation>Server-generated timestamp of the most recent successful deployment or release transition represented by this metadata.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="ReleasedAt" type="xs:dateTime" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Server-generated timestamp at which this publication became an immutable release; absent while the publication is a draft.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="PublishedBy" type="xs:string" minOccurs="0">
+          <xs:annotation>
+            <xs:documentation>Optional trusted publisher identity derived by the deployment adapter from authenticated execution context; never copied from user metadata.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>

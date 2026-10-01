@@ -8,53 +8,50 @@
   "properties": {
     "TechnologyKind": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]*$"
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "TechnologyKind that owns protocol/build semantics for this endpoint."
     },
     "ResourceKind": {
       "type": "string",
-      "pattern": "^[a-z][a-z0-9_]*$"
+      "pattern": "^[a-z][a-z0-9_]*$",
+      "description": "Resource kind addressed by this endpoint."
     },
     "Visibility": {
-      "type": "string",
-      "enum": [
-        "public",
-        "private"
-      ]
+      "$ref": "resource-endpoint-visibility_1.yamldef.schema.json",
+      "description": "Public/private resource namespace of the endpoint."
     },
     "Action": {
-      "type": "string",
-      "enum": [
-        "download",
-        "upload",
-        "manage"
-      ]
+      "$ref": "resource-endpoint-action_1.yamldef.schema.json",
+      "description": "Operation supported by this endpoint."
     },
     "Id": {
       "type": "string",
-      "pattern": "^algites-[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^algites-[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "Stable endpoint identifier used by selection and PublicationDestinations."
     },
     "Url": {
       "type": "string",
       "format": "uri",
-      "minLength": 1
+      "minLength": 1,
+      "description": "Provider endpoint URL."
     },
     "CredentialProfile": {
       "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "Optional credential-profile identifier; secret values are never stored here."
     },
     "Enabled": {
-      "type": "boolean"
+      "type": "boolean",
+      "description": "Whether the endpoint participates in effective selection."
     },
     "Stability": {
-      "type": "string",
-      "enum": [
-        "release",
-        "snapshot"
-      ]
+      "$ref": "resource-stability_1.yamldef.schema.json",
+      "description": "Release/snapshot stability where required by the ResourceKind."
     },
     "ResourceEndpointProviderAdapter": {
       "type": "string",
-      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+      "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+      "description": "Optional provider-specific adapter identifier."
     }
   },
   "required": [
@@ -65,5 +62,6 @@
     "Id",
     "Url",
     "Enabled"
-  ]
+  ],
+  "description": "Defines one external resource endpoint before inheritance/default resolution. The generated data object preserves declared values; the effective Builder model applies semantic rules separately."
 }

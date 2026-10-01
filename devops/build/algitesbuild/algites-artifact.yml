@@ -15,6 +15,21 @@ Dependencies:
         Usages: [product_api]
         VersionRequirement:
           Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.tool.codegen
+        ArtifactId: pub.tool.General_generators.code.defscodegen.coreintf
+        Usages: [product_api]
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.tool.codegen
+        ArtifactId: pub.tool.General_generators.code.defscodegen.coreimpl
+        Usages: [product_api]
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+      - GroupId: eu.algites.lib.naming
+        ArtifactId: pub.lib.General_naming.convention.coreimpl
+        Usages: [product_api]
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
       - GroupId: eu.algites.lib.common
         ArtifactId: pub.lib.General_version.core
         Usages: [product_api]

@@ -1,11 +1,28 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation><xs:documentation>Java Native Documentation Capability Configuration v1</xs:documentation></xs:annotation>
+  <xs:annotation>
+    <xs:documentation>Configures generation of native Java documentation for an artifact.</xs:documentation>
+  </xs:annotation>
   <xs:complexType name="DocumentContentType">
+    <xs:annotation>
+      <xs:documentation>Java native-documentation capability configuration.</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
-      <xs:element name="Enabled" minOccurs="0" maxOccurs="1" type="xs:boolean"/>
-      <xs:element name="Javadoc" minOccurs="0" maxOccurs="1" type="xs:anyType"/>
+      <xs:element name="Enabled" minOccurs="0" maxOccurs="1" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether native Java documentation generation is enabled.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Javadoc" minOccurs="0" maxOccurs="1" type="xs:anyType">
+        <xs:annotation>
+          <xs:documentation>Javadoc-specific configuration passed to the Java native-documentation generator.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
     </xs:sequence>
   </xs:complexType>
-  <xs:element name="CapabilityConfiguration" type="DocumentContentType"/>
+  <xs:element name="CapabilityConfiguration" type="DocumentContentType">
+    <xs:annotation>
+      <xs:documentation>Root Java native-documentation capability configuration.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
 </xs:schema>

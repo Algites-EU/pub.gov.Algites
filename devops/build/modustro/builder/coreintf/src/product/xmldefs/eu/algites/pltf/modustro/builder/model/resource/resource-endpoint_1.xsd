@@ -1,19 +1,71 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation><xs:documentation>ResourceEndpoint Definition v1</xs:documentation></xs:annotation>
+  <xs:annotation>
+    <xs:documentation>Defines one external resource endpoint before inheritance/default resolution. The generated data object preserves declared values; the effective Builder model applies semantic rules separately.</xs:documentation>
+  </xs:annotation>
+  <xs:include schemaLocation="resource-endpoint-visibility_1.xsd"/>
+  <xs:include schemaLocation="resource-endpoint-action_1.xsd"/>
+  <xs:include schemaLocation="resource-stability_1.xsd"/>
   <xs:complexType name="DocumentContentType">
+    <xs:annotation>
+      <xs:documentation>Declared ResourceEndpoint data transferred into generated DTOs before effective-model resolution.</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
-      <xs:element name="TechnologyKind" minOccurs="1" maxOccurs="1" type="xs:string"/>
-      <xs:element name="ResourceKind" minOccurs="1" maxOccurs="1" type="xs:string"/>
-      <xs:element name="Visibility" minOccurs="1" maxOccurs="1" type="xs:string"/>
-      <xs:element name="Action" minOccurs="1" maxOccurs="1" type="xs:string"/>
-      <xs:element name="Id" minOccurs="1" maxOccurs="1" type="xs:string"/>
-      <xs:element name="Url" minOccurs="1" maxOccurs="1" type="xs:anyURI"/>
-      <xs:element name="CredentialProfile" minOccurs="0" maxOccurs="1" type="xs:string"/>
-      <xs:element name="Enabled" minOccurs="1" maxOccurs="1" type="xs:boolean"/>
-      <xs:element name="Stability" minOccurs="0" maxOccurs="1" type="xs:string"/>
-      <xs:element name="ResourceEndpointProviderAdapter" minOccurs="0" maxOccurs="1" type="xs:string"/>
+      <xs:element name="TechnologyKind" minOccurs="1" maxOccurs="1" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>TechnologyKind that owns protocol/build semantics for this endpoint.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ResourceKind" minOccurs="1" maxOccurs="1" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Resource kind addressed by this endpoint.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Visibility" minOccurs="1" maxOccurs="1" type="ResourceEndpointVisibilityType">
+        <xs:annotation>
+          <xs:documentation>Public/private resource namespace of the endpoint.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Action" minOccurs="1" maxOccurs="1" type="ResourceEndpointActionType">
+        <xs:annotation>
+          <xs:documentation>Operation supported by this endpoint.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Id" minOccurs="1" maxOccurs="1" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Stable endpoint identifier used by selection and PublicationDestinations.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Url" minOccurs="1" maxOccurs="1" type="xs:anyURI">
+        <xs:annotation>
+          <xs:documentation>Provider endpoint URL.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="CredentialProfile" minOccurs="0" maxOccurs="1" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Optional credential-profile identifier; secret values are never stored here.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Enabled" minOccurs="1" maxOccurs="1" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether the endpoint participates in effective selection.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Stability" minOccurs="0" maxOccurs="1" type="ResourceStabilityType">
+        <xs:annotation>
+          <xs:documentation>Release/snapshot stability where required by the ResourceKind.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ResourceEndpointProviderAdapter" minOccurs="0" maxOccurs="1" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Optional provider-specific adapter identifier.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
     </xs:sequence>
   </xs:complexType>
-  <xs:element name="ResourceModel" type="DocumentContentType"/>
+  <xs:element name="ResourceModel" type="DocumentContentType">
+    <xs:annotation>
+      <xs:documentation>Root ResourceEndpoint document.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
 </xs:schema>

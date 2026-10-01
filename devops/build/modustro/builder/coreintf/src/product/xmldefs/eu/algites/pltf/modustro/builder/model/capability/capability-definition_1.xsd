@@ -1,6 +1,55 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:model:capability-definition:1" xmlns="urn:algites:modustro:builder:model:capability-definition:1" elementFormDefault="qualified">
-  <xs:annotation><xs:appinfo><DefinitionVersion>1</DefinitionVersion></xs:appinfo></xs:annotation>
-  <xs:simpleType name="ModelScopeType"><xs:restriction base="xs:string"><xs:enumeration value="repository"/><xs:enumeration value="artifact_set"/><xs:enumeration value="artifact"/></xs:restriction></xs:simpleType>
-  <xs:element name="CapabilityDefinition"><xs:complexType><xs:sequence><xs:element name="Capability" type="xs:string"/><xs:element name="AllowedScope" type="ModelScopeType" minOccurs="1" maxOccurs="unbounded"/><xs:element name="ConfigurationSchemaId" type="xs:string" minOccurs="0" nillable="true"/></xs:sequence></xs:complexType></xs:element>
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:model:capability-definition:1" targetNamespace="urn:algites:modustro:builder:model:capability-definition:1" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>Defines a Modustro Builder capability, the model scopes where it may be configured, and the optional schema that describes capability-specific configuration.</xs:documentation>
+    <xs:appinfo>
+      <DefinitionVersion>1</DefinitionVersion>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:simpleType name="ModelScopeType">
+    <xs:annotation>
+      <xs:documentation>Enumerates descriptor scopes at which a capability may be configured.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="repository">
+        <xs:annotation>
+          <xs:documentation>Allows the capability to be configured at repository scope.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="artifact_set">
+        <xs:annotation>
+          <xs:documentation>Allows the capability to be configured at artifact-set scope.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="artifact">
+        <xs:annotation>
+          <xs:documentation>Allows the capability to be configured at artifact scope.</xs:documentation>
+        </xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+  <xs:element name="CapabilityDefinition">
+    <xs:annotation>
+      <xs:documentation>Root capability-definition document.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Capability" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Stable identifier of the capability being defined.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="AllowedScope" type="ModelScopeType" minOccurs="1" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>Descriptor scope at which this capability may be declared.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+        <xs:element name="ConfigurationSchemaId" type="xs:string" minOccurs="0" nillable="true">
+          <xs:annotation>
+            <xs:documentation>Optional canonical schema identifier for capability-specific configuration.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
 </xs:schema>

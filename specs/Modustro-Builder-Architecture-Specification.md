@@ -323,8 +323,9 @@ The source-repository visibility policy is preserved:
 - public source repositories may consume and publish only public ResourceEndpoints;
 - private source repositories may consume public and private ResourceEndpoints, but publish/manage their own resources only through private ResourceEndpoints.
 
-The former `Repositories` document shape remains a migration input during Phase 5. The resolver normalizes each legacy
-`TechnologyKind / Visibility / Stability / Usage` cell to a `native_build_output` ResourceEndpoint cell and moves the legacy stability axis onto the endpoint. Legacy `UsageProviderAdapter` is normalized to `ResourceEndpointProviderAdapter`. New metadata SHOULD use `ResourceEndpoints`; resolved metadata exposes the generalized form and retains a legacy native-build-output projection for compatibility with older adapters during migration.
+Phase 5.1 removes the former repository-matrix input and its compatibility projection. `ResourceEndpoints` is the only endpoint representation accepted by the resolver and consumed by Gradle adapters.
+
+Phase 5.1A also connects canonical definition code generation to `source_native_processing`. `Artifact.DefinitionCodeGeneration` selects definitions and Java/Python targets; the Gradle adapter calls the reusable Defs Codegen Java API directly and writes reproducible output to `.gen` source roots. Generated transport/data types remain distinct from handwritten effective Builder models.
 
 `PublicationDestinations` in publication capability configuration denotes an optional set of ResourceEndpoint IDs. It does not contain URLs, credentials, or provider-specific state. When omitted, the publication adapter may select all enabled endpoints matching the capability's TechnologyKind/ResourceKind/visibility/action context. Phase 6 activates this selection for `docs_site` and `schema_site`.
 

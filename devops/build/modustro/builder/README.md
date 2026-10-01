@@ -18,8 +18,14 @@ Phase 4 adds the Gradle-independent capability demand graph and TechnologyKind-s
 
 ## Phase 5 ResourceEndpoints
 
-Phase 5 generalizes external build/publication targets from the native-package-only `Repositories` matrix to `ResourceEndpoints`. The portable model defines ResourceKinds, endpoint actions, ResourceKind-specific stability rules, effective endpoint definitions, and validation independent of Gradle.
+Phase 5 establishes `ResourceEndpoints` as the canonical external build/publication target model. The portable model defines ResourceKinds, endpoint actions, ResourceKind-specific stability rules, effective endpoint definitions, and validation independent of Gradle.
 
 The canonical selection dimensions are `TechnologyKind / ResourceKind / Visibility / Action`. `Stability` is endpoint data: `native_build_output` and `docs_site` require it, while `schema_site` forbids it. Provider-specific behavior uses the generic `ResourceEndpointProviderAdapter` name.
 
-The active Gradle adapter consumes canonical `resourceEndpoints` for Java/Python native dependency resolution, publication, credential preflight, and released-snapshot cleanup. Legacy `Repositories` input remains accepted and is normalized to `native_build_output` so existing governance overlays can migrate independently. Phase 6 will activate `docs_site` and `schema_site` generation/publication on the same endpoint model.
+The active Gradle adapter consumes canonical `resourceEndpoints` for Java/Python native dependency resolution, publication, credential preflight, and released-snapshot cleanup. Phase 5.1 removes the superseded repository-matrix input completely; only `ResourceEndpoints` participate in resolution. Phase 6 will activate `docs_site` and `schema_site` generation/publication on the same endpoint model.
+
+## Phase 5.1 definition-driven generated sources
+
+Phase 5.1A connects the reusable `pub.tool.General` Defs Codegen API to the Builder `source_native_processing` lifecycle. Artifacts may declare `Artifact.DefinitionCodeGeneration.Items`; each item selects one canonical product `yamldefs`, `jsondefs`, or `xmldefs` source below its matching source-kind root, one or more Java/Python targets, and a target package/module namespace. Generated sources are written to canonical `.gen` source roots and are reproducible build state rather than handwritten source. The first active consumer is the Builder `coreintf` ResourceEndpoint model, which generates versioned `AIcgd..._1` data objects and `AIng..._1` enums from canonical definitions.
+
+Structured-data loading is kept separate from generation and effective-model construction. `AIiStructuredDataLoader` maps YAML/JSON/XML documents into generated or handwritten data objects; inheritance, defaults, and semantic validation remain later Builder stages.

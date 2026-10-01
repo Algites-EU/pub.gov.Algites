@@ -1,13 +1,22 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:publication:global-publication-user-metadata:1" xmlns="urn:algites:modustro:builder:publication:global-publication-user-metadata:1" elementFormDefault="qualified">
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:publication:global-publication-user-metadata:1" targetNamespace="urn:algites:modustro:builder:publication:global-publication-user-metadata:1" elementFormDefault="qualified">
   <xs:annotation>
     <xs:documentation>Author-controlled source metadata used as input to global definition publication. Deployment-controlled fields are not accepted.</xs:documentation>
-    <xs:appinfo><DefinitionVersion>1</DefinitionVersion></xs:appinfo>
+    <xs:appinfo>
+      <DefinitionVersion>1</DefinitionVersion>
+    </xs:appinfo>
   </xs:annotation>
   <xs:element name="GlobalPublicationUserMetadata">
+    <xs:annotation>
+      <xs:documentation>Root author-controlled global-publication metadata document.</xs:documentation>
+    </xs:annotation>
     <xs:complexType>
       <xs:sequence>
-        <xs:element name="GlobalPublicationPathId" type="xs:string"/>
+        <xs:element name="GlobalPublicationPathId" type="xs:string">
+          <xs:annotation>
+            <xs:documentation>Stable logical path selected by the definition author below the canonical definition source root.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
       </xs:sequence>
     </xs:complexType>
   </xs:element>

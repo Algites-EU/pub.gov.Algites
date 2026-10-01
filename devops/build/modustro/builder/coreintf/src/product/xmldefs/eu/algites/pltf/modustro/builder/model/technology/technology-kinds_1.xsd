@@ -1,8 +1,87 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="urn:algites:modustro:builder:model:technology-kinds:1" xmlns="urn:algites:modustro:builder:model:technology-kinds:1" elementFormDefault="qualified">
-  <xs:annotation><xs:appinfo><DefinitionVersion>1</DefinitionVersion><Note>XML uses the extended representation; YAML/JSON additionally support the compact string-list representation.</Note></xs:appinfo></xs:annotation>
-  <xs:complexType name="BuildOutputTypeItemType"><xs:sequence><xs:element name="BuildOutputType" type="xs:string"/><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax" namespace="##other"/></xs:sequence></xs:complexType>
-  <xs:complexType name="CapabilityItemType"><xs:sequence><xs:element name="Capability" type="xs:string"/><xs:element name="Enabled" type="xs:boolean" minOccurs="0" nillable="true"/><xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax" namespace="##other"/></xs:sequence></xs:complexType>
-  <xs:complexType name="TechnologyKindItemType"><xs:sequence><xs:element name="TechnologyKind" type="xs:string"/><xs:element name="BuildOutputType" type="BuildOutputTypeItemType" minOccurs="0" maxOccurs="unbounded"/><xs:element name="Capability" type="CapabilityItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items"/></xs:complexType>
-  <xs:element name="TechnologyKinds"><xs:complexType><xs:sequence><xs:element name="Item" type="TechnologyKindItemType" minOccurs="0" maxOccurs="unbounded"/></xs:sequence><xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items"/></xs:complexType></xs:element>
+<?xml version='1.0' encoding='UTF-8'?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:algites:modustro:builder:model:technology-kinds:1" targetNamespace="urn:algites:modustro:builder:model:technology-kinds:1" elementFormDefault="qualified">
+  <xs:annotation>
+    <xs:documentation>Configures TechnologyKinds selected for an artifact, including per-technology output and capability overrides. XML uses the extended representation; YAML and JSON also support the compact string-list representation.</xs:documentation>
+    <xs:appinfo>
+      <DefinitionVersion>1</DefinitionVersion>
+      <Note>XML uses the extended representation; YAML/JSON additionally support the compact string-list representation.</Note>
+    </xs:appinfo>
+  </xs:annotation>
+  <xs:complexType name="BuildOutputTypeItemType">
+    <xs:annotation>
+      <xs:documentation>Configures one selected build output type and any output-specific extension data.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="BuildOutputType" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Identifier of the selected build output type.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax" namespace="##other"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CapabilityItemType">
+    <xs:annotation>
+      <xs:documentation>Configures one capability for a selected TechnologyKind.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="Capability" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Identifier of the selected capability.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Enabled" type="xs:boolean" minOccurs="0" nillable="true">
+        <xs:annotation>
+          <xs:documentation>Optional explicit capability enablement state; absence leaves the inherited/default state unchanged.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:any minOccurs="0" maxOccurs="unbounded" processContents="lax" namespace="##other"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TechnologyKindItemType">
+    <xs:annotation>
+      <xs:documentation>Configures one selected TechnologyKind together with its build outputs and capabilities.</xs:documentation>
+    </xs:annotation>
+    <xs:sequence>
+      <xs:element name="TechnologyKind" type="xs:string">
+        <xs:annotation>
+          <xs:documentation>Identifier of the selected TechnologyKind.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="BuildOutputType" type="BuildOutputTypeItemType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>One selected build-output-type configuration for this TechnologyKind.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="Capability" type="CapabilityItemType" minOccurs="0" maxOccurs="unbounded">
+        <xs:annotation>
+          <xs:documentation>One selected capability configuration for this TechnologyKind.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+    </xs:sequence>
+    <xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items">
+      <xs:annotation>
+        <xs:documentation>Controls how items missing from a child TechnologyKinds configuration are inherited from its parent.</xs:documentation>
+      </xs:annotation>
+    </xs:attribute>
+  </xs:complexType>
+  <xs:element name="TechnologyKinds">
+    <xs:annotation>
+      <xs:documentation>Root TechnologyKinds configuration.</xs:documentation>
+    </xs:annotation>
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="Item" type="TechnologyKindItemType" minOccurs="0" maxOccurs="unbounded">
+          <xs:annotation>
+            <xs:documentation>One selected TechnologyKind entry.</xs:documentation>
+          </xs:annotation>
+        </xs:element>
+      </xs:sequence>
+      <xs:attribute name="ItemsInheritancePolicy" type="xs:string" default="merge_missing_items">
+        <xs:annotation>
+          <xs:documentation>Controls how items missing from a child TechnologyKinds configuration are inherited from its parent.</xs:documentation>
+        </xs:annotation>
+      </xs:attribute>
+    </xs:complexType>
+  </xs:element>
 </xs:schema>

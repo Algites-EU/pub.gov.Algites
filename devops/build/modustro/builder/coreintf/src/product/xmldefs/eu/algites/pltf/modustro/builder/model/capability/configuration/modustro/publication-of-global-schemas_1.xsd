@@ -1,14 +1,43 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
-  <xs:annotation><xs:documentation>Global Schema Publication Capability Configuration v1</xs:documentation></xs:annotation>
+  <xs:annotation>
+    <xs:documentation>Configures global publication of canonical definitions and schemas.</xs:documentation>
+  </xs:annotation>
   <xs:complexType name="DocumentContentType">
+    <xs:annotation>
+      <xs:documentation>Global-definition publication capability configuration.</xs:documentation>
+    </xs:annotation>
     <xs:sequence>
-      <xs:element name="Enabled" minOccurs="0" maxOccurs="1" type="xs:boolean"/>
-      <xs:element name="SourceKinds" minOccurs="0" maxOccurs="1" type="xs:anyType"/>
-      <xs:element name="AdditionalSourceRoots" minOccurs="0" maxOccurs="1" type="xs:anyType"/>
-      <xs:element name="PublicationDestinations" minOccurs="0" maxOccurs="1" type="xs:anyType"/>
-      <xs:element name="ModustroSchemaVersionValidation" minOccurs="0" maxOccurs="1" type="xs:anyType"/>
+      <xs:element name="Enabled" minOccurs="0" maxOccurs="1" type="xs:boolean">
+        <xs:annotation>
+          <xs:documentation>Whether global definition publication is enabled.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="SourceKinds" minOccurs="0" maxOccurs="1" type="xs:anyType">
+        <xs:annotation>
+          <xs:documentation>Canonical definition source kinds included in publication.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="AdditionalSourceRoots" minOccurs="0" maxOccurs="1" type="xs:anyType">
+        <xs:annotation>
+          <xs:documentation>Additional canonical definition roots to include beyond standard source roots.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="PublicationDestinations" minOccurs="0" maxOccurs="1" type="xs:anyType">
+        <xs:annotation>
+          <xs:documentation>ResourceEndpoint identifiers selected as global-definition publication destinations.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
+      <xs:element name="ModustroSchemaVersionValidation" minOccurs="0" maxOccurs="1" type="xs:anyType">
+        <xs:annotation>
+          <xs:documentation>Controls validation of Modustro schema-definition versions before publication.</xs:documentation>
+        </xs:annotation>
+      </xs:element>
     </xs:sequence>
   </xs:complexType>
-  <xs:element name="CapabilityConfiguration" type="DocumentContentType"/>
+  <xs:element name="CapabilityConfiguration" type="DocumentContentType">
+    <xs:annotation>
+      <xs:documentation>Root global-definition publication capability configuration.</xs:documentation>
+    </xs:annotation>
+  </xs:element>
 </xs:schema>
