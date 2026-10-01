@@ -58,7 +58,10 @@ locAlgitesArtifactDirectories
             .orEmpty()
             .mapNotNull { locTechnologyKind -> locTechnologyKind?.toString()?.trim()?.lowercase() }
         locArtifactDirectory["hasGradleBuild"] == true ||
-            (locArtifactDirectory["structureKind"]?.toString() == "artifact" && "python" in locTechnologyKinds)
+            (
+                locArtifactDirectory["structureKind"]?.toString() == "artifact" &&
+                    locTechnologyKinds.any { locTechnologyKind -> locTechnologyKind in setOf("java", "python") }
+            )
     }
     .forEach { locArtifactDirectory ->
         val locArtifactDirectoryPath = locArtifactDirectory["path"]?.toString() ?: return@forEach

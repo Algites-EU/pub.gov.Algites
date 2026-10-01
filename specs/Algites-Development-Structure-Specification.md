@@ -1052,6 +1052,8 @@ Gradle is the single Algites build orchestrator. This does not imply that every 
 
 Technology-specific task graphs MUST remain independently selectable. Building `java` MUST NOT implicitly require building `python`, and vice versa, unless an explicit task dependency exists because one output is a real input of the other. A build selecting several technologies MAY aggregate their task graphs in one Gradle invocation.
 
+Declaring the `java` TechnologyKind on an artifact activates the standard Java TechnologyKind adapter and its required Gradle plugins (`java-library` and `maven-publish`) automatically. A conventional Java artifact therefore does not require an artifact-local `build.gradle.kts`; such a file is reserved for genuinely artifact-specific Gradle customization. Gradle project discovery MUST include conventional Java and Python artifacts from their effective TechnologyKinds even when no local Gradle build file exists.
+
 Shared source transformations SHOULD be represented as shared Gradle tasks when the transformation is genuinely identical. Different technology-specific transformations of the same source MAY execute independently. Cacheable tasks MUST declare stable inputs and non-overlapping owned outputs.
 
 #### 3.8.2 Java/Maven mapping

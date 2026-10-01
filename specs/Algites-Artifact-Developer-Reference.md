@@ -27,7 +27,7 @@ repository root
 │   ├── algites-artifact-set.yml          optional, nestable
 │   ├── <artifact>/
 │   │   ├── algites-artifact.yml
-│   │   ├── build.gradle.kts
+│   │   ├── build.gradle.kts              optional custom Gradle behavior
 │   │   ├── src/
 │   │   │   ├── product/
 │   │   │   │   └── <source-type>[.gen|.extgen]
@@ -932,9 +932,8 @@ Artifact:
   TechnologyKinds: [java]
 ```
 
-3. Add the Gradle project/build file.
-4. Put production sources in `src/product/java` and development/test sources in `src/develop/java` according to the adapter conventions.
-5. Run metadata/model and build checks.
+3. Put production sources in `src/product/java` and development/test sources in `src/develop/java` according to the adapter conventions. The standard Java TechnologyKind adapter applies the required Gradle Java-library and Maven-publication plugins automatically; add an artifact-local `build.gradle.kts` only when genuinely custom Gradle behavior is required.
+4. Run metadata/model and build checks.
 
 ### 18.2 Add a multi-technology artifact
 

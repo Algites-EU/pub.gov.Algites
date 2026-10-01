@@ -2004,6 +2004,23 @@ allprojects {
 allprojects {
     val locAlgitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
     if (locAlgitesArtifactDirectory != null) {
+        val locAlgitesTechnologyKinds = AIcAlgitesStringList(locAlgitesArtifactDirectory["technologyKinds"]).toSet()
+        if ("java" in locAlgitesTechnologyKinds) {
+            /*
+             * TechnologyKind selection owns the standard Java build adapter.
+             * Artifact-local Gradle files may add custom behavior, but they are
+             * not required to activate ordinary Java compilation/publication.
+             */
+            logger.lifecycle("Modustro Java TechnologyKind adapter active for '${project.path}': java-library, maven-publish")
+            pluginManager.apply("java-library")
+            pluginManager.apply("maven-publish")
+        }
+    }
+}
+
+allprojects {
+    val locAlgitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
+    if (locAlgitesArtifactDirectory != null) {
         plugins.withId("java") {
             AIcConfigureAlgitesJavaEnvironment(project, locAlgitesArtifactDirectory)
             AIcConfigureAlgitesJavaDependencies(project, locAlgitesArtifactDirectory)
