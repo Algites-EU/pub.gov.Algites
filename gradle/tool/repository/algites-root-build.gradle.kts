@@ -2247,6 +2247,11 @@ abstract class AIcResolveAlgitesRequiredCredentialsTask : DefaultTask() {
 }
 
 val locAlgitesRequiredCredentialsPlan = run {
+    val locRequestedResourceKinds = (
+        algitesGradleOrEnvironmentValue("algites.credential.resourceKinds")
+            ?: System.getenv("ALGITES_CREDENTIAL_RESOURCE_KINDS")
+            ?: "native_build_output"
+        ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
     val locRequestedUsages = (
         algitesGradleOrEnvironmentValue("algites.credential.usages")
             ?: System.getenv("ALGITES_CREDENTIAL_USAGES")
@@ -2268,8 +2273,12 @@ val locAlgitesRequiredCredentialsPlan = run {
             ?: "release,snapshot"
         ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
 
+    val locSupportedResourceKinds = setOf("native_build_output", "docs_site", "schema_site")
     val locSupportedUsages = setOf("download", "upload", "manage")
     val locSupportedStabilities = setOf("release", "snapshot")
+    if (!locSupportedResourceKinds.containsAll(locRequestedResourceKinds)) {
+        throw GradleException("Unsupported credential ResourceKind. Supported values: native_build_output, docs_site, schema_site.")
+    }
     if (!locSupportedUsages.containsAll(locRequestedUsages)) {
         throw GradleException("Unsupported credential usage. Supported values: download, upload, manage.")
     }
@@ -2304,27 +2313,29 @@ val locAlgitesRequiredCredentialsPlan = run {
             val locSegments = locCell.split('.')
             if (locSegments.size != 4) return@resourceEndpointCellLoop
             val (locTechnology, locResourceKind, locVisibility, locAction) = locSegments
-            if (locResourceKind != "native_build_output") return@resourceEndpointCellLoop
+            if (locResourceKind !in locRequestedResourceKinds) return@resourceEndpointCellLoop
             if (locAction !in locRequestedUsages) return@resourceEndpointCellLoop
             if (locAction == "download" && locVisibility !in locDownloadVisibilities) return@resourceEndpointCellLoop
             if (locAction == "upload" && locVisibility !in locUploadVisibilities) return@resourceEndpointCellLoop
             if (locAction == "manage" && locVisibility !in locManageVisibilities) return@resourceEndpointCellLoop
             if (locAction == "manage" && aScope == "repository") return@resourceEndpointCellLoop
             if (locAction == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@resourceEndpointCellLoop
-            if (locTechnology !in locOperationTechnologyKinds) return@resourceEndpointCellLoop
-            if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@resourceEndpointCellLoop
+            if (locTechnology != "modustro" && locTechnology !in locOperationTechnologyKinds) return@resourceEndpointCellLoop
+            if (locTechnology != "modustro" && locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@resourceEndpointCellLoop
 
             AIcAlgitesResourceEndpoints(aMetadata["resourceEndpoints"], locCell).forEach resourceEndpointLoop@ { locEndpoint ->
-                val locStability = locEndpoint.stability()?.wireValue() ?: return@resourceEndpointLoop
-                if (locAction == "download" && locStability !in locDownloadStabilities) return@resourceEndpointLoop
-                if (locAction == "upload" && locStability !in locUploadStabilities) return@resourceEndpointLoop
-                if (locAction == "manage" && locStability !in locManageStabilities) return@resourceEndpointLoop
+                val locStability = locEndpoint.stability()?.wireValue()
+                if (locStability != null) {
+                    if (locAction == "download" && locStability !in locDownloadStabilities) return@resourceEndpointLoop
+                    if (locAction == "upload" && locStability !in locUploadStabilities) return@resourceEndpointLoop
+                    if (locAction == "manage" && locStability !in locManageStabilities) return@resourceEndpointLoop
+                }
                 val locProfileId = locEndpoint.credentialProfile()
                 val locProfile = if (locProfileId.isNullOrBlank()) null else locProfiles[locProfileId]
                     ?: throw GradleException(
                         "ResourceEndpoint '${locEndpoint.id()}' references undefined credential profile '$locProfileId'."
                     )
-                val locEndpointKey = "$aScope|$locCell|$locStability|${locEndpoint.id()}"
+                val locEndpointKey = "$aScope|$locCell|${locStability.orEmpty()}|${locEndpoint.id()}"
                 locResourceEndpoints[locEndpointKey] = linkedMapOf(
                     "scope" to aScope,
                     "cell" to locCell,

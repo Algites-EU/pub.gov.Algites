@@ -24,3 +24,4 @@ jobs:
       publication-target: ""
       gradle-arguments: "--warning-mode all"
       publish-pages: true
+    secrets: inherit

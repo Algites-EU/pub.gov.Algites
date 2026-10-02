@@ -42,3 +42,4 @@ jobs:
     uses: Algites-EU/pub.gov.Algites/.github/workflows/algites-universal-docs-site.yml@main
     with:
       automation-request: ${{ inputs.request }}
+    secrets: inherit

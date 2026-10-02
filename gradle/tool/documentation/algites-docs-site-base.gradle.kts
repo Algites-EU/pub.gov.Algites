@@ -19,6 +19,8 @@ import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
 import org.gradle.api.tasks.TaskAction
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationDestinationSelection
+import eu.algites.pltf.modustro.builder.model.resource.AIcResourceEndpointDefinition
 import java.time.Instant
 
 abstract class AIcPrepareAlgitesDocsPublicationTask : DefaultTask() {
@@ -159,6 +161,13 @@ val locAlgitesDocsResolvedArtifactDirectories = AIcDocsReadArtifactDirectories(l
 val locAlgitesDocsResolvedRepositoryId = locAlgitesDocsResolvedMetadataProperties["repository.id"] ?: rootProject.name
 val locAlgitesDocsResolvedRepositoryName = locAlgitesDocsResolvedMetadataProperties["repository.name"] ?: locAlgitesDocsResolvedRepositoryId
 val locAlgitesDocsResolvedRepositoryVisibility = locAlgitesDocsResolvedMetadataProperties["repository.visibility"] ?: ""
+
+val locAlgitesPublicationScript = rootProject.file("gradle/tool/publication/algites-publication.gradle.kts")
+if (locAlgitesPublicationScript.isFile) {
+    apply(from = locAlgitesPublicationScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/publication/algites-publication.gradle.kts"))
+}
 
 extra["algitesDocsResolvedMetadataProperties"] = locAlgitesDocsResolvedMetadataProperties
 extra["algitesDocsResolvedArtifactDirectories"] = locAlgitesDocsResolvedArtifactDirectories
@@ -303,6 +312,65 @@ extra["algitesDocsPublicationId"] = locPublicationId
 
 val locAlgitesDocsEffectivePublicationKind = locPublicationKind ?: "generated"
 val locAlgitesDocsEffectivePublicationId = locPublicationId ?: "current"
+
+@Suppress("UNCHECKED_CAST")
+val locResolveDocsPublicationDestinations = rootProject.extra["algitesResolvePublicationDestinations"] as (
+    Map<String, Any?>,
+    String,
+    String,
+    String?,
+    List<String>
+) -> AIcPublicationDestinationSelection
+@Suppress("UNCHECKED_CAST")
+val locDocsRepositoryMetadata = locAlgitesDocsResolvedMetadata["repository"] as? Map<String, Any?> ?: emptyMap()
+val locDocsPublicationDestinationIds = (findProperty("algites.docs.publicationDestinations") as String?)
+    ?.split(',')
+    ?.map(String::trim)
+    ?.filter(String::isNotBlank)
+    ?: emptyList()
+val locDocsPublicationStability = when (locAlgitesDocsEffectivePublicationKind.lowercase()) {
+    "release" -> "release"
+    "preview", "snapshot", "generated" -> "snapshot"
+    else -> throw GradleException("Unsupported Algites documentation publication kind '$locAlgitesDocsEffectivePublicationKind'.")
+}
+val locDocsPublicationSelection = locResolveDocsPublicationDestinations(
+    locDocsRepositoryMetadata,
+    "docs_site",
+    locAlgitesDocsResolvedRepositoryVisibility,
+    locDocsPublicationStability,
+    locDocsPublicationDestinationIds
+)
+extra["algitesDocsPublicationEndpoints"] = locDocsPublicationSelection.endpoints()
+
+val locDocsPublicationSelectionFile = locDocsSiteRoot.file(".algites-publication/docs-site.properties")
+if (tasks.findByName("writeAlgitesDocsPublicationSelection") == null) {
+    tasks.register("writeAlgitesDocsPublicationSelection") {
+        group = "algites"
+        description = "Writes the effective docs_site ResourceEndpoint selection for the deployment adapter."
+        outputs.file(locDocsPublicationSelectionFile)
+        doLast {
+            val locOutput = locDocsPublicationSelectionFile.asFile
+            locOutput.parentFile.mkdirs()
+            val locEndpoints = locDocsPublicationSelection.endpoints()
+            val locLines = mutableListOf(
+                "resourceKind=docs_site",
+                "stability=$locDocsPublicationStability",
+                "count=${locEndpoints.size}"
+            )
+            locEndpoints.forEachIndexed { locIndex, locEndpoint ->
+                locLines += "endpoint.$locIndex.id=${locEndpoint.id()}"
+                locLines += "endpoint.$locIndex.url=${locEndpoint.url()}"
+                locLines += "endpoint.$locIndex.credentialProfile=${locEndpoint.credentialProfile().orEmpty()}"
+                locLines += "endpoint.$locIndex.providerAdapter=${locEndpoint.resourceEndpointProviderAdapter().orEmpty()}"
+            }
+            locOutput.writeText(locLines.joinToString(System.lineSeparator()) + System.lineSeparator(), Charsets.UTF_8)
+            logger.lifecycle(
+                "Algites docs_site publication endpoints: " +
+                    if (locEndpoints.isEmpty()) "<none>" else locEndpoints.joinToString(", ") { it.id() }
+            )
+        }
+    }
+}
 
 if (tasks.findByName("prepareAlgitesDocsPublication") == null) {
     tasks.register<AIcPrepareAlgitesDocsPublicationTask>("prepareAlgitesDocsPublication") {
@@ -1556,6 +1624,7 @@ if (tasks.findByName("generateAlgitesDocsSite") == null) {
         description = "Generic aggregate task for repository documentation site generation."
 
         dependsOn("prepareAlgitesDocsPublication")
+        dependsOn("writeAlgitesDocsPublicationSelection")
         dependsOn("generateAlgitesDocsRootIndex")
         dependsOn("generateAlgitesDocsArtifactPublicationIndexes")
         dependsOn("generateAlgitesDocsPublicationGroupIndexes")

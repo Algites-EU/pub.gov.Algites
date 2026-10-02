@@ -252,6 +252,45 @@ jobs:
             > "${locPublicDownloadFile}"
           echo "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE=${locPublicDownloadFile}" >> "${GITHUB_ENV}"
 
+      - name: Create private governance read token
+        id: governance_token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.PRIVATE_GOVERNANCE_GITHUB_APP_ID }}
+          private-key: ${{ secrets.PRIVATE_GOVERNANCE_GITHUB_APP_PEM }}
+          owner: Algites-EU
+          repositories: priv.gov.Algites
+          permission-contents: read
+
+      - name: Fetch Algites governed publication defaults
+        shell: bash
+        env:
+          GH_TOKEN: ${{ steps.governance_token.outputs.token }}
+        run: |
+          set -euo pipefail
+          locDefaultsDir="${RUNNER_TEMP}/algites-governance-defaults"
+          mkdir -p "${locDefaultsDir}"
+          locRepositoryName="${GITHUB_REPOSITORY#*/}"
+
+          if [[ "${locRepositoryName}" == pub.* ]]; then
+            locGovernedPublicFile="${locDefaultsDir}/algites-repository-governed-defaults-public.yml"
+            gh api \
+              -H "Accept: application/vnd.github.raw+json" \
+              "repos/Algites-EU/priv.gov.Algites/contents/repository/defaults/algites-repository-governed-defaults-public.yml?ref=main" \
+              > "${locGovernedPublicFile}"
+            echo "ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE=${locGovernedPublicFile}" >> "${GITHUB_ENV}"
+          elif [[ "${locRepositoryName}" == priv.* ]]; then
+            locPrivateFile="${locDefaultsDir}/algites-repository-defaults-private.yml"
+            gh api \
+              -H "Accept: application/vnd.github.raw+json" \
+              "repos/Algites-EU/priv.gov.Algites/contents/repository/defaults/algites-repository-defaults-private.yml?ref=main" \
+              > "${locPrivateFile}"
+            echo "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE=${locPrivateFile}" >> "${GITHUB_ENV}"
+          else
+            echo "::error::Unable to infer Algites repository visibility from '${locRepositoryName}'."
+            exit 1
+          fi
+
       - name: Fetch Algites public licensing governance
         shell: bash
         run: |
@@ -521,6 +560,45 @@ jobs:
             -Palgites.technologyKinds="${{ steps.request.outputs.technology-kinds }}" \
             ${{ steps.request.outputs.gradle-arguments }}
 
+      - name: Resolve documentation ResourceEndpoint adapters
+        id: publication-endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          locSelectionFile="${GITHUB_WORKSPACE}/documentation-branch/.algites-publication/docs-site.properties"
+          if [[ ! -f "${locSelectionFile}" ]]; then
+            echo "::error::Documentation generation did not produce ${locSelectionFile}."
+            exit 1
+          fi
+
+          locCount="$(awk -F= '$1 == "count" {print $2; exit}' "${locSelectionFile}")"
+          if [[ ! "${locCount}" =~ ^[0-9]+$ || "${locCount}" -lt 1 ]]; then
+            echo "::error::No effective docs_site upload ResourceEndpoint was selected."
+            exit 1
+          fi
+
+          locPublishGitHubPages="false"
+          for ((locIndex=0; locIndex<locCount; locIndex++)); do
+            locId="$(awk -F= -v k="endpoint.${locIndex}.id" '$1 == k {print substr($0, index($0,"=")+1); exit}' "${locSelectionFile}")"
+            locAdapter="$(awk -F= -v k="endpoint.${locIndex}.providerAdapter" '$1 == k {print substr($0, index($0,"=")+1); exit}' "${locSelectionFile}")"
+            case "${locAdapter}" in
+              github-pages)
+                locPublishGitHubPages="true"
+                ;;
+              github-branch)
+                ;;
+              *)
+                echo "::error::Unsupported docs_site ResourceEndpointProviderAdapter '${locAdapter}' for endpoint '${locId}'."
+                exit 1
+                ;;
+            esac
+          done
+
+          if [[ "${{ steps.request.outputs.publish-pages }}" != "true" ]]; then
+            locPublishGitHubPages="false"
+          fi
+          echo "publish-github-pages=${locPublishGitHubPages}" >> "${GITHUB_OUTPUT}"
+
       - name: Commit generated documentation to documentation branch
         working-directory: documentation-branch
         shell: bash
@@ -548,16 +626,16 @@ jobs:
           if-no-files-found: error
 
       - name: Configure GitHub Pages
-        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
+        if: ${{ steps.publication-endpoints.outputs.publish-github-pages == 'true' }}
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages artifact
-        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
+        if: ${{ steps.publication-endpoints.outputs.publish-github-pages == 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: documentation-branch
 
       - name: Deploy GitHub Pages
-        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
+        if: ${{ steps.publication-endpoints.outputs.publish-github-pages == 'true' }}
         id: deploy-pages
         uses: actions/deploy-pages@v4
