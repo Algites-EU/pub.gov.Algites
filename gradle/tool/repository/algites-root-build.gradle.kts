@@ -92,13 +92,14 @@ buildscript {
          * the version used by the current Defs Codegen bootstrap artifacts while published libraries retain
          * their broader compatible 2.x ranges.
          */
-        classpath(enforcedPlatform("com.fasterxml.jackson:jackson-bom:2.18.3"))
+/*        classpath(enforcedPlatform("com.fasterxml.jackson:jackson-bom:2.18.3")) */
         classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:1.0-SNAPSHOT")
-        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
+/*        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
         classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
         classpath("eu.algites.tool.codegen:pub.tool.General_generators.code.defscodegen.coreintf:1.0-SNAPSHOT")
         classpath("eu.algites.tool.codegen:pub.tool.General_generators.code.defscodegen.coreimpl:1.0-SNAPSHOT")
         classpath("eu.algites.lib.naming:pub.lib.General_naming.convention.coreimpl:1.0-SNAPSHOT")
+*/
     }
 }
 
