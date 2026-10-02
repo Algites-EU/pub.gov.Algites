@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
   <xs:annotation>
-    <xs:documentation>Defines one external resource endpoint before inheritance/default resolution. The generated data object preserves declared values; the effective Builder model applies semantic rules separately.</xs:documentation>
+    <xs:documentation>Defines one ResourceEndpoint declaration before inheritance/default resolution. The generated data object preserves nullable amendment fields; the effective Builder model applies defaults and semantic rules separately.</xs:documentation>
   </xs:annotation>
   <xs:include schemaLocation="resource-endpoint-visibility_1.xsd"/>
   <xs:include schemaLocation="resource-endpoint-action_1.xsd"/>
@@ -36,9 +36,9 @@
           <xs:documentation>Stable endpoint identifier used by selection and PublicationDestinations.</xs:documentation>
         </xs:annotation>
       </xs:element>
-      <xs:element name="Url" minOccurs="1" maxOccurs="1" type="xs:anyURI">
+      <xs:element name="Url" minOccurs="0" maxOccurs="1" type="xs:anyURI">
         <xs:annotation>
-          <xs:documentation>Provider endpoint URL.</xs:documentation>
+          <xs:documentation>Provider endpoint URL. It may be omitted by an inherited amendment but must exist on the effective endpoint.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="CredentialProfile" minOccurs="0" maxOccurs="1" type="xs:string">
@@ -46,9 +46,9 @@
           <xs:documentation>Optional credential-profile identifier; secret values are never stored here.</xs:documentation>
         </xs:annotation>
       </xs:element>
-      <xs:element name="Enabled" minOccurs="1" maxOccurs="1" type="xs:boolean">
+      <xs:element name="Enabled" minOccurs="0" maxOccurs="1" type="xs:boolean">
         <xs:annotation>
-          <xs:documentation>Whether the endpoint participates in effective selection.</xs:documentation>
+          <xs:documentation>Optional participation flag. It inherits when omitted and defaults to true after inheritance.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="Stability" minOccurs="0" maxOccurs="1" type="ResourceStabilityType">

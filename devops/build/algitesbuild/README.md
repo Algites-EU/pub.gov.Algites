@@ -36,7 +36,7 @@ The current source artifact declares its build-support dependencies in `algites-
 
 The current dependency requirement uses the exact Algites v1 snapshot version `1.0-SNAPSHOT`; repository version metadata separately uses `ReleaseLineVersion`, `Revision`, and `QualifierKind`. Changing the build-support dependency set or its versions is therefore a governed source-metadata change of this artifact.
 
-The bootstrap remains intentionally asymmetric: the shared root build script obtains its directly imported build-runtime classes from already-published bootstrap artifacts. Since Phase 3 this includes `algitesbuild:1.0-SNAPSHOT` plus the published Modustro Builder `coreintf` and `coreimpl` artifacts. Phase 4B also uses the published capability-demand planner from `coreimpl`, and Phase 5.1A additionally bootstraps the published Defs Codegen and naming-profile artifacts while the root Gradle script remains the execution adapter. The current source artifacts are then rebuilt and republished using the repository dependency declarations. This avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency and build-output model.
+The bootstrap remains intentionally asymmetric: the shared root build script obtains its directly imported build-runtime classes from an already-published `algitesbuild:1.0-SNAPSHOT`. The published `product_api` dependency graph of that bundle supplies Modustro Builder `coreimpl`/`coreintf`, Defs Codegen, naming support, and the remaining build-runtime libraries transitively. The current source artifacts are then rebuilt and republished using the repository dependency declarations. A new build-runtime API therefore has to be published in a bootstrap stage before a subsequent root/settings script revision starts importing it; this avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency model.
 
 ## Publication identity
 
@@ -51,24 +51,21 @@ The artifact version follows the version of `pub.gov.Algites`, so a published `a
 
 ## Intended bootstrap use
 
-Gradle bootstrap code currently needs these published build-support dependencies:
+The shared root Gradle build has one direct governed bootstrap dependency:
 
 ```text
 eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:<bootstrap-version>
-eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:<bootstrap-version>
-eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:<bootstrap-version>
-eu.algites.tool.codegen:pub.tool.General_generators.code.defscodegen.coreintf:<bootstrap-version>
-eu.algites.tool.codegen:pub.tool.General_generators.code.defscodegen.coreimpl:<bootstrap-version>
-eu.algites.lib.naming:pub.lib.General_naming.convention.coreimpl:<bootstrap-version>
 ```
 
-The build of a new `pub.gov.Algites` generation must still use already-published bootstrap versions of every artifact directly imported by the shared root build script. After the new governance generation has published `algitesbuild` and the Modustro Builder core artifacts, downstream builds such as `priv.gov.Algites` and clean documentation builds can use that newly published bootstrap generation.
+Its published API dependency graph supplies the concrete Builder, Defs Codegen, naming, versioning, and credential support required by the script. Settings-phase code that must execute before the root buildscript is available may declare the narrow already-published support artifact it needs explicitly. The following Phase 5.1B activation stage will use this for the ResourceEndpoint resolver during metadata resolution.
+
+The build of a new `pub.gov.Algites` generation must still use already-published bootstrap versions of every API imported during bootstrap. After a bootstrap-stage publication has made a new Builder API available, a following activation revision can safely import that API from settings/root scripts.
 
 ## Current Gradle bootstrap
 
-The shared `gradle/tool/repository/algites-root-build.gradle.kts` currently loads `algitesbuild`, Modustro Builder `coreintf`/`coreimpl`, Defs Codegen `coreintf`/`coreimpl`, and the Algites naming-profile implementation explicitly on its script classpath from the public Cloudsmith snapshot repository using version `1.0-SNAPSHOT`. `algitesbuild` continues to export the governed build-support dependency set transitively; artifacts are also declared directly on the script classpath when the root script imports their classes during bootstrap.
+The shared `gradle/tool/repository/algites-root-build.gradle.kts` loads only `algitesbuild:1.0-SNAPSHOT` directly from the public Cloudsmith snapshot repository. Modustro Builder, Defs Codegen, and the Algites naming-profile implementation are supplied transitively by the published `algitesbuild` metadata.
 
-Phase 5.1A uses Defs Codegen directly from the Gradle adapter during `source_native_processing`; no CLI process is spawned. The naming-profile dependency supplies the standard Algites generated-type conventions (`AIcgd..._N`, `AIng..._N`).
+Phase 5.1A uses Defs Codegen directly from the Gradle adapter during `source_native_processing`; no CLI process is spawned. The Phase 5.1B bootstrap stage published by this revision keeps the existing settings resolver unchanged; the following activation revision can then bootstrap the newly published Builder core narrowly for ResourceEndpoint declaration/effective-model resolution.
 
 The floating snapshot coordinate is intentional during the current development phase. It can later be replaced by an immutable/released bootstrap coordinate without changing the dependency-model implementation or its consumers.
 

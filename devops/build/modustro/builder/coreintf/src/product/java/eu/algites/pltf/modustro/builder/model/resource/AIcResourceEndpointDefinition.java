@@ -152,4 +152,13 @@ public final class AIcResourceEndpointDefinition {
     public String resourceEndpointProviderAdapter() {
         return resourceEndpointProviderAdapter;
     }
+
+    /**
+     * Returns the canonical four-dimensional ResourceEndpoint cell identifier.
+     *
+     * @return cell identifier in TechnologyKind.ResourceKind.Visibility.Action form
+     */
+    public String cell() {
+        return technologyKind + "." + resourceKind + "." + visibility + "." + action.wireValue();
+    }
 }

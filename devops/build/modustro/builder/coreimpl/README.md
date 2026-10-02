@@ -28,3 +28,12 @@ Phase 3 adds the build-output producer layer and activates it in the Gradle adap
 - explicit rejection of virtual dependency-only outputs such as `python_distribution` as directly producible outputs.
 
 Phase 4 adds demand-driven capabilities. Production plans declare their capability requirements, `AIcBuiltinCapabilityDemandPlanner` deduplicates them and expands prerequisites, and the active Gradle adapter materializes the resulting source-processing and dependency-resolution boundaries. Native documentation is represented by the same graph rather than by a separate dependency chain.
+
+Phase 5.1B adds the effective ResourceEndpoint pipeline:
+
+- `AIcResourceEndpointResolver` merge-composes generated `AIcgdResourceEndpoint_1` declarations, applies `Enabled=true` after inheritance, constructs the handwritten effective model, and runs ResourceKind semantic validation;
+- `AIcResourceEndpointMetadataBridge` converts the normalized Algites metadata representation used by execution adapters into the same generated DTO/effective-model pipeline;
+- `AIcResourceEndpointCatalog` provides globally unique endpoint-id lookup and typed operation-context selection.
+
+The optional `builder/structureddata/jackson` artifact supplies YAML/JSON/XML representation mapping without putting Jackson on the core/bootstrap dependency path.
+

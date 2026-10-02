@@ -28,7 +28,7 @@ canonical yamldefs/jsondefs/xmldefs definition
     -> handwritten effective Builder model
 ```
 
-Phase 5.1A establishes the generation and loading contracts. It does not make generated DTOs responsible for inheritance, defaults, provider selection, or other effective-model behavior. Those transformations remain Builder responsibilities and are integrated in Phase 5.1B.
+Phase 5.1A establishes the generation and loading contracts. Phase 5.1B keeps the generated DTOs as transport declarations while moving ResourceEndpoint inheritance, defaulting, selection, and semantic validation into the handwritten Builder effective-model layer. Declaration fields that may be inherited, including `Url`, `Enabled`, and `Stability`, remain nullable until effective resolution; `Enabled` defaults to true only after inheritance.
 
 The generated ResourceEndpoint Java types are based on first-class canonical definitions for the endpoint object and its visibility, action and stability enums. Human-readable definition/property descriptions are propagated by Defs Codegen into generated source documentation.
 
@@ -36,6 +36,6 @@ The generated ResourceEndpoint Java types are based on first-class canonical def
 
 `AIiStructuredDataLoader` is the representation-mapping boundary for YAML, JSON and XML. A loader maps a document to the requested generated or handwritten data-object class. It intentionally does not apply descriptor inheritance, effective defaults, cross-field semantic validation, or effective-model construction.
 
-`AInStructuredDataFormat` identifies the supported serialization family. Concrete loader implementations belong outside this public core-interface artifact.
+`AInStructuredDataFormat` identifies the supported serialization family. Concrete loader implementations belong outside this public core-interface artifact. `AIcResourceEndpointCatalog` is the immutable effective endpoint view used by execution adapters after declaration resolution.
 
 No Gradle API type is part of this artifact's public or implementation dependencies.

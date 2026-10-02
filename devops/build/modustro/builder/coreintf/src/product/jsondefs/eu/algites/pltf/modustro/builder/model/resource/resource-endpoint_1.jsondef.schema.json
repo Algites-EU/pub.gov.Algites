@@ -33,7 +33,7 @@
       "type": "string",
       "format": "uri",
       "minLength": 1,
-      "description": "Provider endpoint URL."
+      "description": "Provider endpoint URL. It may be omitted by an inherited amendment but must exist on the effective endpoint."
     },
     "CredentialProfile": {
       "type": "string",
@@ -42,7 +42,7 @@
     },
     "Enabled": {
       "type": "boolean",
-      "description": "Whether the endpoint participates in effective selection."
+      "description": "Optional participation flag. It inherits when omitted and defaults to true after inheritance."
     },
     "Stability": {
       "$ref": "resource-stability_1.jsondef.schema.json",
@@ -59,9 +59,7 @@
     "ResourceKind",
     "Visibility",
     "Action",
-    "Id",
-    "Url",
-    "Enabled"
+    "Id"
   ],
-  "description": "Defines one external resource endpoint before inheritance/default resolution. The generated data object preserves declared values; the effective Builder model applies semantic rules separately."
+  "description": "Defines one ResourceEndpoint declaration before inheritance/default resolution. The generated data object preserves nullable amendment fields; the effective Builder model applies defaults and semantic rules separately."
 }

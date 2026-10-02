@@ -33,12 +33,12 @@
           "enum": [
             "release",
             "snapshot"
-          ]
+          ],
+          "description": "Release/snapshot stability. It may be omitted by an inherited amendment but is required on the effective endpoint for ResourceKinds that use stability channels."
         }
       },
       "required": [
-        "Id",
-        "Stability"
+        "Id"
       ],
       "minProperties": 2
     },
