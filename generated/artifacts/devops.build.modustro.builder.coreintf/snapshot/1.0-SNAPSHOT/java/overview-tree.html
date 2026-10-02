@@ -59,6 +59,7 @@ loadScripts(document, 'script');</script>
 <li><a href="eu/algites/pltf/modustro/builder/model/output/package-tree.html">eu.algites.pltf.modustro.builder.model.output</a>, </li>
 <li><a href="eu/algites/pltf/modustro/builder/model/resource/package-tree.html">eu.algites.pltf.modustro.builder.model.resource</a>, </li>
 <li><a href="eu/algites/pltf/modustro/builder/model/source/package-tree.html">eu.algites.pltf.modustro.builder.model.source</a>, </li>
+<li><a href="eu/algites/pltf/modustro/builder/model/structureddata/package-tree.html">eu.algites.pltf.modustro.builder.model.structureddata</a>, </li>
 <li><a href="eu/algites/pltf/modustro/builder/model/technology/package-tree.html">eu.algites.pltf.modustro.builder.model.technology</a></li>
 </ul>
 <section class="hierarchy">
@@ -118,6 +119,7 @@ loadScripts(document, 'script');</script>
 <li class="circle">eu.algites.pltf.modustro.builder.model.inheritance.<a href="eu/algites/pltf/modustro/builder/model/inheritance/AIiInheritanceResolver.html" class="type-name-link" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiInheritanceResolver</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.inheritance.<a href="eu/algites/pltf/modustro/builder/model/inheritance/AIiItemIdentity.html" class="type-name-link" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemIdentity</a>&lt;T,<wbr>K&gt;</li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.inheritance.<a href="eu/algites/pltf/modustro/builder/model/inheritance/AIiItemMerger.html" class="type-name-link" title="interface in eu.algites.pltf.modustro.builder.model.inheritance">AIiItemMerger</a>&lt;T&gt;</li>
+<li class="circle">eu.algites.pltf.modustro.builder.model.structureddata.<a href="eu/algites/pltf/modustro/builder/model/structureddata/AIiStructuredDataLoader.html" class="type-name-link" title="interface in eu.algites.pltf.modustro.builder.model.structureddata">AIiStructuredDataLoader</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.technology.<a href="eu/algites/pltf/modustro/builder/model/technology/AIiTechnologyKindDefinitionValidator.html" class="type-name-link" title="interface in eu.algites.pltf.modustro.builder.model.technology">AIiTechnologyKindDefinitionValidator</a></li>
 </ul>
 </section>
@@ -132,12 +134,30 @@ loadScripts(document, 'script');</script>
 <li class="circle">eu.algites.pltf.modustro.builder.model.output.<a href="eu/algites/pltf/modustro/builder/model/output/AInBuildOutputProductionKind.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.output">AInBuildOutputProductionKind</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.dependency.resolution.<a href="eu/algites/pltf/modustro/builder/model/dependency/resolution/AInDependencyResolutionDiagnosticSeverity.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.dependency.resolution">AInDependencyResolutionDiagnosticSeverity</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.dependency.<a href="eu/algites/pltf/modustro/builder/model/dependency/AInDependencyUsage.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.dependency">AInDependencyUsage</a></li>
+<li class="circle">eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIngResourceEndpointAction_1.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.resource">AIngResourceEndpointAction_1</a></li>
+<li class="circle">eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIngResourceEndpointVisibility_1.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.resource">AIngResourceEndpointVisibility_1</a></li>
+<li class="circle">eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIngResourceStability_1.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.resource">AIngResourceStability_1</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.inheritance.<a href="eu/algites/pltf/modustro/builder/model/inheritance/AInInheritedValueState.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.inheritance">AInInheritedValueState</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.inheritance.<a href="eu/algites/pltf/modustro/builder/model/inheritance/AInItemsInheritancePolicy.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.inheritance">AInItemsInheritancePolicy</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.<a href="eu/algites/pltf/modustro/builder/model/AInModelScope.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model">AInModelScope</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AInResourceEndpointAction.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.resource">AInResourceEndpointAction</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AInResourceStability.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.resource">AInResourceStability</a></li>
 <li class="circle">eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AInResourceStabilityRequirement.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.resource">AInResourceStabilityRequirement</a></li>
+<li class="circle">eu.algites.pltf.modustro.builder.model.structureddata.<a href="eu/algites/pltf/modustro/builder/model/structureddata/AInStructuredDataFormat.html" class="type-name-link" title="enum class in eu.algites.pltf.modustro.builder.model.structureddata">AInStructuredDataFormat</a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</section>
+<section class="hierarchy">
+<h2 title="Record Class Hierarchy">Record Class Hierarchy</h2>
+<ul>
+<li class="circle">java.lang.<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Object.html" class="type-name-link external-link" title="class or interface in java.lang">Object</a>
+<ul>
+<li class="circle">java.lang.<a href="https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/lang/Record.html" class="type-name-link external-link" title="class or interface in java.lang">Record</a>
+<ul>
+<li class="circle">eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIcgdResourceEndpoint_1.html" class="type-name-link" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcgdResourceEndpoint_1</a></li>
 </ul>
 </li>
 </ul>
