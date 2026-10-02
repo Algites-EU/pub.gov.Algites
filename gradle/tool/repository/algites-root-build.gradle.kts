@@ -1841,6 +1841,36 @@ fun AIcConfigureAlgitesJavaDependencies(aProject: Project, aArtifactDirectory: M
                         } else {
                             aProject.dependencies.add(locGradleConfiguration.name, locProjectDependency)
                         }
+
+                        if (locVersionConstraint != null) {
+                            val locTargetGroupId = locTargetMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                                ?: algitesResolvedRepositoryMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                                ?: throw GradleException("$locContext targets local Algites artifact '${locTargetProject.path}' without a resolvable GroupId for published version constraints.")
+                            val locTargetVariantId = locTargetMetadata["variantId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                            val locTargetArtifactId = AIcAlgitesEffectiveArtifactId(
+                                AIcAlgitesCanonicalArtifactId(locTargetProject.path),
+                                locTargetVariantId
+                            )
+                            val locTargetNotation = "$locTargetGroupId:$locTargetArtifactId"
+                            aProject.dependencies.constraints.add(
+                                locGradleConfiguration.name,
+                                locTargetNotation,
+                                object : Action<DependencyConstraint> {
+                                    override fun execute(locDependencyConstraint: DependencyConstraint) {
+                                        locDependencyConstraint.version(
+                                            object : Action<MutableVersionConstraint> {
+                                                override fun execute(locMutableVersionConstraint: MutableVersionConstraint) {
+                                                    AIcApplyAlgitesGradleVersionConstraint(
+                                                        locMutableVersionConstraint,
+                                                        locVersionConstraint
+                                                    )
+                                                }
+                                            }
+                                        )
+                                    }
+                                }
+                            )
+                        }
                         return@forEachIndexed
                     }
 
