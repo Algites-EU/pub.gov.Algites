@@ -19,7 +19,7 @@ buildscript {
         mavenCentral()
         maven {
             name = "algites_modustro_builder_bootstrap"
-            url = URI("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/")
+            url = uri("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/")
             mavenContent {
                 snapshotsOnly()
             }
