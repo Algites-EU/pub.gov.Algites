@@ -2318,6 +2318,7 @@ val algitesResolveRequiredCredentials = tasks.register<AIcResolveAlgitesRequired
 }
 
 subprojects {
+    val locAlgitesRunDirectoryRelativePath = AIcAlgitesRunDirectoryRelativePath(project.projectDir)
     val locAlgitesArtifactDirectory = algitesResolvedArtifactDirectoryForProject(project.path)
     val locAlgitesResolvedProjectGroup = locAlgitesArtifactDirectory?.get("groupId")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
         ?: algitesResolvedRepositoryMetadata["groupId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
