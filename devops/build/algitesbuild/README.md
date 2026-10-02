@@ -57,7 +57,7 @@ The shared root Gradle build has one direct governed bootstrap dependency:
 eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:<bootstrap-version>
 ```
 
-Its published API dependency graph supplies the concrete Builder, Defs Codegen, naming, versioning, and credential support required by the script. Settings-phase code that must execute before the root buildscript is available may declare the narrow already-published support artifact it needs explicitly. The following Phase 5.1B activation stage will use this for the ResourceEndpoint resolver during metadata resolution.
+Its published API dependency graph supplies the concrete Builder, Defs Codegen, naming, versioning, and credential support required by the script. Settings-phase code that must execute before the root buildscript is available may declare the narrow already-published support artifact it needs explicitly; Phase 5.1B uses this only for the ResourceEndpoint resolver during metadata resolution.
 
 The build of a new `pub.gov.Algites` generation must still use already-published bootstrap versions of every API imported during bootstrap. After a bootstrap-stage publication has made a new Builder API available, a following activation revision can safely import that API from settings/root scripts.
 
@@ -65,7 +65,7 @@ The build of a new `pub.gov.Algites` generation must still use already-published
 
 The shared `gradle/tool/repository/algites-root-build.gradle.kts` loads only `algitesbuild:1.0-SNAPSHOT` directly from the public Cloudsmith snapshot repository. Modustro Builder, Defs Codegen, and the Algites naming-profile implementation are supplied transitively by the published `algitesbuild` metadata.
 
-Phase 5.1A uses Defs Codegen directly from the Gradle adapter during `source_native_processing`; no CLI process is spawned. The Phase 5.1B bootstrap stage published by this revision keeps the existing settings resolver unchanged; the following activation revision can then bootstrap the newly published Builder core narrowly for ResourceEndpoint declaration/effective-model resolution.
+Phase 5.1A uses Defs Codegen directly from the Gradle adapter during `source_native_processing`; no CLI process is spawned. Phase 5.1B keeps the same root bootstrap boundary while allowing the settings metadata resolver to bootstrap the published Builder core narrowly for ResourceEndpoint declaration/effective-model resolution.
 
 The floating snapshot coordinate is intentional during the current development phase. It can later be replaced by an immutable/released bootstrap coordinate without changing the dependency-model implementation or its consumers.
 

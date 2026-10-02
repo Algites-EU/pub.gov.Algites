@@ -86,12 +86,10 @@ data class AIcdSettingsCredentialProfile(
 )
 
 data class AIcdSettingsResourceEndpoint(
-    val cell: String,
     val id: String,
     val url: String,
-    val credentialProfile: String?,
-    val stability: String,
-    val profiles: Map<String, AIcdSettingsCredentialProfile>
+    val credentialProfile: AIcdSettingsCredentialProfile?,
+    val stability: String
 )
 
 @Suppress("UNCHECKED_CAST")
@@ -121,14 +119,23 @@ fun AIcCollectJavaDownloadResourceEndpoints(
         val locCell = "java.native_build_output.$locVisibility.download"
         val locItems = locResourceEndpoints[locCell] as? List<*> ?: return@visibilityLoop
         locItems.forEach endpointLoop@ { locItem ->
-            val locMap = locItem as? Map<*, *> ?: return@endpointLoop
-            val locEnabled = locMap["enabled"]?.toString()?.toBooleanStrictOrNull() ?: true
+            val locMap = locItem as? Map<*, *>
+                ?: error("Effective ResourceEndpoint cell '$locCell' contains a non-object item.")
+            val locEnabled = locMap["enabled"] as? Boolean
+                ?: error("Effective ResourceEndpoint in cell '$locCell' has no boolean enabled state.")
             if (!locEnabled) return@endpointLoop
-            val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@endpointLoop
-            val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@endpointLoop
-            val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()?.takeIf { it in setOf("release", "snapshot") } ?: return@endpointLoop
-            val locProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-            val locEndpoint = AIcdSettingsResourceEndpoint(locCell, locId, locUrl, locProfile, locStability, locProfiles)
+            val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                ?: error("Effective ResourceEndpoint in cell '$locCell' has no id.")
+            val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                ?: error("Effective ResourceEndpoint '$locId' in cell '$locCell' has no URL.")
+            val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
+                ?: error("Effective ResourceEndpoint '$locId' in cell '$locCell' has no Stability.")
+            val locProfileId = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
+            val locProfile = locProfileId?.let { locIdValue ->
+                locProfiles[locIdValue]
+                    ?: error("Effective ResourceEndpoint '$locId' references undefined credential profile '$locIdValue'.")
+            }
+            val locEndpoint = AIcdSettingsResourceEndpoint(locId, locUrl, locProfile, locStability)
             val locPrevious = aTarget[locId]
             if (locPrevious != null && locPrevious != locEndpoint) {
                 error("ResourceEndpoint '$locId' resolves inconsistently across the repository build.")
@@ -161,10 +168,8 @@ dependencyResolutionManagement.repositories {
             mavenContent {
                 if (locStability == "snapshot") snapshotsOnly() else releasesOnly()
             }
-            val locProfileId = locEndpoint.credentialProfile
-            if (!locProfileId.isNullOrBlank() && !locAlgitesCredentialPreflight) {
-                val locProfile = locEndpoint.profiles[locProfileId]
-                    ?: error("ResourceEndpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'.")
+            val locProfile = locEndpoint.credentialProfile
+            if (locProfile != null && !locAlgitesCredentialPreflight) {
                 when (locProfile.type) {
                     "basic" -> {
                         val locUsername = locAlgitesResolveCredentialValue(locProfile.id, locProfile.type, "Username", rootDir)

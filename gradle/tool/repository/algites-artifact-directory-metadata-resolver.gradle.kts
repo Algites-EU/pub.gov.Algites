@@ -1,14 +1,37 @@
 /*
  * Algites artifact directory metadata resolver core.
  *
- * This script intentionally contains only Settings/Project compatible logic.
- * It resolves structural metadata, TechnologyKinds, inherited groupId,
- * credential profiles, version contexts, and effective ResourceEndpoints.
+ * This script intentionally contains only Settings/Project compatible orchestration logic.
+ * It resolves structural metadata, TechnologyKinds, inherited groupId, credential profiles,
+ * and version contexts while delegating ResourceEndpoint declaration merge/defaulting/validation
+ * to the Gradle-independent Modustro Builder core implementation.
  */
 
+import eu.algites.pltf.modustro.builder.model.resource.AIcgdResourceEndpoint_1
+import eu.algites.pltf.modustro.builder.resource.AIcResourceEndpointMetadataBridge
+import eu.algites.pltf.modustro.builder.resource.AIcResourceEndpointResolver
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+
+buildscript {
+    repositories {
+        mavenCentral()
+        maven {
+            name = "algites_modustro_builder_bootstrap"
+            url = URI("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/")
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
+    }
+    dependencies {
+        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
+    }
+}
+
+val AIcAlgitesResourceEndpointResolver = AIcResourceEndpointResolver.builtin()
+val AIcAlgitesResourceEndpointMetadataBridge = AIcResourceEndpointMetadataBridge(AIcAlgitesResourceEndpointResolver)
 
 data class AIcdAlgitesVersion(
     val releaseLineVersion: String? = null,
@@ -200,29 +223,6 @@ data class AIcdAlgitesDefinitionCodeGeneration(
     fun AIcIdentity(): String = "$sourceKind|$source|$packageName"
 }
 
-data class AIcdAlgitesResourceEndpoint(
-    val id: String,
-    val url: String? = null,
-    val credentialProfile: String? = null,
-    val enabled: Boolean? = null,
-    val stability: String? = null,
-    val resourceEndpointProviderAdapter: String? = null
-) {
-    fun AIcMerge(aOther: AIcdAlgitesResourceEndpoint): AIcdAlgitesResourceEndpoint {
-        require(id == aOther.id) { "Cannot merge repository endpoints with different ids '$id' and '${aOther.id}'." }
-        return AIcdAlgitesResourceEndpoint(
-            id = id,
-            url = aOther.url ?: url,
-            credentialProfile = aOther.credentialProfile ?: credentialProfile,
-            enabled = aOther.enabled ?: enabled,
-            stability = aOther.stability ?: stability,
-            resourceEndpointProviderAdapter = aOther.resourceEndpointProviderAdapter ?: resourceEndpointProviderAdapter
-        )
-    }
-
-    fun AIcEffectiveEnabled(): Boolean = enabled ?: true
-}
-
 data class AIcdAlgitesCredentialProfileDefinition(
     val id: String,
     val type: String? = null,
@@ -242,7 +242,7 @@ data class AIcdAlgitesResolvedState(
     val technologyKinds: AIcdAlgitesTechnologyKindsConfig? = null,
     val groupId: String? = null,
     val definitionCodeGeneration: List<AIcdAlgitesDefinitionCodeGeneration> = emptyList(),
-    val resourceEndpoints: Map<String, Map<String, AIcdAlgitesResourceEndpoint>> = emptyMap(),
+    val resourceEndpoints: List<AIcgdResourceEndpoint_1> = emptyList(),
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition> = emptyMap(),
     val version: AIcdAlgitesVersion = AIcdAlgitesVersion(),
     val dependencies: List<AIcdAlgitesDependencyDefinition> = emptyList(),
@@ -253,15 +253,10 @@ data class AIcdAlgitesResolvedState(
     val deleteSnapshotWhenReleased: Boolean? = null
 ) {
     fun AIcMerge(aOther: AIcdAlgitesResolvedState): AIcdAlgitesResolvedState {
-        val locResourceEndpoints = linkedMapOf<String, Map<String, AIcdAlgitesResourceEndpoint>>()
-        (resourceEndpoints.keys + aOther.resourceEndpoints.keys).distinct().forEach { locCell ->
-            val locMerged = linkedMapOf<String, AIcdAlgitesResourceEndpoint>()
-            resourceEndpoints[locCell]?.forEach { (locId, locEndpoint) -> locMerged[locId] = locEndpoint }
-            aOther.resourceEndpoints[locCell]?.forEach { (locId, locEndpoint) ->
-                locMerged[locId] = locMerged[locId]?.AIcMerge(locEndpoint) ?: locEndpoint
-            }
-            locResourceEndpoints[locCell] = locMerged
-        }
+        val locResourceEndpoints = AIcAlgitesResourceEndpointResolver.mergeDeclarations(
+            resourceEndpoints,
+            aOther.resourceEndpoints
+        )
 
         val locProfiles = linkedMapOf<String, AIcdAlgitesCredentialProfileDefinition>()
         credentialProfiles.forEach { (locId, locProfile) -> locProfiles[locId] = locProfile }
@@ -323,7 +318,7 @@ data class AIcdAlgitesArtifactDirectoryMetadata(
     val groupId: String?,
     val variantId: String?,
     val definitionCodeGeneration: List<AIcdAlgitesDefinitionCodeGeneration>,
-    val resourceEndpoints: Map<String, Map<String, AIcdAlgitesResourceEndpoint>>,
+    val resourceEndpoints: List<AIcgdResourceEndpoint_1>,
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>,
     val contentsModel: String,
     val hasGradleBuild: Boolean,
@@ -341,7 +336,7 @@ data class AIcdAlgitesRepositoryMetadata(
     val name: String,
     val visibility: String,
     val groupId: String?,
-    val resourceEndpoints: Map<String, Map<String, AIcdAlgitesResourceEndpoint>>,
+    val resourceEndpoints: List<AIcgdResourceEndpoint_1>,
     val credentialProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>,
     val dependencies: List<AIcdAlgitesDependencyDefinition>,
     val dependencyConstraints: List<AIcdAlgitesDependencyDefinition>,
@@ -354,20 +349,6 @@ data class AIcdAlgitesResolutionResult(
 )
 
 val AIcAlgitesSupportedTechnologyKinds = linkedSetOf("java", "python", "mps", "modustro")
-val AIcAlgitesResourceEndpointVisibilities = linkedSetOf("public", "private")
-val AIcAlgitesResourceEndpointStabilities = linkedSetOf("release", "snapshot")
-val AIcAlgitesResourceEndpointActions = linkedSetOf("download", "upload", "manage")
-val AIcAlgitesResourceKindsByTechnologyKind = mapOf(
-    "java" to linkedSetOf("native_build_output"),
-    "python" to linkedSetOf("native_build_output"),
-    "mps" to linkedSetOf("native_build_output"),
-    "modustro" to linkedSetOf("docs_site", "schema_site")
-)
-val AIcAlgitesResourceKindStabilityRequirements = mapOf(
-    "native_build_output" to "required",
-    "docs_site" to "required",
-    "schema_site" to "forbidden"
-)
 val AIcAlgitesCredentialTypes = linkedSetOf("basic", "bearer", "api_key", "certificate")
 
 val AIcAlgitesRootIgnoredDirectoryNames = setOf(
@@ -532,7 +513,7 @@ fun AIcResolveRepositoryMetadataBase(
         ?: locRootConfig?.values?.let { AIcFirstValue(it, "SourceRepository.Visibility") }?.takeIf { it.isNotBlank() }
         ?: AIcInferVisibilityFromRepositoryName(locRepositoryId)
     val locGroupId = locRootConfig?.values?.let { AIcFirstValue(it, "GroupId") }?.takeIf { it.isNotBlank() }
-    return AIcdAlgitesRepositoryMetadata(locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyMap(), emptyMap(), emptyList(), emptyList(), true)
+    return AIcdAlgitesRepositoryMetadata(locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyList(), emptyMap(), emptyList(), emptyList(), true)
 }
 
 fun AIcInferVisibilityFromRepositoryName(aRepositoryName: String): String = when {
@@ -1147,27 +1128,11 @@ fun AIcDependencyDefinitionsFromConfig(
 }
 
 
-fun AIcMergeResourceEndpointMaps(
-    aBase: Map<String, Map<String, AIcdAlgitesResourceEndpoint>>,
-    aOverride: Map<String, Map<String, AIcdAlgitesResourceEndpoint>>
-): Map<String, Map<String, AIcdAlgitesResourceEndpoint>> {
-    val locResult = linkedMapOf<String, Map<String, AIcdAlgitesResourceEndpoint>>()
-    (aBase.keys + aOverride.keys).distinct().forEach { locCell ->
-        val locMerged = linkedMapOf<String, AIcdAlgitesResourceEndpoint>()
-        aBase[locCell]?.forEach { (locId, locEndpoint) -> locMerged[locId] = locEndpoint }
-        aOverride[locCell]?.forEach { (locId, locEndpoint) ->
-            locMerged[locId] = locMerged[locId]?.AIcMerge(locEndpoint) ?: locEndpoint
-        }
-        locResult[locCell] = locMerged
-    }
-    return locResult
-}
-
 fun AIcResourceEndpointOverridesFromConfig(
     aValues: Map<String, String>,
     aPrefix: String,
     aFile: File
-): Map<String, Map<String, AIcdAlgitesResourceEndpoint>> {
+): List<AIcgdResourceEndpoint_1> {
     val locPrefixes = listOf("$aPrefix.ResourceEndpoints.", "ResourceEndpoints.").filter { !it.startsWith(".ResourceEndpoints") }
     data class AIcdBuilder(
         var id: String? = null,
@@ -1190,7 +1155,6 @@ fun AIcResourceEndpointOverridesFromConfig(
         val locIndex = locSegments[4]
         val locProperty = locSegments.drop(5).joinToString(".")
         if (locIndex.toIntOrNull() == null) return@forEach
-        AIcValidateResourceEndpointCell(locTechnology, locResourceKind, locVisibility, locAction, locKey)
         val locCell = "$locTechnology.$locResourceKind.$locVisibility.$locAction"
         val locBuilder = locBuilders.getOrPut(locCell to locIndex) { AIcdBuilder() }
         when (locProperty) {
@@ -1203,39 +1167,35 @@ fun AIcResourceEndpointOverridesFromConfig(
         }
     }
 
-    val locResult = linkedMapOf<String, MutableMap<String, AIcdAlgitesResourceEndpoint>>()
-    locBuilders.forEach { (locKey, locBuilder) ->
+    return locBuilders.map { (locKey, locBuilder) ->
         val locCell = locKey.first
         val locSegments = locCell.split('.')
-        val locResourceKind = locSegments[1]
         val locId = locBuilder.id?.takeIf { it.isNotBlank() }
             ?: error("ResourceEndpoint in '${aFile.path}' cell '$locCell' is missing required Id.")
-        val locStability = locBuilder.stability
-        if (locStability != null && locStability !in AIcAlgitesResourceEndpointStabilities) {
-            error("Unsupported ResourceEndpoint Stability '$locStability' in '${aFile.path}' cell '$locCell'.")
+        try {
+            AIcAlgitesResourceEndpointMetadataBridge.declaration(
+                locSegments[0],
+                locSegments[1],
+                locSegments[2],
+                locSegments[3],
+                locId,
+                locBuilder.url,
+                locBuilder.credentialProfile,
+                locBuilder.enabled,
+                locBuilder.stability,
+                locBuilder.resourceEndpointProviderAdapter
+            )
+        } catch (locException: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid ResourceEndpoint '$locId' in '${aFile.path}' cell '$locCell': ${locException.message}", locException)
         }
-        when (AIcAlgitesResourceKindStabilityRequirements[locResourceKind]) {
-            "required" -> if (locStability == null) error("ResourceKind '$locResourceKind' requires Stability in '${aFile.path}' cell '$locCell'.")
-            "forbidden" -> if (locStability != null) error("ResourceKind '$locResourceKind' forbids Stability in '${aFile.path}' cell '$locCell'.")
-        }
-        AIcValidateResourceEndpointId(locId, locCell, locStability, aFile)
-        locResult.getOrPut(locCell) { linkedMapOf() }[locId] = AIcdAlgitesResourceEndpoint(
-            id = locId,
-            url = locBuilder.url,
-            credentialProfile = locBuilder.credentialProfile,
-            enabled = locBuilder.enabled,
-            stability = locStability,
-            resourceEndpointProviderAdapter = locBuilder.resourceEndpointProviderAdapter
-        )
     }
-    return locResult
 }
 
 fun AIcResourceEndpointsFromConfig(
     aValues: Map<String, String>,
     aPrefix: String,
     aFile: File
-): Map<String, Map<String, AIcdAlgitesResourceEndpoint>> =
+): List<AIcgdResourceEndpoint_1> =
     AIcResourceEndpointOverridesFromConfig(aValues, aPrefix, aFile)
 
 fun AIcCredentialProfilesFromConfig(
@@ -1272,41 +1232,6 @@ fun AIcCredentialProfilesFromConfig(
 }
 
 
-fun AIcValidateResourceEndpointCell(aTechnology: String, aResourceKind: String, aVisibility: String, aAction: String, aKey: String) {
-    if (aTechnology !in AIcAlgitesSupportedTechnologyKinds) error("Unsupported TechnologyKind '$aTechnology' in ResourceEndpoints key '$aKey'.")
-    val locSupportedResourceKinds = AIcAlgitesResourceKindsByTechnologyKind[aTechnology].orEmpty()
-    if (aResourceKind !in locSupportedResourceKinds) {
-        error("Unsupported ResourceKind '$aResourceKind' for TechnologyKind '$aTechnology' in ResourceEndpoints key '$aKey'. Supported ResourceKinds: ${locSupportedResourceKinds.joinToString(", ")}.")
-    }
-    if (aVisibility !in AIcAlgitesResourceEndpointVisibilities) error("Unsupported ResourceEndpoint visibility '$aVisibility' in ResourceEndpoints key '$aKey'.")
-    if (aAction !in AIcAlgitesResourceEndpointActions) error("Unsupported ResourceEndpoint action '$aAction' in ResourceEndpoints key '$aKey'.")
-}
-
-fun AIcValidateResourceEndpointId(aId: String, aCell: String, aStability: String?, aFile: File) {
-    if (!Regex("^algites-[a-z0-9]+(?:-[a-z0-9]+)*$").matches(aId)) {
-        error("ResourceEndpoint id '$aId' in '${aFile.path}' must start with 'algites-' and use lowercase dash-separated form.")
-    }
-    val locSegments = aCell.split('.')
-    val locTechnology = locSegments[0]
-    val locResourceKind = locSegments[1].replace('_', '-')
-    val locVisibility = locSegments[2]
-    val locAction = locSegments[3]
-    val locSuffix = if (aStability == null) {
-        "-$locTechnology-$locResourceKind-$locVisibility-$locAction"
-    } else {
-        "-$locTechnology-$locResourceKind-$locVisibility-$aStability-$locAction"
-    }
-    val locLegacySuffix = if (locSegments[1] == "native_build_output" && aStability != null) {
-        "-$locTechnology-$locVisibility-$aStability-$locAction"
-    } else {
-        null
-    }
-    if (!aId.endsWith(locSuffix) && aId != "algites${locSuffix}" && (locLegacySuffix == null || !aId.endsWith(locLegacySuffix))) {
-        val locCompatibilityText = locLegacySuffix?.let { " (legacy native-build-output suffix '$it' is also accepted)" }.orEmpty()
-        error("ResourceEndpoint id '$aId' in '${aFile.path}' must encode its dimensions and end with '$locSuffix'$locCompatibilityText.")
-    }
-}
-
 fun AIcValidateEffectiveState(aState: AIcdAlgitesResolvedState, aContext: String) {
     (aState.dependencies + aState.dependencyConstraints).forEach { locDependency ->
         val locRequirement = locDependency.versionRequirement ?: return@forEach
@@ -1317,42 +1242,19 @@ fun AIcValidateEffectiveState(aState: AIcdAlgitesResolvedState, aContext: String
             error("$aContext dependency '${locDependency.artifactId}' excludes its effective Exact version '${locRequirement.exact}'.")
         }
     }
-    aState.resourceEndpoints.forEach { (locCell, locEndpoints) ->
-        val locSegments = locCell.split('.')
-        if (locSegments.size != 4) {
-            error("Invalid effective ResourceEndpoint cell '$locCell' in $aContext.")
-        }
-        val locTechnology = locSegments[0]
-        val locResourceKind = locSegments[1]
-        val locVisibility = locSegments[2]
-        val locAction = locSegments[3]
-        AIcValidateResourceEndpointCell(locTechnology, locResourceKind, locVisibility, locAction, locCell)
-        locEndpoints.values.forEach { locEndpoint ->
-            if (locEndpoint.AIcEffectiveEnabled() && locEndpoint.url.isNullOrBlank()) {
-                error("Enabled ResourceEndpoint '${locEndpoint.id}' in $aContext cell '$locCell' has no URL after inheritance.")
-            }
-            val locStabilityRequirement = AIcAlgitesResourceKindStabilityRequirements[locResourceKind]
-            if (locEndpoint.AIcEffectiveEnabled() && locStabilityRequirement == "required" && locEndpoint.stability == null) {
-                error("Enabled ResourceEndpoint '${locEndpoint.id}' in $aContext cell '$locCell' requires Stability.")
-            }
-            if (locEndpoint.stability != null && locEndpoint.stability !in AIcAlgitesResourceEndpointStabilities) {
-                error("ResourceEndpoint '${locEndpoint.id}' in $aContext cell '$locCell' uses unsupported Stability '${locEndpoint.stability}'.")
-            }
-            if (locStabilityRequirement == "forbidden" && locEndpoint.stability != null) {
-                error("ResourceEndpoint '${locEndpoint.id}' in $aContext cell '$locCell' forbids Stability.")
-            }
-            /*
-             * ResourceEndpointProviderAdapter is an extensibility identifier. Generic metadata
-             * resolution validates its shape in the schema but intentionally does not maintain a
-             * closed provider catalog. The concrete operation adapter validates support when used.
-             */
-            val locProfileId = locEndpoint.credentialProfile
-            if (!locProfileId.isNullOrBlank()) {
-                val locProfile = aState.credentialProfiles[locProfileId]
-                    ?: error("ResourceEndpoint '${locEndpoint.id}' in $aContext references undefined credential profile '$locProfileId'.")
-                if (locProfile.type.isNullOrBlank()) {
-                    error("Credential profile '$locProfileId' referenced by '${locEndpoint.id}' in $aContext has no type after inheritance.")
-                }
+
+    val locCatalog = try {
+        AIcAlgitesResourceEndpointResolver.resolve(aState.resourceEndpoints)
+    } catch (locException: IllegalArgumentException) {
+        throw IllegalArgumentException("Invalid effective ResourceEndpoints in $aContext: ${locException.message}", locException)
+    }
+    locCatalog.all().forEach { locEndpoint ->
+        val locProfileId = locEndpoint.credentialProfile()
+        if (!locProfileId.isNullOrBlank()) {
+            val locProfile = aState.credentialProfiles[locProfileId]
+                ?: error("ResourceEndpoint '${locEndpoint.id()}' in $aContext references undefined credential profile '$locProfileId'.")
+            if (locProfile.type.isNullOrBlank()) {
+                error("Credential profile '$locProfileId' referenced by '${locEndpoint.id()}' in $aContext has no type after inheritance.")
             }
         }
     }
@@ -1580,19 +1482,24 @@ fun AIcDefinitionCodeGenerationForOutput(aEntries: List<AIcdAlgitesDefinitionCod
         )
     }
 
-fun AIcResourceEndpointMapForOutput(aResourceEndpoints: Map<String, Map<String, AIcdAlgitesResourceEndpoint>>): Map<String, Any?> =
-    aResourceEndpoints.toSortedMap().mapValues { (_, locEndpoints) ->
-        locEndpoints.values.map { locEndpoint ->
-            linkedMapOf<String, Any?>(
-                "id" to locEndpoint.id,
-                "url" to locEndpoint.url,
-                "credentialProfile" to locEndpoint.credentialProfile,
-                "enabled" to locEndpoint.AIcEffectiveEnabled(),
-                "stability" to locEndpoint.stability,
-                "resourceEndpointProviderAdapter" to locEndpoint.resourceEndpointProviderAdapter
-            )
+fun AIcResourceEndpointMapForOutput(aResourceEndpoints: List<AIcgdResourceEndpoint_1>): Map<String, Any?> {
+    val locCatalog = AIcAlgitesResourceEndpointResolver.resolve(aResourceEndpoints)
+    return locCatalog.all()
+        .groupBy { locEndpoint -> locEndpoint.cell() }
+        .toSortedMap()
+        .mapValues { (_, locEndpoints) ->
+            locEndpoints.map { locEndpoint ->
+                linkedMapOf<String, Any?>(
+                    "id" to locEndpoint.id(),
+                    "url" to locEndpoint.url().toString(),
+                    "credentialProfile" to locEndpoint.credentialProfile(),
+                    "enabled" to locEndpoint.enabled(),
+                    "stability" to locEndpoint.stability()?.wireValue(),
+                    "resourceEndpointProviderAdapter" to locEndpoint.resourceEndpointProviderAdapter()
+                )
+            }
         }
-    }
+}
 
 
 fun AIcCredentialProfilesMapForOutput(aProfiles: Map<String, AIcdAlgitesCredentialProfileDefinition>): Map<String, Any?> =

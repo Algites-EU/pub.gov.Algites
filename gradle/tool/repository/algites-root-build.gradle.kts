@@ -28,8 +28,12 @@ import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionScheme
 import eu.algites.lib.common.version.scheme.pep440.AInPythonBuildPhase
 import eu.algites.pltf.modustro.builder.capability.AIcBuiltinCapabilityDemandPlanner
 import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind
+import eu.algites.pltf.modustro.builder.model.resource.AIcResourceEndpointDefinition
+import eu.algites.pltf.modustro.builder.model.resource.AInResourceEndpointAction
+import eu.algites.pltf.modustro.builder.model.resource.AInResourceStability
 import eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet
 import eu.algites.pltf.modustro.builder.output.AIcBuiltinBuildOutputProducers
+import eu.algites.pltf.modustro.builder.resource.AIcResourceEndpointMetadataBridge
 import eu.algites.lib.naming.convention.AIcAlgitesNamingProfiles
 import eu.algites.tool.codegen.defs.AIcDefaultDefsCodegenService
 import eu.algites.tool.codegen.defs.AIcdCanonicalDefinition
@@ -1051,36 +1055,48 @@ fun AIcAlgitesPreparedSourceSet(aProject: Project, aTechnologyKind: String): AIc
     }
 }
 
-data class AIcdAlgitesResourceEndpoint(
-    val cell: String,
-    val id: String,
-    val url: String,
-    val credentialProfile: String?,
-    val stability: String?,
-    val resourceEndpointProviderAdapter: String?
-)
-
 data class AIcdAlgitesCredentialProfile(
     val id: String,
     val type: String,
     val configuration: Map<String, String>
 )
 
+val AIcAlgitesResourceEndpointMetadataBridge = AIcResourceEndpointMetadataBridge.builtin()
+
 @Suppress("UNCHECKED_CAST")
-fun AIcAlgitesResourceEndpoints(aValue: Any?, aCell: String, aStability: String? = null): List<AIcdAlgitesResourceEndpoint> {
+fun AIcAlgitesResourceEndpoints(
+    aValue: Any?,
+    aCell: String,
+    aStability: String? = null
+): List<AIcResourceEndpointDefinition> {
     val locResourceEndpoints = aValue as? Map<*, *> ?: return emptyList()
-    val locItems = locResourceEndpoints[aCell] as? List<*> ?: return emptyList()
-    return locItems.mapNotNull { locItem ->
-        val locMap = locItem as? Map<*, *> ?: return@mapNotNull null
-        val locEnabled = locMap["enabled"]?.toString()?.toBooleanStrictOrNull() ?: true
-        if (!locEnabled) return@mapNotNull null
-        val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-        val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-        val locCredentialProfile = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-        val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
-        if (aStability != null && locStability != aStability) return@mapNotNull null
-        val locResourceEndpointProviderAdapter = locMap["resourceEndpointProviderAdapter"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() && it != "null" }
-        AIcdAlgitesResourceEndpoint(aCell, locId, locUrl, locCredentialProfile, locStability, locResourceEndpointProviderAdapter)
+    val locSegments = aCell.split('.')
+    if (locSegments.size != 4) {
+        throw GradleException("Invalid ResourceEndpoint cell '$aCell'.")
+    }
+    val locStability = aStability?.let { locValue ->
+        try {
+            AInResourceStability.fromWireValue(locValue)
+        } catch (locException: IllegalArgumentException) {
+            throw GradleException("Unsupported ResourceEndpoint Stability '$locValue'.", locException)
+        }
+    }
+    val locAction = try {
+        AInResourceEndpointAction.fromWireValue(locSegments[3])
+    } catch (locException: IllegalArgumentException) {
+        throw GradleException("Unsupported ResourceEndpoint action '${locSegments[3]}' in cell '$aCell'.", locException)
+    }
+    return try {
+        AIcAlgitesResourceEndpointMetadataBridge.resolve(locResourceEndpoints).select(
+            locSegments[0],
+            locSegments[1],
+            locSegments[2],
+            locAction,
+            locStability,
+            true
+        )
+    } catch (locException: IllegalArgumentException) {
+        throw GradleException("Invalid effective ResourceEndpoints while selecting cell '$aCell': ${locException.message}", locException)
     }
 }
 
@@ -1191,11 +1207,11 @@ fun AIcAlgitesSnapshotVersionForTechnology(aReleaseVersion: String, aTechnology:
     else -> "$aReleaseVersion-SNAPSHOT"
 }
 
-fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcdAlgitesResourceEndpoint, aProfiles: Map<String, AIcdAlgitesCredentialProfile>): Map<String, String> {
-    val locProfileId = aEndpoint.credentialProfile
-        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id}' requires a credentialProfile.")
+fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcResourceEndpointDefinition, aProfiles: Map<String, AIcdAlgitesCredentialProfile>): Map<String, String> {
+    val locProfileId = aEndpoint.credentialProfile()
+        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id()}' requires a credentialProfile.")
     val locProfile = aProfiles[locProfileId]
-        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id}' references undefined credential profile '$locProfileId'.")
+        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id()}' references undefined credential profile '$locProfileId'.")
     return when (locProfile.type) {
         "api_key" -> {
             val locApiKey = AIcAlgitesCredentialValue(locProfile, "ApiKey")
@@ -1210,7 +1226,7 @@ fun AIcAlgitesCloudsmithHeaders(aEndpoint: AIcdAlgitesResourceEndpoint, aProfile
             mapOf("Authorization" to "Bearer $locToken")
         }
         else -> throw GradleException(
-            "Cloudsmith manage endpoint '${aEndpoint.id}' uses credential type '${locProfile.type}'. " +
+            "Cloudsmith manage endpoint '${aEndpoint.id()}' uses credential type '${locProfile.type}'. " +
                 "The Cloudsmith management adapter supports 'api_key' and 'bearer'."
         )
     }
@@ -1278,13 +1294,13 @@ fun AIcAlgitesRepsyLoginUrl(aEndpointUrl: String): String {
 
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesRepsyHeaders(
-    aEndpoint: AIcdAlgitesResourceEndpoint,
+    aEndpoint: AIcResourceEndpointDefinition,
     aProfiles: Map<String, AIcdAlgitesCredentialProfile>
 ): Map<String, String> {
-    val locProfileId = aEndpoint.credentialProfile
-        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id}' requires a credentialProfile.")
+    val locProfileId = aEndpoint.credentialProfile()
+        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id()}' requires a credentialProfile.")
     val locProfile = aProfiles[locProfileId]
-        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id}' references undefined credential profile '$locProfileId'.")
+        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id()}' references undefined credential profile '$locProfileId'.")
     val locToken = when (locProfile.type) {
         "bearer" -> AIcAlgitesCredentialValue(locProfile, "Token")
             ?: throw GradleException("Credential profile '$locProfileId' does not provide required token.")
@@ -1293,22 +1309,22 @@ fun AIcAlgitesRepsyHeaders(
             val locLoginBody = JsonOutput.toJson(mapOf("username" to locUsername, "password" to locPassword))
             val (locStatus, locBody) = AIcAlgitesHttpJsonRequest(
                 "POST",
-                AIcAlgitesRepsyLoginUrl(aEndpoint.url),
+                AIcAlgitesRepsyLoginUrl(aEndpoint.url().toString()),
                 emptyMap(),
                 locLoginBody
             )
             if (locStatus !in 200..299) {
                 throw GradleException(
-                    "Repsy authentication failed for endpoint '${aEndpoint.id}' with HTTP $locStatus: $locBody"
+                    "Repsy authentication failed for endpoint '${aEndpoint.id()}' with HTTP $locStatus: $locBody"
                 )
             }
             val locParsed = JsonSlurper().parseText(locBody) as? Map<*, *>
             val locData = locParsed?.get("data") as? Map<*, *>
             locData?.get("token")?.toString()?.takeIf { it.isNotBlank() }
-                ?: throw GradleException("Repsy authentication response for endpoint '${aEndpoint.id}' did not contain data.token.")
+                ?: throw GradleException("Repsy authentication response for endpoint '${aEndpoint.id()}' did not contain data.token.")
         }
         else -> throw GradleException(
-            "Repsy manage endpoint '${aEndpoint.id}' uses credential type '${locProfile.type}'. " +
+            "Repsy manage endpoint '${aEndpoint.id()}' uses credential type '${locProfile.type}'. " +
                 "The Repsy management adapter supports 'basic' and 'bearer'."
         )
     }
@@ -1316,24 +1332,24 @@ fun AIcAlgitesRepsyHeaders(
 }
 
 fun AIcAlgitesDeleteRepsySnapshot(
-    aEndpoint: AIcdAlgitesResourceEndpoint,
+    aEndpoint: AIcResourceEndpointDefinition,
     aProfiles: Map<String, AIcdAlgitesCredentialProfile>,
     aPackageName: String,
     aVersion: String,
     aFormat: String,
     aGroupId: String?
 ): Int {
-    val locBaseUrl = aEndpoint.url.trimEnd('/')
+    val locBaseUrl = aEndpoint.url().toString().trimEnd('/')
     val locExpectedSuffix = when (aFormat.lowercase()) {
         "maven" -> "/api/mvn/artifacts/"
         "python" -> "/api/pypi/packages/"
         else -> throw GradleException(
-            "Repsy management adapter does not support package format '$aFormat' for endpoint '${aEndpoint.id}'."
+            "Repsy management adapter does not support package format '$aFormat' for endpoint '${aEndpoint.id()}'."
         )
     }
     if (!locBaseUrl.contains(locExpectedSuffix)) {
         throw GradleException(
-            "Repsy manage endpoint '${aEndpoint.id}' URL '$locBaseUrl' must identify the configured repository using " +
+            "Repsy manage endpoint '${aEndpoint.id()}' URL '$locBaseUrl' must identify the configured repository using " +
                 "'$locExpectedSuffix<repoName>' for format '$aFormat'."
         )
     }
@@ -1353,7 +1369,7 @@ fun AIcAlgitesDeleteRepsySnapshot(
         locStatus in 200..299 -> 1
         locStatus == 404 -> 0
         else -> throw GradleException(
-            "Repsy package deletion failed for '$aPackageName/$aVersion' at endpoint '${aEndpoint.id}' " +
+            "Repsy package deletion failed for '$aPackageName/$aVersion' at endpoint '${aEndpoint.id()}' " +
                 "with HTTP $locStatus: $locBody"
         )
     }
@@ -1361,14 +1377,14 @@ fun AIcAlgitesDeleteRepsySnapshot(
 
 @Suppress("UNCHECKED_CAST")
 fun AIcAlgitesDeleteCloudsmithSnapshot(
-    aEndpoint: AIcdAlgitesResourceEndpoint,
+    aEndpoint: AIcResourceEndpointDefinition,
     aProfiles: Map<String, AIcdAlgitesCredentialProfile>,
     aPackageName: String,
     aVersionSelector: String,
     aVersionPrefix: Boolean,
     aFormat: String
 ): Int {
-    val locBaseUrl = aEndpoint.url.trimEnd('/') + "/"
+    val locBaseUrl = aEndpoint.url().toString().trimEnd('/') + "/"
     val locHeaders = AIcAlgitesCloudsmithHeaders(aEndpoint, aProfiles)
     val locVersionQuery = if (aVersionPrefix) {
         "version:^$aVersionSelector"
@@ -1383,7 +1399,7 @@ fun AIcAlgitesDeleteCloudsmithSnapshot(
         val locListUrl = "${locBaseUrl}?page_size=500&page=$locPage&query=$locEncodedQuery"
         val (locStatus, locBody) = AIcAlgitesHttpRequest("GET", locListUrl, locHeaders)
         if (locStatus !in 200..299) {
-            throw GradleException("Cloudsmith package lookup failed for endpoint '${aEndpoint.id}' with HTTP $locStatus: $locBody")
+            throw GradleException("Cloudsmith package lookup failed for endpoint '${aEndpoint.id()}' with HTTP $locStatus: $locBody")
         }
         val locParsed = JsonSlurper().parseText(locBody)
         val locItems = when (locParsed) {
@@ -1410,7 +1426,7 @@ fun AIcAlgitesDeleteCloudsmithSnapshot(
         val (locDeleteStatus, locDeleteBody) = AIcAlgitesHttpRequest("DELETE", "$locBaseUrl$locIdentifier/", locHeaders)
         if (locDeleteStatus !in setOf(204, 404)) {
             throw GradleException(
-                "Cloudsmith package deletion failed for '$aPackageName/$locVersion' at endpoint '${aEndpoint.id}' " +
+                "Cloudsmith package deletion failed for '$aPackageName/$locVersion' at endpoint '${aEndpoint.id()}' " +
                     "with HTTP $locDeleteStatus: $locDeleteBody"
             )
         }
@@ -2299,21 +2315,21 @@ val locAlgitesRequiredCredentialsPlan = run {
             if (locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@resourceEndpointCellLoop
 
             AIcAlgitesResourceEndpoints(aMetadata["resourceEndpoints"], locCell).forEach resourceEndpointLoop@ { locEndpoint ->
-                val locStability = locEndpoint.stability ?: return@resourceEndpointLoop
+                val locStability = locEndpoint.stability()?.wireValue() ?: return@resourceEndpointLoop
                 if (locAction == "download" && locStability !in locDownloadStabilities) return@resourceEndpointLoop
                 if (locAction == "upload" && locStability !in locUploadStabilities) return@resourceEndpointLoop
                 if (locAction == "manage" && locStability !in locManageStabilities) return@resourceEndpointLoop
-                val locProfileId = locEndpoint.credentialProfile
+                val locProfileId = locEndpoint.credentialProfile()
                 val locProfile = if (locProfileId.isNullOrBlank()) null else locProfiles[locProfileId]
                     ?: throw GradleException(
-                        "ResourceEndpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
+                        "ResourceEndpoint '${locEndpoint.id()}' references undefined credential profile '$locProfileId'."
                     )
-                val locEndpointKey = "$aScope|$locCell|$locStability|${locEndpoint.id}"
+                val locEndpointKey = "$aScope|$locCell|$locStability|${locEndpoint.id()}"
                 locResourceEndpoints[locEndpointKey] = linkedMapOf(
                     "scope" to aScope,
                     "cell" to locCell,
                     "stability" to locStability,
-                    "id" to locEndpoint.id,
+                    "id" to locEndpoint.id(),
                     "credentialProfile" to locProfileId,
                     "credentialType" to locProfile?.type
                 )
@@ -2669,13 +2685,13 @@ subprojects {
 
                     locEndpoints.forEach { locEndpoint ->
                         maven {
-                            name = locEndpoint.id.replace('-', '_')
-                            url = uri(locEndpoint.url)
-                            val locProfileId = locEndpoint.credentialProfile
+                            name = locEndpoint.id().replace('-', '_')
+                            url = uri(locEndpoint.url().toString())
+                            val locProfileId = locEndpoint.credentialProfile()
                             if (!locProfileId.isNullOrBlank() && !algitesCredentialPreflight) {
                                 val locProfile = locEffectiveCredentialProfiles[locProfileId]
                                     ?: throw GradleException(
-                                        "Repository endpoint '${locEndpoint.id}' references undefined credential profile '$locProfileId'."
+                                        "Repository endpoint '${locEndpoint.id()}' references undefined credential profile '$locProfileId'."
                                     )
                                 when (locProfile.type) {
                                     "basic" -> {
@@ -2712,7 +2728,7 @@ subprojects {
                                         authentication { create<HttpHeaderAuthentication>("header") }
                                     }
                                     else -> throw GradleException(
-                                        "Java/Maven upload endpoint '${locEndpoint.id}' uses credential type '${locProfile.type}', " +
+                                        "Java/Maven upload endpoint '${locEndpoint.id()}' uses credential type '${locProfile.type}', " +
                                             "which is not supported by the Java/Maven repository adapter."
                                     )
                                 }
@@ -2831,9 +2847,9 @@ subprojects {
             "python.native_build_output.private.download"
         ).flatMap { locCell -> AIcAlgitesResourceEndpoints(locEffectiveResourceEndpoints, locCell) }
         val locPythonDownloadEndpointDefinitions = locPythonDownloadEndpoints.map { locEndpoint ->
-            val locProfileId = locEndpoint.credentialProfile.orEmpty()
+            val locProfileId = locEndpoint.credentialProfile().orEmpty()
             val locProfileType = if (locProfileId.isBlank()) "" else locEffectiveCredentialProfiles[locProfileId]?.type.orEmpty()
-            listOf(locEndpoint.id, locEndpoint.url, locProfileId, locProfileType).joinToString("\t")
+            listOf(locEndpoint.id(), locEndpoint.url().toString(), locProfileId, locProfileType).joinToString("\t")
         }
 
         val locResolvePythonDependencies = tasks.register<AIcResolvePythonDependenciesTask>("resolvePythonDependencies") {
@@ -3064,9 +3080,9 @@ subprojects {
         val locPythonPublishCell = "python.native_build_output.$algitesPublicationRepositoryVisibility.upload"
         val locPythonPublishEndpoints = AIcAlgitesResourceEndpoints(locEffectiveResourceEndpoints, locPythonPublishCell, locPythonPublishStability)
         val locPythonPublishEndpointDefinitions = locPythonPublishEndpoints.map { locEndpoint ->
-            val locProfileId = locEndpoint.credentialProfile.orEmpty()
+            val locProfileId = locEndpoint.credentialProfile().orEmpty()
             val locProfileType = if (locProfileId.isBlank()) "" else locEffectiveCredentialProfiles[locProfileId]?.type.orEmpty()
-            listOf(locEndpoint.id, locEndpoint.url, locProfileId, locProfileType).joinToString("\t")
+            listOf(locEndpoint.id(), locEndpoint.url().toString(), locProfileId, locProfileType).joinToString("\t")
         }
 
         val locPublishPython = tasks.register<AIcPublishPythonTask>("publishPython") {
@@ -3157,7 +3173,7 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
 
                 locEndpoints.forEach { locEndpoint ->
                     locConfiguredTargets++
-                    val locDeleted = when (locEndpoint.resourceEndpointProviderAdapter) {
+                    val locDeleted = when (locEndpoint.resourceEndpointProviderAdapter()) {
                         "cloudsmith" -> AIcAlgitesDeleteCloudsmithSnapshot(
                             locEndpoint,
                             locProfiles,
@@ -3185,14 +3201,14 @@ val algitesDeleteReleasedSnapshots = tasks.register("algitesDeleteReleasedSnapsh
                                 )
                             }
                         }
-                        null -> throw GradleException("Manage endpoint '${locEndpoint.id}' has no ResourceEndpointProviderAdapter.")
+                        null -> throw GradleException("Manage endpoint '${locEndpoint.id()}' has no ResourceEndpointProviderAdapter.")
                         else -> throw GradleException(
-                            "Manage endpoint '${locEndpoint.id}' uses unsupported ResourceEndpointProviderAdapter '${locEndpoint.resourceEndpointProviderAdapter}'."
+                            "Manage endpoint '${locEndpoint.id()}' uses unsupported ResourceEndpointProviderAdapter '${locEndpoint.resourceEndpointProviderAdapter()}'."
                         )
                     }
                     locDeletedPackages += locDeleted
                     logger.lifecycle(
-                        "Released-snapshot cleanup endpoint '${locEndpoint.id}': package=$locPackageName " +
+                        "Released-snapshot cleanup endpoint '${locEndpoint.id()}': package=$locPackageName " +
                             "versionSelector=${locSnapshotVersion}${if (locSnapshotVersionIsPrefix) "*" else ""} deleted=$locDeleted"
                     )
                 }
