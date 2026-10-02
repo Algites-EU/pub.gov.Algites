@@ -87,6 +87,12 @@ buildscript {
         }
     }
     dependencies {
+        /*
+         * Build-support artifacts share one Gradle buildscript classpath. Keep the Jackson family aligned with
+         * the version used by the current Defs Codegen bootstrap artifacts while published libraries retain
+         * their broader compatible 2.x ranges.
+         */
+        classpath(enforcedPlatform("com.fasterxml.jackson:jackson-bom:2.18.3"))
         classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.algitesbuild:1.0-SNAPSHOT")
         classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
         classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")

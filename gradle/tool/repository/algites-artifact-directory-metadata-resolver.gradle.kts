@@ -1398,6 +1398,17 @@ fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
     val locStack = mutableListOf<Pair<Int, String>>()
     val locListCounters = mutableMapOf<String, Int>()
 
+    fun locStoreValue(aPath: String, aRawValue: String) {
+        val locTrimmed = aRawValue.trim()
+        if (locTrimmed.startsWith("{") && locTrimmed.endsWith("}")) {
+            AIcParseYamlFlowMap(locTrimmed).forEach { (locKey, locValue) ->
+                locStoreValue("$aPath.$locKey", locValue)
+            }
+        } else {
+            locValues[aPath] = AIcUnquoteYamlScalar(locTrimmed)
+        }
+    }
+
     aFile.readLines(Charsets.UTF_8).forEach { locOriginalLine ->
         val locLine = AIcStripYamlComment(locOriginalLine)
         if (locLine.isBlank()) return@forEach
@@ -1437,7 +1448,7 @@ fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
                 val locRawValue = locItemText.substring(locSeparator + 1).trim()
                 val locPath = (locStack.map { it.second } + locKey).joinToString(".")
                 if (locRawValue.isEmpty()) locStack.add((locIndent + 2) to locKey)
-                else locValues[locPath] = AIcUnquoteYamlScalar(locRawValue)
+                else locStoreValue(locPath, locRawValue)
             } else {
                 if (locParentPath.isNotBlank()) {
                     val locItem = AIcUnquoteYamlScalar(locItemText)
@@ -1456,9 +1467,64 @@ fun AIcReadSimpleYamlScalars(aFile: File): Map<String, String> {
         val locRawValue = locTrimmed.substring(locSeparator + 1).trim()
         val locPath = (locStack.map { it.second } + locKey).joinToString(".")
         if (locRawValue.isEmpty()) locStack.add(locIndent to locKey)
-        else locValues[locPath] = AIcUnquoteYamlScalar(locRawValue)
+        else locStoreValue(locPath, locRawValue)
     }
     return locValues
+}
+
+
+fun AIcParseYamlFlowMap(aValue: String): Map<String, String> {
+    val locTrimmed = aValue.trim()
+    require(locTrimmed.startsWith("{") && locTrimmed.endsWith("}")) {
+        "YAML flow map must be enclosed in braces: '$aValue'."
+    }
+    val locContent = locTrimmed.substring(1, locTrimmed.length - 1).trim()
+    if (locContent.isBlank()) return emptyMap()
+
+    fun locSplitTopLevel(aText: String, aSeparator: Char): List<String> {
+        val locParts = mutableListOf<String>()
+        var locStart = 0
+        var locQuote: Char? = null
+        var locEscape = false
+        var locDepth = 0
+        aText.forEachIndexed { locIndex, locCharacter ->
+            if (locEscape) {
+                locEscape = false
+                return@forEachIndexed
+            }
+            if (locQuote != null) {
+                if (locQuote == '"' && locCharacter == '\\') {
+                    locEscape = true
+                } else if (locCharacter == locQuote) {
+                    locQuote = null
+                }
+                return@forEachIndexed
+            }
+            when (locCharacter) {
+                '\'', '"' -> locQuote = locCharacter
+                '[', '{', '(' -> locDepth++
+                ']', '}', ')' -> locDepth--
+                aSeparator -> if (locDepth == 0) {
+                    locParts.add(aText.substring(locStart, locIndex).trim())
+                    locStart = locIndex + 1
+                }
+            }
+        }
+        require(locQuote == null && locDepth == 0) {
+            "Malformed YAML flow value '$aText'."
+        }
+        locParts.add(aText.substring(locStart).trim())
+        return locParts.filter { locPart -> locPart.isNotBlank() }
+    }
+
+    return locSplitTopLevel(locContent, ',').associate { locEntry ->
+        val locParts = locSplitTopLevel(locEntry, ':')
+        require(locParts.size >= 2) { "Malformed YAML flow-map entry '$locEntry'." }
+        val locKey = AIcUnquoteYamlScalar(locParts.first().trim())
+        val locValue = locEntry.substringAfter(':').trim()
+        require(locKey.isNotBlank()) { "YAML flow-map entry '$locEntry' has a blank key." }
+        locKey to AIcUnquoteYamlScalar(locValue)
+    }
 }
 
 fun AIcParseYamlStringList(aValue: String): List<String> {
