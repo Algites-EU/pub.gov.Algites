@@ -10,7 +10,8 @@ It contains:
 - technology-neutral `PreparedSourceSet` plus portable build-output producer and production-plan contracts;
 - canonical versioned definitions in YAML-definition, JSON-definition and XML-definition source roots;
 - structured-data loading contracts for mapping YAML, JSON and XML documents to generated or handwritten data-object types;
-- strict global-publication user sidecars for canonical source definitions plus a separate deployment-owned metadata contract for published state.
+- strict global-publication user sidecars for canonical source definitions plus a separate deployment-owned metadata contract for published state;
+- Phase-6 publication endpoint-selection and deploy-state contracts for `docs_site` and `schema_site`.
 
 The dependency model uses `DependencyKind: modustro` for Modustro-controlled artifact references. Dependency/constraint groups use `ItemsInheritancePolicy` to control membership, while a surviving same-identity dependency always merge-composes its `Usages` and `RequiredBuildOutputTypes`; neither property participates in dependency identity. `VariantId` remains part of the dependency identity. Version scalars support explicit `null` clearing, and the hard `Exclude` collection has its own item-inheritance policy.
 
@@ -39,3 +40,7 @@ The generated ResourceEndpoint Java types are based on first-class canonical def
 `AInStructuredDataFormat` identifies the supported serialization family. Concrete loader implementations belong outside this public core-interface artifact. `AIcResourceEndpointCatalog` is the immutable effective endpoint view used by execution adapters after declaration resolution.
 
 No Gradle API type is part of this artifact's public or implementation dependencies.
+
+## Phase 6 publication contracts
+
+Phase 6 adds portable publication contracts without introducing storage-provider APIs into Builder Core. `AIcPublicationDestinationSelection` carries the effective `ResourceEndpoint` targets selected for one publication capability invocation. `AInGlobalPublicationState` and `AIcGlobalPublicationDeployMetadata` represent trusted deployment state independently from author-controlled sidecars. Canonical publication user/deploy metadata definitions and the Modustro publication capability configuration definitions are now included in definition-driven Java source generation so execution adapters can consume versioned generated DTOs rather than ad-hoc maps.

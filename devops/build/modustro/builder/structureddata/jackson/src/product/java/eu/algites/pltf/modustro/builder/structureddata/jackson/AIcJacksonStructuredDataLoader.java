@@ -1,6 +1,7 @@
 package eu.algites.pltf.modustro.builder.structureddata.jackson;
 
 import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationContext;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
@@ -106,6 +107,26 @@ public final class AIcJacksonStructuredDataLoader implements AIiStructuredDataLo
      * Jackson enum-name mapping does not match the serialized value.
      */
     private static final class AIcGeneratedEnumWireValueHandler extends DeserializationProblemHandler {
+
+        @Override
+        public boolean handleUnknownProperty(
+            DeserializationContext aContext,
+            JsonParser aParser,
+            com.fasterxml.jackson.databind.JsonDeserializer<?> aDeserializer,
+            Object aBeanOrClass,
+            String aPropertyName
+        ) throws IOException {
+            if (
+                "$schema".equals(aPropertyName)
+                    && aParser.getParsingContext() != null
+                    && aParser.getParsingContext().getParent() != null
+                    && aParser.getParsingContext().getParent().inRoot()
+            ) {
+                aParser.skipChildren();
+                return true;
+            }
+            return false;
+        }
 
         @Override
         public Object handleWeirdStringValue(

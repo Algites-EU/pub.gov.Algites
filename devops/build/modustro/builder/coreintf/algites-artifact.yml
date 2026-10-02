@@ -30,3 +30,19 @@ Artifact:
         Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/model/resource/resource-endpoint_1.yamldef.schema.json
         Targets: [java]
         Package: eu.algites.pltf.modustro.builder.model.resource
+      - SourceKind: yamldefs
+        Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.yamldef.schema.json
+        Targets: [java]
+        Package: eu.algites.pltf.modustro.builder.publication
+      - SourceKind: yamldefs
+        Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-deploy-metadata_1.yamldef.schema.json
+        Targets: [java]
+        Package: eu.algites.pltf.modustro.builder.publication
+      - SourceKind: yamldefs
+        Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/model/capability/configuration/modustro/publication-of-docs-site_1.yamldef.schema.json
+        Targets: [java]
+        Package: eu.algites.pltf.modustro.builder.model.capability.configuration.modustro
+      - SourceKind: yamldefs
+        Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/model/capability/configuration/modustro/publication-of-global-schemas_1.yamldef.schema.json
+        Targets: [java]
+        Package: eu.algites.pltf.modustro.builder.model.capability.configuration.modustro

@@ -37,3 +37,7 @@ Phase 5.1B adds the effective ResourceEndpoint pipeline:
 
 The optional `builder/structureddata/jackson` artifact supplies YAML/JSON/XML representation mapping without putting Jackson on the core/bootstrap dependency path.
 
+
+## Phase 6 publication services
+
+Phase 6 adds Gradle-independent publication services. `AIcPublicationDestinationResolver` resolves optional `PublicationDestinations` against the effective ResourceEndpoint catalog and rejects ids outside the requested `modustro / ResourceKind / visibility / upload / Stability` context. `AIcGlobalPublicationPathValidator` enforces the canonical path contract at the publication trust boundary, and `AIcGlobalPublicationDeployMetadataResolver` owns draft revision advancement, draft-to-release transition, and released-content immutability. Storage/provider adapters remain outside Builder Core.
