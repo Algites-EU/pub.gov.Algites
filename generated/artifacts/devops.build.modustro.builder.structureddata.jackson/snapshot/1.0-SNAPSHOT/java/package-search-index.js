@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"eu.algites.pltf.modustro.builder.structureddata.jackson"}];updateSearchResults();

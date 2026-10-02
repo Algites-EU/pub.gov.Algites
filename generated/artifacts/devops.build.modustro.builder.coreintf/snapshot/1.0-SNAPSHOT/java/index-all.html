@@ -190,7 +190,7 @@ loadScripts(document, 'script');</script>
 </dd>
 <dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcgdResourceEndpoint_1.html" class="type-name-link" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcgdResourceEndpoint_1</a> - Record Class in <a href="eu/algites/pltf/modustro/builder/model/resource/package-summary.html">eu.algites.pltf.modustro.builder.model.resource</a></dt>
 <dd>
-<div class="block">Defines one external resource endpoint before inheritance/default resolution.</div>
+<div class="block">Defines one ResourceEndpoint declaration before inheritance/default resolution.</div>
 </dd>
 <dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcgdResourceEndpoint_1.html#%3Cinit%3E(java.lang.String,java.lang.String,eu.algites.pltf.modustro.builder.model.resource.AIngResourceEndpointVisibility_1,eu.algites.pltf.modustro.builder.model.resource.AIngResourceEndpointAction_1,java.lang.String,java.lang.String,java.lang.String,java.lang.Boolean,eu.algites.pltf.modustro.builder.model.resource.AIngResourceStability_1,java.lang.String)" class="member-name-link">AIcgdResourceEndpoint_1(String, String, AIngResourceEndpointVisibility_1, AIngResourceEndpointAction_1, String, String, String, Boolean, AIngResourceStability_1, String)</a> - Constructor for record class eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIcgdResourceEndpoint_1.html" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcgdResourceEndpoint_1</a></dt>
 <dd>
@@ -211,6 +211,14 @@ loadScripts(document, 'script');</script>
 <dt><a href="eu/algites/pltf/modustro/builder/model/source/AIcPreparedSourceSet.html#%3Cinit%3E(java.lang.String,java.util.List,java.util.List,java.util.List)" class="member-name-link">AIcPreparedSourceSet(String, List&lt;String&gt;, List&lt;String&gt;, List&lt;String&gt;)</a> - Constructor for class eu.algites.pltf.modustro.builder.model.source.<a href="eu/algites/pltf/modustro/builder/model/source/AIcPreparedSourceSet.html" title="class in eu.algites.pltf.modustro.builder.model.source">AIcPreparedSourceSet</a></dt>
 <dd>
 <div class="block">Creates an <code>AIcPreparedSourceSet</code> instance.</div>
+</dd>
+<dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html" class="type-name-link" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcResourceEndpointCatalog</a> - Class in <a href="eu/algites/pltf/modustro/builder/model/resource/package-summary.html">eu.algites.pltf.modustro.builder.model.resource</a></dt>
+<dd>
+<div class="block">Immutable catalog of effective ResourceEndpoint definitions.</div>
+</dd>
+<dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html#%3Cinit%3E(java.lang.Iterable)" class="member-name-link">AIcResourceEndpointCatalog(Iterable&lt;AIcResourceEndpointDefinition&gt;)</a> - Constructor for class eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcResourceEndpointCatalog</a></dt>
+<dd>
+<div class="block">Creates an immutable catalog.</div>
 </dd>
 <dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointDefinition.html" class="type-name-link" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcResourceEndpointDefinition</a> - Class in <a href="eu/algites/pltf/modustro/builder/model/resource/package-summary.html">eu.algites.pltf.modustro.builder.model.resource</a></dt>
 <dd>
@@ -348,6 +356,10 @@ loadScripts(document, 'script');</script>
 <dd>
 <div class="block">Creates a model-validation exception with the supplied message.</div>
 </dd>
+<dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html#all()" class="member-name-link">all()</a> - Method in class eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcResourceEndpointCatalog</a></dt>
+<dd>
+<div class="block">Returns all effective endpoints in deterministic declaration order.</div>
+</dd>
 <dt><a href="eu/algites/pltf/modustro/builder/model/capability/AIcCapabilityDefinition.html#allowedScopes()" class="member-name-link">allowedScopes()</a> - Method in class eu.algites.pltf.modustro.builder.model.capability.<a href="eu/algites/pltf/modustro/builder/model/capability/AIcCapabilityDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDefinition</a></dt>
 <dd>
 <div class="block">Returns the scopes in which this capability may be configured.</div>
@@ -386,6 +398,10 @@ loadScripts(document, 'script');</script>
 <dt><a href="eu/algites/pltf/modustro/builder/model/technology/AIcTechnologyKindDefinition.html#buildOutputTypes()" class="member-name-link">buildOutputTypes()</a> - Method in class eu.algites.pltf.modustro.builder.model.technology.<a href="eu/algites/pltf/modustro/builder/model/technology/AIcTechnologyKindDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.technology">AIcTechnologyKindDefinition</a></dt>
 <dd>
 <div class="block">Returns BuildOutputTypes defined for this TechnologyKind.</div>
+</dd>
+<dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html#byId(java.lang.String)" class="member-name-link">byId(String)</a> - Method in class eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcResourceEndpointCatalog</a></dt>
+<dd>
+<div class="block">Resolves one effective endpoint by its globally stable identifier.</div>
 </dd>
 </dl>
 <h2 class="title" id="I:C">C</h2>
@@ -437,6 +453,10 @@ loadScripts(document, 'script');</script>
 <dt><a href="eu/algites/pltf/modustro/builder/model/capability/AIcCapabilityDemandKey.html#capabilityId()" class="member-name-link">capabilityId()</a> - Method in class eu.algites.pltf.modustro.builder.model.capability.<a href="eu/algites/pltf/modustro/builder/model/capability/AIcCapabilityDemandKey.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandKey</a></dt>
 <dd>
 <div class="block">Returns the capability identifier.</div>
+</dd>
+<dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointDefinition.html#cell()" class="member-name-link">cell()</a> - Method in class eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointDefinition.html" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcResourceEndpointDefinition</a></dt>
+<dd>
+<div class="block">Returns the canonical four-dimensional ResourceEndpoint cell identifier.</div>
 </dd>
 <dt><a href="eu/algites/pltf/modustro/builder/model/inheritance/AIcInheritedValue.html#clear()" class="member-name-link">clear()</a> - Static method in class eu.algites.pltf.modustro.builder.model.inheritance.<a href="eu/algites/pltf/modustro/builder/model/inheritance/AIcInheritedValue.html" title="class in eu.algites.pltf.modustro.builder.model.inheritance">AIcInheritedValue</a></dt>
 <dd>
@@ -972,6 +992,10 @@ loadScripts(document, 'script');</script>
 <dt><a href="eu/algites/pltf/modustro/builder/model/capability/AIcCapabilityDemandKey.html#scopeIdentity()" class="member-name-link">scopeIdentity()</a> - Method in class eu.algites.pltf.modustro.builder.model.capability.<a href="eu/algites/pltf/modustro/builder/model/capability/AIcCapabilityDemandKey.html" title="class in eu.algites.pltf.modustro.builder.model.capability">AIcCapabilityDemandKey</a></dt>
 <dd>
 <div class="block">Returns the stable identity of the concrete scope instance.</div>
+</dd>
+<dt><a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html#select(java.lang.String,java.lang.String,java.lang.String,eu.algites.pltf.modustro.builder.model.resource.AInResourceEndpointAction,eu.algites.pltf.modustro.builder.model.resource.AInResourceStability,boolean)" class="member-name-link">select(String, String, String, AInResourceEndpointAction, AInResourceStability, boolean)</a> - Method in class eu.algites.pltf.modustro.builder.model.resource.<a href="eu/algites/pltf/modustro/builder/model/resource/AIcResourceEndpointCatalog.html" title="class in eu.algites.pltf.modustro.builder.model.resource">AIcResourceEndpointCatalog</a></dt>
+<dd>
+<div class="block">Selects endpoints matching one effective resource-operation context.</div>
 </dd>
 <dt><a href="eu/algites/pltf/modustro/builder/model/dependency/resolution/AIcDependencyResolutionDiagnostic.html#severity()" class="member-name-link">severity()</a> - Method in class eu.algites.pltf.modustro.builder.model.dependency.resolution.<a href="eu/algites/pltf/modustro/builder/model/dependency/resolution/AIcDependencyResolutionDiagnostic.html" title="class in eu.algites.pltf.modustro.builder.model.dependency.resolution">AIcDependencyResolutionDiagnostic</a></dt>
 <dd>

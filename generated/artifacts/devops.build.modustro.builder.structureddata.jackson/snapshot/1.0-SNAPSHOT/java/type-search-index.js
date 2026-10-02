@@ -1,0 +1,1 @@
+typeSearchIndex = [{"p":"eu.algites.pltf.modustro.builder.structureddata.jackson","l":"AIcJacksonStructuredDataLoader"},{"l":"All Classes and Interfaces","u":"allclasses-index.html"}];updateSearchResults();
