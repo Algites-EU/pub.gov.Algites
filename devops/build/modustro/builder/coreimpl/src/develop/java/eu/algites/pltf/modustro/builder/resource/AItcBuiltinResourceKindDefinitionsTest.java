@@ -29,7 +29,7 @@ public final class AItcBuiltinResourceKindDefinitionsTest {
         AIcResourceEndpointValidator locValidator = AIcResourceEndpointValidator.builtin();
         locValidator.validate(
             new AIcResourceEndpointDefinition(
-                "java", "native_build_output", "public", AInResourceEndpointAction.UPLOAD,
+                "java", "native_binary_output", "public", AInResourceEndpointAction.UPLOAD,
                 "algites-java-native-build-output-public-snapshot-upload",
                 new URI("https://example.invalid/maven/"), null, true, AInResourceStability.SNAPSHOT, null
             )
@@ -53,4 +53,21 @@ public final class AItcBuiltinResourceKindDefinitionsTest {
             )
         );
     }
+    /**
+     * Verifies the complete Phase-5.2 built-in output/resource-kind catalog.
+     */
+    @Test
+    public void AIcExposesPhase52PublishingResourceKinds() {
+        Assert.assertEquals(
+            AIcBuiltinResourceKindDefinitions.all().stream().map(locDefinition -> locDefinition.resourceKind()).toList(),
+            java.util.List.of(
+                "native_binary_output",
+                "native_source_output",
+                "native_documentation_output",
+                "modustro_docs_site",
+                "schema_site"
+            )
+        );
+    }
+
 }

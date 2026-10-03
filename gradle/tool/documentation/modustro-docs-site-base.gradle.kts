@@ -1,0 +1,1718 @@
+/*
+ * Modustro Builder shared documentation site base script.
+ *
+ * Intended location in governance repository:
+ *   gradle/tool/documentation/modustro-docs-site-base.gradle.kts
+ *
+ * This script defines common documentation-site conventions and a stable root
+ * index. Technology-specific scripts should apply this script automatically.
+ */
+
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayload
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayloadFile
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingStabilityConfiguration
+import eu.algites.pltf.modustro.builder.model.publication.AInPublishingOutputKind
+import eu.algites.pltf.modustro.builder.model.publication.AInPublishingStability
+import org.gradle.api.Action
+import org.gradle.api.DefaultTask
+import org.gradle.api.Task
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.TaskAction
+import java.time.Instant
+
+abstract class AIcPrepareModustroDocsPublishingTask : DefaultTask() {
+    @get:Input
+    abstract val publicationKind: Property<String>
+
+    @get:Input
+    abstract val publicationId: Property<String>
+
+    @get:Input
+    abstract val technologyKinds: Property<String>
+
+    @get:Internal
+    abstract val artifactDocsRoot: DirectoryProperty
+
+    @get:Internal
+    abstract val publicationsDocsRoot: DirectoryProperty
+
+    @TaskAction
+    fun AIcPrepare() {
+        val locPublicationKind = publicationKind.get()
+        val locPublicationId = publicationId.get()
+
+        artifactDocsRoot.get().asFile.listFiles()
+            ?.filter { locArtifactDirectory -> locArtifactDirectory.isDirectory }
+            ?.forEach { locArtifactDirectory ->
+                File(locArtifactDirectory, "$locPublicationKind/$locPublicationId").deleteRecursively()
+            }
+
+        File(publicationsDocsRoot.get().asFile, "$locPublicationKind/$locPublicationId").deleteRecursively()
+    }
+}
+
+apply(plugin = "base")
+
+if (!rootProject.extra.has("modustroResolveSourceRootFiles")) {
+    val locAlgitesSourceRootResolverScript = rootProject.file("gradle/tool/repository/modustro-source-root-resolver.gradle.kts")
+    if (locAlgitesSourceRootResolverScript.isFile) {
+        apply(from = locAlgitesSourceRootResolverScript)
+    } else {
+        apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-source-root-resolver.gradle.kts"))
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsResolveSourceRootFiles = rootProject.extra["modustroResolveSourceRootFiles"] as
+    (File, String, String) -> List<File>
+
+val locAlgitesRepositoryMetadataResolverScript = (findProperty("modustro.docs.repositoryMetadataResolverScript") as String?)
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts"
+
+apply(from = uri(locAlgitesRepositoryMetadataResolverScript))
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsResolvedMetadata = rootProject.extra.properties["modustroResolvedArtifactDirectoryMetadata"] as? Map<String, Any?>
+    ?: run {
+        val locAlgitesResolveMetadataMap = extra.properties["modustroResolveArtifactDirectoryMetadataMap"] as? (
+            File,
+            String?,
+            String?,
+            String?,
+            String?
+        ) -> Map<String, Any?>
+            ?: error("Modustro Builder artifact directory metadata resolver did not export modustroResolvedArtifactDirectoryMetadata or modustroResolveArtifactDirectoryMetadataMap.")
+
+        locAlgitesResolveMetadataMap(
+            rootProject.projectDir,
+            "",
+            "current-with-subdirs",
+            providers.gradleProperty("repository.name").orNull,
+            providers.gradleProperty("repository.visibility").orNull
+        )
+    }
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsResolvedMetadataPropertiesRaw = rootProject.extra.properties["modustroResolvedArtifactDirectoryMetadataProperties"] as? Map<String, String>
+    ?: run {
+        val locAlgitesFlattenMetadata = extra.properties["modustroFlattenArtifactDirectoryMetadata"] as? (Map<String, Any?>) -> Map<String, String>
+            ?: error("Modustro Builder artifact directory metadata resolver did not export modustroResolvedArtifactDirectoryMetadataProperties or modustroFlattenArtifactDirectoryMetadata.")
+
+        locAlgitesFlattenMetadata(locAlgitesDocsResolvedMetadata)
+    }
+
+fun AIcDocsReadDottedProperties(aText: String): Map<String, String?> {
+    return aText.lineSequence()
+        .map { locLine -> locLine.trim() }
+        .filter { locLine -> locLine.isNotBlank() && !locLine.startsWith("#") }
+        .mapNotNull { locLine ->
+            val locSeparatorIndex = locLine.indexOf('=')
+            if (locSeparatorIndex < 0) {
+                null
+            } else {
+                val locKey = locLine.substring(0, locSeparatorIndex).trim()
+                val locValue = locLine.substring(locSeparatorIndex + 1).trim()
+                locKey to locValue.takeIf { it != "null" }
+            }
+        }
+        .toMap()
+}
+
+fun AIcDocsReadDescriptorHierarchy(aProperties: Map<String, String?>, aArtifactIndex: Int): String {
+    val locPrefix = "artifactDirectories.$aArtifactIndex.descriptorHierarchy"
+    val locCount = aProperties["$locPrefix.count"]?.toIntOrNull() ?: 0
+    return (0 until locCount).joinToString("\u001e") { locDescriptorIndex ->
+        listOf(
+            aProperties["$locPrefix.$locDescriptorIndex.structureKind"] ?: "",
+            aProperties["$locPrefix.$locDescriptorIndex.path"] ?: "",
+            aProperties["$locPrefix.$locDescriptorIndex.sha256"] ?: ""
+        ).joinToString("\u001f")
+    }
+}
+
+fun AIcDocsReadArtifactDirectories(aProperties: Map<String, String?>): List<Map<String, String?>> {
+    val locCount = aProperties["artifactDirectories.count"]?.toIntOrNull() ?: 0
+    return (0 until locCount).map { locIndex ->
+        mapOf(
+            "path" to aProperties["artifactDirectories.${locIndex}.path"],
+            "structureKind" to aProperties["artifactDirectories.${locIndex}.structureKind"],
+            "technologyKinds" to aProperties["artifactDirectories.${locIndex}.technologyKinds"],
+            "name" to aProperties["artifactDirectories.${locIndex}.name"],
+            "description" to aProperties["artifactDirectories.${locIndex}.description"],
+            "groupId" to aProperties["artifactDirectories.${locIndex}.groupId"],
+            "contentsModel" to aProperties["artifactDirectories.${locIndex}.contentsModel"],
+            "hasGradleBuild" to aProperties["artifactDirectories.${locIndex}.hasGradleBuild"],
+            "gradleProjectPath" to aProperties["artifactDirectories.${locIndex}.gradleProjectPath"],
+            "descriptorHierarchy" to AIcDocsReadDescriptorHierarchy(aProperties, locIndex),
+            "version.lane" to aProperties["artifactDirectories.${locIndex}.version.lane"],
+            "version.revision" to aProperties["artifactDirectories.${locIndex}.version.revision"],
+            "version.qualifierKind" to aProperties["artifactDirectories.${locIndex}.version.qualifierKind"],
+            "version.resolvedValue" to aProperties["artifactDirectories.${locIndex}.version.resolvedValue"]
+        )
+    }
+}
+
+val locAlgitesDocsResolvedMetadataProperties = locAlgitesDocsResolvedMetadataPropertiesRaw
+    .mapValues { locEntry -> locEntry.value.takeIf { it != "null" } }
+val locAlgitesDocsResolvedArtifactDirectories = AIcDocsReadArtifactDirectories(locAlgitesDocsResolvedMetadataProperties)
+val locAlgitesDocsResolvedRepositoryId = locAlgitesDocsResolvedMetadataProperties["repository.id"] ?: rootProject.name
+val locAlgitesDocsResolvedRepositoryName = locAlgitesDocsResolvedMetadataProperties["repository.name"] ?: locAlgitesDocsResolvedRepositoryId
+val locAlgitesDocsResolvedRepositoryVisibility = locAlgitesDocsResolvedMetadataProperties["repository.visibility"] ?: ""
+
+val locAlgitesPublicationScript = rootProject.file("gradle/tool/publication/modustro-publication.gradle.kts")
+if (locAlgitesPublicationScript.isFile) {
+    apply(from = locAlgitesPublicationScript)
+} else {
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/publication/modustro-publication.gradle.kts"))
+}
+
+extra["modustroDocsResolvedMetadataProperties"] = locAlgitesDocsResolvedMetadataProperties
+extra["modustroDocsResolvedArtifactDirectories"] = locAlgitesDocsResolvedArtifactDirectories
+extra["modustroDocsResolvedRepositoryId"] = locAlgitesDocsResolvedRepositoryId
+extra["modustroDocsResolvedRepositoryName"] = locAlgitesDocsResolvedRepositoryName
+extra["modustroDocsResolvedRepositoryVisibility"] = locAlgitesDocsResolvedRepositoryVisibility
+
+fun AIcDocsTechnologyKinds(aValue: String?): Set<String> {
+    return aValue
+        ?.split(',')
+        ?.map { locValue -> locValue.trim().lowercase() }
+        ?.filter { locValue -> locValue.isNotBlank() }
+        ?.toSet()
+        ?: emptySet()
+}
+
+val locAlgitesDocsSupportedTechnologyKinds = setOf("java", "python", "mps")
+val locAlgitesDocsDeclaredTechnologyKinds = locAlgitesDocsResolvedArtifactDirectories
+    .flatMap { locArtifactDirectory -> AIcDocsTechnologyKinds(locArtifactDirectory["technologyKinds"]) }
+    .toSet()
+val locAlgitesDocsRequestedTechnologyKinds = (
+    (findProperty("algites.technologyKinds") as String?)
+        ?: System.getenv("ALGITES_TECHNOLOGY_KINDS")
+)
+    ?.let(::AIcDocsTechnologyKinds)
+    ?: emptySet()
+
+val locAlgitesDocsUnsupportedRequestedTechnologyKinds =
+    locAlgitesDocsRequestedTechnologyKinds - locAlgitesDocsSupportedTechnologyKinds
+require(locAlgitesDocsUnsupportedRequestedTechnologyKinds.isEmpty()) {
+    "Unsupported documentation TechnologyKind selection: ${locAlgitesDocsUnsupportedRequestedTechnologyKinds.sorted().joinToString(", ")}. " +
+        "Supported values: ${locAlgitesDocsSupportedTechnologyKinds.sorted().joinToString(", ")}."
+}
+
+val locAlgitesDocsEffectiveTechnologyKinds = if (locAlgitesDocsRequestedTechnologyKinds.isEmpty()) {
+    locAlgitesDocsDeclaredTechnologyKinds
+} else {
+    locAlgitesDocsDeclaredTechnologyKinds.intersect(locAlgitesDocsRequestedTechnologyKinds)
+}
+
+fun AIcDocsGitValue(vararg aArguments: String): String? {
+    return try {
+        val locExecOutput = providers.exec {
+            workingDir(rootProject.projectDir)
+            commandLine(listOf("git") + aArguments)
+            isIgnoreExitValue = true
+        }
+        val locResult = locExecOutput.result.get()
+        val locOutput = locExecOutput.standardOutput.asText.get().trim()
+        if (locResult.exitValue == 0) locOutput.takeIf { it.isNotBlank() } else null
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsExistingPublicationMetadata =
+    rootProject.extra.properties["modustroDocsPublishingMetadata"] as? Map<String, String>
+
+val locAlgitesDocsSourceRef = locAlgitesDocsExistingPublicationMetadata?.get("documentation.sourceRef")
+    ?: (findProperty("modustro.docs.sourceRef") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    ?: System.getenv("ALGITES_DOCS_SOURCE_REF")?.trim()?.takeIf { it.isNotBlank() }
+    ?: System.getenv("GITHUB_REF_NAME")?.trim()?.takeIf { it.isNotBlank() }
+    ?: AIcDocsGitValue("branch", "--show-current")
+    ?: AIcDocsGitValue("rev-parse", "--abbrev-ref", "HEAD")
+    ?: "unknown"
+val locAlgitesDocsSourceCommit = locAlgitesDocsExistingPublicationMetadata?.get("documentation.sourceCommit")
+    ?: (findProperty("modustro.docs.sourceCommit") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    ?: System.getenv("ALGITES_DOCS_SOURCE_COMMIT")?.trim()?.takeIf { it.isNotBlank() }
+    ?: System.getenv("GITHUB_SHA")?.trim()?.takeIf { it.isNotBlank() }
+    ?: AIcDocsGitValue("rev-parse", "HEAD")
+    ?: "unknown"
+val locAlgitesDocsGeneratedAt = locAlgitesDocsExistingPublicationMetadata?.get("documentation.generatedAt")
+    ?: (findProperty("modustro.docs.generatedAt") as String?)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+    ?: System.getenv("ALGITES_DOCS_GENERATED_AT")?.trim()?.takeIf { it.isNotBlank() }
+    ?: Instant.now().toString()
+
+val locAlgitesDocsPublicationMetadata = mapOf(
+    "documentation.sourceRef" to locAlgitesDocsSourceRef,
+    "documentation.sourceCommit" to locAlgitesDocsSourceCommit,
+    "documentation.generatedAt" to locAlgitesDocsGeneratedAt
+)
+
+extra["modustroDocsDeclaredTechnologyKinds"] = locAlgitesDocsDeclaredTechnologyKinds
+extra["modustroDocsRequestedTechnologyKinds"] = locAlgitesDocsRequestedTechnologyKinds
+extra["modustroDocsEffectiveTechnologyKinds"] = locAlgitesDocsEffectiveTechnologyKinds
+extra["modustroDocsPublishingMetadata"] = locAlgitesDocsPublicationMetadata
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsTechnologyTaskNames =
+    (rootProject.extra.properties["modustroDocsTechnologyTaskNames"] as? MutableSet<String>)
+        ?: linkedSetOf<String>().also { rootProject.extra["modustroDocsTechnologyTaskNames"] = it }
+
+logger.lifecycle(
+    "Modustro documentation TechnologyKinds: declared=${locAlgitesDocsDeclaredTechnologyKinds.sorted()}, " +
+        "requested=${if (locAlgitesDocsRequestedTechnologyKinds.isEmpty()) "<all declared>" else locAlgitesDocsRequestedTechnologyKinds.sorted()}, " +
+        "effective=${locAlgitesDocsEffectiveTechnologyKinds.sorted()}"
+)
+
+
+val locDocsSiteRoot = layout.projectDirectory.dir(
+    (findProperty("modustro.docs.siteRoot") as String?) ?: "build/run/bld/algites-docs/site"
+)
+
+/*
+ * Generated documentation is always placed below the documentation site root.
+ * Technology-specific scripts should generate into locPublicationDocsRoot, not
+ * directly into locGeneratedDocsRoot.
+ */
+val locGeneratedDocsRoot = locDocsSiteRoot.dir("generated")
+val locArtifactDocsRoot = locGeneratedDocsRoot.dir("artifacts")
+val locPublicationsDocsRoot = locGeneratedDocsRoot.dir("publications")
+
+val locPublicationKind = (findProperty("modustro.docs.publicationKind") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+
+val locPublicationId = (findProperty("modustro.docs.publicationId") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+
+val locPublicationDocsRoot = if (locPublicationKind != null && locPublicationId != null) {
+    locPublicationsDocsRoot.dir("${locPublicationKind}/${locPublicationId}")
+} else {
+    locPublicationsDocsRoot
+}
+
+
+extra["modustroDocsSiteRootPath"] = locDocsSiteRoot.asFile.path
+extra["modustroGeneratedDocsRootPath"] = locGeneratedDocsRoot.asFile.path
+extra["modustroArtifactDocsRootPath"] = locArtifactDocsRoot.asFile.path
+extra["modustroPublishingsDocsRootPath"] = locPublicationsDocsRoot.asFile.path
+extra["modustroPublishingDocsRootPath"] = locPublicationDocsRoot.asFile.path
+extra["modustroDocsPublishingKind"] = locPublicationKind
+extra["modustroDocsPublishingId"] = locPublicationId
+
+val locAlgitesDocsEffectivePublicationKind = locPublicationKind ?: "generated"
+val locAlgitesDocsEffectivePublicationId = locPublicationId ?: "current"
+
+@Suppress("UNCHECKED_CAST")
+val locResolveDocsPublishingPlan = rootProject.extra["modustroResolvePublishingPlan"] as (
+    Map<String, Any?>,
+    String,
+    String,
+    List<String>
+) -> Map<String, Any?>
+@Suppress("UNCHECKED_CAST")
+val locDocsRepositoryMetadata = locAlgitesDocsResolvedMetadata["repository"] as? Map<String, Any?> ?: emptyMap()
+val locDocsPublicationDestinationIds = (findProperty("modustro.docs.publicationDestinations") as String?)
+    ?.split(',')
+    ?.map(String::trim)
+    ?.filter(String::isNotBlank)
+    ?: emptyList()
+val locDocsPublicationStability = when (locAlgitesDocsEffectivePublicationKind.lowercase()) {
+    "release" -> "release"
+    "preview", "snapshot", "generated" -> "snapshot"
+    else -> throw GradleException("Unsupported Modustro documentation publication kind '$locAlgitesDocsEffectivePublicationKind'.")
+}
+val locDocsPublishingPlan = locResolveDocsPublishingPlan(
+    locDocsRepositoryMetadata,
+    "modustro_docs_site",
+    locDocsPublicationStability,
+    locDocsPublicationDestinationIds
+)
+@Suppress("UNCHECKED_CAST")
+val locDocsPublishingEndpoints = (locDocsPublishingPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+extra["modustroDocsPublishingEndpoints"] = locDocsPublishingEndpoints
+val locDocsHasPublishingEndpoints =
+    (locDocsPublishingPlan["publishingEnabled"] as? Boolean ?: false) && locDocsPublishingEndpoints.isNotEmpty()
+
+val locDocsPublicationSelectionFile = locDocsSiteRoot.file(".modustro-publishing/docs-site.properties")
+if (tasks.findByName("writeModustroDocsPublishingSelection") == null) {
+    tasks.register("writeModustroDocsPublishingSelection") {
+        group = "modustro"
+        description = "Writes the effective modustro_docs_site PublishingEndpoint selection for the deployment adapter."
+        outputs.file(locDocsPublicationSelectionFile)
+        doLast {
+            val locOutput = locDocsPublicationSelectionFile.asFile
+            locOutput.parentFile.mkdirs()
+            val locEndpoints = locDocsPublishingEndpoints
+            val locLines = mutableListOf(
+                "outputKind=modustro_docs_site",
+                "stability=$locDocsPublicationStability",
+                "publishingEnabled=${locDocsPublishingPlan["publishingEnabled"]}",
+                "count=${locEndpoints.size}"
+            )
+            locEndpoints.forEachIndexed { locIndex, locEndpoint ->
+                locLines += "endpoint.$locIndex.id=${locEndpoint["id"]?.toString().orEmpty()}"
+                locLines += "endpoint.$locIndex.url=${locEndpoint["publishingUrl"]?.toString().orEmpty()}"
+                locLines += "endpoint.$locIndex.credentialProfile=${locEndpoint["publishingCredentialProfile"]?.toString().orEmpty()}"
+                locLines += "endpoint.$locIndex.adapter=${locEndpoint["publishingAdapter"]?.toString().orEmpty()}"
+                locLines += "endpoint.$locIndex.order=${locEndpoint["publishingOrder"] ?: 0}"
+                locLines += "endpoint.$locIndex.failurePolicy=${locEndpoint["publishingFailurePolicy"] ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"}"
+            }
+            locOutput.writeText(locLines.joinToString(System.lineSeparator()) + System.lineSeparator(), Charsets.UTF_8)
+            logger.lifecycle(
+                "Algites modustro_docs_site publication endpoints: " +
+                    if (locEndpoints.isEmpty()) "<none>" else locEndpoints.joinToString(", ") { it["id"].toString() }
+            )
+        }
+    }
+}
+
+if (tasks.findByName("prepareModustroDocsPublishing") == null) {
+    tasks.register<AIcPrepareModustroDocsPublishingTask>("prepareModustroDocsPublishing") {
+        group = "modustro"
+        description = "Clears the selected documentation publication before regenerating requested TechnologyKinds."
+
+        publicationKind.set(locAlgitesDocsEffectivePublicationKind)
+        publicationId.set(locAlgitesDocsEffectivePublicationId)
+        technologyKinds.set(locAlgitesDocsEffectiveTechnologyKinds.sorted().joinToString(","))
+        artifactDocsRoot.set(locArtifactDocsRoot)
+        publicationsDocsRoot.set(locPublicationsDocsRoot)
+    }
+}
+
+fun String.AIcDocsNormalizeYamlScalar(): String {
+    return trim().removeSurrounding("\"").removeSurrounding("'")
+}
+
+fun String.AIcDocsHtmlEscape(): String {
+    return replace("&", "&amp;")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+        .replace("\"", "&quot;")
+        .replace("'", "&#39;")
+}
+
+fun AIcDocsReadRepositoryScalar(aKey: String): String? {
+    return when (aKey) {
+        "id" -> locAlgitesDocsResolvedRepositoryId
+        "name" -> locAlgitesDocsResolvedRepositoryName
+        "visibility" -> locAlgitesDocsResolvedRepositoryVisibility.takeIf { it.isNotBlank() }
+        else -> null
+    }
+}
+
+val locAlgitesDocsRepositoryId = AIcDocsReadRepositoryScalar("id") ?: locAlgitesDocsResolvedRepositoryName
+val locAlgitesDocsRepositoryNameForSite = AIcDocsReadRepositoryScalar("name") ?: locAlgitesDocsRepositoryId
+val locAlgitesDocsRepositoryDescription = AIcDocsReadRepositoryScalar("description")
+val locAlgitesDocsRepositoryHomeUrl = (findProperty("modustro.docs.repositoryHomeUrl") as String?)
+    ?.trim()
+    ?.takeIf { it.isNotBlank() }
+    ?: AIcDocsReadRepositoryScalar("homeUrl")
+    ?: AIcDocsReadRepositoryScalar("repositoryUrl")
+    ?: AIcDocsReadRepositoryScalar("url")
+    ?: "https://github.com/Algites-EU/${locAlgitesDocsRepositoryId}"
+val locAlgitesDocsPublicationLabel = if (locPublicationKind != null && locPublicationId != null) {
+    "${locPublicationKind}/${locPublicationId}"
+} else {
+    "generated"
+}
+
+fun AIcDocsRelativeHref(aBaseDirectory: File, aTargetDirectory: File): String {
+    val locRelativePath = aBaseDirectory.toPath()
+        .relativize(aTargetDirectory.toPath())
+        .toString()
+        .replace(File.separatorChar, '/')
+        .trim('/')
+
+    return if (locRelativePath.isBlank()) {
+        "index.html"
+    } else {
+        "${locRelativePath}/index.html"
+    }
+}
+
+
+fun AIcDocsWritePublicationGroupIndex(
+    aGroupDirectory: File,
+    aPublicationKind: String,
+    aRepositoryName: String,
+    aDescending: Boolean
+) {
+    aGroupDirectory.mkdirs()
+
+    val locEntries = aGroupDirectory
+        .listFiles()
+        ?.filter { locFile -> locFile.isDirectory && locFile.resolve("index.html").isFile }
+        ?.sortedBy { locFile -> locFile.name.lowercase() }
+        ?: emptyList()
+
+    val locSortedEntries = if (aDescending) {
+        locEntries.asReversed()
+    } else {
+        locEntries
+    }
+
+    val locTitle = "${aRepositoryName} ${aPublicationKind} documentation"
+    val locIndexFile = aGroupDirectory.resolve("index.html")
+
+    locIndexFile.writeText(
+        """
+        <!doctype html>
+        <html lang="en">
+        <head>
+          <meta charset="utf-8">
+          <title>${locTitle.AIcDocsHtmlEscape()}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>
+            body {
+              margin: 0;
+              font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+              line-height: 1.5;
+              color: #1f2937;
+              background: #f9fafb;
+            }
+
+            main {
+              max-width: 900px;
+              margin: 0 auto;
+              padding: 2rem 1.5rem;
+            }
+
+            .muted {
+              color: #6b7280;
+            }
+
+            .card {
+              background: white;
+              border: 1px solid #e5e7eb;
+              border-radius: 0.75rem;
+              padding: 1rem 1.25rem;
+              margin: 1rem 0;
+              box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+            }
+
+            li {
+              margin: 0.35rem 0;
+            }
+
+            a {
+              color: #2563eb;
+            }
+          </style>
+        </head>
+        <body>
+          <main>
+            <h1>${locTitle.AIcDocsHtmlEscape()}</h1>
+            <p class="muted">
+              ${
+                  if (aDescending) {
+                      "Entries are sorted descending so newer or higher version identifiers appear first."
+                  } else {
+                      "Entries are sorted ascending alphabetically."
+                  }
+              }
+            </p>
+
+            <section class="card">
+              <h2>Available ${aPublicationKind.AIcDocsHtmlEscape()} publications</h2>
+              ${
+                  if (locSortedEntries.isEmpty()) {
+                      "<p>No ${aPublicationKind.AIcDocsHtmlEscape()} documentation has been generated yet.</p>"
+                  } else {
+                      "<ul>\n" + locSortedEntries.joinToString("\n") { locDirectory ->
+                          "                <li><a href=\"${locDirectory.name.AIcDocsHtmlEscape()}/index.html\">${locDirectory.name.AIcDocsHtmlEscape()}</a></li>"
+                      } + "\n              </ul>"
+                  }
+              }
+            </section>
+
+            <p><a href="../index.html">Back to generated documentation index</a></p>
+          </main>
+        </body>
+        </html>
+        """.trimIndent(),
+        Charsets.UTF_8
+    )
+}
+
+
+class AIcGenerateModustroDocsRootIndexAction(
+    private val locRepositoryId: String,
+    private val locRepositoryHomeUrl: String,
+    private val locIndexFile: File
+) : Action<Task>, java.io.Serializable {
+
+    override fun execute(aTask: Task) {
+        locIndexFile.parentFile.mkdirs()
+
+        if (locIndexFile.exists()) {
+            aTask.logger.lifecycle("Keeping existing documentation root index: ${locIndexFile.absolutePath}")
+            return
+        }
+
+        locIndexFile.writeText(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>Algites ${AIcDocsHtmlEscape(locRepositoryId)} Repository Documentation</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                body {
+                  margin: 0;
+                  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                  line-height: 1.5;
+                  color: #1f2937;
+                  background: #f9fafb;
+                }
+
+                header, main {
+                  max-width: 1100px;
+                  margin: 0 auto;
+                  padding: 1.5rem;
+                }
+
+                header {
+                  padding-top: 2rem;
+                }
+
+                h1 {
+                  margin: 0 0 0.5rem 0;
+                  font-size: 2rem;
+                }
+
+                .card {
+                  background: white;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 0.75rem;
+                  padding: 1rem 1.25rem;
+                  margin: 1rem 0;
+                  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+                }
+
+                iframe {
+                  width: 100%;
+                  min-height: 70vh;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 0.75rem;
+                  background: white;
+                }
+
+                a {
+                  color: #2563eb;
+                }
+              </style>
+            </head>
+            <body>
+              <header>
+                <h1>Algites <strong>${AIcDocsHtmlEscape(locRepositoryId)}</strong> Repository Documentation</h1>
+                <p>
+                  This page is the stable repository documentation entry point.
+                  Generated artifact documentation is published under
+                  <a href="generated/">generated/</a>.
+                </p>
+                <p>
+                  ${AIcDocsHtmlEscape(locRepositoryId)} repository home is <a href="${AIcDocsHtmlEscape(locRepositoryHomeUrl)}">
+            here
+            </a>.
+                </p>
+              </header>
+
+              <main>
+                <section class="card">
+                  <h2>Generated Artifact Documentation</h2>
+                  <p>
+                    The content below is generated automatically. If the embedded view is not available,
+                    open the generated documentation index directly:
+                    <a href="generated/">generated/index.html</a>.
+                  </p>
+                </section>
+
+                <iframe src="generated/" title="Generated artifact documentation"></iframe>
+              </main>
+            </body>
+            </html>
+            """.trimIndent(),
+            Charsets.UTF_8
+        )
+    }
+
+    private fun AIcDocsHtmlEscape(aText: String): String {
+        return aText.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
+    }
+}
+
+class AIcGenerateModustroDocsGeneratedIndexAction(
+    private val locRepositoryId: String,
+    private val locRepositoryName: String,
+    private val locRepositoryDescription: String?,
+    private val locGeneratedDocsRootFile: File,
+    private val locCurrentPublicationDirectory: File,
+    private val locPublicationLabel: String,
+    private val locIndexFile: File
+) : Action<Task>, java.io.Serializable {
+
+    override fun execute(aTask: Task) {
+        val locCurrentPublicationHref = AIcDocsRelativeHref(locGeneratedDocsRootFile, locCurrentPublicationDirectory)
+
+        locIndexFile.parentFile.mkdirs()
+        locIndexFile.writeText(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>${AIcDocsHtmlEscape(locRepositoryName)} Generated Documentation</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                body {
+                  margin: 0;
+                  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                  line-height: 1.5;
+                  color: #1f2937;
+                  background: #f9fafb;
+                }
+
+                header, main {
+                  max-width: 1100px;
+                  margin: 0 auto;
+                  padding: 1.5rem;
+                }
+
+                header {
+                  padding-top: 2rem;
+                }
+
+                h1 {
+                  margin: 0 0 0.5rem 0;
+                  font-size: 2rem;
+                }
+
+                .muted {
+                  color: #6b7280;
+                }
+
+                .card {
+                  background: white;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 0.75rem;
+                  padding: 1rem 1.25rem;
+                  margin: 1rem 0;
+                  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+                }
+
+                .nav-list {
+                  display: flex;
+                  flex-wrap: wrap;
+                  gap: 0.75rem;
+                  padding: 0;
+                  list-style: none;
+                }
+
+                .nav-list a {
+                  display: inline-block;
+                  padding: 0.5rem 0.75rem;
+                  border: 1px solid #d1d5db;
+                  border-radius: 0.5rem;
+                  background: #f9fafb;
+                }
+
+                iframe {
+                  width: 100%;
+                  min-height: 70vh;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 0.75rem;
+                  background: white;
+                }
+
+                a {
+                  color: #2563eb;
+                }
+              </style>
+            </head>
+            <body>
+              <header>
+                <h1>${AIcDocsHtmlEscape(locRepositoryName)} Generated Documentation</h1>
+                <p class="muted">Repository ID: ${AIcDocsHtmlEscape(locRepositoryId)}</p>
+                ${locRepositoryDescription?.let { "<p>${AIcDocsHtmlEscape(it)}</p>" } ?: ""}
+              </header>
+
+              <main>
+                <section class="card">
+                  <h2>Documentation sections</h2>
+                  <ul class="nav-list">
+                    <li><a href="preview/index.html">Preview</a></li>
+                    <li><a href="snapshot/index.html">Snapshot</a></li>
+                    <li><a href="release/index.html">Release</a></li>
+                  </ul>
+                </section>
+
+                <section class="card">
+                  <h2>Current generated documentation</h2>
+                  <p>
+                    Current publication: <strong>${AIcDocsHtmlEscape(locPublicationLabel)}</strong>.
+                    Open it directly here:
+                    <a href="${AIcDocsHtmlEscape(locCurrentPublicationHref)}">${AIcDocsHtmlEscape(locCurrentPublicationHref)}</a>.
+                  </p>
+                </section>
+
+                <iframe src="${AIcDocsHtmlEscape(locCurrentPublicationHref)}" title="Current generated artifact documentation"></iframe>
+
+                <p><a href="../index.html">Repository documentation root</a></p>
+              </main>
+            </body>
+            </html>
+            """.trimIndent(),
+            Charsets.UTF_8
+        )
+    }
+
+    private fun AIcDocsRelativeHref(aBaseDirectory: File, aTargetDirectory: File): String {
+        val locRelativePath = aBaseDirectory.toPath()
+            .relativize(aTargetDirectory.toPath())
+            .toString()
+            .replace(File.separatorChar, '/')
+            .trim('/')
+
+        return if (locRelativePath.isBlank()) {
+            "index.html"
+        } else {
+            "${locRelativePath}/index.html"
+        }
+    }
+
+    private fun AIcDocsHtmlEscape(aText: String): String {
+        return aText.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
+    }
+}
+
+class AIcGenerateModustroDocsPublishingGroupIndexesAction(
+    private val locGeneratedDocsRootFile: File,
+    private val locRepositoryName: String
+) : Action<Task>, java.io.Serializable {
+
+    override fun execute(aTask: Task) {
+        AIcDocsWritePublicationGroupIndex(File(locGeneratedDocsRootFile, "preview"), "preview", locRepositoryName, false)
+        AIcDocsWritePublicationGroupIndex(File(locGeneratedDocsRootFile, "snapshot"), "snapshot", locRepositoryName, true)
+        AIcDocsWritePublicationGroupIndex(File(locGeneratedDocsRootFile, "release"), "release", locRepositoryName, true)
+    }
+
+    private fun AIcDocsWritePublicationGroupIndex(
+        aGroupDirectory: File,
+        aPublicationKind: String,
+        aRepositoryName: String,
+        aDescending: Boolean
+    ) {
+        aGroupDirectory.mkdirs()
+
+        val locEntries = aGroupDirectory
+            .listFiles()
+            ?.filter { locFile -> locFile.isDirectory && locFile.resolve("index.html").isFile }
+            ?.sortedBy { locFile -> locFile.name.lowercase() }
+            ?: emptyList()
+
+        val locSortedEntries = if (aDescending) {
+            locEntries.asReversed()
+        } else {
+            locEntries
+        }
+
+        val locTitle = "${aRepositoryName} ${aPublicationKind} documentation"
+        val locIndexFile = aGroupDirectory.resolve("index.html")
+
+        locIndexFile.writeText(
+            """
+            <!doctype html>
+            <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <title>${AIcDocsHtmlEscape(locTitle)}</title>
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <style>
+                body {
+                  margin: 0;
+                  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+                  line-height: 1.5;
+                  color: #1f2937;
+                  background: #f9fafb;
+                }
+
+                main {
+                  max-width: 900px;
+                  margin: 0 auto;
+                  padding: 2rem 1.5rem;
+                }
+
+                h1 {
+                  margin: 0 0 0.5rem 0;
+                }
+
+                .muted {
+                  color: #6b7280;
+                }
+
+                .card {
+                  background: white;
+                  border: 1px solid #e5e7eb;
+                  border-radius: 0.75rem;
+                  padding: 1rem 1.25rem;
+                  margin: 1rem 0;
+                  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+                }
+
+                a {
+                  color: #2563eb;
+                }
+              </style>
+            </head>
+            <body>
+              <main>
+                <h1>${AIcDocsHtmlEscape(locTitle)}</h1>
+                <p class="muted">
+                  ${
+                      if (aDescending) {
+                          "Entries are sorted descending so newer or higher version identifiers appear first."
+                      } else {
+                          "Entries are sorted ascending alphabetically."
+                      }
+                  }
+                </p>
+
+                <section class="card">
+                  <h2>Available ${AIcDocsHtmlEscape(aPublicationKind)} publications</h2>
+                  ${
+                      if (locSortedEntries.isEmpty()) {
+                          "<p>No ${AIcDocsHtmlEscape(aPublicationKind)} documentation has been generated yet.</p>"
+                      } else {
+                          "<ul>\n" + locSortedEntries.joinToString("\n") { locDirectory ->
+                              "                <li><a href=\"${AIcDocsHtmlEscape(locDirectory.name)}/index.html\">${AIcDocsHtmlEscape(locDirectory.name)}</a></li>"
+                          } + "\n              </ul>"
+                      }
+                  }
+                </section>
+
+                <p><a href="../index.html">Back to generated documentation index</a></p>
+              </main>
+            </body>
+            </html>
+            """.trimIndent(),
+            Charsets.UTF_8
+        )
+    }
+
+    private fun AIcDocsHtmlEscape(aText: String): String {
+        return aText.replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#39;")
+    }
+}
+
+
+abstract class AIcGenerateModustroDocsArtifactPublishingIndexesTask : DefaultTask() {
+    @get:Input
+    abstract val repositoryId: Property<String>
+
+    @get:Input
+    abstract val repositoryName: Property<String>
+
+    @get:Input
+    abstract val artifactMetadataEntries: ListProperty<String>
+
+    @get:OutputDirectory
+    abstract val generatedDocsRoot: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val artifactDocsRoot: DirectoryProperty
+
+    @get:OutputDirectory
+    abstract val publicationsDocsRoot: DirectoryProperty
+
+    @TaskAction
+    fun generate() {
+        val locArtifactRootFile = artifactDocsRoot.get().asFile
+        val locPublicationsRootFile = publicationsDocsRoot.get().asFile
+        val locRepositoryId = repositoryId.get()
+        val locRepositoryName = repositoryName.get()
+
+        locArtifactRootFile.mkdirs()
+        locPublicationsRootFile.mkdirs()
+
+        val locMetadataByLocalArtifactId = artifactMetadataEntries.get()
+            .mapNotNull { locLine ->
+                val locParts = locLine.split('\t')
+                if (locParts.size < 16) {
+                    null
+                } else {
+                    val locMap = mapOf(
+                        "localArtifactId" to locParts[0],
+                        "artifactId" to locParts[1],
+                        "groupId" to locParts[2],
+                        "path" to locParts[3],
+                        "name" to locParts[4],
+                        "description" to locParts[5],
+                        "structureKind" to locParts[6],
+                        "technologyKinds" to locParts[7],
+                        "contentsModel" to locParts[8],
+                        "gradleProjectPath" to locParts[9],
+                        "version.resolvedValue" to locParts[10],
+                        "version.lane" to locParts[11],
+                        "version.revision" to locParts[12],
+                        "version.qualifierKind" to locParts[13],
+                        "descriptorHierarchy" to locParts[15]
+                    )
+                    locParts[0] to locMap
+                }
+            }
+            .toMap()
+
+        data class AIcdLocalArtifactPublication(
+            val localArtifactId: String,
+            val publicationKind: String,
+            val publicationId: String,
+            val directory: File,
+            val metadata: Map<String, String>
+        )
+
+        fun readSidecar(aDirectory: File): Map<String, String> {
+            val locSidecarFile = aDirectory.resolve(".modustro-artifact-docs.properties")
+            if (!locSidecarFile.isFile) {
+                return emptyMap()
+            }
+
+            return locSidecarFile.readLines(Charsets.UTF_8)
+                .map { it.trim() }
+                .filter { it.isNotBlank() && !it.startsWith("#") }
+                .mapNotNull { locLine ->
+                    val locSeparatorIndex = locLine.indexOf('=')
+                    if (locSeparatorIndex < 0) {
+                        null
+                    } else {
+                        locLine.substring(0, locSeparatorIndex) to locLine.substring(locSeparatorIndex + 1)
+                    }
+                }
+                .toMap()
+        }
+
+        fun html(aText: String?): String {
+            return (aText ?: "")
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;")
+        }
+
+        fun valueOrDash(aValue: String?): String = aValue?.takeIf { it.isNotBlank() } ?: "—"
+
+        fun yamlScalar(aValue: String): String {
+            if (aValue.isBlank()) return "\"\""
+            val locPlain = Regex("^[A-Za-z0-9._/+:-]+$").matches(aValue) &&
+                aValue !in setOf("null", "true", "false") &&
+                aValue.toDoubleOrNull() == null
+            return if (locPlain) {
+                aValue
+            } else {
+                "\"" + aValue.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+            }
+        }
+
+        fun descriptorHierarchy(aMetadata: Map<String, String>): List<List<String>> =
+            aMetadata["descriptorHierarchy"]
+                ?.takeIf { it.isNotBlank() }
+                ?.split("\u001e")
+                ?.map { locEntry -> locEntry.split("\u001f") }
+                ?.filter { locParts -> locParts.size == 3 }
+                ?: emptyList()
+
+        fun artifactManifest(aMetadata: Map<String, String>): String {
+            val locLocalArtifactId = aMetadata["localArtifactId"].orEmpty()
+            val locArtifactCoordinateId = aMetadata["artifactId"]
+                ?.takeIf { it.isNotBlank() }
+                ?: "${locRepositoryId}_${locLocalArtifactId}"
+            val locDescriptors = descriptorHierarchy(aMetadata)
+            return buildString {
+                appendLine("ManifestVersion: 1")
+                appendLine("Artifact:")
+                appendLine("  RepositoryId: ${yamlScalar(locRepositoryId)}")
+                appendLine("  LocalArtifactId: ${yamlScalar(locLocalArtifactId)}")
+                appendLine("  ArtifactCoordinateId: ${yamlScalar(locArtifactCoordinateId)}")
+                aMetadata["groupId"]?.takeIf { it.isNotBlank() }?.let { locGroupId ->
+                    appendLine("  GroupId: ${yamlScalar(locGroupId)}")
+                }
+                appendLine("  Version: ${yamlScalar(aMetadata["version.resolvedValue"].orEmpty())}")
+                appendLine("  SourcePath: ${yamlScalar(aMetadata["path"].orEmpty())}")
+                appendLine("  StructureKind: ${yamlScalar(aMetadata["structureKind"].orEmpty().replace('-', '_'))}")
+                appendLine("  Name: ${yamlScalar(aMetadata["name"].orEmpty())}")
+                appendLine("  Description: ${yamlScalar(aMetadata["description"].orEmpty())}")
+                appendLine("SourceMetadata:")
+                appendLine("  DescriptorHierarchy:")
+                locDescriptors.forEach { locParts ->
+                    appendLine("    - StructureKind: ${yamlScalar(locParts[0].replace('-', '_'))}")
+                    appendLine("      Path: ${yamlScalar(locParts[1])}")
+                    appendLine("      Sha256: ${yamlScalar(locParts[2])}")
+                }
+            }
+        }
+
+        fun relativeHref(aBaseDirectory: File, aTargetDirectory: File): String {
+            val locRelativePath = aBaseDirectory.toPath()
+                .relativize(aTargetDirectory.toPath())
+                .toString()
+                .replace(File.separatorChar, '/')
+                .trim('/')
+
+            return if (locRelativePath.isBlank()) {
+                "index.html"
+            } else {
+                "${locRelativePath}/index.html"
+            }
+        }
+
+        fun writeArtifactPublicationIndex(aPublication: AIcdLocalArtifactPublication) {
+            val locMetadata = aPublication.metadata
+            val locIndexFile = aPublication.directory.resolve("index.html")
+            val locLocalArtifactId = aPublication.localArtifactId
+            val locGroupId = valueOrDash(locMetadata["groupId"])
+            val locArtifactId = valueOrDash(
+                locMetadata["artifactId"]?.takeIf { it.isNotBlank() }
+                    ?: "${locRepositoryId}_${locLocalArtifactId}"
+            )
+            val locVersion = valueOrDash(locMetadata["version.resolvedValue"])
+
+            val locManifestFile = aPublication.directory.resolve("modustro-artifact-manifest.yml")
+            locManifestFile.writeText(artifactManifest(locMetadata), Charsets.UTF_8)
+            val locDescriptorRows = descriptorHierarchy(locMetadata).joinToString("\n") { locParts ->
+                """<tr><td>${html(locParts[0])}</td><td><code>${html(locParts[1])}</code></td><td><code>${html(locParts[2])}</code></td></tr>"""
+            }.ifBlank { "<tr><td colspan=\"3\">No descriptor hierarchy was resolved.</td></tr>" }
+
+            val locDocumentationKinds = listOf(
+                "java" to "Java API documentation",
+                "python" to "Python API documentation",
+                "mps" to "MPS documentation"
+            ).filter { (locDirectoryName, _) -> aPublication.directory.resolve(locDirectoryName).isDirectory }
+            val locDocumentationLinks = locDocumentationKinds
+                .joinToString("\n") { (locDirectoryName, locLabel) ->
+                    """<li><a href="${html(locDirectoryName)}/index.html">${html(locLabel)}</a></li>"""
+                }
+                .ifBlank { "<li>No generated documentation output was found for this artifact publication yet.</li>" }
+            val locTechnologyDetails = locDocumentationKinds.joinToString("\n") { (locDirectoryName, locLabel) ->
+                val locDetails = when (locDirectoryName) {
+                    "java" -> listOf(
+                        "Maven group ID" to valueOrDash(locMetadata["java.maven.groupId"]),
+                        "Maven artifact ID" to valueOrDash(locMetadata["java.maven.artifactId"]),
+                        "Maven version" to valueOrDash(locMetadata["java.maven.version"])
+                    )
+                    "python" -> listOf(
+                        "Distribution" to valueOrDash(locMetadata["python.distributionName"]),
+                        "Import namespace" to valueOrDash(locMetadata["python.importNamespace"]),
+                        "Python package version" to valueOrDash(locMetadata["python.version"])
+                    )
+                    "mps" -> listOf(
+                        "MPS artifact ID" to valueOrDash(locMetadata["mps.artifactId"]),
+                        "MPS module path" to valueOrDash(locMetadata["mps.modulePath"])
+                    )
+                    else -> emptyList()
+                }
+                val locDetailHtml = if (locDetails.isEmpty()) {
+                    ""
+                } else {
+                    "<dl class=\"metadata\">" + locDetails.joinToString("") { (locName, locValue) ->
+                        "<dt>${html(locName)}</dt><dd>${html(locValue)}</dd>"
+                    } + "</dl>"
+                }
+                """<div class="technology"><h3>${html(locDirectoryName.uppercase())}</h3><p><a href="${html(locDirectoryName)}/index.html">${html(locLabel)}</a></p>${locDetailHtml}</div>"""
+            }
+            val locDeclaredTechnologyKinds = locMetadata["technologyKinds"]
+                ?.split(',')
+                ?.map { it.trim().uppercase() }
+                ?.filter { it.isNotBlank() }
+                ?.joinToString(", ")
+                ?.takeIf { it.isNotBlank() }
+                ?: "—"
+            val locDocumentationTechnologyKinds = locDocumentationKinds
+                .map { (locDirectoryName, _) -> locDirectoryName.uppercase() }
+                .joinToString(", ")
+                .ifBlank { "—" }
+
+            locIndexFile.writeText(
+                """
+                <!doctype html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8">
+                  <title>${html(locLocalArtifactId)} ${html(aPublication.publicationKind)}/${html(aPublication.publicationId)}</title>
+                  <meta name="viewport" content="width=device-width, initial-scale=1">
+                  <style>
+                    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.35; color: #1f2937; background: #f9fafb; }
+                    main { max-width: 1180px; margin: 0 auto; padding: 1rem; }
+                    h1 { margin: 0 0 0.5rem 0; font-size: 1.55rem; }
+                    h2 { margin: 0 0 0.55rem 0; font-size: 1.05rem; }
+                    .muted { color: #6b7280; }
+                    .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem); gap: 0.85rem; align-items: start; }
+                    .main-column { display: flex; flex-direction: column; gap: 0.85rem; min-width: 0; }
+                    .metadata-column { min-width: 0; }
+                    .card { background: white; border: 1px solid #e5e7eb; border-radius: 0.65rem; padding: 0.8rem 0.95rem; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+                    .coordinates, .metadata { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 0.25rem 0.75rem; align-items: baseline; }
+                    .metadata { gap: 0.25rem 0.65rem; font-size: 0.9rem; }
+                    .coordinates dt, .metadata dt { font-weight: 650; color: #374151; }
+                    .coordinates dd, .metadata dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+                    .coordinates dd { font-weight: 650; }
+                    .technology { border-top: 1px solid #e5e7eb; padding-top: 0.6rem; margin-top: 0.6rem; }
+                    .technology:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+                    .technology h3 { margin: 0 0 0.25rem 0; font-size: 0.98rem; }
+                    .technology p { margin: 0 0 0.4rem 0; }
+                    .manifest-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+                    .manifest-table th, .manifest-table td { text-align: left; vertical-align: top; padding: 0.3rem 0.4rem; border-top: 1px solid #e5e7eb; overflow-wrap: anywhere; }
+                    .manifest-table th { border-top: 0; color: #374151; }
+                    code { font-size: 0.8rem; }
+                    ul { margin: 0.25rem 0 0 1.2rem; padding: 0; }
+                    li { margin: 0.2rem 0; }
+                    a { color: #2563eb; }
+                    @media (max-width: 820px) { .layout { display: block; } .metadata-column { margin-top: 0.85rem; } }
+                  </style>
+                </head>
+                <body>
+                  <main>
+                    <h1>${html(locLocalArtifactId)}</h1>
+                    <p class="muted">Publication: <strong>${html(aPublication.publicationKind)}/${html(aPublication.publicationId)}</strong></p>
+                    <section class="card">
+                      <h2>Modustro artifact manifest</h2>
+                      <p><a href="modustro-artifact-manifest.yml"><code>modustro-artifact-manifest.yml</code></a> is the deterministic, TechnologyKind-neutral identity of this logical artifact.</p>
+                      <table class="manifest-table">
+                        <thead><tr><th>Descriptor kind</th><th>Source descriptor</th><th>SHA-256</th></tr></thead>
+                        <tbody>${locDescriptorRows}</tbody>
+                      </table>
+                    </section>
+                    <div class="layout">
+                      <div class="main-column">
+                        <section class="card">
+                          <h2>Artifact coordinates</h2>
+                          <dl class="coordinates">
+                            <dt>Group ID</dt><dd>${html(locGroupId)}</dd>
+                            <dt>Artifact ID</dt><dd>${html(locArtifactId)}</dd>
+                            <dt>Version</dt><dd>${html(locVersion)}</dd>
+                          </dl>
+                        </section>
+                        <section class="card">
+                          <h2>Technology selection</h2>
+                          <dl class="coordinates">
+                            <dt>Declared technologies</dt><dd>${html(locDeclaredTechnologyKinds)}</dd>
+                            <dt>Documentation technologies</dt><dd>${html(locDocumentationTechnologyKinds)}</dd>
+                          </dl>
+                        </section>
+                        <section class="card">
+                          <h2>Generated documentation</h2>
+                          ${if (locTechnologyDetails.isBlank()) "<ul>${locDocumentationLinks}</ul>" else locTechnologyDetails}
+                        </section>
+                      </div>
+                      <aside class="metadata-column">
+                        <section class="card">
+                          <h2>Source</h2>
+                          <dl class="metadata">
+                            <dt>Ref</dt><dd>${html(valueOrDash(locMetadata["documentation.sourceRef"]))}</dd>
+                            <dt>Commit</dt><dd>${html(valueOrDash(locMetadata["documentation.sourceCommit"]))}</dd>
+                            <dt>Generated</dt><dd>${html(valueOrDash(locMetadata["documentation.generatedAt"]))}</dd>
+                          </dl>
+                        </section>
+                        <section class="card">
+                          <h2>Metadata</h2>
+                          <dl class="metadata">
+                            <dt>Local artifact ID</dt><dd>${html(locLocalArtifactId)}</dd>
+                            <dt>Name</dt><dd>${html(valueOrDash(locMetadata["name"]))}</dd>
+                            <dt>Description</dt><dd>${html(valueOrDash(locMetadata["description"]))}</dd>
+                            <dt>Structure kind</dt><dd>${html(valueOrDash(locMetadata["structureKind"]))}</dd>
+                            <dt>Contents model</dt><dd>${html(valueOrDash(locMetadata["contentsModel"]))}</dd>
+                            <dt>Source path</dt><dd>${html(valueOrDash(locMetadata["path"]))}</dd>
+                            <dt>Gradle project path</dt><dd>${html(valueOrDash(locMetadata["gradleProjectPath"]))}</dd>
+                            <dt>Version lane</dt><dd>${html(valueOrDash(locMetadata["version.lane"]))}</dd>
+                            <dt>Version revision</dt><dd>${html(valueOrDash(locMetadata["version.revision"]))}</dd>
+                            <dt>Qualifier kind</dt><dd>${html(valueOrDash(locMetadata["version.qualifierKind"]))}</dd>
+                          </dl>
+                        </section>
+                      </aside>
+                    </div>
+                    <p><a href="${html(relativeHref(aPublication.directory, locPublicationsRootFile.resolve(aPublication.publicationKind).resolve(aPublication.publicationId)))}">Back to publication index</a></p>
+                  </main>
+                </body>
+                </html>
+                """.trimIndent(),
+                Charsets.UTF_8
+            )
+        }
+
+        val locPublications = locArtifactRootFile
+            .listFiles()
+            ?.filter { it.isDirectory }
+            ?.flatMap { locArtifactDirectory ->
+                locArtifactDirectory.listFiles()
+                    ?.filter { it.isDirectory }
+                    ?.flatMap { locPublicationKindDirectory ->
+                        locPublicationKindDirectory.listFiles()
+                            ?.filter { it.isDirectory }
+                            ?.map { locPublicationIdDirectory ->
+                                val locLocalArtifactId = locArtifactDirectory.name
+                                val locSidecarMetadata = readSidecar(locPublicationIdDirectory)
+                                val locBaseMetadata = locMetadataByLocalArtifactId[locLocalArtifactId] ?: emptyMap()
+                                AIcdLocalArtifactPublication(
+                                    localArtifactId = locLocalArtifactId,
+                                    publicationKind = locPublicationKindDirectory.name,
+                                    publicationId = locPublicationIdDirectory.name,
+                                    directory = locPublicationIdDirectory,
+                                    metadata = locBaseMetadata + locSidecarMetadata
+                                )
+                            }
+                            ?: emptyList()
+                    }
+                    ?: emptyList()
+            }
+            ?.sortedWith(compareBy<AIcdLocalArtifactPublication> { it.publicationKind }.thenBy { it.publicationId }.thenBy { it.localArtifactId })
+            ?: emptyList()
+
+        locPublications.forEach { writeArtifactPublicationIndex(it) }
+
+        locArtifactRootFile.resolve("index.html").writeText(
+            """
+            <!doctype html>
+            <html lang="en"><head><meta charset="utf-8"><title>${html(locRepositoryName)} artifacts</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.35;color:#1f2937;background:#f9fafb}main{max-width:980px;margin:0 auto;padding:1rem}.card{background:white;border:1px solid #e5e7eb;border-radius:.65rem;padding:.8rem .95rem;margin:.75rem 0}li{margin:.25rem 0}a{color:#2563eb}</style></head>
+            <body><main><h1>${html(locRepositoryName)} artifacts</h1><section class="card">${
+                if (locPublications.isEmpty()) {
+                    "<p>No artifact documentation has been generated yet.</p>"
+                } else {
+                    "<ul>\n" + locPublications.groupBy { it.localArtifactId }.toSortedMap().entries.joinToString("\n") { (locLocalArtifactId, locArtifactPublications) ->
+                        "<li><strong>${html(locLocalArtifactId)}</strong><ul>" + locArtifactPublications.joinToString("") { locPublication ->
+                            """<li><a href="${html(locLocalArtifactId)}/${html(locPublication.publicationKind)}/${html(locPublication.publicationId)}/index.html">${html(locPublication.publicationKind)}/${html(locPublication.publicationId)}</a></li>"""
+                        } + "</ul></li>"
+                    } + "\n</ul>"
+                }
+            }</section><p><a href="../index.html">Back to generated documentation index</a></p></main></body></html>
+            """.trimIndent(),
+            Charsets.UTF_8
+        )
+
+        val locPublicationGroups = locPublications.groupBy { it.publicationKind to it.publicationId }
+        locPublicationGroups.forEach { (locPublicationKey, locEntries) ->
+            val (locPublicationKind, locPublicationId) = locPublicationKey
+            val locPublicationDirectory = locPublicationsRootFile.resolve(locPublicationKind).resolve(locPublicationId)
+            locPublicationDirectory.mkdirs()
+            locPublicationDirectory.resolve("index.html").writeText(
+                """
+                <!doctype html>
+                <html lang="en"><head><meta charset="utf-8"><title>${html(locRepositoryName)} ${html(locPublicationKind)}/${html(locPublicationId)}</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.35;color:#1f2937;background:#f9fafb}main{max-width:980px;margin:0 auto;padding:1rem}.card{background:white;border:1px solid #e5e7eb;border-radius:.65rem;padding:.8rem .95rem;margin:.75rem 0}li{margin:.25rem 0}a{color:#2563eb}</style></head>
+                <body><main><h1>${html(locRepositoryName)} ${html(locPublicationKind)}/${html(locPublicationId)}</h1><section class="card"><h2>Artifacts</h2><ul>${
+                    locEntries.sortedBy { it.localArtifactId }.joinToString("\n") { locPublication ->
+                        val locHref = relativeHref(locPublicationDirectory, locPublication.directory)
+                        """<li><a href="${html(locHref)}">${html(locPublication.localArtifactId)}</a></li>"""
+                    }
+                }</ul></section><p><a href="../../index.html">Back to publications index</a></p></main></body></html>
+                """.trimIndent(),
+                Charsets.UTF_8
+            )
+        }
+
+        locPublicationsRootFile.resolve("index.html").writeText(
+            """
+            <!doctype html>
+            <html lang="en"><head><meta charset="utf-8"><title>${html(locRepositoryName)} publications</title><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.35;color:#1f2937;background:#f9fafb}main{max-width:980px;margin:0 auto;padding:1rem}.card{background:white;border:1px solid #e5e7eb;border-radius:.65rem;padding:.8rem .95rem;margin:.75rem 0}li{margin:.25rem 0}a{color:#2563eb}</style></head>
+            <body><main><h1>${html(locRepositoryName)} publications / versions</h1><section class="card">${
+                if (locPublicationGroups.isEmpty()) {
+                    "<p>No publication documentation has been generated yet.</p>"
+                } else {
+                    "<ul>\n" + locPublicationGroups.keys.sortedWith(compareBy<Pair<String, String>> { it.first }.thenBy { it.second }).joinToString("\n") { (locPublicationKind, locPublicationId) ->
+                        """<li><a href="${html(locPublicationKind)}/${html(locPublicationId)}/index.html">${html(locPublicationKind)}/${html(locPublicationId)}</a></li>"""
+                    } + "\n</ul>"
+                }
+            }</section><p><a href="../index.html">Back to generated documentation index</a></p></main></body></html>
+            """.trimIndent(),
+            Charsets.UTF_8
+        )
+
+        logger.lifecycle("Generated Modustro artifact/publication indexes for ${locPublications.size} artifact publication(s).")
+    }
+}
+
+
+if (tasks.findByName("generateModustroDocsRootIndex") == null) {
+    tasks.register("generateModustroDocsRootIndex") {
+        group = "modustro"
+        description = "Generates the stable root index page for the Modustro documentation site only if it does not already exist."
+
+        outputs.file(locDocsSiteRoot.file("index.html"))
+
+        doLast(
+            AIcGenerateModustroDocsRootIndexAction(
+                locAlgitesDocsRepositoryId,
+                locAlgitesDocsRepositoryHomeUrl,
+                locDocsSiteRoot.file("index.html").asFile
+            )
+        )
+    }
+}
+
+if (tasks.findByName("generateModustroDocsGeneratedIndex") == null) {
+    tasks.register<Exec>("generateModustroDocsGeneratedIndex") {
+        group = "modustro"
+        description = "Generates the generated documentation landing page."
+
+        dependsOn("generateModustroDocsArtifactPublishingIndexes")
+        outputs.file(locGeneratedDocsRoot.file("index.html"))
+
+        commandLine(
+            "python3",
+            "-c",
+            """
+import html
+import pathlib
+import sys
+
+loc_repository_id = sys.argv[1]
+loc_repository_name = sys.argv[2]
+loc_repository_description = sys.argv[3] or None
+loc_artifacts_root = pathlib.Path(sys.argv[4]).resolve()
+loc_publications_root = pathlib.Path(sys.argv[5]).resolve()
+loc_index_file = pathlib.Path(sys.argv[6]).resolve()
+
+def loc_has_index(path):
+    return path.is_dir() and (path / 'index.html').is_file()
+
+loc_description_html = ''
+if loc_repository_description:
+    loc_description_html = '<p>' + html.escape(loc_repository_description, quote=True) + '</p>'
+
+loc_index_file.parent.mkdir(parents=True, exist_ok=True)
+loc_index_file.write_text(f'''<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{html.escape(loc_repository_name, quote=True)} Generated Documentation</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {{ margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height: 1.35; color: #1f2937; background: #f9fafb; }}
+    header, main {{ max-width: 1120px; margin: 0 auto; padding: 1rem; }}
+    header {{ padding-top: 1.4rem; }}
+    h1 {{ margin: 0 0 0.35rem 0; font-size: 1.65rem; }}
+    h2 {{ margin: 0 0 0.5rem 0; font-size: 1.1rem; }}
+    .muted {{ color: #6b7280; }}
+    .card {{ background: white; border: 1px solid #e5e7eb; border-radius: 0.65rem; padding: 0.85rem 1rem; margin: 0.8rem 0; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }}
+    iframe {{ width: 100%; min-height: 18rem; border: 1px solid #e5e7eb; border-radius: 0.65rem; background: white; }}
+    a {{ color: #2563eb; }}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>{html.escape(loc_repository_name, quote=True)} Generated Documentation</h1>
+    <p class="muted">Repository ID: {html.escape(loc_repository_id, quote=True)}</p>
+    {loc_description_html}
+  </header>
+  <main>
+    <section class="card">
+      <h2>Artifacts</h2>
+      <p>Browse canonical documentation pages by local artifact ID.</p>
+      <p><a href="artifacts/index.html">Open artifacts index</a></p>
+      {('<iframe src="artifacts/index.html" title="Artifacts"></iframe>') if loc_has_index(loc_artifacts_root) else '<p>No artifact index has been generated yet.</p>'}
+    </section>
+
+    <section class="card">
+      <h2>Publications / versions</h2>
+      <p>Browse repository publication contexts such as preview, snapshot, or release.</p>
+      <p><a href="publications/index.html">Open publications index</a></p>
+      {('<iframe src="publications/index.html" title="Publications"></iframe>') if loc_has_index(loc_publications_root) else '<p>No publication index has been generated yet.</p>'}
+    </section>
+
+    <p><a href="../index.html">Repository documentation root</a></p>
+  </main>
+</body>
+</html>
+f''', encoding='utf-8')
+            """.trimIndent(),
+            locAlgitesDocsRepositoryId,
+            locAlgitesDocsRepositoryNameForSite,
+            locAlgitesDocsRepositoryDescription ?: "",
+            locArtifactDocsRoot.asFile.absolutePath,
+            locPublicationsDocsRoot.asFile.absolutePath,
+            locGeneratedDocsRoot.file("index.html").asFile.absolutePath
+        )
+    }
+}
+
+
+if (tasks.findByName("generateModustroDocsPublishingGroupIndexes") == null) {
+    tasks.register<Exec>("generateModustroDocsPublishingGroupIndexes") {
+        group = "modustro"
+        description = "Generates index pages for Algites preview, snapshot, and release documentation groups."
+
+        dependsOn("generateModustroDocsArtifactPublishingIndexes")
+
+        outputs.file(locPublicationsDocsRoot.file("preview/index.html"))
+        outputs.file(locPublicationsDocsRoot.file("snapshot/index.html"))
+        outputs.file(locPublicationsDocsRoot.file("release/index.html"))
+
+        commandLine(
+            "python3",
+            "-c",
+            """
+import html
+import pathlib
+import sys
+
+loc_generated_docs_root = pathlib.Path(sys.argv[1]).resolve()
+loc_repository_name = sys.argv[2]
+
+def loc_write_publication_group_index(group_directory, publication_kind, repository_name, descending):
+    group_directory.mkdir(parents=True, exist_ok=True)
+    loc_entries = [loc_path for loc_path in group_directory.iterdir() if loc_path.is_dir() and (loc_path / 'index.html').is_file()]
+    loc_entries = sorted(loc_entries, key=lambda loc_path: loc_path.name.lower())
+    if descending:
+        loc_entries = list(reversed(loc_entries))
+
+    loc_title = f'{repository_name} {publication_kind} documentation'
+    loc_index_file = group_directory / 'index.html'
+    if not loc_entries:
+        loc_entries_html = f'<p>No {html.escape(publication_kind, quote=True)} documentation has been generated yet.</p>'
+    else:
+        loc_entries_html = '<ul>\n' + '\n'.join(
+            f'                <li><a href="{html.escape(loc_entry.name, quote=True)}/index.html">{html.escape(loc_entry.name, quote=True)}</a></li>'
+            for loc_entry in loc_entries
+        ) + '\n              </ul>'
+
+    loc_sort_text = 'Entries are sorted descending so newer or higher version identifiers appear first.' if descending else 'Entries are sorted ascending alphabetically.'
+
+    loc_index_file.write_text(f'''<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{html.escape(loc_title, quote=True)}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {{
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.5;
+      color: #1f2937;
+      background: #f9fafb;
+    }}
+
+    main {{
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }}
+
+    h1 {{
+      margin: 0 0 0.5rem 0;
+    }}
+
+    .muted {{
+      color: #6b7280;
+    }}
+
+    .card {{
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 0.75rem;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+    }}
+
+    a {{
+      color: #2563eb;
+    }}
+  </style>
+</head>
+<body>
+  <main>
+    <h1>{html.escape(loc_title, quote=True)}</h1>
+    <p class="muted">
+      {html.escape(loc_sort_text, quote=True)}
+    </p>
+
+    <section class="card">
+      <h2>Available {html.escape(publication_kind, quote=True)} publications</h2>
+      {loc_entries_html}
+    </section>
+
+    <p><a href="../index.html">Back to generated documentation index</a></p>
+  </main>
+</body>
+</html>
+''', encoding='utf-8')
+
+loc_write_publication_group_index(loc_generated_docs_root / 'preview', 'preview', loc_repository_name, False)
+loc_write_publication_group_index(loc_generated_docs_root / 'snapshot', 'snapshot', loc_repository_name, True)
+loc_write_publication_group_index(loc_generated_docs_root / 'release', 'release', loc_repository_name, True)
+            """.trimIndent(),
+            locPublicationsDocsRoot.asFile.absolutePath,
+            locAlgitesDocsRepositoryNameForSite
+        )
+    }
+}
+
+
+fun AIcDocsLocalArtifactIdFromPath(aPath: String?): String {
+    return aPath?.trim()?.trim('/')?.replace('/', '.')?.takeIf { it.isNotBlank() } ?: "."
+}
+
+fun AIcDocsArtifactMetadataEntryLine(aArtifactDirectory: Map<String, String?>): String {
+    val locLocalArtifactId = AIcDocsLocalArtifactIdFromPath(aArtifactDirectory["path"])
+    val locArtifactId = "${locAlgitesDocsRepositoryId}_${locLocalArtifactId}"
+    return listOf(
+        locLocalArtifactId,
+        locArtifactId,
+        aArtifactDirectory["groupId"] ?: "",
+        aArtifactDirectory["path"] ?: "",
+        aArtifactDirectory["name"] ?: "",
+        aArtifactDirectory["description"] ?: "",
+        aArtifactDirectory["structureKind"] ?: "",
+        aArtifactDirectory["technologyKinds"] ?: "",
+        aArtifactDirectory["contentsModel"] ?: "",
+        aArtifactDirectory["gradleProjectPath"] ?: "",
+        aArtifactDirectory["version.resolvedValue"] ?: "",
+        aArtifactDirectory["version.lane"] ?: "",
+        aArtifactDirectory["version.revision"] ?: "",
+        aArtifactDirectory["version.qualifierKind"] ?: "",
+        aArtifactDirectory["descriptorHierarchy"] ?: ""
+    ).joinToString("\t") { it.replace('\t', ' ') }
+}
+
+val locAlgitesDocsArtifactMetadataEntryLines = locAlgitesDocsResolvedArtifactDirectories
+    .filter { locArtifactDirectory -> locArtifactDirectory["structureKind"] != "repository" }
+    .filter { locArtifactDirectory ->
+        val locDeclaredKinds = AIcDocsTechnologyKinds(locArtifactDirectory["technologyKinds"])
+        val locEffectiveKinds = if (locAlgitesDocsRequestedTechnologyKinds.isEmpty()) {
+            locDeclaredKinds
+        } else {
+            locDeclaredKinds.intersect(locAlgitesDocsRequestedTechnologyKinds)
+        }
+        locEffectiveKinds.isNotEmpty()
+    }
+    .map { locArtifactDirectory -> AIcDocsArtifactMetadataEntryLine(locArtifactDirectory) }
+
+if (tasks.findByName("generateModustroDocsArtifactPublishingIndexes") == null) {
+    tasks.register<AIcGenerateModustroDocsArtifactPublishingIndexesTask>("generateModustroDocsArtifactPublishingIndexes") {
+        group = "modustro"
+        description = "Generates canonical artifact pages and publication index pages."
+
+        repositoryId.set(locAlgitesDocsRepositoryId)
+        repositoryName.set(locAlgitesDocsRepositoryNameForSite)
+        artifactMetadataEntries.set(locAlgitesDocsArtifactMetadataEntryLines)
+        generatedDocsRoot.set(locGeneratedDocsRoot)
+        artifactDocsRoot.set(locArtifactDocsRoot)
+        publicationsDocsRoot.set(locPublicationsDocsRoot)
+    }
+}
+
+
+if (tasks.findByName("generateModustroDocsSite") == null) {
+    tasks.register("generateModustroDocsSite") {
+        group = "modustro"
+        description = "Generic aggregate task for repository documentation site generation."
+
+        dependsOn("prepareModustroDocsPublishing")
+        dependsOn("writeModustroDocsPublishingSelection")
+        dependsOn("generateModustroDocsRootIndex")
+        dependsOn("generateModustroDocsArtifactPublishingIndexes")
+        dependsOn("generateModustroDocsPublishingGroupIndexes")
+        dependsOn("generateModustroDocsGeneratedIndex")
+    }
+}
+
+
+if (tasks.findByName("publishModustroDocsSite") == null) {
+    tasks.register("publishModustroDocsSite") {
+        group = "publishing"
+        description = "Publishes the generated Modustro documentation site through the common publishing scheduler."
+        if (locDocsHasPublishingEndpoints) {
+            dependsOn("generateModustroDocsSite")
+        }
+        onlyIf { locDocsHasPublishingEndpoints }
+        doLast {
+            @Suppress("UNCHECKED_CAST")
+            val locConfigurationFactory = rootProject.extra["modustroPublishingConfigurationFromPlan"] as
+                (Map<String, Any?>) -> AIcPublishingStabilityConfiguration
+            @Suppress("UNCHECKED_CAST")
+            val locSchedulePublishing = rootProject.extra["modustroSchedulePublishingPayload"] as
+                (AIcPublishingPayload, AIcPublishingStabilityConfiguration, Any?) -> Unit
+            val locConfiguration = locConfigurationFactory(locDocsPublishingPlan)
+            val locStability = if (locDocsPublicationStability == "release") {
+                AInPublishingStability.RELEASE
+            } else {
+                AInPublishingStability.SNAPSHOT
+            }
+            val locRoot = locDocsSiteRoot.asFile.canonicalFile
+            val locFiles = if (locRoot.isDirectory) {
+                locRoot.walkTopDown()
+                    .filter(File::isFile)
+                    .filterNot { locFile ->
+                        val locRelative = locFile.relativeTo(locRoot).invariantSeparatorsPath
+                        locRelative.startsWith(".git/") || locRelative.startsWith(".modustro-publishing/")
+                    }
+                    .sortedBy { locFile -> locFile.relativeTo(locRoot).invariantSeparatorsPath }
+                    .map { locFile ->
+                        AIcPublishingPayloadFile(
+                            locFile.toPath(),
+                            locFile.relativeTo(locRoot).invariantSeparatorsPath
+                        )
+                    }
+                    .toList()
+            } else {
+                emptyList()
+            }
+            val locPublishingBranch = (findProperty("modustro.docs.publishingBranch") as String?)
+                ?.trim()
+                ?.takeIf(String::isNotBlank)
+                ?: "documentation"
+            val locPayload = AIcPublishingPayload(
+                AInPublishingOutputKind.MODUSTRO_DOCS_SITE,
+                locStability,
+                locAlgitesDocsRepositoryId,
+                locAlgitesDocsEffectivePublicationId,
+                locFiles,
+                mapOf(
+                    "workingTree" to locRoot.path,
+                    "branch" to locPublishingBranch,
+                    "commitMessage" to "Publish documentation for $locAlgitesDocsEffectivePublicationKind/$locAlgitesDocsEffectivePublicationId"
+                )
+            )
+            locSchedulePublishing(locPayload, locConfiguration, locDocsRepositoryMetadata["credentialProfiles"])
+        }
+    }
+}
+
+
+afterEvaluate {
+    val locGeneratedIndexTask = tasks.findByName("generateModustroDocsGeneratedIndex")
+    val locArtifactPublicationIndexesTask = tasks.findByName("generateModustroDocsArtifactPublishingIndexes")
+    val locPublicationGroupIndexesTask = tasks.findByName("generateModustroDocsPublishingGroupIndexes")
+
+    locAlgitesDocsTechnologyTaskNames
+        .mapNotNull { locTaskName -> tasks.findByName(locTaskName) }
+        .forEach { locDocumentationTask ->
+            locArtifactPublicationIndexesTask?.mustRunAfter(locDocumentationTask)
+            locGeneratedIndexTask?.mustRunAfter(locDocumentationTask)
+            locPublicationGroupIndexesTask?.mustRunAfter(locDocumentationTask)
+        }
+}

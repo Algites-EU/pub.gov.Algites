@@ -182,13 +182,13 @@ public final class AItcDependencyTechnologyHandlersTest {
         AIcDependencyDefinition locDependency = dependency(
             "modustro",
             Set.of(AInDependencyUsage.PRODUCT_IMPLEMENTATION),
-            Set.of("docs_site")
+            Set.of("modustro_docs_site")
         );
         AIcTechnologyKindDefinition locJavaDefinition = new AIcTechnologyKindDefinition(
             "java",
             List.of(),
-            List.of(new AIcBuildOutputTypeDefinition("docs_site", true, false, Set.of(), null)),
-            Set.of("docs_site"),
+            List.of(new AIcBuildOutputTypeDefinition("modustro_docs_site", true, false, Set.of(), null)),
+            Set.of("modustro_docs_site"),
             Set.of()
         );
         new AIcJavaDependencyTechnologyHandler("modustro").createResolutionPlan(

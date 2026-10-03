@@ -9,7 +9,7 @@
 
 ResourceEndpoints:
   java:
-    native_build_output:
+    native_binary_output:
       public:
         download:
           - Id: algites-java-public-release-download
@@ -19,7 +19,7 @@ ResourceEndpoints:
             Url: "https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/"
             Stability: snapshot
   python:
-    native_build_output:
+    native_binary_output:
       public:
         download:
           - Id: algites-python-public-release-download
@@ -29,7 +29,7 @@ ResourceEndpoints:
             Url: "https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/"
             Stability: snapshot
   mps:
-    native_build_output:
+    native_binary_output:
       public:
         download:
           - Id: algites-mps-public-release-download

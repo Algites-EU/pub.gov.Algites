@@ -1,0 +1,47 @@
+# yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-artifact_1.yamldef.schema.json
+# $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-artifact_1.yamldef.schema.json
+$schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-artifact_1.yamldef.schema.json
+
+Artifact:
+  TechnologyKinds: [java]
+  Name: Modustro Builder Jackson structured-data adapter
+  Description: Jackson-based YAML, JSON, and XML implementation of the Modustro Builder structured-data loader contract.
+
+Dependencies:
+  - DependencyKind: modustro
+    Items:
+      - GroupId: eu.algites.pltf.modustro.builder
+        ArtifactId: pub.gov.Algites_devops.build.modustro.builder.coreintf
+        Usages: [product_api]
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+  - DependencyKind: java
+    Items:
+      - GroupId: com.fasterxml.jackson.core
+        ArtifactId: jackson-databind
+        Usages: [product_implementation]
+        VersionRequirement:
+          Minimum: ">=2.12.0"
+          Maximum: "<3.0.0"
+          MaximumStrict: true
+      - GroupId: com.fasterxml.jackson.dataformat
+        ArtifactId: jackson-dataformat-yaml
+        Usages: [product_implementation]
+        VersionRequirement:
+          Minimum: ">=2.12.0"
+          Maximum: "<3.0.0"
+          MaximumStrict: true
+      - GroupId: com.fasterxml.jackson.dataformat
+        ArtifactId: jackson-dataformat-xml
+        Usages: [product_implementation]
+        VersionRequirement:
+          Minimum: ">=2.12.0"
+          Maximum: "<3.0.0"
+          MaximumStrict: true
+      - GroupId: org.testng
+        ArtifactId: testng
+        Usages: [develop_implementation]
+        VersionRequirement:
+          Minimum: ">=7.0.0"
+          Maximum: "<8.0.0"
+          MaximumStrict: true

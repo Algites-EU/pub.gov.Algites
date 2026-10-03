@@ -17,7 +17,7 @@ on:
         description: Gradle task that generates the documentation site.
         required: false
         type: string
-        default: generateAlgitesDocsSite
+        default: generateModustroDocsSite
       java-version:
         description: Java version used for Gradle execution.
         required: false
@@ -406,12 +406,12 @@ jobs:
           import java.io.File
 
           val locRepositoryDirectory = File(System.getenv("_TMP_ALGITES_METADATA_REPOSITORY_DIR"))
-          val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
+          val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/modustro-artifact-directory-metadata-resolver.gradle.kts")
 
           if (locResolverCoreScript.isFile) {
               apply(from = locResolverCoreScript)
           } else {
-              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts"))
+              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver.gradle.kts"))
           }
 
           tasks.register("writeAlgitesResolvedArtifactMetadataProperties") {
@@ -420,7 +420,7 @@ jobs:
 
               doLast {
                   @Suppress("UNCHECKED_CAST")
-                  val locResolveMetadataMap = rootProject.extra["algitesResolveArtifactDirectoryMetadataMap"] as (
+                  val locResolveMetadataMap = rootProject.extra["modustroResolveArtifactDirectoryMetadataMap"] as (
                       File,
                       String?,
                       String?,
@@ -429,7 +429,7 @@ jobs:
                   ) -> Map<String, Any?>
 
                   @Suppress("UNCHECKED_CAST")
-                  val locFlattenMetadata = rootProject.extra["algitesFlattenArtifactDirectoryMetadata"] as (Map<String, Any?>) -> Map<String, String>
+                  val locFlattenMetadata = rootProject.extra["modustroFlattenArtifactDirectoryMetadata"] as (Map<String, Any?>) -> Map<String, String>
 
                   val locMetadata = locResolveMetadataMap(
                       locRepositoryDirectory,
@@ -550,73 +550,34 @@ jobs:
 
           ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
             ${{ steps.request.outputs.gradle-task }} \
-            -Palgites.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
-            -Palgites.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
-            -Palgites.docs.publicationId="${{ steps.effective-publication.outputs.publication-id }}" \
-            -Palgites.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
-            -Palgites.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
-            -Palgites.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
+            -Pmodustro.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
+            -Pmodustro.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
+            -Pmodustro.docs.publicationId="${{ steps.effective-publication.outputs.publication-id }}" \
+            -Pmodustro.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
+            -Pmodustro.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
+            -Pmodustro.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
             -Palgites.snapshot.instanceId="${{ steps.request.outputs.snapshot-instance-id }}" \
             -Palgites.technologyKinds="${{ steps.request.outputs.technology-kinds }}" \
             ${{ steps.request.outputs.gradle-arguments }}
 
-      - name: Resolve documentation ResourceEndpoint adapters
-        id: publication-endpoints
-        shell: bash
-        run: |
-          set -euo pipefail
-          locSelectionFile="${GITHUB_WORKSPACE}/documentation-branch/.algites-publication/docs-site.properties"
-          if [[ ! -f "${locSelectionFile}" ]]; then
-            echo "::error::Documentation generation did not produce ${locSelectionFile}."
-            exit 1
-          fi
-
-          locCount="$(awk -F= '$1 == "count" {print $2; exit}' "${locSelectionFile}")"
-          if [[ ! "${locCount}" =~ ^[0-9]+$ || "${locCount}" -lt 1 ]]; then
-            echo "::error::No effective docs_site upload ResourceEndpoint was selected."
-            exit 1
-          fi
-
-          locPublishGitHubPages="false"
-          for ((locIndex=0; locIndex<locCount; locIndex++)); do
-            locId="$(awk -F= -v k="endpoint.${locIndex}.id" '$1 == k {print substr($0, index($0,"=")+1); exit}' "${locSelectionFile}")"
-            locAdapter="$(awk -F= -v k="endpoint.${locIndex}.providerAdapter" '$1 == k {print substr($0, index($0,"=")+1); exit}' "${locSelectionFile}")"
-            case "${locAdapter}" in
-              github-pages)
-                locPublishGitHubPages="true"
-                ;;
-              github-branch)
-                ;;
-              *)
-                echo "::error::Unsupported docs_site ResourceEndpointProviderAdapter '${locAdapter}' for endpoint '${locId}'."
-                exit 1
-                ;;
-            esac
-          done
-
-          if [[ "${{ steps.request.outputs.publish-pages }}" != "true" ]]; then
-            locPublishGitHubPages="false"
-          fi
-          echo "publish-github-pages=${locPublishGitHubPages}" >> "${GITHUB_OUTPUT}"
-
-      - name: Commit generated documentation to documentation branch
-        working-directory: documentation-branch
+      - name: Publish documentation through Modustro Builder
+        working-directory: source
         shell: bash
         run: |
           set -euo pipefail
 
-          locDocumentationBranch="${{ steps.publication.outputs.documentation-branch }}"
-
-          touch .nojekyll
-          git add -A
-
-          if git diff --cached --quiet; then
-            echo "No documentation changes to persist."
-            exit 0
-          fi
-
-          git commit -m "Publish documentation for ${{ steps.publication.outputs.publication-kind }}/${{ steps.effective-publication.outputs.publication-id }}"
-          git push origin HEAD:"${locDocumentationBranch}"
+          ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
+            publishModustroDocsSite \
+            -Pmodustro.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
+            -Pmodustro.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
+            -Pmodustro.docs.publicationId="${{ steps.effective-publication.outputs.publication-id }}" \
+            -Pmodustro.docs.publishingBranch="${{ steps.publication.outputs.documentation-branch }}" \
+            -Pmodustro.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
+            -Pmodustro.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
+            -Pmodustro.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
+            -Palgites.snapshot.instanceId="${{ steps.request.outputs.snapshot-instance-id }}" \
+            -Palgites.technologyKinds="${{ steps.request.outputs.technology-kinds }}" \
+            ${{ steps.request.outputs.gradle-arguments }}
 
       - name: Upload documentation site as workflow artifact
         uses: actions/upload-artifact@v4
@@ -626,16 +587,16 @@ jobs:
           if-no-files-found: error
 
       - name: Configure GitHub Pages
-        if: ${{ steps.publication-endpoints.outputs.publish-github-pages == 'true' }}
+        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages artifact
-        if: ${{ steps.publication-endpoints.outputs.publish-github-pages == 'true' }}
+        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
         uses: actions/upload-pages-artifact@v3
         with:
           path: documentation-branch
 
       - name: Deploy GitHub Pages
-        if: ${{ steps.publication-endpoints.outputs.publish-github-pages == 'true' }}
+        if: ${{ steps.publication.outputs.publish-github-pages == 'true' }}
         id: deploy-pages
         uses: actions/deploy-pages@v4

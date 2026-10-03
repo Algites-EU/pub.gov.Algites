@@ -251,7 +251,7 @@ val AIcAlgitesLicensingIgnoredDirectoryNames = setOf(
 )
 
 @Suppress("UNCHECKED_CAST")
-val AIcAlgitesLicensingRepositoryMetadata = rootProject.extra["algitesResolvedRepositoryMetadata"] as Map<String, Any?>
+val AIcAlgitesLicensingRepositoryMetadata = rootProject.extra["modustroResolvedRepositoryMetadata"] as Map<String, Any?>
 val AIcAlgitesLicensingRepositoryId = AIcAlgitesLicensingRepositoryMetadata["id"]?.toString()?.trim().orEmpty()
 val AIcAlgitesLicensingRepositoryVisibility = AIcAlgitesLicensingRepositoryMetadata["visibility"]?.toString()?.trim()?.lowercase().orEmpty()
 
@@ -659,7 +659,7 @@ fun AIcLicensingUsageFiles(): List<File> {
 }
 
 @Suppress("UNCHECKED_CAST")
-val AIcAlgitesLicensingArtifactDirectories = rootProject.extra["algitesResolvedArtifactDirectories"] as List<Map<String, Any?>>
+val AIcAlgitesLicensingArtifactDirectories = rootProject.extra["modustroResolvedArtifactDirectories"] as List<Map<String, Any?>>
 
 fun AIcLicensingRelevantPaths(): List<String> {
     val locPaths = linkedSetOf(".")
@@ -852,7 +852,7 @@ val verifyAlgitesLicensing = tasks.register<AIcVerifyAlgitesLicensingTask>("veri
 }
 
 tasks.matching {
-    it.name == "build" || it.name == "check" || it.name == "algitesBuild" || it.name == "algitesPublish"
+    it.name == "build" || it.name == "check" || it.name == "modustroBuild" || it.name == "modustroPublish"
 }.configureEach {
     dependsOn(verifyAlgitesLicensing)
 }
@@ -866,7 +866,7 @@ val locAlgitesDocumentationLicenseIds = linkedSetOf<String>().also { locLicenseI
 }.toList().sorted()
 
 val locAlgitesDocumentationSiteRoot = rootProject.file(
-    (rootProject.findProperty("algites.docs.siteRoot") as String?) ?: "build/run/bld/algites-docs/site"
+    (rootProject.findProperty("modustro.docs.siteRoot") as String?) ?: "build/run/bld/algites-docs/site"
 )
 
 val materializeAlgitesDocumentationLicenses = tasks.register<AIcMaterializeAlgitesDocumentationLicensesTask>("materializeAlgitesDocumentationLicenses") {
@@ -880,7 +880,7 @@ val materializeAlgitesDocumentationLicenses = tasks.register<AIcMaterializeAlgit
     summaryFile.fileValue(File(locAlgitesDocumentationSiteRoot, "LICENSE"))
 }
 
-tasks.matching { it.name == "generateAlgitesDocsSite" }.configureEach {
+tasks.matching { it.name == "generateModustroDocsSite" }.configureEach {
     dependsOn(materializeAlgitesDocumentationLicenses)
 }
 

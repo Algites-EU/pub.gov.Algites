@@ -1,0 +1,9 @@
+# yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-artifact-set_1.yamldef.schema.json
+# $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-artifact-set_1.yamldef.schema.json
+$schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-artifact-set_1.yamldef.schema.json
+
+ArtifactSet:
+  Name: Modustro Builder
+  Description: Gradle-independent Modustro Builder contracts and implementation.
+
+GroupId: eu.algites.pltf.modustro.builder

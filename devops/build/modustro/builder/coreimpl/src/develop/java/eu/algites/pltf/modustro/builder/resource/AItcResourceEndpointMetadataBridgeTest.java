@@ -31,7 +31,7 @@ public final class AItcResourceEndpointMetadataBridgeTest {
             "stability", "release"
         );
         Map<String, Object> locMetadata = Map.of(
-            "java.native_build_output.public.download",
+            "java.native_binary_output.public.download",
             List.of(locItem)
         );
 
@@ -39,7 +39,7 @@ public final class AItcResourceEndpointMetadataBridgeTest {
         Assert.assertEquals(
             locCatalog.select(
                 "java",
-                "native_build_output",
+                "native_binary_output",
                 "public",
                 AInResourceEndpointAction.DOWNLOAD,
                 AInResourceStability.RELEASE,

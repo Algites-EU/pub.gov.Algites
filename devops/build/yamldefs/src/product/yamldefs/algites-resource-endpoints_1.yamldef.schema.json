@@ -144,25 +144,15 @@
       },
       "minProperties": 1
     },
-    "nativeBuildOutputResourceKinds": {
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "native_build_output": {
-          "$ref": "#/$defs/stableVisibilityMatrix"
-        }
-      },
-      "minProperties": 1
-    },
     "modustroResourceKinds": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "docs_site": {
-          "$ref": "#/$defs/stableVisibilityMatrix"
-        },
         "schema_site": {
           "$ref": "#/$defs/unstableVisibilityMatrix"
+        },
+        "modustro_docs_site": {
+          "$ref": "#/$defs/stableVisibilityMatrix"
         }
       },
       "minProperties": 1
@@ -172,13 +162,13 @@
       "additionalProperties": false,
       "properties": {
         "java": {
-          "$ref": "#/$defs/nativeBuildOutputResourceKinds"
+          "$ref": "#/$defs/nativeOutputResourceKinds"
         },
         "python": {
-          "$ref": "#/$defs/nativeBuildOutputResourceKinds"
+          "$ref": "#/$defs/nativeOutputResourceKinds"
         },
         "mps": {
-          "$ref": "#/$defs/nativeBuildOutputResourceKinds"
+          "$ref": "#/$defs/nativeOutputResourceKinds"
         },
         "modustro": {
           "$ref": "#/$defs/modustroResourceKinds"
@@ -194,6 +184,22 @@
         }
       ],
       "unevaluatedProperties": false
+    },
+    "nativeOutputResourceKinds": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "native_binary_output": {
+          "$ref": "#/$defs/stableVisibilityMatrix"
+        },
+        "native_source_output": {
+          "$ref": "#/$defs/stableVisibilityMatrix"
+        },
+        "native_documentation_output": {
+          "$ref": "#/$defs/stableVisibilityMatrix"
+        }
+      },
+      "minProperties": 1
     }
   },
   "allOf": [

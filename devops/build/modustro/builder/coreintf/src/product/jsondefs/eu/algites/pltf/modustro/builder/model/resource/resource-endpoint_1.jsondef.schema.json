@@ -27,7 +27,7 @@
     "Id": {
       "type": "string",
       "pattern": "^algites-[a-z0-9]+(?:-[a-z0-9]+)*$",
-      "description": "Stable endpoint identifier used by selection and PublicationDestinations."
+      "description": "Stable resource endpoint identifier used by resource-resolution selection."
     },
     "Url": {
       "type": "string",

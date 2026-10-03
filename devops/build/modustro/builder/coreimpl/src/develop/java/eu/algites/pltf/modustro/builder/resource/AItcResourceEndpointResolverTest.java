@@ -32,7 +32,7 @@ public final class AItcResourceEndpointResolverTest {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
         AIcgdResourceEndpoint_1 locBase = new AIcgdResourceEndpoint_1(
             "java",
-            "native_build_output",
+            "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
             "algites-java-native-build-output-public-snapshot-download",
@@ -44,7 +44,7 @@ public final class AItcResourceEndpointResolverTest {
         );
         AIcgdResourceEndpoint_1 locOverride = new AIcgdResourceEndpoint_1(
             "java",
-            "native_build_output",
+            "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
             "algites-java-native-build-output-public-snapshot-download",
@@ -66,7 +66,7 @@ public final class AItcResourceEndpointResolverTest {
         Assert.assertEquals(
             locCatalog.select(
                 "java",
-                "native_build_output",
+                "native_binary_output",
                 "public",
                 AInResourceEndpointAction.DOWNLOAD,
                 AInResourceStability.SNAPSHOT,
@@ -84,7 +84,7 @@ public final class AItcResourceEndpointResolverTest {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
         AIcgdResourceEndpoint_1 locDeclaration = new AIcgdResourceEndpoint_1(
             "java",
-            "native_build_output",
+            "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.UPLOAD,
             "algites-java-native-build-output-public-snapshot-upload",
@@ -106,7 +106,7 @@ public final class AItcResourceEndpointResolverTest {
         String locId = "algites-java-native-build-output-public-snapshot-download";
         AIcgdResourceEndpoint_1 locDownload = new AIcgdResourceEndpoint_1(
             "java",
-            "native_build_output",
+            "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
             locId,
@@ -118,7 +118,7 @@ public final class AItcResourceEndpointResolverTest {
         );
         AIcgdResourceEndpoint_1 locUpload = new AIcgdResourceEndpoint_1(
             "java",
-            "native_build_output",
+            "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.UPLOAD,
             locId,
@@ -141,7 +141,7 @@ public final class AItcResourceEndpointResolverTest {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
         AIcgdResourceEndpoint_1 locDeclaration = new AIcgdResourceEndpoint_1(
             "java",
-            "native_build_output",
+            "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
             "algites-java-public-release-download",

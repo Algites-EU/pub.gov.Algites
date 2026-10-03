@@ -89,7 +89,7 @@ python_sdist        produced=yes  dependency=yes
 python_distribution produced=no   dependency=yes
                     alternatives=[python_wheel, python_sdist]
 
-docs_site           produced=yes  dependency=no
+modustro_docs_site  produced=yes  dependency=no
 schema_site         produced=yes  dependency=no
 ```
 
@@ -184,7 +184,7 @@ Conflicts between hard requirements are resolution failures only when the requir
 
 `coreintf` defines a Gradle-independent `AIiDependencyTechnologyHandler` contract and a portable dependency technology resolution plan. `coreimpl` supplies built-in Java and Python handlers. A handler receives already-resolved dependency/constraint definitions and a TechnologyKind definition, applies `DefaultDependencyOutputTypes` when needed, validates that requested outputs are dependency-consumable, maps portable usages to technology-native logical roles, and emits non-fatal diagnostics for lossy mappings.
 
-The Java handler exposes standard Gradle configuration **names** only; it imports no Gradle API. The current `algites-root-build.gradle.kts` adapter creates/configures the actual Gradle dependencies and configurations. The Python handler exposes logical roles (`package_runtime`, `build_source_processing`, `development`, `no_op`); the current execution adapter continues to use pip for graph preflight. Phase 2 does not yet materialize a distinct Python source-processing environment; that execution concern follows with source processing/output production.
+The Java handler exposes standard Gradle configuration **names** only; it imports no Gradle API. The current `modustro-root-build.gradle.kts` adapter creates/configures the actual Gradle dependencies and configurations. The Python handler exposes logical roles (`package_runtime`, `build_source_processing`, `development`, `no_op`); the current execution adapter continues to use pip for graph preflight. Phase 2 does not yet materialize a distinct Python source-processing environment; that execution concern follows with source processing/output production.
 
 `RequiredBuildOutputTypes` remains a dependency-consumption concern and uses `DefaultDependencyOutputTypes` when omitted. Build production is independent: Phase 3B now resolves effective `BuildOutputTypes` per TechnologyKind and materializes the selected concrete outputs through the producer registry. Virtual dependency-only outputs such as `python_distribution` cannot be requested as build products.
 
@@ -213,7 +213,7 @@ PreparedSourceSet
 
 PreparedSourceSet + documentation classpath
     -> generation_of_native_documentation
-    -> java_javadoc_jar and/or docs_site input
+    -> java_javadoc_jar and/or modustro_docs_site input
 ```
 
 For Python:
@@ -253,7 +253,7 @@ The active Phase-3B adapter currently maps production plans as follows:
 - `python_sdist` -> `python -m build --sdist`;
 - the default Python selection requests both wheel and sdist in one native build staging flow.
 
-`algitesBuild` still performs the normal verification/test lifecycle for an effective Java TechnologyKind, but output packaging is now driven by the selected production plans rather than by unconditional Gradle packaging defaults. Phase 4 retains the hard-wired producer registry for producer selection but adds portable capability requirements to every production plan and introduces the capability demand DAG. The planner deduplicates common demands and expands capability prerequisites. Phase 4A published the portable graph/model first as a bootstrap stage. Phase 4B activates the DAG in the Gradle adapter and documentation generation.
+`modustroBuild` still performs the normal verification/test lifecycle for an effective Java TechnologyKind, but output packaging is now driven by the selected production plans rather than by unconditional Gradle packaging defaults. Phase 4 retains the hard-wired producer registry for producer selection but adds portable capability requirements to every production plan and introduces the capability demand DAG. The planner deduplicates common demands and expands capability prerequisites. Phase 4A published the portable graph/model first as a bootstrap stage. Phase 4B activates the DAG in the Gradle adapter and documentation generation.
 
 
 ### Phase-4 capability demand graph
@@ -280,20 +280,24 @@ TechnologyKind / ResourceKind / Visibility / Action
 
 `Stability` is deliberately not a fifth mandatory matrix dimension. It is endpoint data whose presence is governed by the selected ResourceKind. This lets one endpoint model serve both native package repositories and publication resources whose lifecycle is not meaningfully split into release/snapshot channels.
 
-The initial built-in ResourceKinds are:
+The built-in output/resource kinds are:
 
-| ResourceKind | TechnologyKinds | Stability | Phase-5 status |
+| ResourceKind | TechnologyKinds | Stability | Role |
 | --- | --- | --- | --- |
-| `native_build_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | active for download/upload/manage |
-| `docs_site` | `modustro` | required (`release` / `snapshot`) | selectable infrastructure; generation/publication activates in Phase 6 |
-| `schema_site` | `modustro` | forbidden | selectable infrastructure; generation/publication activates in Phase 6 |
+| `native_binary_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | native binary packages and dependency resources |
+| `native_source_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | native source packages |
+| `native_documentation_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | technology-native documentation packages |
+| `modustro_docs_site` | `modustro` | required (`release` / `snapshot`) | aggregate Modustro documentation site |
+| `schema_site` | `modustro` | forbidden as a ResourceEndpoint property | globally published canonical schemas |
+
+Concrete build outputs map to these publishing kinds independently of the build producer: `java_classes_jar` and `python_wheel` map to `native_binary_output`; `java_sources_jar` and `python_sdist` map to `native_source_output`; `java_javadoc_jar` maps to `native_documentation_output`. The mapping belongs to Builder core and is not encoded in individual artifact descriptors.
 
 A canonical endpoint declaration therefore has the shape:
 
 ```yaml
 ResourceEndpoints:
   java:
-    native_build_output:
+    native_binary_output:
       public:
         upload:
           - Id: algites-java-native-build-output-public-snapshot-upload
@@ -316,22 +320,56 @@ ResourceEndpoints:
 
 Each endpoint may define `Id`, `Url`, `CredentialProfile`, `Enabled`, `Stability` when permitted/required by its ResourceKind, and optional `ResourceEndpointProviderAdapter`. `Enabled` defaults to true. Inheritance merges endpoints by `Id` inside the same four-dimensional cell, so a descendant can change one property or disable an inherited endpoint without copying the remaining endpoint definition.
 
-`ResourceEndpointProviderAdapter` is the generalized name for provider-specific behavior. The TechnologyKind/ResourceKind/Action combination owns default protocol behavior; a provider adapter is used only when a provider requires behavior outside that default contract. Current native-build-output management adapters remain `cloudsmith` and `repsy`. Phase 6 defines `github-pages` and `github-branch` for documentation deployment and `scaleway-object-storage` for direct S3-compatible global-schema deployment. The Scaleway adapter interprets a `basic` credential profile as the S3 access-key/secret-key pair and derives the bucket from the endpoint URL; no writer Function participates in upload.
+`ResourceEndpointProviderAdapter` is the generalized name for provider-specific **resource access/management** behavior. The TechnologyKind/ResourceKind/Action combination owns default protocol behavior; a provider adapter is used only when a concrete resource provider requires behavior outside that default contract. Publishing is no longer modeled as a ResourceEndpoint specialization in Phase 5.2. Publication targets use `PublishingEndpoints` and their separate `PublishingAdapter` contract, so generic publishing order/retry/failure/timeout/progress semantics do not leak into download or management endpoints.
 
-The source-repository visibility policy is preserved:
+The source-repository visibility policy is preserved while resource access and publishing use separate endpoint models:
 
-- public source repositories may consume and publish only public ResourceEndpoints;
-- private source repositories may consume public and private ResourceEndpoints, but publish/manage their own resources only through private ResourceEndpoints.
+- public source repositories may consume only public ResourceEndpoints; their publication targets come only from public-governance PublishingEndpoints;
+- private source repositories may consume public and private ResourceEndpoints; publication targets for their own outputs come from authorized private PublishingEndpoint overlays.
 
-Phase 5.1 removes the former repository-matrix input and its compatibility projection. `ResourceEndpoints` is the only endpoint representation accepted by the resolver and consumed by Gradle adapters.
+Phase 5.1 removes the former repository-matrix input and its compatibility projection. Phase 5.2 keeps `ResourceEndpoints` as the generalized resource-resolution/management representation and uses `PublishingEndpoints` exclusively for publishing.
 
-Phase 5.1A also connects canonical definition code generation to `source_native_processing`. `Artifact.DefinitionCodeGeneration` selects definitions and Java/Python targets; the Gradle adapter calls the reusable Defs Codegen Java API directly and writes reproducible output to `.gen` source roots. Generated transport/data types remain distinct from handwritten effective Builder models.
+Phase 5.2 makes canonical definition code generation convention-driven at `source_native_processing`. The Gradle adapter discovers canonical product definition roots, derives SourceKind/package/targets, calls the reusable Defs Codegen Java API directly, and writes reproducible output to `.gen` source roots. Generated transport/data types remain distinct from handwritten effective Builder models.
+
+Phase 5.2 also separates **publishing configuration** from the generalized ResourceEndpoint catalog. Publication policy is declared directly under each publishing output kind and then under `Snapshot` / `Release`. Each branch carries `PublishingEnabled` plus `PublishingEndpoints`; endpoint arrays merge hierarchically by stable `Id`, while individual endpoint properties inherit independently. The effective endpoint defaults are `Enabled=true`, `PublishingOrder=0`, `PublishingFailurePolicy=FAIL_BUILD_ON_PUBLISHING_FAILURE`, `PublishingRetryCount=0`, `PublishingRetryDelayMillis=1000`, and `ShowPublishingProgressIfPossible=true`. Negative publishing orders are valid. `PublishingAttemptTimeoutMillis` is optional and, when present, must be positive.
+
+Snapshot invocations expose five independent `DEFAULT` / `FORCE_ON` / `FORCE_OFF` overrides for `native_binary_output`, `native_source_output`, `native_documentation_output`, `modustro_docs_site`, and `schema_site`. Overrides affect only the branch-level `PublishingEnabled`; they never rewrite endpoint `Enabled`. Release publishing is descriptor-only and rejects a non-default portable override. Publishing enablement is intentionally independent from code generation, compilation, verification, and packaging.
 
 Phase 5.1B completes the ResourceEndpoint transport/effective-model split. Generated `AIcgdResourceEndpoint_1` values represent precedence-ordered declarations and therefore permit inherited amendment fields such as `Url`, `Enabled`, and `Stability` to remain absent. Builder Core merge-composes declarations by the four-dimensional cell plus `Id`, applies defaults only after inheritance, validates the effective ResourceKind contract, and exposes immutable typed selection through `AIcResourceEndpointCatalog`. Structured-data loaders perform YAML/JSON/XML representation mapping only; they do not apply inheritance or endpoint semantics. The Jackson implementation is packaged as the separate optional `builder/structureddata/jackson` artifact so the Builder core and Algites bootstrap path do not acquire Jackson transitively.
 
-`PublicationDestinations` in publication capability configuration denotes an optional set of ResourceEndpoint IDs. It does not contain URLs, credentials, or provider-specific state. When omitted, the publication adapter may select all enabled endpoints matching the capability's TechnologyKind/ResourceKind/visibility/action context. Phase 6 activates this selection for `docs_site` and `schema_site`; endpoint selection is performed by the portable publication resolver before provider adaptation.
+`PublicationDestinations` in a publication capability configuration denotes an optional set of **PublishingEndpoint IDs** for the corresponding output kind and stability branch. It never contains URLs, credentials, or provider-specific state. When omitted, all enabled effective PublishingEndpoints of that output/stability branch participate. This is an optional selection/filter only; inheritance, endpoint enablement, runtime Snapshot overrides, ordering, retries, failure handling, attempt timeouts, cancellation, and progress remain properties of the Builder publishing model and scheduler.
 
-Resource endpoint selection and credential materialization remain separate. Endpoints contain only a `CredentialProfile` reference; secret values continue to be resolved by the existing provider-independent credential document and trusted CI bridge.
+Resource-endpoint and publishing-endpoint credential materialization remain separate from both endpoint models. Descriptors contain only credential-profile references; secret values continue to be resolved by the provider-independent credential document and trusted CI bridge at execution time.
+
+### Phase-5.2 publishing scheduler
+
+The generic `AIcPublishingScheduler` owns publication orchestration. A PublishingAdapter executes exactly one attempt and never implements a second generic retry/order scheduler. Every attempt receives the effective endpoint, attempt number, configured timeout/deadline, cooperative cancellation token, materialized credentials, and a Builder-neutral progress reporter. Adapters may report determinate progress (`completed`, `total`, `unit`) or indeterminate/status updates. `ShowPublishingProgressIfPossible=false` suppresses continuous progress while preserving final success/failure diagnostics.
+
+`PublishingOrder` is a **start barrier**. Lower values start first and negative values are valid. Endpoints with the same effective order are eligible for parallel execution. Before a higher order starts, the scheduler waits only for endpoints whose failure policy is `FAIL_BUILD_ON_PUBLISHING_FAILURE`. An `IGNORE_PUBLISHING_FAILURE` endpoint may continue in the background across later publishing groups and other build-session work. Phase 5.2 intentionally keeps such background activity owned by the current Gradle/build session; it is not detached work that survives a completed Gradle process.
+
+Retries are counted after the initial attempt (`PublishingRetryCount=0` therefore means one total attempt). The scheduler rejects `PublishingRetryCount>0` for an adapter that does not declare automatic retry safety. Timeout enforcement is dual: the scheduler enforces the external deadline/cancellation boundary, while the adapter also receives the deadline so it can configure native I/O/process timeouts and cooperate with cancellation.
+
+### Phase-5.2 Gradle build domains and global phase barriers
+
+`NestedGradleSettingsBuildPolicy` is hierarchical and has two values: `IGNORE_NESTED_SETTINGS` and `USE_ISOLATED_BUILD_ON_NESTED_SETTINGS`. With `IGNORE_NESTED_SETTINGS`, a nested `settings.gradle(.kts)` does not create a Modustro boundary and discovery continues in the current Gradle domain. With `USE_ISOLATED_BUILD_ON_NESTED_SETTINGS`, discovery stops at that nested settings root and registers it as an included isolated build. The child domain reconstructs effective Modustro state in its own classloader by locating the single ancestor `modustro-source-repository.yml`, loading the descriptor ancestry from that source-repository root to its local Gradle build root, and resolving configuration independently. Live Builder/JVM domain objects never cross that build boundary.
+
+A source-repository infrastructure has exactly one relevant `modustro-source-repository.yml`. Absence is an error; conflicting/multiple relevant roots are an error. The source-repository root is a Modustro concept and need not be the VCS root.
+
+The central phase controller executes the build-domain tree horizontally. The canonical order is:
+
+```text
+RESOLVE -> PREPARE -> COMPILE -> VERIFY -> PACKAGE -> PUBLISH
+```
+
+Each phase is a separate Gradle invocation. The phase task in the current domain depends on the same phase task in every included isolated child domain. Successful return from that invocation is therefore the required global barrier before the controller starts the next phase. If any domain fails a required phase, the controller stops immediately and no later phase starts. In particular, `PUBLISH` cannot begin until `PACKAGE` has succeeded for every relevant domain.
+
+The portable Java controller is `AIcGradlePhaseController`; `gradle/tool/repository/modustro-phase-controller.sh` is the command-line/CI entry point. The shared public CI workflow auto-selects the phase controller for repositories that contain `modustro-source-repository.yml`, while not-yet-migrated repositories retain the previous task path until their individual migration.
+
+### Phase-5.2 remote publication consistency boundary
+
+Remote publication is deliberately **not globally transactional** in Phase 5.2. There is no repository-wide remote staging transaction, rollback protocol, or all-or-nothing commit across endpoints/artifacts. A concrete attempt may partially mutate a remote system before failing, just as an ordinary Maven publication can expose one uploaded file before a later file fails. Retry safety is therefore an adapter contract rather than an assumption.
+
+The guarantee provided by the phase controller is the useful boundary: every mandatory resolve/prepare/compile/verify/package operation across all relevant build domains completes successfully before any publishing phase starts. Once publication starts, failures are handled according to each PublishingEndpoint failure policy and retry contract; already completed remote side effects are not rolled back globally.
 
 ## 10. Canonical definitions and global publication metadata
 
@@ -362,7 +400,7 @@ The staged continuation is:
 3. concrete BuildOutputType producers, `PreparedSourceSet`, effective output selection, and Gradle adapter activation (complete);
 4. technology capabilities and demand-driven build graph (complete);
 5. generalized ResourceEndpoints and publication/deployment infrastructure (complete);
-6. `docs_site` and `schema_site` generation/publication;
+6. `modustro_docs_site` and `schema_site` generation/publication;
 7. additional producers, including `python_aws_lambda_zip`, and gradual removal of business logic from Gradle scripts;
 8. later producer/plugin discovery through AAC capabilities/providers.
 

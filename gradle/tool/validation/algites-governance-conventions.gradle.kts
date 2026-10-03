@@ -73,7 +73,11 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
             "java", "python", "mps", "modustro"
         )
         val locResourceKindSymbolicPropertyNames = setOf(
-            "native_build_output", "docs_site", "schema_site"
+            "native_binary_output",
+            "native_source_output",
+            "native_documentation_output",
+            "modustro_docs_site",
+            "schema_site"
         )
         val locVisibilitySymbolicPropertyNames = setOf(
             "public", "private"
@@ -244,7 +248,7 @@ val checkAlgitesGovernanceConventions = tasks.register<AIcCheckAlgitesGovernance
 }
 
 tasks.matching { locTask ->
-    locTask.name == "algitesBuild" || locTask.name == "build" || locTask.name == "check"
+    locTask.name == "modustroBuild" || locTask.name == "build" || locTask.name == "check"
 }.configureEach {
     dependsOn(checkAlgitesGovernanceConventions)
 }

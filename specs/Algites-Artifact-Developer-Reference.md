@@ -20,13 +20,13 @@ An Algites source repository is a hierarchy of one source-repository root, zero 
 
 ```text
 repository root
-├── algites-source-repository.yml
+├── modustro-source-repository.yml
 ├── license-usage.yml                     optional local licensing declaration
 ├── licensing/                            repository-local license definitions/texts
 ├── <container>/
-│   ├── algites-artifact-set.yml          optional, nestable
+│   ├── modustro-artifact-set.yml          optional, nestable
 │   ├── <artifact>/
-│   │   ├── algites-artifact.yml
+│   │   ├── modustro-artifact.yml
 │   │   ├── build.gradle.kts              optional custom Gradle behavior
 │   │   ├── src/
 │   │   │   ├── product/
@@ -37,11 +37,11 @@ repository root
 │   │       ├── product/
 │   │       └── develop/
 │   └── <nested-container>/
-│       └── algites-artifact-set.yml
+│       └── modustro-artifact-set.yml
 └── ...
 ```
 
-Discovery is structural. Once an `algites-artifact.yml` is found, discovery stops below that artifact. Directories inside the artifact are implementation details, not candidate artifact-set nodes.
+Discovery is structural. Once an `modustro-artifact.yml` is found, discovery stops below that artifact. Directories inside the artifact are implementation details, not candidate artifact-set nodes.
 
 Root infrastructure directories such as `.git`, `.gradle`, `.idea`, legacy root `run`, and root-level `build` are ignored only at the repository root. The same names may legitimately occur deeper in the structural hierarchy, for example `devops/build`.
 
@@ -59,9 +59,9 @@ The standard source metadata files are:
 
 | File | Structural role | Schema |
 | --- | --- | --- |
-| `algites-source-repository.yml` | repository root | `algites-source-repository_1.yamldef.schema.json` |
-| `algites-artifact-set.yml` | inheritable container | `algites-artifact-set_1.yamldef.schema.json` |
-| `algites-artifact.yml` | artifact leaf | `algites-artifact_1.yamldef.schema.json` |
+| `modustro-source-repository.yml` | repository root | `modustro-source-repository_1.yamldef.schema.json` |
+| `modustro-artifact-set.yml` | inheritable container | `modustro-artifact-set_1.yamldef.schema.json` |
+| `modustro-artifact.yml` | artifact leaf | `modustro-artifact_1.yamldef.schema.json` |
 | `license-usage.yml` | hierarchical licensing declaration | `algites-license-usage_1.yamldef.schema.json` |
 | `licensing/license-definitions.yml` | repository-local license catalog | `algites-license-definitions_1.yamldef.schema.json` |
 
@@ -75,7 +75,7 @@ Supporting reusable schemas include:
 - `algites-credential-profiles_1.yamldef.schema.json`
 - `algites-credentials_1.yamldef.schema.json`
 - `algites-publication-readiness_1.yamldef.schema.json`
-- `algites-artifact-manifest_1.yamldef.schema.json`
+- `modustro-artifact-manifest_1.yamldef.schema.json`
 
 The schemas use versioned filenames. A schema revision is therefore explicit and does not silently replace the meaning of an older version.
 
@@ -160,7 +160,7 @@ The planned automatic definition `SystemId` follows the same logical-path rule: 
 
 Root YAML/JSON documents may expose `$schema` as technical document metadata. For generated YAML roots the comment form used by YAML language servers, the commented `$schema` hint, and the actual `$schema` property should identify the same schema URI. Embedded contracts keep `$schema` at the document root rather than forcing it into embedded business objects.
 
-## 4. `algites-source-repository.yml`
+## 4. `modustro-source-repository.yml`
 
 A source repository begins with a root descriptor.
 
@@ -189,7 +189,7 @@ Version:
 | `SourceRepository.ResourceEndpoints` | no | General ResourceEndpoint contribution at repository scope. New metadata should use this field. |
 
 Wire names in all examples below follow the Algites structured-data naming convention from the Development Structure Specification: Algites fields use `UpperCamelCase` and symbolic values use `lower_snake_case`.
-ResourceEndpoint matrix dimensions are symbolic values used as map keys, so TechnologyKind, ResourceKind, visibility, stability, and action keys such as `modustro`, `native_build_output`, `docs_site`, `public`, `snapshot`, and `upload` intentionally retain their symbolic `lower_snake_case` spelling.
+ResourceEndpoint matrix dimensions are symbolic values used as map keys, so TechnologyKind, ResourceKind, visibility, stability, and action keys such as `modustro`, `native_binary_output`, `modustro_docs_site`, `public`, `snapshot`, and `upload` intentionally retain their symbolic `lower_snake_case` spelling.
 
 The repository descriptor may also contain these top-level inheritable properties:
 
@@ -203,7 +203,7 @@ The repository descriptor may also contain these top-level inheritable propertie
 
 These are top-level siblings of `SourceRepository`; do not nest them inside the `SourceRepository` object unless the schema explicitly defines a field there.
 
-## 5. `algites-artifact-set.yml`
+## 5. `modustro-artifact-set.yml`
 
 An artifact set groups descendant artifacts and can contribute inherited defaults.
 
@@ -237,7 +237,7 @@ Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `Enviro
 
 Artifact sets may be nested. Inheritance follows the actual structural path from repository root through every containing artifact set to the artifact.
 
-## 6. `algites-artifact.yml`
+## 6. `modustro-artifact.yml`
 
 Every artifact leaf has an artifact descriptor.
 
@@ -257,7 +257,6 @@ Artifact:
 | `Artifact.Description` | no | Free-form description. |
 | `Artifact.VariantId` | no | Optional lowercase dash-separated variant identity appended to native artifact/distribution identity. |
 | `Artifact.ResourceEndpoints` | no | General ResourceEndpoint contribution for this artifact. |
-| `Artifact.DefinitionCodeGeneration` | no | Artifact-local canonical definitions to generate into Java/Python `.gen` source roots during `source_native_processing`. |
 | `Artifact.Version` | no | Version-context contribution for this artifact. |
 
 Top-level `GroupId`, `Version`, `Dependencies`, `DependencyConstraints`, `EnvironmentRequirements`, `CredentialProfiles`, `PublicationReadiness`, and `DeleteSnapshotWhenReleased` are also allowed.
@@ -268,9 +267,9 @@ For readability, when `Name`, `Description`, and `TechnologyKinds` are present i
 
 ### 6.1.1 Definition-driven generated sources
 
-`Artifact.DefinitionCodeGeneration.Items` connects canonical definitions to the standard `source_native_processing` lifecycle. Each item declares `SourceKind` (`yamldefs`, `jsondefs`, or `xmldefs`), an artifact-relative canonical product `Source` below the matching `src/product/<SourceKind>/` root, one or more `Targets` (`java`, `python`), a target `Package`, and optionally `NamingProfile` (currently `algites`). The standard adapter invokes the reusable Defs Codegen Java API directly; it does not shell out to the CLI.
+Canonical definitions connect to the standard `source_native_processing` lifecycle by convention. The common adapter discovers files below the representation-specific product definition roots, derives package/module namespaces from their relative directories, and generates Java/Python sources for the matching artifact TechnologyKinds. When multiple representation-specific definitions generate the same target path, identical generated content is deduplicated; divergent content is a build error. The standard adapter invokes the reusable Defs Codegen Java API directly; it does not shell out to the CLI.
 
-Generated Java and Python files are materialized under `src/product/java.gen` and `src/product/python.gen` respectively, are reproducible, and MUST NOT be edited manually. The `.gen` roots may be shared by multiple generators: Defs Codegen tracks only its own generated files in disposable `build/run` state, removes stale owned files, and fails on duplicate target paths instead of overwriting them silently. `clean` removes standard `.gen` roots. A generator task attaches only to the corresponding `processAlgites*NativeSources` capability boundary; downstream compile/package/documentation task wiring remains owned by the common adapter.
+Generated Java and Python files are materialized under `src/product/java.gen` and `src/product/python.gen` respectively, are reproducible, and MUST NOT be edited manually. The `.gen` roots may be shared by multiple generators: Defs Codegen tracks only its own generated files in disposable `build/run` state, removes stale owned files, and fails on duplicate target paths instead of overwriting them silently. `clean` removes standard `.gen` roots. A generator task attaches only to the corresponding `processModustro*NativeSources` capability boundary; downstream compile/package/documentation task wiring remains owned by the common adapter.
 
 ### 6.1.2 Selecting BuildOutputTypes
 
@@ -323,7 +322,7 @@ A production plan identifies the concrete `BuildOutputType`, its built-in produc
 
 `generation_of_native_documentation` expands to `source_native_processing` plus `dependency_resolution` for Java and Python. Capability demands are deduplicated by `(TechnologyKind, Capability, Scope, ScopeIdentity)` and assembled into a prerequisite-before-dependent DAG. This lets multiple outputs and documentation consumers share one prerequisite without each wiring an independent Gradle dependency chain.
 
-For artifact-local source generators, `source_native_processing` is the supported integration boundary. A generator that materializes files consumed as native/generated sources should make the corresponding `processAlgitesJavaNativeSources` or `processAlgitesPythonNativeSources` task depend on the generator. It SHOULD NOT additionally wire itself directly to downstream tasks such as `preparePythonBuildProject`, `buildPython`, `compileJava`, or packaging tasks; the common adapter owns those downstream dependencies from the capability graph. The `devops/build/yamldefs` artifact is the reference example: its local Gradle script only generates the artifact-specific Python package layout and attaches that generator to `processAlgitesPythonNativeSources`.
+For artifact-local source generators, `source_native_processing` is the supported integration boundary. A generator that materializes files consumed as native/generated sources should make the corresponding `processModustroJavaNativeSources` or `processModustroPythonNativeSources` task depend on the generator. It SHOULD NOT additionally wire itself directly to downstream tasks such as `preparePythonBuildProject`, `buildPython`, `compileJava`, or packaging tasks; the common adapter owns those downstream dependencies from the capability graph. The `devops/build/yamldefs` artifact is the reference example for convention-only canonical definitions: its local Gradle script contains only the standard plugins. Modustro Builder discovers canonical definitions from the governed source roots and attaches the common generator to the corresponding `processModustro*NativeSources` capability boundary.
 
 ### 6.2 Environment requirements
 
@@ -468,7 +467,7 @@ ResourceEndpoints merge by stable endpoint `Id` within the same `TechnologyKind 
 Artifact:
   ResourceEndpoints:
     java:
-      native_build_output:
+      native_binary_output:
         public:
           download:
             - Id: algites-java-public-snapshot-download
@@ -514,7 +513,7 @@ If the object is absent, the implicit level is `release`.
 
 Readiness does **not** remove an artifact from discovery and does **not** prevent compilation/testing. A local project dependency may still cause tasks of a `none` artifact to run when another local artifact needs it.
 
-Publication is different. Before `algitesPublish`, the framework validates the selected controlled publication closure. If a selected artifact depends on a local controlled artifact whose effective readiness is too low, publication stops before upload. Diagnostics include the blocking descriptor path and, when supplied, `Cause` and `Author`.
+Publication is different. Before `modustroPublish`, the framework validates the selected controlled publication closure. If a selected artifact depends on a local controlled artifact whose effective readiness is too low, publication stops before upload. Diagnostics include the blocking descriptor path and, when supplied, `Cause` and `Author`.
 
 ## 10. Version
 
@@ -546,18 +545,18 @@ TechnologyKind -> ResourceKind -> visibility -> action -> endpoint list
 The four structural dimensions are:
 
 - TechnologyKind: `java`, `python`, `mps`, `modustro`;
-- ResourceKind: initially `native_build_output`, `docs_site`, `schema_site`;
+- ResourceKind: `native_binary_output`, `native_source_output`, `native_documentation_output`, `modustro_docs_site`, `schema_site`;
 - visibility: `public`, `private`;
 - action: `download`, `upload`, `manage`.
 
-`Stability` is an endpoint property, not a structural axis. `native_build_output` and `docs_site` require `release` or `snapshot`; `schema_site` forbids Stability because draft/release state belongs to deployed schema metadata rather than endpoint channel selection.
+`Stability` is an endpoint property, not a structural axis. Native binary/source/documentation outputs and `modustro_docs_site` require `release` or `snapshot`; `schema_site` forbids Stability because draft/release state belongs to deployed schema metadata rather than endpoint channel selection.
 
 Example:
 
 ```yaml
 ResourceEndpoints:
   java:
-    native_build_output:
+    native_binary_output:
       public:
         download:
           - Id: algites-java-public-snapshot-download
@@ -599,9 +598,53 @@ The precedence is therefore:
 1. explicit `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`;
 2. otherwise the published public GitHub defaults.
 
-### 11.3 Publication destinations
+### 11.3 Publishing configuration
 
-`PublicationDestinations` in a publication capability configuration is a list of ResourceEndpoint IDs. It narrows the effective matching endpoints; it never embeds URLs, credentials, provider state, or deployment metadata. Phase 6 activates this for `docs_site` and `schema_site`.
+Phase 5.2 separates Builder publishing from the generalized ResourceEndpoint catalog. Publication policy is declared directly at the descriptor root under one of these publishing output kinds:
+
+```text
+native_binary_output
+native_source_output
+native_documentation_output
+modustro_docs_site
+schema_site
+```
+
+Each output kind contains `Snapshot` and/or `Release`, and each stability branch contains `PublishingEnabled` plus `PublishingEndpoints`. Endpoint lists merge by stable `Id`; omitted endpoint properties inherit independently. The effective defaults are `Enabled: true`, `PublishingOrder: 0`, `PublishingFailurePolicy: FAIL_BUILD_ON_PUBLISHING_FAILURE`, `PublishingRetryCount: 0`, `PublishingRetryDelayMillis: 1000`, and `ShowPublishingProgressIfPossible: true`. Negative `PublishingOrder` values are valid. `PublishingAttemptTimeoutMillis` has no implicit value and must be positive when specified.
+
+Example:
+
+```yaml
+native_binary_output:
+  Snapshot:
+    PublishingEnabled: true
+    PublishingEndpoints:
+      - Id: snapshot-repository
+        Enabled: true
+        PublishingUrl: https://example.invalid/maven/
+        PublishingAdapter: maven-repository
+        PublishingCredentialProfile: snapshot-publisher
+        PublishingOrder: 0
+        PublishingFailurePolicy: FAIL_BUILD_ON_PUBLISHING_FAILURE
+        PublishingRetryCount: 0
+        PublishingRetryDelayMillis: 1000
+        PublishingAttemptTimeoutMillis: 30000
+        ShowPublishingProgressIfPossible: true
+```
+
+Snapshot invocation overrides are independent for all five output kinds and accept `DEFAULT`, `FORCE_ON`, or `FORCE_OFF`. They modify only the effective `PublishingEnabled`; endpoint `Enabled` is never overridden. Release publishing is descriptor-only and does not permit a non-default portable override. Publishing policy never disables code generation, compilation, verification, or packaging.
+
+The Gradle adapter accepts the following properties (with equivalent `MODUSTRO_PUBLISHING_*` environment variables):
+
+```text
+modustro.publishing.nativeBinaryOutput
+modustro.publishing.nativeSourceOutput
+modustro.publishing.nativeDocumentationOutput
+modustro.publishing.modustroDocsSite
+modustro.publishing.schemaSite
+```
+
+`ResourceEndpoints` remain the generalized resource-resolution contract used for dependency/resource access and management. Builder publication destinations are governed by `PublishingEndpoints`.
 
 ## 12. Credential profiles vs credential values
 
@@ -617,7 +660,7 @@ CredentialProfiles:
 Artifact:
   ResourceEndpoints:
     java:
-      native_build_output:
+      native_binary_output:
         private:
           download:
             - Id: algites-example-java-native-build-output-private-release-download
@@ -709,23 +752,23 @@ After changing licensing governance, rebuild and commit the materialized files.
 Every Java/Python distribution produced by the shared Algites adapters carries the deterministic logical-artifact manifest:
 
 ```text
-algites-artifact-manifest.yml
+modustro-artifact-manifest.yml
 ```
 
-The governed v1 structure is defined by `algites-artifact-manifest_1.yamldef.schema.json`.
+The governed v1 structure is defined by `modustro-artifact-manifest_1.yamldef.schema.json`.
 
 For every Java JAR produced by the project, including any sources JAR when present, the manifest is embedded at:
 
 ```text
-META-INF/algites/algites-artifact-manifest.yml
+META-INF/modustro/modustro-artifact-manifest.yml
 ```
 
 For Python distributions, the same TechnologyKind-neutral manifest is embedded in both distribution forms:
 
-- wheel: `<distribution>.dist-info/META-INF/algites/algites-artifact-manifest.yml`;
-- source distribution: `META-INF/algites/algites-artifact-manifest.yml` below the source-distribution root directory.
+- wheel: `<distribution>.dist-info/META-INF/modustro/modustro-artifact-manifest.yml`;
+- source distribution: `META-INF/modustro/modustro-artifact-manifest.yml` below the source-distribution root directory.
 
-The wheel location is intentionally scoped by the distribution's `.dist-info` directory so multiple installed Python distributions do not compete for one global `META-INF/algites` path. Future TechnologyKind adapters that define another distributable package format SHOULD embed the same logical-artifact manifest in that package using a format-appropriate metadata location.
+The wheel location is intentionally scoped by the distribution's `.dist-info` directory so multiple installed Python distributions do not compete for one global `META-INF/modustro` path. Future TechnologyKind adapters that define another distributable package format SHOULD embed the same logical-artifact manifest in that package using a format-appropriate metadata location.
 
 The manifest identifies the **logical Algites artifact**, not one TechnologyKind-specific representation. Therefore it intentionally does not contain `TechnologyKinds`, Java/Python/MPS-specific coordinates, build-tool details, or documentation-tool details. The same logical artifact manifest can be embedded in all TechnologyKind outputs of that artifact.
 
@@ -746,13 +789,13 @@ Artifact:
 SourceMetadata:
   DescriptorHierarchy:
     - StructureKind: repository
-      Path: algites-source-repository.yml
+      Path: modustro-source-repository.yml
       Sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     - StructureKind: artifact_set
-      Path: api/algites-artifact-set.yml
+      Path: api/modustro-artifact-set.yml
       Sha256: 123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef0
     - StructureKind: artifact
-      Path: api/core/algites-artifact.yml
+      Path: api/core/modustro-artifact.yml
       Sha256: 23456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef01
 ```
 
@@ -769,7 +812,7 @@ The manifest is deliberately **cache-stable with respect to unrelated build cont
 
 A change to a descriptor in the effective hierarchy changes its SHA-256 and therefore changes the manifest. A change only to unrelated CI/Git execution context does not.
 
-Generated artifact documentation also publishes a copy named `algites-artifact-manifest.yml` in the logical artifact publication directory and exposes the descriptor hierarchy and hashes in the artifact page header. Documentation-specific provenance such as source ref, Git commit, and generation time remains separate documentation metadata; it is not copied into the artifact manifest.
+Generated artifact documentation also publishes a copy named `modustro-artifact-manifest.yml` in the logical artifact publication directory and exposes the descriptor hierarchy and hashes in the artifact page header. Documentation-specific provenance such as source ref, Git commit, and generation time remains separate documentation metadata; it is not copied into the artifact manifest.
 
 ## 15. Common Gradle lifecycle
 
@@ -779,14 +822,14 @@ The exact task graph is TechnologyKind-dependent. These are the common entry poi
 | --- | --- |
 | `prepareDevelopment` | Generate effective development metadata needed by supported TechnologyKinds. |
 | `refreshDevelopment` | Force regeneration of effective development metadata. |
-| `algitesBuild` | Build all effective or explicitly selected TechnologyKinds. |
+| `modustroBuild` | Build all effective or explicitly selected TechnologyKinds. |
 | `validateAlgitesPublicationReadiness` | Validate readiness of the selected publication closure. Normally invoked by publication. |
-| `algitesPublish` | Publish all effective or selected TechnologyKinds. Publication credentials/overlays are normally supplied only by governed automation. |
-| `resolveAlgitesRequiredCredentials` | Resolve enabled repository endpoints and required credential profile/type pairs. |
-| `printAlgitesDeploymentPlan` | Print effective deployment/repository configuration. |
-| `printAlgitesArtifactModel` | Print discovered artifact metadata. |
-| `resolveAllAlgitesArtifactDirectoryMetadata` | Resolve metadata for all discovered artifact directories. |
-| `generateAlgitesDocsSite` | Generate the aggregate documentation site. |
+| `modustroPublish` | Publish all effective or selected TechnologyKinds. Publication credentials/overlays are normally supplied only by governed automation. |
+| `resolveModustroRequiredCredentials` | Resolve enabled repository endpoints and required credential profile/type pairs. |
+| `printModustroPublishingPlan` | Print effective deployment/repository configuration. |
+| `printModustroArtifactModel` | Print discovered artifact metadata. |
+| `resolveAllModustroArtifactDirectoryMetadata` | Resolve metadata for all discovered artifact directories. |
+| `generateModustroDocsSite` | Generate the aggregate documentation site. |
 | `rebuildAlgitesLicensing` | Rebuild materialized licensing files. |
 | `checkAlgitesLicensing` | Strict licensing consistency check. |
 | `verifyAlgitesLicensing` | Lifecycle licensing validation. |
@@ -826,7 +869,7 @@ The decimal suffix is one UTC snapshot-instance timestamp generated once by the 
 ALGITES_SNAPSHOT_INSTANCE_ID=20260921100435123
 ```
 
-The value contains decimal digits only. It is build execution metadata, not logical artifact metadata, so it is intentionally absent from `algites-artifact-manifest.yml`.
+The value contains decimal digits only. It is build execution metadata, not logical artifact metadata, so it is intentionally absent from `modustro-artifact-manifest.yml`.
 
 When documentation is generated as part of that centralized snapshot worker run, the same snapshot-instance id is propagated into the documentation and the concrete Python package version is shown there. A standalone/manual documentation run has no concrete package build to identify; in that case the documentation explicitly reports that the Python package version is not tied to a concrete package build instead of inventing `*.dev0`.
 
@@ -858,16 +901,16 @@ Normal developer builds normally need only download usage.
 Important documentation inputs include:
 
 ```text
--Palgites.docs.siteRoot=docs-site
--Palgites.docs.publicationKind=preview|snapshot|release
--Palgites.docs.publicationId=<id>
--Palgites.docs.sourceRef=<ref>
--Palgites.docs.sourceCommit=<commit>
--Palgites.docs.generatedAt=<UTC timestamp>
--Palgites.docs.repositoryHomeUrl=<url>
+-Pmodustro.docs.siteRoot=docs-site
+-Pmodustro.docs.publicationKind=preview|snapshot|release
+-Pmodustro.docs.publicationId=<id>
+-Pmodustro.docs.sourceRef=<ref>
+-Pmodustro.docs.sourceCommit=<commit>
+-Pmodustro.docs.generatedAt=<UTC timestamp>
+-Pmodustro.docs.repositoryHomeUrl=<url>
 ```
 
-The documentation system may also be given script/adapter overrides such as `algites.docs.baseScript`, `algites.docs.javaScript`, `algites.docs.pythonScript`, `algites.docs.mpsScript`, and `algites.docs.repositoryMetadataResolverScript`. These are infrastructure override points rather than normal artifact-author settings.
+The documentation system may also be given script/adapter overrides such as `modustro.docs.baseScript`, `modustro.docs.javaScript`, `modustro.docs.pythonScript`, `modustro.docs.mpsScript`, and `modustro.docs.repositoryMetadataResolverScript`. These are infrastructure override points rather than normal artifact-author settings.
 
 ## 17. Public GitHub workflow entry points
 
@@ -924,7 +967,7 @@ Artifact authors normally do not embed upload/manage repository secrets or centr
 ### 18.1 Add a Java artifact
 
 1. Create the structural directory.
-2. Add `algites-artifact.yml`:
+2. Add `modustro-artifact.yml`:
 
 ```yaml
 Artifact:
@@ -970,21 +1013,21 @@ PublicationReadiness:
 ### 18.5 Build only selected technologies
 
 ```bash
-./gradlew -Palgites.technologyKinds=java algitesBuild
+./gradlew -Palgites.technologyKinds=java modustroBuild
 ```
 
 or:
 
 ```bash
-ALGITES_TECHNOLOGY_KINDS=java,python ./gradlew algitesBuild
+ALGITES_TECHNOLOGY_KINDS=java,python ./gradlew modustroBuild
 ```
 
 ### 18.6 Inspect effective metadata
 
 ```bash
-./gradlew printAlgitesArtifactModel
-./gradlew resolveAllAlgitesArtifactDirectoryMetadata
-./gradlew printAlgitesDeploymentPlan
+./gradlew printModustroArtifactModel
+./gradlew resolveAllModustroArtifactDirectoryMetadata
+./gradlew printModustroPublishingPlan
 ```
 
 ## 19. Common failure modes
@@ -999,11 +1042,11 @@ Read the blocking declaration(s) printed by the task. The error identifies descr
 
 ### Missing or unresolved TechnologyKind during credential preflight
 
-If `resolveAlgitesRequiredCredentials` reports that no TechnologyKinds were resolved, verify that each distributable artifact uses the current `Artifact.TechnologyKinds` declaration. Legacy keys such as `Artifact.Type` are not a TechnologyKind declaration. An explicit TechnologyKind selection only narrows declared artifact technologies; it does not create missing declarations. An accidental empty resolution is rejected rather than expanded to all ResourceEndpoint technologies.
+If `resolveModustroRequiredCredentials` reports that no TechnologyKinds were resolved, verify that each distributable artifact uses the current `Artifact.TechnologyKinds` declaration. Legacy keys such as `Artifact.Type` are not a TechnologyKind declaration. An explicit TechnologyKind selection only narrows declared artifact technologies; it does not create missing declarations. An accidental empty resolution is rejected rather than expanded to all ResourceEndpoint technologies.
 
 ### Missing repository credentials
 
-Run `resolveAlgitesRequiredCredentials` for the intended context. Confirm that endpoint `CredentialProfile` ids match the universal credential document and that the selected profile contains the type required by non-secret repository metadata.
+Run `resolveModustroRequiredCredentials` for the intended context. Confirm that endpoint `CredentialProfile` ids match the universal credential document and that the selected profile contains the type required by non-secret repository metadata.
 
 ### Licensing materialization is stale
 
@@ -1021,7 +1064,7 @@ The selected Python interpreter must provide the tools used by the adapter, curr
 
 ### Documentation contains stale technology output
 
-Generate through `generateAlgitesDocsSite` or the standard documentation workflow. The documentation publication lifecycle clears/rebuilds the selected publication and should not be emulated by manually copying old generated directories.
+Generate through `generateModustroDocsSite` or the standard documentation workflow. The documentation publication lifecycle clears/rebuilds the selected publication and should not be emulated by manually copying old generated directories.
 
 ## 20. Reference map
 

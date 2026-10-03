@@ -11,13 +11,13 @@ It contains:
 - canonical versioned definitions in YAML-definition, JSON-definition and XML-definition source roots;
 - structured-data loading contracts for mapping YAML, JSON and XML documents to generated or handwritten data-object types;
 - strict global-publication user sidecars for canonical source definitions plus a separate deployment-owned metadata contract for published state;
-- Phase-6 publication endpoint-selection and deploy-state contracts for `docs_site` and `schema_site`.
+- Phase-6 publication endpoint-selection and deploy-state contracts for `modustro_docs_site` and `schema_site`.
 
 The dependency model uses `DependencyKind: modustro` for Modustro-controlled artifact references. Dependency/constraint groups use `ItemsInheritancePolicy` to control membership, while a surviving same-identity dependency always merge-composes its `Usages` and `RequiredBuildOutputTypes`; neither property participates in dependency identity. `VariantId` remains part of the dependency identity. Version scalars support explicit `null` clearing, and the hard `Exclude` collection has its own item-inheritance policy.
 
 ## Definition-driven generated sources
 
-The artifact declares `Artifact.DefinitionCodeGeneration` entries for canonical ResourceEndpoint definitions. During the `source_native_processing` lifecycle boundary, the common Algites build adapter invokes the reusable Defs Codegen Java API from `pub.tool.General` and materializes reproducible generated sources below the standard `.gen` source roots. Generated files are derived state and MUST NOT be edited manually.
+Modustro Builder automatically discovers canonical definitions below `src/product/yamldefs`, `src/product/jsondefs`, and `src/product/xmldefs`. During the `source_native_processing` lifecycle boundary it derives SourceKind from the source root, the generated package/module namespace from the path below that root, and Java/Python generation targets from the artifact TechnologyKinds. The reusable Defs Codegen Java API from `pub.tool.General` materializes reproducible generated sources below the standard `.gen` source roots. Generated files are derived state and MUST NOT be edited manually.
 
 The ResourceEndpoint model deliberately separates canonical serialized data from the effective Builder domain model:
 
@@ -43,4 +43,4 @@ No Gradle API type is part of this artifact's public or implementation dependenc
 
 ## Phase 6 publication contracts
 
-Phase 6 adds portable publication contracts without introducing storage-provider APIs into Builder Core. `AIcPublicationDestinationSelection` carries the effective `ResourceEndpoint` targets selected for one publication capability invocation. `AInGlobalPublicationState` and `AIcGlobalPublicationDeployMetadata` represent trusted deployment state independently from author-controlled sidecars. Canonical publication user/deploy metadata definitions and the Modustro publication capability configuration definitions are now included in definition-driven Java source generation so execution adapters can consume versioned generated DTOs rather than ad-hoc maps.
+Phase 6 adds portable publication contracts without introducing storage-provider APIs into Builder Core. `AInGlobalPublicationState` and `AIcGlobalPublicationDeployMetadata` represent trusted deployment state independently from author-controlled sidecars. Canonical publication user/deploy metadata definitions and the Modustro publication capability configuration definitions are now included in definition-driven Java source generation so execution adapters can consume versioned generated DTOs rather than ad-hoc maps.

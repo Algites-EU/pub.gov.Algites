@@ -173,6 +173,39 @@ jobs:
           # 5) Everything else: skip
           echo "mode=skip" >> "$GITHUB_OUTPUT"
 
+      - name: Resolve Modustro phase controller
+        id: modustro_phase_controller
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t locRepositoryRoots < <(
+            find "${GITHUB_WORKSPACE}" -type f -name modustro-source-repository.yml \
+              -not -path '*/.git/*' -printf '%h\n' | sort -u
+          )
+          if [[ ${#locRepositoryRoots[@]} -eq 0 ]]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ ${#locRepositoryRoots[@]} -ne 1 ]]; then
+            printf '::error::Expected exactly one Modustro source repository root, found %d:\n' "${#locRepositoryRoots[@]}"
+            printf ' - %s\n' "${locRepositoryRoots[@]}"
+            exit 1
+          fi
+
+          locBuildRoot="${locRepositoryRoots[0]}"
+          locController="${GITHUB_WORKSPACE}/gradle/tool/repository/modustro-phase-controller.sh"
+          if [[ ! -f "${locController}" ]]; then
+            locController="${RUNNER_TEMP}/modustro-phase-controller.sh"
+            curl -fsSL \
+              "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-phase-controller.sh" \
+              > "${locController}"
+          fi
+          chmod +x "${locController}"
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          echo "controller=${locController}" >> "$GITHUB_OUTPUT"
+          echo "build_root=${locBuildRoot}" >> "$GITHUB_OUTPUT"
+
       - name: Detect config changes (pom/gradle)
         id: changes
         if: ${{ steps.mode.outputs.mode != 'skip' }}
@@ -364,7 +397,7 @@ jobs:
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
           locPlanFile="${RUNNER_TEMP}/algites-required-credentials.json"
           "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q \
-            resolveAlgitesRequiredCredentials \
+            resolveModustroRequiredCredentials \
             -Palgites.credential.usages=download \
             -Palgites.credential.download.stabilities=release,snapshot \
             -Palgites.credential.output="${locPlanFile}"
@@ -414,12 +447,12 @@ jobs:
           import java.io.File
 
           val locRepositoryDirectory = File(System.getenv("_TMP_ALGITES_METADATA_REPOSITORY_DIR"))
-          val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts")
+          val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/modustro-artifact-directory-metadata-resolver.gradle.kts")
 
           if (locResolverCoreScript.isFile) {
               apply(from = locResolverCoreScript)
           } else {
-              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-artifact-directory-metadata-resolver.gradle.kts"))
+              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver.gradle.kts"))
           }
 
           tasks.register("algitesCiResolveMetadata") {
@@ -428,7 +461,7 @@ jobs:
 
               doLast {
                   @Suppress("UNCHECKED_CAST")
-                  val locResolveMetadataMap = rootProject.extra["algitesResolveArtifactDirectoryMetadataMap"] as (
+                  val locResolveMetadataMap = rootProject.extra["modustroResolveArtifactDirectoryMetadataMap"] as (
                       File,
                       String?,
                       String?,
@@ -437,7 +470,7 @@ jobs:
                   ) -> Map<String, Any?>
 
                   @Suppress("UNCHECKED_CAST")
-                  val locFlattenMetadata = rootProject.extra["algitesFlattenArtifactDirectoryMetadata"] as (Map<String, Any?>) -> Map<String, String>
+                  val locFlattenMetadata = rootProject.extra["modustroFlattenArtifactDirectoryMetadata"] as (Map<String, Any?>) -> Map<String, String>
 
                   val locMetadata = locResolveMetadataMap(
                       locRepositoryDirectory,
@@ -615,7 +648,16 @@ jobs:
           EXTRA=""
           if [[ -n "$_TMP_ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$_TMP_ALGITES_VERSION"; fi
           echo "=== Gradle construction: compile (including test sources, without test execution) ==="
-          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
+          if [[ "${{ steps.modustro_phase_controller.outputs.enabled }}" == "true" ]]; then
+            locArgs=()
+            if [[ -n "${EXTRA}" ]]; then locArgs+=("${EXTRA}"); fi
+            "${{ steps.modustro_phase_controller.outputs.controller }}" \
+              --through compile \
+              --build-root "${{ steps.modustro_phase_controller.outputs.build_root }}" \
+              -- "${locArgs[@]}"
+          else
+            "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
+          fi
 
       # -------------------------
       # Verification mode
@@ -631,7 +673,16 @@ jobs:
           EXTRA=""
           if [[ -n "$_TMP_ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$_TMP_ALGITES_VERSION"; fi
           echo "=== Gradle verification: test+integration test, no packaging ==="
-          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
+          if [[ "${{ steps.modustro_phase_controller.outputs.enabled }}" == "true" ]]; then
+            locArgs=()
+            if [[ -n "${EXTRA}" ]]; then locArgs+=("${EXTRA}"); fi
+            "${{ steps.modustro_phase_controller.outputs.controller }}" \
+              --through verify \
+              --build-root "${{ steps.modustro_phase_controller.outputs.build_root }}" \
+              -- "${locArgs[@]}"
+          else
+            "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
+          fi
 
       # -------------------------
       # Approval mode
@@ -647,7 +698,16 @@ jobs:
           EXTRA=""
           if [[ -n "$_TMP_ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$_TMP_ALGITES_VERSION"; fi
           echo "=== Gradle approval (test+integration test, with packaging) ==="
-          "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
+          if [[ "${{ steps.modustro_phase_controller.outputs.enabled }}" == "true" ]]; then
+            locArgs=()
+            if [[ -n "${EXTRA}" ]]; then locArgs+=("${EXTRA}"); fi
+            "${{ steps.modustro_phase_controller.outputs.controller }}" \
+              --through package \
+              --build-root "${{ steps.modustro_phase_controller.outputs.build_root }}" \
+              -- "${locArgs[@]}"
+          else
+            "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
+          fi
 
       - name: Skip (non-matching branch)
         if: ${{ steps.mode.outputs.mode == 'skip' }}

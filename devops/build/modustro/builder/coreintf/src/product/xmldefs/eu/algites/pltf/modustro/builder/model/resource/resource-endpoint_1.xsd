@@ -33,7 +33,7 @@
       </xs:element>
       <xs:element name="Id" minOccurs="1" maxOccurs="1" type="xs:string">
         <xs:annotation>
-          <xs:documentation>Stable endpoint identifier used by selection and PublicationDestinations.</xs:documentation>
+          <xs:documentation>Stable resource endpoint identifier used by resource-resolution selection.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="Url" minOccurs="0" maxOccurs="1" type="xs:anyURI">

@@ -98,7 +98,7 @@ public final class AIcResourceEndpointValidator {
             + "-" + aEndpoint.visibility()
             + (aEndpoint.stability() == null ? "" : "-" + aEndpoint.stability().wireValue())
             + "-" + aEndpoint.action().wireValue();
-        String locLegacySuffix = "native_build_output".equals(aEndpoint.resourceKind()) && aEndpoint.stability() != null
+        String locLegacySuffix = "native_binary_output".equals(aEndpoint.resourceKind()) && aEndpoint.stability() != null
             ? "-" + aEndpoint.technologyKind() + "-" + aEndpoint.visibility() + "-"
                 + aEndpoint.stability().wireValue() + "-" + aEndpoint.action().wireValue()
             : null;

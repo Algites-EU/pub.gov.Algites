@@ -1,14 +1,14 @@
 pluginManagement {
     repositories {
-        val locIsCi =
-                providers.gradleProperty("CI")
-                .orElse(providers.environmentVariable("CI"))
+        val locUseMavenLocalForResolution =
+            providers.gradleProperty("modustro.useMavenLocalForResolution")
+                .orElse(providers.environmentVariable("MODUSTRO_USE_MAVEN_LOCAL_FOR_RESOLUTION"))
                 .map { it.equals("true", ignoreCase = true) }
                 .orElse(false)
                 .get()
 
         gradlePluginPortal()
-        if (!locIsCi) {
+        if (locUseMavenLocalForResolution) {
             mavenLocal()
         }
         mavenCentral()
@@ -32,24 +32,24 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        val locIsCi =
-                providers.gradleProperty("CI")
-                .orElse(providers.environmentVariable("CI"))
+        val locUseMavenLocalForResolution =
+            providers.gradleProperty("modustro.useMavenLocalForResolution")
+                .orElse(providers.environmentVariable("MODUSTRO_USE_MAVEN_LOCAL_FOR_RESOLUTION"))
                 .map { it.equals("true", ignoreCase = true) }
                 .orElse(false)
                 .get()
 
-        if (!locIsCi) {
+        if (locUseMavenLocalForResolution) {
             mavenLocal()
         }
         mavenCentral()
     }
 }
 
-val locAlgitesSettingsDiscoveryScript = file("gradle/tool/repository/algites-root-settings-discovery.gradle.kts")
+val locAlgitesSettingsDiscoveryScript = file("gradle/tool/repository/modustro-root-settings-discovery.gradle.kts")
 if (locAlgitesSettingsDiscoveryScript.isFile) {
     apply(from = locAlgitesSettingsDiscoveryScript)
 } else {
-    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/algites-root-settings-discovery.gradle.kts"))
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-root-settings-discovery.gradle.kts"))
 }
 

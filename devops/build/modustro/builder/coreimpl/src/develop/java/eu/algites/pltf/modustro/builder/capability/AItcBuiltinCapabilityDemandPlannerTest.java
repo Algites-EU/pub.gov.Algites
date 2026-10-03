@@ -86,7 +86,7 @@ public final class AItcBuiltinCapabilityDemandPlannerTest {
                 AInModelScope.REPOSITORY,
                 "pub.gov.Algites"
             ),
-            Set.of("task:generateAlgitesDocsSite")
+            Set.of("task:generateModustroDocsSite")
         );
         var locGraph = new AIcBuiltinCapabilityDemandPlanner().createDemandGraph(
             "devops/build/example",

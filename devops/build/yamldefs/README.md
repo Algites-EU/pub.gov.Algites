@@ -37,7 +37,7 @@ Python packaging of these common definition roots is handled entirely by the gen
 
 ## Artifact manifest schema
 
-`algites-artifact-manifest_1.yamldef.schema.json` defines the deterministic TechnologyKind-neutral `algites-artifact-manifest.yml` embedded into distributed Algites artifacts and published with generated artifact documentation. It contains logical artifact identity plus SHA-256 hashes of the effective source descriptor hierarchy, but excludes timestamps, Git identities, CI run identifiers, credentials, and other execution-context values that would change independently of the governed artifact sources.
+`modustro-artifact-manifest_1.yamldef.schema.json` defines the deterministic TechnologyKind-neutral `modustro-artifact-manifest.yml` embedded into distributed Algites artifacts and published with generated artifact documentation. It contains logical artifact identity plus SHA-256 hashes of the effective source descriptor hierarchy, but excludes timestamps, Git identities, CI run identifiers, credentials, and other execution-context values that would change independently of the governed artifact sources.
 
 ## Credential document schema
 

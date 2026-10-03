@@ -78,7 +78,7 @@ public final class AIcBuiltinTechnologyKindDefinitions {
                 new AIcCapabilityDefinition("docs_site_content", Set.of(AInModelScope.REPOSITORY, AInModelScope.ARTIFACT_SET, AInModelScope.ARTIFACT), "urn:algites:modustro:builder:capability-configuration:modustro:docs-site-content:1")
             ),
             List.of(
-                output("docs_site", true, false),
+                output("modustro_docs_site", true, false),
                 output("schema_site", true, false)
             ),
             Set.of(),

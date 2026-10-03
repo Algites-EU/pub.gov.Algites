@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/modustro-builder-publishing_1.yamldef.schema.json",
+  "title": "Modustro Builder Publishing Model v1",
+  "description": "Defines inheritable output publishing configuration and nested Gradle settings build-domain policy for Modustro Builder.",
+  "$defs": {
+    "NestedGradleSettingsBuildPolicy": {
+      "type": "string",
+      "enum": [
+        "IGNORE_NESTED_SETTINGS",
+        "USE_ISOLATED_BUILD_ON_NESTED_SETTINGS"
+      ],
+      "default": "IGNORE_NESTED_SETTINGS",
+      "description": "Controls whether nested Gradle settings files are ignored as build boundaries or create isolated Gradle build domains."
+    },
+    "PublishingFailurePolicy": {
+      "type": "string",
+      "enum": [
+        "FAIL_BUILD_ON_PUBLISHING_FAILURE",
+        "IGNORE_PUBLISHING_FAILURE"
+      ],
+      "default": "FAIL_BUILD_ON_PUBLISHING_FAILURE",
+      "description": "Controls whether final failure of this endpoint fails the required build path."
+    },
+    "PublishingEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "Stable endpoint identity used for hierarchical merging."
+        },
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "PublishingUrl": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Destination URL or URI understood by the selected publishing adapter.",
+          "format": "uri"
+        },
+        "PublishingAdapter": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "PublishingCredentialProfile": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "PublishingOrder": {
+          "type": "integer",
+          "default": 0,
+          "description": "Lower values may start earlier. Equal effective values are eligible for concurrent start; negative values are valid."
+        },
+        "PublishingFailurePolicy": {
+          "$ref": "#/$defs/PublishingFailurePolicy"
+        },
+        "PublishingRetryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of retries after the initial attempt."
+        },
+        "PublishingRetryDelayMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000
+        },
+        "PublishingAttemptTimeoutMillis": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum duration of one publishing attempt. The scheduler owns the deadline and the adapter receives it for native timeout/cancellation handling."
+        },
+        "ShowPublishingProgressIfPossible": {
+          "type": "boolean",
+          "default": true
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "minProperties": 1
+    },
+    "PublishingEndpoints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PublishingEndpoint"
+      },
+      "description": "Endpoint amendments are hierarchically merged by Id; individual endpoint properties inherit independently."
+    },
+    "PublishingStabilityConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "PublishingEnabled": {
+          "type": "boolean",
+          "description": "Enables publishing for this output kind and stability. It inherits when omitted and defaults to false when no ancestor defines it. It does not control compilation, verification, packaging, or creation of the output itself.",
+          "default": false
+        },
+        "PublishingEndpoints": {
+          "$ref": "#/$defs/PublishingEndpoints"
+        }
+      },
+      "minProperties": 1
+    },
+    "OutputPublishingConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Snapshot": {
+          "$ref": "#/$defs/PublishingStabilityConfiguration"
+        },
+        "Release": {
+          "$ref": "#/$defs/PublishingStabilityConfiguration"
+        }
+      },
+      "minProperties": 1
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "NestedGradleSettingsBuildPolicy": {
+      "$ref": "#/$defs/NestedGradleSettingsBuildPolicy"
+    },
+    "native_binary_output": {
+      "$ref": "#/$defs/OutputPublishingConfiguration"
+    },
+    "native_source_output": {
+      "$ref": "#/$defs/OutputPublishingConfiguration"
+    },
+    "native_documentation_output": {
+      "$ref": "#/$defs/OutputPublishingConfiguration"
+    },
+    "modustro_docs_site": {
+      "$ref": "#/$defs/OutputPublishingConfiguration"
+    },
+    "schema_site": {
+      "$ref": "#/$defs/OutputPublishingConfiguration"
+    }
+  }
+}

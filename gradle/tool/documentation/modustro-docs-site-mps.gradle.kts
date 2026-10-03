@@ -1,0 +1,950 @@
+/*
+ * Algites shared MPS documentation site script.
+ *
+ * Intended location in governance repository:
+ *   gradle/tool/documentation/modustro-docs-site-mps.gradle.kts
+ *
+ * A repository can apply only this script; it automatically applies the base
+ * documentation-site script.
+ */
+
+import org.gradle.api.Action
+import org.gradle.api.Task
+import java.security.MessageDigest
+
+val locAlgitesDocsBaseScript = (findProperty("modustro.docs.baseScript") as String?)
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/modustro-docs-site-base.gradle.kts"
+
+apply(from = uri(locAlgitesDocsBaseScript))
+
+val locProjectRootDirectory = layout.projectDirectory.asFile
+
+data class AIcdArtifactSetProject(
+    val locRelativePath: String,
+    val locProjectDirectory: File
+) : java.io.Serializable
+
+data class AIcdDiscoveredMpsArtifact(
+    val locArtifactSetProjectPath: String,
+    val locDescriptorPath: String,
+    val locModuleName: String,
+    val locModuleKind: String,
+    val locModulePath: String,
+    val locArtifactId: String,
+    val locDocumentationPath: String,
+    val locPublishable: Boolean
+) : java.io.Serializable
+
+data class AIcdMpsArtifactCandidate(
+    val locArtifactSetProjectPath: String,
+    val locDescriptorPath: String,
+    val locModuleName: String,
+    val locModuleKind: String,
+    val locBaseModulePath: String,
+    val locPublishable: Boolean
+) : java.io.Serializable
+
+val locDiscoveryOutputFile = layout.buildDirectory.file("algites/discovered-mps-artifacts.tsv")
+val locAlgitesDocsResolvedRepositoryId =
+    (extra.properties["modustroDocsResolvedRepositoryId"] as String?)
+        ?: (rootProject.extra.properties["modustroDocsResolvedRepositoryId"] as String?)
+        ?: (rootProject.extra.properties["modustroResolvedRepositoryMetadata"] as? Map<*, *>)
+            ?.get("name")
+            ?.toString()
+        ?: rootProject.name
+val locAlgitesDocsResolvedRepositoryName =
+    (extra.properties["modustroDocsResolvedRepositoryName"] as String?)
+        ?: (rootProject.extra.properties["modustroDocsResolvedRepositoryName"] as String?)
+        ?: locAlgitesDocsResolvedRepositoryId
+
+fun AIcNormalizeResolvedArtifactDirectories(aValue: Any?): List<Map<String, String?>> {
+    return (aValue as? List<*>)
+        ?.mapNotNull { locEntry ->
+            (locEntry as? Map<*, *>)?.mapKeys { locMapEntry -> locMapEntry.key.toString() }
+                ?.mapValues { locMapEntry -> locMapEntry.value?.toString()?.takeIf { it != "null" } }
+        }
+        ?: emptyList()
+}
+
+val locAlgitesDocsResolvedArtifactDirectories =
+    AIcNormalizeResolvedArtifactDirectories(extra.properties["modustroDocsResolvedArtifactDirectories"])
+        .ifEmpty { AIcNormalizeResolvedArtifactDirectories(rootProject.extra.properties["modustroDocsResolvedArtifactDirectories"]) }
+        .ifEmpty { AIcNormalizeResolvedArtifactDirectories(rootProject.extra.properties["modustroResolvedArtifactDirectories"]) }
+
+@Suppress("UNCHECKED_CAST")
+val locAlgitesDocsPublicationMetadata =
+    (extra.properties["modustroDocsPublishingMetadata"] as? Map<String, String>)
+        ?: (rootProject.extra.properties["modustroDocsPublishingMetadata"] as? Map<String, String>)
+        ?: emptyMap()
+
+fun AIcReadMpsDocsRepositoryId(): String {
+    return locAlgitesDocsResolvedRepositoryId
+}
+
+val locArtifactDocsRoot = layout.projectDirectory.dir(
+    (extra.properties["modustroArtifactDocsRootPath"] as String?)
+        ?: (findProperty("modustro.docs.artifactRoot") as String?)
+        ?: "build/run/bld/algites-docs/site/generated/artifacts"
+)
+val locPublicationKind = (extra.properties["modustroDocsPublishingKind"] as String?) ?: "generated"
+val locPublicationId = (extra.properties["modustroDocsPublishingId"] as String?) ?: "current"
+
+fun String.AIcToSha256Text(): String {
+    val locDigest = MessageDigest.getInstance("SHA-256")
+    val locHashBytes = locDigest.digest(toByteArray(Charsets.UTF_8))
+    return locHashBytes.joinToString("") { locByte -> "%02x".format(locByte) }
+}
+
+fun AIcReadXmlAttribute(aXmlText: String, aAttributeName: String): String? {
+    val locRegex = Regex("""\b${Regex.escape(aAttributeName)}\s*=\s*["']([^"']+)["']""")
+    return locRegex.find(aXmlText)?.groupValues?.get(1)
+}
+
+fun AIcReadRepositoryId(): String {
+    return locAlgitesDocsResolvedRepositoryId
+}
+
+fun AIcReadArtifactSetProjects(): List<AIcdArtifactSetProject> {
+    val locMpsArtifactDirectories = locAlgitesDocsResolvedArtifactDirectories.filter { locArtifactDirectory ->
+        locArtifactDirectory["technologyKinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
+            (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
+    }
+
+    if (locMpsArtifactDirectories.isEmpty()) {
+        val locHasMpsDescriptors = locProjectRootDirectory
+            .walkTopDown()
+            .filter { locFile -> locFile.isFile }
+            .any { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
+
+        require(locHasMpsDescriptors) {
+            "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with technologyKinds containing mps and contentsModel=self-contained."
+        }
+
+        return listOf(
+            AIcdArtifactSetProject(
+                locRelativePath = ".",
+                locProjectDirectory = locProjectRootDirectory
+            )
+        )
+    }
+
+    return locMpsArtifactDirectories.map { locArtifactDirectory ->
+        val locRelativePath = locArtifactDirectory["path"] ?: "."
+        val locProjectDirectory = File(locProjectRootDirectory, locRelativePath)
+        require(locProjectDirectory.isDirectory) {
+            "Resolved MPS artifact directory does not exist: ${locProjectDirectory.absolutePath}"
+        }
+        AIcdArtifactSetProject(
+            locRelativePath = locRelativePath,
+            locProjectDirectory = locProjectDirectory
+        )
+    }
+}
+
+fun AIcReadRepositoryRole(): String {
+    val locRepositoryId = AIcReadMpsDocsRepositoryId()
+    val locSegments = locRepositoryId.split(".")
+    require(locSegments.size >= 3) {
+        "Repository id must follow <vis>.<role>.<BusinessName>[.<reposubname>]: ${locRepositoryId}"
+    }
+    return locSegments[1]
+}
+
+fun AIcDeriveModuleKind(aDescriptorFile: File): String? {
+    return when (aDescriptorFile.extension.lowercase()) {
+        "mpl" -> "lang"
+        "msd" -> "sol"
+        else -> null
+    }
+}
+
+fun AIcRemoveMpsTechnicalPrefix(aModuleName: String, aModuleKind: String): String {
+    val locLegacyPrefix = when (aModuleKind) {
+        "lang" -> "mpslang."
+        "sol" -> "mpssol."
+        else -> null
+    }
+
+    if (locLegacyPrefix != null && aModuleName.startsWith(locLegacyPrefix)) {
+        return aModuleName.removePrefix(locLegacyPrefix)
+    }
+
+    val locModernMarker = ".mps.${aModuleKind}."
+    val locModernMarkerIndex = aModuleName.indexOf(locModernMarker)
+
+    if (locModernMarkerIndex >= 0) {
+        return aModuleName.substring(0, locModernMarkerIndex) + "." +
+            aModuleName.substring(locModernMarkerIndex + locModernMarker.length)
+    }
+
+    return aModuleName
+}
+
+fun AIcStripKnownDomainRolePrefix(aNameWithoutMpsPrefix: String, aRepositoryRole: String): String {
+    val locSegments = aNameWithoutMpsPrefix.split(".")
+    if (locSegments.size <= 1) {
+        return aNameWithoutMpsPrefix
+    }
+
+    val locRoleIndex = locSegments.indexOf(aRepositoryRole)
+    if (locRoleIndex >= 0 && locRoleIndex < locSegments.lastIndex) {
+        return locSegments.drop(locRoleIndex + 1).joinToString(".")
+    }
+
+    return aNameWithoutMpsPrefix
+}
+
+fun AIcDeriveBaseModulePath(
+    aModuleName: String,
+    aModuleKind: String,
+    aRepositoryRole: String
+): String {
+    val locNameWithoutMpsPrefix = AIcRemoveMpsTechnicalPrefix(aModuleName, aModuleKind)
+    return AIcStripKnownDomainRolePrefix(locNameWithoutMpsPrefix, aRepositoryRole)
+}
+
+fun AIcIsPublishableMpsModule(aModuleName: String, aModulePath: String): Boolean {
+    val locModuleNameLowercase = aModuleName.lowercase()
+    val locModulePathLowercase = aModulePath.lowercase()
+
+    return !(
+        locModuleNameLowercase.startsWith("mpslang.test") ||
+        locModuleNameLowercase.startsWith("mpssol.test") ||
+        ".test." in locModuleNameLowercase ||
+        locModulePathLowercase.startsWith("test") ||
+        locModulePathLowercase.startsWith("lang.test") ||
+        locModulePathLowercase.startsWith("sol.test") ||
+        ".test." in locModulePathLowercase
+    )
+}
+
+fun AIcReadMpsModuleName(aDescriptorFile: File): String? {
+    val locXmlText = aDescriptorFile.readText(Charsets.UTF_8)
+    return AIcReadXmlAttribute(locXmlText, "namespace")
+        ?: AIcReadXmlAttribute(locXmlText, "name")
+        ?: aDescriptorFile.nameWithoutExtension
+}
+
+fun AIcResolveModulePathCollisions(aCandidates: List<AIcdMpsArtifactCandidate>): List<Pair<AIcdMpsArtifactCandidate, String>> {
+    val locBasePathCounts = aCandidates.groupingBy { it.locBaseModulePath }.eachCount()
+
+    val locResolvedCandidates = aCandidates.map { locCandidate ->
+        val locResolvedModulePath = if ((locBasePathCounts[locCandidate.locBaseModulePath] ?: 0) > 1) {
+            "${locCandidate.locModuleKind}.${locCandidate.locBaseModulePath}"
+        } else {
+            locCandidate.locBaseModulePath
+        }
+
+        locCandidate to locResolvedModulePath
+    }
+
+    val locDuplicatedResolvedModulePaths = locResolvedCandidates
+        .groupBy { it.second }
+        .filterValues { it.size > 1 }
+
+    require(locDuplicatedResolvedModulePaths.isEmpty()) {
+        buildString {
+            appendLine("Duplicate resolved MPS modulePath value(s) detected.")
+            appendLine("Each modulePath must be unique within one source repository because it is used for artifactId and documentation path derivation.")
+            locDuplicatedResolvedModulePaths.forEach { (locModulePath, locConflictingCandidates) ->
+                appendLine("Duplicate modulePath: ${locModulePath}")
+                locConflictingCandidates.forEach { (locCandidate, _) ->
+                    appendLine(" - ${locCandidate.locDescriptorPath} -> ${locCandidate.locModuleName}")
+                }
+            }
+        }
+    }
+
+    return locResolvedCandidates
+}
+
+fun AIcValidateDiscoveredMpsArtifactUniqueness(aArtifacts: List<AIcdDiscoveredMpsArtifact>) {
+    val locDuplicateModulePaths = aArtifacts.groupBy { it.locModulePath }.filterValues { it.size > 1 }
+    val locDuplicateArtifactIds = aArtifacts.groupBy { it.locArtifactId }.filterValues { it.size > 1 }
+    val locDuplicateDocumentationPaths = aArtifacts.groupBy { it.locDocumentationPath }.filterValues { it.size > 1 }
+
+    require(locDuplicateModulePaths.isEmpty() && locDuplicateArtifactIds.isEmpty() && locDuplicateDocumentationPaths.isEmpty()) {
+        buildString {
+            appendLine("Duplicate discovered MPS artifact identity value(s) detected.")
+
+            if (locDuplicateModulePaths.isNotEmpty()) {
+                appendLine("Duplicate modulePath value(s):")
+                locDuplicateModulePaths.forEach { (locValue, locArtifacts) ->
+                    appendLine(" - ${locValue}")
+                    locArtifacts.forEach { locArtifact ->
+                        appendLine("   - ${locArtifact.locDescriptorPath} -> ${locArtifact.locModuleName}")
+                    }
+                }
+            }
+
+            if (locDuplicateArtifactIds.isNotEmpty()) {
+                appendLine("Duplicate artifactId value(s):")
+                locDuplicateArtifactIds.forEach { (locValue, locArtifacts) ->
+                    appendLine(" - ${locValue}")
+                    locArtifacts.forEach { locArtifact ->
+                        appendLine("   - ${locArtifact.locDescriptorPath} -> ${locArtifact.locModuleName}")
+                    }
+                }
+            }
+
+            if (locDuplicateDocumentationPaths.isNotEmpty()) {
+                appendLine("Duplicate documentationPath value(s):")
+                locDuplicateDocumentationPaths.forEach { (locValue, locArtifacts) ->
+                    appendLine(" - ${locValue}")
+                    locArtifacts.forEach { locArtifact ->
+                        appendLine("   - ${locArtifact.locDescriptorPath} -> ${locArtifact.locModuleName}")
+                    }
+                }
+            }
+        }
+    }
+}
+
+fun AIcDiscoverMpsArtifacts(
+    aRepositoryId: String,
+    aArtifactSetProjects: List<AIcdArtifactSetProject>
+): List<AIcdDiscoveredMpsArtifact> {
+    val locRepositoryRole = AIcReadRepositoryRole()
+
+    val locCandidates = aArtifactSetProjects.flatMap { locArtifactSetProject ->
+        val locDescriptorFiles = locArtifactSetProject.locProjectDirectory
+            .walkTopDown()
+            .filter { locFile -> locFile.isFile }
+            .filter { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
+            .filter { locFile ->
+                val locRelativePath = locArtifactSetProject.locProjectDirectory.toPath()
+                    .relativize(locFile.toPath())
+                    .toString()
+                    .replace(File.separatorChar, '/')
+
+                !(
+                    "/build/" in "/${locRelativePath}" ||
+                    "/.gradle/" in "/${locRelativePath}" ||
+                    "/classes_gen/" in "/${locRelativePath}" ||
+                    "/source_gen/" in "/${locRelativePath}" ||
+                    "/source_gen.caches/" in "/${locRelativePath}"
+                )
+            }
+            .toList()
+
+        locDescriptorFiles.mapNotNull { locDescriptorFile ->
+            val locModuleKind = AIcDeriveModuleKind(locDescriptorFile) ?: return@mapNotNull null
+            val locModuleName = AIcReadMpsModuleName(locDescriptorFile) ?: return@mapNotNull null
+            val locBaseModulePath = AIcDeriveBaseModulePath(locModuleName, locModuleKind, locRepositoryRole)
+            val locDescriptorPath = locProjectRootDirectory.toPath()
+                .relativize(locDescriptorFile.toPath())
+                .toString()
+                .replace(File.separatorChar, '/')
+
+            AIcdMpsArtifactCandidate(
+                locArtifactSetProjectPath = locArtifactSetProject.locRelativePath,
+                locDescriptorPath = locDescriptorPath,
+                locModuleName = locModuleName,
+                locModuleKind = locModuleKind,
+                locBaseModulePath = locBaseModulePath,
+                locPublishable = AIcIsPublishableMpsModule(locModuleName, locBaseModulePath)
+            )
+        }
+    }.distinctBy {
+        it.locModuleName
+    }
+
+    val locDiscoveredArtifacts = AIcResolveModulePathCollisions(locCandidates).map { (locCandidate, locModulePath) ->
+        val locArtifactId = "${aRepositoryId}_${locModulePath}"
+        val locDocumentationPath = locModulePath
+
+        AIcdDiscoveredMpsArtifact(
+            locArtifactSetProjectPath = locCandidate.locArtifactSetProjectPath,
+            locDescriptorPath = locCandidate.locDescriptorPath,
+            locModuleName = locCandidate.locModuleName,
+            locModuleKind = locCandidate.locModuleKind,
+            locModulePath = locModulePath,
+            locArtifactId = locArtifactId,
+            locDocumentationPath = locDocumentationPath,
+            locPublishable = locCandidate.locPublishable
+        )
+    }.sortedWith(
+        compareBy<AIcdDiscoveredMpsArtifact> { it.locArtifactSetProjectPath }
+            .thenBy { it.locModuleKind }
+            .thenBy { it.locModulePath }
+    )
+
+    AIcValidateDiscoveredMpsArtifactUniqueness(locDiscoveredArtifacts)
+
+    return locDiscoveredArtifacts
+}
+
+
+class AIcMpsSupport(
+    private val locProjectRootDirectory: File,
+    private val locRepositoryId: String,
+    private val locResolvedArtifactDirectories: List<Map<String, String?>>
+) : java.io.Serializable {
+
+    fun AIcReadArtifactSetProjects(): List<AIcdArtifactSetProject> {
+        val locMpsArtifactDirectories = locResolvedArtifactDirectories.filter { locArtifactDirectory ->
+            locArtifactDirectory["technologyKinds"]?.split(',')?.map { it.trim() }?.contains("mps") == true &&
+            (locArtifactDirectory["contentsModel"] == "self-contained" || locArtifactDirectory["contentsModel"].isNullOrBlank())
+        }
+
+        if (locMpsArtifactDirectories.isEmpty()) {
+            val locHasMpsDescriptors = locProjectRootDirectory
+                .walkTopDown()
+                .filter { locFile -> locFile.isFile }
+                .any { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
+
+            require(locHasMpsDescriptors) {
+                "Cannot find any resolved MPS artifact directory. Expected at least one artifact directory with technologyKinds containing mps and contentsModel=self-contained."
+            }
+
+            return listOf(
+                AIcdArtifactSetProject(
+                    locRelativePath = ".",
+                    locProjectDirectory = locProjectRootDirectory
+                )
+            )
+        }
+
+        return locMpsArtifactDirectories.map { locArtifactDirectory ->
+            val locRelativePath = locArtifactDirectory["path"] ?: "."
+            val locProjectDirectory = File(locProjectRootDirectory, locRelativePath)
+            require(locProjectDirectory.isDirectory) {
+                "Resolved MPS artifact directory does not exist: ${locProjectDirectory.absolutePath}"
+            }
+            AIcdArtifactSetProject(
+                locRelativePath = locRelativePath,
+                locProjectDirectory = locProjectDirectory
+            )
+        }
+    }
+
+    fun AIcDiscoverMpsArtifacts(aArtifactSetProjects: List<AIcdArtifactSetProject>): List<AIcdDiscoveredMpsArtifact> {
+        val locRepositoryRole = AIcReadRepositoryRole()
+
+        val locCandidates = aArtifactSetProjects.flatMap { locArtifactSetProject ->
+            val locDescriptorFiles = locArtifactSetProject.locProjectDirectory
+                .walkTopDown()
+                .filter { locFile -> locFile.isFile }
+                .filter { locFile -> locFile.extension.lowercase() == "mpl" || locFile.extension.lowercase() == "msd" }
+                .filter { locFile ->
+                    val locRelativePath = locArtifactSetProject.locProjectDirectory.toPath()
+                        .relativize(locFile.toPath())
+                        .toString()
+                        .replace(File.separatorChar, '/')
+
+                    !("/build/" in "/${locRelativePath}" ||
+                        "/.gradle/" in "/${locRelativePath}" ||
+                        "/classes_gen/" in "/${locRelativePath}" ||
+                        "/source_gen/" in "/${locRelativePath}" ||
+                        "/source_gen.caches/" in "/${locRelativePath}")
+                }
+                .toList()
+
+            locDescriptorFiles.mapNotNull { locDescriptorFile ->
+                val locModuleKind = AIcDeriveModuleKind(locDescriptorFile) ?: return@mapNotNull null
+                val locModuleName = AIcReadMpsModuleName(locDescriptorFile) ?: return@mapNotNull null
+                val locBaseModulePath = AIcDeriveBaseModulePath(locModuleName, locModuleKind, locRepositoryRole)
+                val locDescriptorPath = locProjectRootDirectory.toPath()
+                    .relativize(locDescriptorFile.toPath())
+                    .toString()
+                    .replace(File.separatorChar, '/')
+
+                AIcdMpsArtifactCandidate(
+                    locArtifactSetProjectPath = locArtifactSetProject.locRelativePath,
+                    locDescriptorPath = locDescriptorPath,
+                    locModuleName = locModuleName,
+                    locModuleKind = locModuleKind,
+                    locBaseModulePath = locBaseModulePath,
+                    locPublishable = AIcIsPublishableMpsModule(locModuleName, locBaseModulePath)
+                )
+            }
+        }.distinctBy { it.locModuleName }
+
+        val locDiscoveredArtifacts = AIcResolveModulePathCollisions(locCandidates).map { (locCandidate, locModulePath) ->
+            val locArtifactId = "${locRepositoryId}_${locModulePath}"
+            val locDocumentationPath = locModulePath
+
+            AIcdDiscoveredMpsArtifact(
+                locArtifactSetProjectPath = locCandidate.locArtifactSetProjectPath,
+                locDescriptorPath = locCandidate.locDescriptorPath,
+                locModuleName = locCandidate.locModuleName,
+                locModuleKind = locCandidate.locModuleKind,
+                locModulePath = locModulePath,
+                locArtifactId = locArtifactId,
+                locDocumentationPath = locDocumentationPath,
+                locPublishable = locCandidate.locPublishable
+            )
+        }.sortedWith(
+            compareBy<AIcdDiscoveredMpsArtifact> { it.locArtifactSetProjectPath }
+                .thenBy { it.locModuleKind }
+                .thenBy { it.locModulePath }
+        )
+
+        AIcValidateDiscoveredMpsArtifactUniqueness(locDiscoveredArtifacts)
+        return locDiscoveredArtifacts
+    }
+
+    private fun AIcReadRepositoryRole(): String {
+        val locSegments = locRepositoryId.split(".")
+        require(locSegments.size >= 3) {
+            "Repository id must follow <vis>.<role>.<BusinessName>[.<reposubname>]: ${locRepositoryId}"
+        }
+        return locSegments[1]
+    }
+
+    private fun AIcDeriveModuleKind(aDescriptorFile: File): String? {
+        return when (aDescriptorFile.extension.lowercase()) {
+            "mpl" -> "lang"
+            "msd" -> "sol"
+            else -> null
+        }
+    }
+
+    private fun AIcReadXmlAttribute(aXmlText: String, aAttributeName: String): String? {
+        val locRegex = Regex("""\b${Regex.escape(aAttributeName)}\s*=\s*["']([^"']+)["']""")
+        return locRegex.find(aXmlText)?.groupValues?.get(1)
+    }
+
+    private fun AIcReadMpsModuleName(aDescriptorFile: File): String? {
+        val locXmlText = aDescriptorFile.readText(Charsets.UTF_8)
+        return AIcReadXmlAttribute(locXmlText, "namespace")
+            ?: AIcReadXmlAttribute(locXmlText, "name")
+            ?: aDescriptorFile.nameWithoutExtension
+    }
+
+    private fun AIcDeriveBaseModulePath(aModuleName: String, aModuleKind: String, aRepositoryRole: String): String {
+        val locNameWithoutMpsPrefix = AIcRemoveMpsTechnicalPrefix(aModuleName, aModuleKind)
+        return AIcStripKnownDomainRolePrefix(locNameWithoutMpsPrefix, aRepositoryRole)
+    }
+
+    private fun AIcRemoveMpsTechnicalPrefix(aModuleName: String, aModuleKind: String): String {
+        val locLegacyPrefix = when (aModuleKind) {
+            "lang" -> "mpslang."
+            "sol" -> "mpssol."
+            else -> null
+        }
+
+        if (locLegacyPrefix != null && aModuleName.startsWith(locLegacyPrefix)) {
+            return aModuleName.removePrefix(locLegacyPrefix)
+        }
+
+        val locModernMarker = ".mps.${aModuleKind}."
+        val locModernMarkerIndex = aModuleName.indexOf(locModernMarker)
+
+        if (locModernMarkerIndex >= 0) {
+            return aModuleName.substring(0, locModernMarkerIndex) + "." +
+                aModuleName.substring(locModernMarkerIndex + locModernMarker.length)
+        }
+
+        return aModuleName
+    }
+
+    private fun AIcStripKnownDomainRolePrefix(aNameWithoutMpsPrefix: String, aRepositoryRole: String): String {
+        val locSegments = aNameWithoutMpsPrefix.split(".")
+        if (locSegments.size <= 1) {
+            return aNameWithoutMpsPrefix
+        }
+
+        val locRoleIndex = locSegments.indexOf(aRepositoryRole)
+        if (locRoleIndex >= 0 && locRoleIndex < locSegments.lastIndex) {
+            return locSegments.drop(locRoleIndex + 1).joinToString(".")
+        }
+
+        return aNameWithoutMpsPrefix
+    }
+
+    private fun AIcIsPublishableMpsModule(aModuleName: String, aModulePath: String): Boolean {
+        val locModuleNameLowercase = aModuleName.lowercase()
+        val locModulePathLowercase = aModulePath.lowercase()
+
+        return !(locModuleNameLowercase.startsWith("mpslang.test") ||
+            locModuleNameLowercase.startsWith("mpssol.test") ||
+            ".test." in locModuleNameLowercase ||
+            locModulePathLowercase.startsWith("test") ||
+            locModulePathLowercase.startsWith("lang.test") ||
+            locModulePathLowercase.startsWith("sol.test") ||
+            ".test." in locModulePathLowercase)
+    }
+
+    private fun AIcResolveModulePathCollisions(aCandidates: List<AIcdMpsArtifactCandidate>): List<Pair<AIcdMpsArtifactCandidate, String>> {
+        val locBasePathCounts = aCandidates.groupingBy { it.locBaseModulePath }.eachCount()
+
+        val locResolvedCandidates = aCandidates.map { locCandidate ->
+            val locResolvedModulePath = if ((locBasePathCounts[locCandidate.locBaseModulePath] ?: 0) > 1) {
+                "${locCandidate.locModuleKind}.${locCandidate.locBaseModulePath}"
+            } else {
+                locCandidate.locBaseModulePath
+            }
+
+            locCandidate to locResolvedModulePath
+        }
+
+        val locDuplicatedResolvedModulePaths = locResolvedCandidates
+            .groupBy { it.second }
+            .filterValues { it.size > 1 }
+
+        require(locDuplicatedResolvedModulePaths.isEmpty()) {
+            buildString {
+                appendLine("Duplicate resolved MPS modulePath value(s) detected.")
+                appendLine("Each modulePath must be unique within one source repository because it is used for artifactId and documentation path derivation.")
+                locDuplicatedResolvedModulePaths.forEach { (locModulePath, locConflictingCandidates) ->
+                    appendLine("Duplicate modulePath: ${locModulePath}")
+                    locConflictingCandidates.forEach { (locCandidate, _) ->
+                        appendLine(" - ${locCandidate.locDescriptorPath} -> ${locCandidate.locModuleName}")
+                    }
+                }
+            }
+        }
+
+        return locResolvedCandidates
+    }
+
+    private fun AIcValidateDiscoveredMpsArtifactUniqueness(aArtifacts: List<AIcdDiscoveredMpsArtifact>) {
+        val locDuplicateModulePaths = aArtifacts.groupBy { it.locModulePath }.filterValues { it.size > 1 }
+        val locDuplicateArtifactIds = aArtifacts.groupBy { it.locArtifactId }.filterValues { it.size > 1 }
+        val locDuplicateDocumentationPaths = aArtifacts.groupBy { it.locDocumentationPath }.filterValues { it.size > 1 }
+
+        require(locDuplicateModulePaths.isEmpty() && locDuplicateArtifactIds.isEmpty() && locDuplicateDocumentationPaths.isEmpty()) {
+            buildString {
+                appendLine("Duplicate discovered MPS artifact identity value(s) detected.")
+                if (locDuplicateModulePaths.isNotEmpty()) {
+                    appendLine("Duplicate modulePath value(s):")
+                    locDuplicateModulePaths.forEach { (locValue, locArtifacts) ->
+                        appendLine(" - ${locValue}")
+                        locArtifacts.forEach { locArtifact -> appendLine("   - ${locArtifact.locDescriptorPath} -> ${locArtifact.locModuleName}") }
+                    }
+                }
+                if (locDuplicateArtifactIds.isNotEmpty()) {
+                    appendLine("Duplicate artifactId value(s):")
+                    locDuplicateArtifactIds.forEach { (locValue, locArtifacts) ->
+                        appendLine(" - ${locValue}")
+                        locArtifacts.forEach { locArtifact -> appendLine("   - ${locArtifact.locDescriptorPath} -> ${locArtifact.locModuleName}") }
+                    }
+                }
+                if (locDuplicateDocumentationPaths.isNotEmpty()) {
+                    appendLine("Duplicate documentationPath value(s):")
+                    locDuplicateDocumentationPaths.forEach { (locValue, locArtifacts) ->
+                        appendLine(" - ${locValue}")
+                        locArtifacts.forEach { locArtifact -> appendLine("   - ${locArtifact.locDescriptorPath} -> ${locArtifact.locModuleName}") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+class AIcValidateModustroConfigurationAction(
+    private val locRepositoryId: String,
+    private val locProjectRootDirectory: File,
+    private val locResolvedArtifactDirectories: List<Map<String, String?>>
+) : Action<Task>, java.io.Serializable {
+    override fun execute(aTask: Task) {
+        val locArtifactSetProjects = AIcMpsSupport(locProjectRootDirectory, locRepositoryId, locResolvedArtifactDirectories).AIcReadArtifactSetProjects()
+        aTask.logger.lifecycle("Algites repository id: ${locRepositoryId}")
+        aTask.logger.lifecycle("Configured artifact-set project(s):")
+        locArtifactSetProjects.forEach { locArtifactSetProject ->
+            aTask.logger.lifecycle(" - ${locArtifactSetProject.locRelativePath}")
+        }
+    }
+}
+
+class AIcDiscoverMpsArtifactsAction(
+    private val locRepositoryId: String,
+    private val locProjectRootDirectory: File,
+    private val locResolvedArtifactDirectories: List<Map<String, String?>>,
+    private val locOutputFile: File
+) : Action<Task>, java.io.Serializable {
+    override fun execute(aTask: Task) {
+        val locSupport = AIcMpsSupport(locProjectRootDirectory, locRepositoryId, locResolvedArtifactDirectories)
+        val locArtifactSetProjects = locSupport.AIcReadArtifactSetProjects()
+        val locArtifacts = locSupport.AIcDiscoverMpsArtifacts(locArtifactSetProjects)
+
+        locOutputFile.parentFile.mkdirs()
+        locOutputFile.writeText(
+            buildString {
+                appendLine("artifactSetProjectPath\tdescriptorPath\tmoduleKind\tmodulePath\tartifactId\tdocumentationPath\tpublishable\tmoduleName")
+                locArtifacts.forEach { locArtifact ->
+                    appendLine(
+                        listOf(
+                            locArtifact.locArtifactSetProjectPath,
+                            locArtifact.locDescriptorPath,
+                            locArtifact.locModuleKind,
+                            locArtifact.locModulePath,
+                            locArtifact.locArtifactId,
+                            locArtifact.locDocumentationPath,
+                            locArtifact.locPublishable.toString(),
+                            locArtifact.locModuleName
+                        ).joinToString("\t")
+                    )
+                }
+            },
+            Charsets.UTF_8
+        )
+
+        aTask.logger.lifecycle("Discovered ${locArtifacts.size} MPS artifact(s).")
+        aTask.logger.lifecycle("Discovery output: ${locOutputFile.absolutePath}")
+    }
+}
+
+class AIcPrintDiscoveredMpsArtifactsAction(
+    private val locDiscoveryFile: File
+) : Action<Task>, java.io.Serializable {
+    override fun execute(aTask: Task) {
+        aTask.logger.lifecycle(locDiscoveryFile.readText(Charsets.UTF_8))
+    }
+}
+
+class AIcGenerateDummyMpsDocsAction(
+    private val locRepositoryId: String,
+    private val locDiscoveryFile: File,
+    private val locArtifactDocsRootFile: File,
+    private val locPublicationKind: String,
+    private val locPublicationId: String,
+    private val locResolvedArtifactDirectories: List<Map<String, String?>>,
+    private val locPublicationMetadata: Map<String, String>
+) : Action<Task>, java.io.Serializable {
+    override fun execute(aTask: Task) {
+        require(locDiscoveryFile.isFile) {
+            "Missing discovery output file: ${locDiscoveryFile.absolutePath}"
+        }
+
+        val locLines = locDiscoveryFile.readLines(Charsets.UTF_8).drop(1).filter { it.isNotBlank() }
+        val locPublishableLines = locLines.filter { locLine ->
+            val locColumns = locLine.split("\t")
+            locColumns.size >= 8 && locColumns[6].toBoolean()
+        }
+
+        locPublishableLines.forEach { locLine ->
+            val locColumns = locLine.split("\t")
+            require(locColumns.size >= 8) {
+                "Invalid discovery line: ${locLine}"
+            }
+
+            val locArtifactSetProjectPath = locColumns[0]
+            val locDescriptorPath = locColumns[1]
+            val locModuleKind = locColumns[2]
+            val locModulePath = locColumns[3]
+            val locArtifactId = locColumns[4]
+            val locDocumentationPath = locColumns[5]
+            val locModuleName = locColumns[7]
+            val locContentHash = AIcToSha256Text(locLine)
+
+            val locArtifactPublicationDirectory = File(
+                locArtifactDocsRootFile,
+                "${locDocumentationPath}/${locPublicationKind}/${locPublicationId}"
+            )
+            val locTargetDirectory = File(locArtifactPublicationDirectory, "mps")
+            locTargetDirectory.deleteRecursively()
+            locTargetDirectory.mkdirs()
+
+            AIcWriteArtifactMetadataSidecar(
+                locArtifactPublicationDirectory,
+                AIcBuildMpsArtifactMetadata(
+                    locArtifactSetProjectPath,
+                    locModulePath,
+                    locArtifactId,
+                    locArtifactSetProjectPath
+                )
+            )
+
+            locTargetDirectory.resolve("index.html").writeText(
+                """
+                <!doctype html>
+                <html lang="en">
+                <head>
+                  <meta charset="utf-8">
+                  <title>${locModulePath}</title>
+                </head>
+                <body>
+                  <main>
+                    <h1>${locModulePath}</h1>
+                    <dl>
+                      <dt>Artifact-set project path</dt>
+                      <dd>${locArtifactSetProjectPath}</dd>
+                      <dt>Descriptor path</dt>
+                      <dd>${locDescriptorPath}</dd>
+                      <dt>Module kind</dt>
+                      <dd>${locModuleKind}</dd>
+                      <dt>MPS module name</dt>
+                      <dd>${locModuleName}</dd>
+                      <dt>Artifact ID</dt>
+                      <dd>${locArtifactId}</dd>
+                      <dt>Documentation path</dt>
+                      <dd>${locDocumentationPath}</dd>
+                      <dt>Discovery hash</dt>
+                      <dd>${locContentHash}</dd>
+                    </dl>
+                  </main>
+                </body>
+                </html>
+                """.trimIndent(),
+                Charsets.UTF_8
+            )
+        }
+
+        aTask.logger.lifecycle("Dummy MPS documentation generated at: ${locArtifactDocsRootFile.absolutePath}")
+        aTask.logger.lifecycle("Publishable MPS artifact(s): ${locPublishableLines.size}")
+        aTask.logger.lifecycle("Skipped non-publishable MPS artifact(s): ${locLines.size - locPublishableLines.size}")
+    }
+
+    private fun AIcBuildMpsArtifactMetadata(
+        aArtifactSetProjectPath: String,
+        aModulePath: String,
+        aArtifactId: String,
+        aFallbackPath: String
+    ): Map<String, String> {
+        val locArtifactSetMetadata = locResolvedArtifactDirectories.firstOrNull { locArtifactDirectory ->
+            locArtifactDirectory["path"] == aArtifactSetProjectPath
+        } ?: emptyMap()
+
+        return mapOf(
+            "localArtifactId" to aModulePath,
+            "artifactId" to aArtifactId,
+            "groupId" to (locArtifactSetMetadata["groupId"] ?: ""),
+            "path" to "",
+            "name" to "",
+            "description" to "",
+            "structureKind" to "",
+            "technologyKinds" to (locArtifactSetMetadata["technologyKinds"] ?: "mps"),
+            "contentsModel" to "",
+            "gradleProjectPath" to "",
+            "version.resolvedValue" to (locArtifactSetMetadata["version.resolvedValue"] ?: ""),
+            "version.lane" to (locArtifactSetMetadata["version.lane"] ?: ""),
+            "version.revision" to (locArtifactSetMetadata["version.revision"] ?: ""),
+            "version.qualifierKind" to (locArtifactSetMetadata["version.qualifierKind"] ?: ""),
+            "mps.artifactId" to aArtifactId,
+            "mps.modulePath" to aModulePath
+        ) + locPublicationMetadata
+    }
+
+    private fun AIcWriteArtifactMetadataSidecar(
+        aArtifactPublicationDirectory: File,
+        aArtifactMetadata: Map<String, String>
+    ) {
+        aArtifactPublicationDirectory.mkdirs()
+        val locSidecarFile = aArtifactPublicationDirectory.resolve(".modustro-artifact-docs.properties")
+        val locExistingMetadata = if (locSidecarFile.isFile) {
+            locSidecarFile.readLines(Charsets.UTF_8)
+                .mapNotNull { locLine ->
+                    val locSeparatorIndex = locLine.indexOf('=')
+                    if (locSeparatorIndex < 0) null else
+                        locLine.substring(0, locSeparatorIndex) to locLine.substring(locSeparatorIndex + 1)
+                }
+                .toMap()
+        } else {
+            emptyMap()
+        }
+        val locMergedMetadata = locExistingMetadata + aArtifactMetadata.filterValues { it.isNotBlank() }
+
+        locSidecarFile.writeText(
+            locMergedMetadata.entries
+                .sortedBy { it.key }
+                .joinToString(System.lineSeparator()) { locEntry ->
+                    "${locEntry.key}=${locEntry.value.replace(System.lineSeparator(), " ")}"
+                } + System.lineSeparator(),
+            Charsets.UTF_8
+        )
+    }
+
+    private fun AIcToSha256Text(aText: String): String {
+        val locDigest = MessageDigest.getInstance("SHA-256")
+        val locHashBytes = locDigest.digest(aText.toByteArray(Charsets.UTF_8))
+        return locHashBytes.joinToString("") { locByte -> "%02x".format(locByte) }
+    }
+}
+
+
+tasks.register("validateModustroConfiguration") {
+    group = "modustro"
+    description = "Validates minimal Algites source repository configuration."
+
+    inputs.property("modustroDocsResolvedRepositoryId", locAlgitesDocsResolvedRepositoryId)
+    inputs.property("modustroDocsResolvedArtifactDirectories", locAlgitesDocsResolvedArtifactDirectories.toString())
+
+    doLast(
+        AIcValidateModustroConfigurationAction(
+            locAlgitesDocsResolvedRepositoryId,
+            locProjectRootDirectory,
+            locAlgitesDocsResolvedArtifactDirectories
+        )
+    )
+}
+
+tasks.register("discoverMpsArtifacts") {
+    group = "modustro"
+    description = "Discovers MPS language/solution descriptors in configured artifact-set projects and derives Algites artifact identities."
+
+    dependsOn("validateModustroConfiguration")
+
+    inputs.property("modustroDocsResolvedRepositoryId", locAlgitesDocsResolvedRepositoryId)
+    inputs.property("modustroDocsResolvedArtifactDirectories", locAlgitesDocsResolvedArtifactDirectories.toString())
+    inputs.files(fileTree(locProjectRootDirectory) {
+        include("**/*.mpl")
+        include("**/*.msd")
+        exclude("**/build/**")
+        exclude("**/.gradle/**")
+        exclude("**/classes_gen/**")
+        exclude("**/source_gen/**")
+        exclude("**/source_gen.caches/**")
+    })
+    outputs.file(locDiscoveryOutputFile)
+
+    doLast(
+        AIcDiscoverMpsArtifactsAction(
+            locAlgitesDocsResolvedRepositoryId,
+            locProjectRootDirectory,
+            locAlgitesDocsResolvedArtifactDirectories,
+            locDiscoveryOutputFile.get().asFile
+        )
+    )
+}
+
+tasks.register("printDiscoveredMpsArtifacts") {
+    group = "modustro"
+    description = "Prints discovered MPS artifacts to the Gradle log."
+
+    dependsOn("discoverMpsArtifacts")
+
+    doLast(
+        AIcPrintDiscoveredMpsArtifactsAction(
+            locDiscoveryOutputFile.get().asFile
+        )
+    )
+}
+
+tasks.register("generateDummyMpsDocs") {
+    group = "modustro"
+    description = "Generates dummy static documentation pages for discovered MPS artifacts."
+
+    dependsOn("prepareModustroDocsPublishing")
+    dependsOn("discoverMpsArtifacts")
+    dependsOn("generateModustroDocsRootIndex")
+
+    inputs.file(locDiscoveryOutputFile)
+    outputs.dir(locArtifactDocsRoot)
+
+    doLast(
+        AIcGenerateDummyMpsDocsAction(
+            locAlgitesDocsResolvedRepositoryId,
+            locDiscoveryOutputFile.get().asFile,
+            locArtifactDocsRoot.asFile,
+            locPublicationKind,
+            locPublicationId,
+            locAlgitesDocsResolvedArtifactDirectories,
+            locAlgitesDocsPublicationMetadata
+        )
+    )
+}
+
+tasks.named("generateDummyMpsDocs") {
+    tasks.findByName("generateJavaDocsSite")?.let { locJavaDocsTask -> mustRunAfter(locJavaDocsTask) }
+    tasks.findByName("generatePythonDocsSite")?.let { locPythonDocsTask -> mustRunAfter(locPythonDocsTask) }
+}
+
+@Suppress("UNCHECKED_CAST")
+(rootProject.extra.properties["modustroDocsTechnologyTaskNames"] as? MutableSet<String>)
+    ?.add("generateDummyMpsDocs")
+
+tasks.named("generateModustroDocsSite") {
+    dependsOn("generateDummyMpsDocs")
+}

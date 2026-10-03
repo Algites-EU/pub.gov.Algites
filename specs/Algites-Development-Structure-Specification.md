@@ -56,9 +56,9 @@ Algites-controlled structured-data formats MUST use one common wire naming conve
 - schema-defined Algites properties, XML elements, and XML attributes use **UpperCamelCase**, for example `TechnologyKinds`, `ArtifactId`, `ReleaseLineVersion`, and `ContentKinds`;
 - Algites symbolic/enum values use **lower_snake_case**, for example `release_candidate`, `self_contained`, `api_key`, and `snapshot`; single-word symbolic values remain lowercase, for example `java`, `python`, and `count`;
 - environment variables and system-level constant identifiers use **UPPER_SNAKE_CASE**, for example `ALGITES_TECHNOLOGY_KINDS`;
-- controlled file and directory names use **lower-kebab-case** unless another established external syntax requires otherwise, for example `license-usage.yml` and `algites-artifact-manifest.yml`;
+- controlled file and directory names use **lower-kebab-case** unless another established external syntax requires otherwise, for example `license-usage.yml` and `modustro-artifact-manifest.yml`;
 - keywords owned by an external schema/meta-language keep that language's spelling, for example JSON Schema `allOf`, `oneOf`, `additionalProperties`, and XML Schema `complexType`/`minOccurs`;
-- map keys that represent dynamic identifiers or symbolic dimensions are values rather than field names and therefore keep their identifier/value convention. Examples are credential profile IDs and ResourceEndpoint matrix dimension keys such as `java`, `modustro`, `native_build_output`, `docs_site`, `public`, `release`, and `download`.
+- map keys that represent dynamic identifiers or symbolic dimensions are values rather than field names and therefore keep their identifier/value convention. Examples are credential profile IDs and ResourceEndpoint matrix dimension keys such as `java`, `modustro`, `native_binary_output`, `modustro_docs_site`, `public`, `release`, and `download`.
 
 The convention applies to the serialized wire representation. Language bindings SHOULD use the idiomatic naming of their target language; for example wire `ArtifactId` maps naturally to Java/Kotlin `artifactId` and Python `artifact_id`. Acronyms in UpperCamelCase field names are treated as words (`ArtifactId`, `GroupId`, `Url`, `ApiKey`, `Sha256`) so conversion is deterministic.
 
@@ -968,7 +968,7 @@ The initial catalog is:
 | `python` | `python_wheel` | yes | yes |
 | `python` | `python_sdist` | yes | yes |
 | `python` | `python_distribution` | no | yes |
-| `modustro` | `docs_site` | yes | no |
+| `modustro` | `modustro_docs_site` | yes | no |
 | `modustro` | `schema_site` | yes | no |
 
 `python_distribution` has dependency alternatives `[python_wheel, python_sdist]`; it expresses OR semantics for consumers and has no direct producer.
@@ -1119,7 +1119,7 @@ When a YAML or JSON definition is itself expressed as JSON Schema, its filename 
 
 #### 3.9.2 Generated and externally generated sources
 
-Artifact-local canonical-definition generation MAY be declared through `Artifact.DefinitionCodeGeneration`. The declaration identifies a canonical product definition below the matching `src/product/<SourceKind>/` root, its definition family, Java/Python generation targets, and the target package/module namespace. The common Builder adapter invokes Defs Codegen during the corresponding `source_native_processing` capability and materializes reproducible source below the applicable `.gen` root. Generated types preserve canonical identity/version provenance and definition documentation.
+Artifact-local canonical-definition generation is convention-driven. Modustro Builder scans the canonical product definition roots `src/product/yamldefs`, `src/product/jsondefs`, and `src/product/xmldefs`; SourceKind is implied by the root, the generated package/module namespace is derived from the relative directory path, and Java/Python targets are selected from the artifact TechnologyKinds. The common Builder adapter invokes Defs Codegen during the corresponding `source_native_processing` capability and materializes reproducible source below the applicable `.gen` root. Generated types preserve canonical identity/version provenance and definition documentation.
 
 
 For any source type, the following semantics apply:
@@ -1264,8 +1264,10 @@ External build and publication targets are modeled by `ResourceEndpoints`. A Res
 
 | ResourceKind | TechnologyKinds | Stability |
 | --- | --- | --- |
-| `native_build_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `docs_site` | `modustro` | required: `release` or `snapshot` |
+| `native_binary_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_source_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_documentation_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `modustro_docs_site` | `modustro` | required: `release` or `snapshot` |
 | `schema_site` | `modustro` | forbidden |
 
 For example:
@@ -1273,7 +1275,7 @@ For example:
 ```yaml
 ResourceEndpoints:
   java:
-    native_build_output:
+    native_binary_output:
       private:
         download:
           - Id: algites-java-native-build-output-private-release-download
@@ -1300,7 +1302,7 @@ ResourceEndpoints:
 ```yaml
 ResourceEndpoints:
   java:
-    native_build_output:
+    native_binary_output:
       private:
         download:
           - Id: algites-java-native-build-output-private-release-download
@@ -1315,12 +1317,12 @@ Standard new endpoint IDs SHOULD encode their dimensions in this order:
 algites-<technology-kind>-<resource-kind>-<visibility>-[<stability>-]<action>
 ```
 
-The stability segment is present exactly when the ResourceKind uses Stability. Qualified external endpoint IDs MAY insert an additional owner/provider qualifier before the dimensional suffix. During the Phase-5 migration, existing `native_build_output` endpoint IDs in the legacy form `algites-<technology-kind>-<visibility>-<stability>-<action>` remain valid so lower-level overrides keep the same identity.
+The stability segment is present exactly when the ResourceKind uses Stability. Qualified external endpoint IDs MAY insert an additional owner/provider qualifier before the dimensional suffix. During the Phase-5 migration, existing `native_binary_output` endpoint IDs in the legacy form `algites-<technology-kind>-<visibility>-<stability>-<action>` remain valid so lower-level overrides keep the same identity.
 
 ResourceEndpoint visibility is distinct from source-repository visibility, but source-repository visibility constrains which endpoint branches may be used:
 
-- artifacts from a `pub` source repository MUST resolve dependencies only from public ResourceEndpoints, MUST publish only to public upload ResourceEndpoints, and MUST manage only public manage ResourceEndpoints;
-- artifacts from a `priv` source repository MAY resolve dependencies from public and private ResourceEndpoints and MUST publish/manage their own resources only through private upload/manage ResourceEndpoints.
+- artifacts from a `pub` source repository MUST resolve dependencies only from public ResourceEndpoints; publication targets MUST come from public-governance PublishingEndpoints.
+- artifacts from a `priv` source repository MAY resolve dependencies from public and private ResourceEndpoints; publication targets for its own outputs MUST come from authorized private PublishingEndpoint overlays.
 
 The default protocol/client behavior is owned by the effective TechnologyKind/ResourceKind/action adapter. Any endpoint MAY additionally declare `ResourceEndpointProviderAdapter` when a concrete provider needs behavior that cannot be expressed by the standard adapter. Adapter identity belongs to the individual endpoint. `manage` remains deliberately distinct because management operations such as package deletion do not have a technology-wide standard. An enabled native-build-output `manage` endpoint currently MUST declare a supported provider adapter; the generic lifecycle never infers that an upload URL accepts a generic HTTP `DELETE`.
 
@@ -1329,21 +1331,21 @@ Supported native-build-output management provider adapters remain:
 - `cloudsmith`: package-management API lookup/delete adapter supporting exact versions and version-prefix selection;
 - `repsy`: Repsy management API adapter supporting exact Maven/PyPI version deletion as documented by the lifecycle specification.
 
-`PublicationDestinations` on publication capability configuration is an optional list of ResourceEndpoint IDs. It narrows endpoint selection but never embeds URLs, credentials, or provider-specific state. Phase 6 activates this mechanism for `docs_site` and `schema_site` publication.
+`PublicationDestinations` on publication capability configuration is an optional list of PublishingEndpoint IDs. It narrows publishing endpoint selection but never embeds URLs, credentials, or provider-specific state.
 
-Phase 5.1 uses `ResourceEndpoints` as the sole endpoint representation. The superseded repository-matrix input and compatibility projection are removed.
+Phase 5.2 uses `ResourceEndpoints` only for generalized resource resolution/management and `PublishingEndpoints` exclusively for publishing. The superseded repository-matrix input and compatibility projection are removed.
 
 A repository MAY configure ResourceEndpoints for TechnologyKinds or ResourceKinds that are not currently selected by an artifact. `TechnologyKinds` controls artifact build participation; ResourceEndpoints define available external resource targets.
 
 #### 3.9.6 Released snapshot lifecycle
 
-`DeleteSnapshotWhenReleased` is an independent top-level inherited boolean metadata value, analogous to `GroupId`. Its global Algites default is `true`. It MAY be declared in `algites-source-repository.yml`, `algites-artifact-set.yml`, or `algites-artifact.yml`; the nearest descendant declaration overrides the inherited value.
+`DeleteSnapshotWhenReleased` is an independent top-level inherited boolean metadata value, analogous to `GroupId`. Its global Algites default is `true`. It MAY be declared in `modustro-source-repository.yml`, `modustro-artifact-set.yml`, or `modustro-artifact.yml`; the nearest descendant declaration overrides the inherited value.
 
 ```yaml
 DeleteSnapshotWhenReleased: false
 ```
 
-When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `native_build_output` manage ResourceEndpoints with `Stability: snapshot`. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
+When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `native_binary_output` manage ResourceEndpoints with `Stability: snapshot`. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
 
 For example, release `1.4.0` targets only the corresponding snapshot line. For Java that is the exact `1.4.0-SNAPSHOT` version; for Python it is every immutable development release whose version starts with `1.4.0.dev`. It MUST NOT remove later snapshot lines such as Java `1.4.1-SNAPSHOT` / `1.5.0-SNAPSHOT` or Python `1.4.1.dev*` / `1.5.0.dev*`. A multi-TechnologyKind artifact is cleaned only after all release publication processing has completed, and only TechnologyKinds actually selected for that release are eligible for cleanup.
 
@@ -1358,7 +1360,7 @@ CredentialProfiles:
 
 ResourceEndpoints:
   java:
-    native_build_output:
+    native_binary_output:
       private:
         download:
           - Id: algites-java-private-release-download
@@ -1367,7 +1369,7 @@ ResourceEndpoints:
             CredentialProfile: algites-java-private-release-download
 ```
 
-`CredentialProfiles` is an independent top-level inherited metadata map, like `GroupId`. It MAY be declared in `algites-source-repository.yml`, `algites-artifact-set.yml`, and `algites-artifact.yml`. Profiles merge by profile id through the structural hierarchy:
+`CredentialProfiles` is an independent top-level inherited metadata map, like `GroupId`. It MAY be declared in `modustro-source-repository.yml`, `modustro-artifact-set.yml`, and `modustro-artifact.yml`. Profiles merge by profile id through the structural hierarchy:
 
 ```text
 built-in / governance profiles
@@ -1437,7 +1439,7 @@ Credential-type support in `coreintf` is distinct from authentication support in
 | Python download | not yet implemented | Python dependency repository consumption adapter remains to be defined |
 | MPS repository access | not yet implemented | declaration of `mps` alone does not provide a repository adapter |
 
-GitHub Actions performs credential selection in two phases. The Gradle task `resolveAlgitesRequiredCredentials` evaluates enabled native-build-output ResourceEndpoints for the requested technology/visibility/stability/action context without requiring their secret values. The trusted bridge then filters `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` to the union of profile/type pairs returned by that plan and materializes all retained fields to `direct_value` before the actual Gradle processing starts.
+GitHub Actions performs credential selection in two phases. The Gradle task `resolveModustroRequiredCredentials` evaluates enabled native-build-output ResourceEndpoints for the requested technology/visibility/stability/action context without requiring their secret values. The trusted bridge then filters `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` to the union of profile/type pairs returned by that plan and materializes all retained fields to `direct_value` before the actual Gradle processing starts.
 
 The bridge is intentionally trusted with the complete GitHub secret context: its purpose is to select and materialize the minimum credential subset passed downstream. The final build/publish processing therefore does not receive unrelated credentials.
 
@@ -1448,9 +1450,9 @@ The effective repository/credential configuration follows the structural contain
 ```text
 Algites public-governance download defaults
         -> optional private-governance defaults overlays
-        -> algites-source-repository.yml
-        -> ancestor algites-artifact-set.yml / algites-artifact.yml
-        -> descendant algites-artifact-set.yml / algites-artifact.yml
+        -> modustro-source-repository.yml
+        -> ancestor modustro-artifact-set.yml / modustro-artifact.yml
+        -> descendant modustro-artifact-set.yml / modustro-artifact.yml
 ```
 
 Public governance MUST contain only ResourceEndpoint information safe to expose publicly. Canonical private ResourceEndpoints and canonical upload ResourceEndpoints MUST NOT be embedded in `pub.gov.Algites`. Private governance supplies them as authorized overlays.
@@ -1484,7 +1486,7 @@ A build operation has an effective set of selected TechnologyKinds:
 
 Technology task graphs remain independent. Verification, construction, snapshot publication, and documentation MAY therefore target only Java, only Python, or any supported subset without requiring the remaining TechnologyKinds to execute. Release publication uses the same selection mechanism but requires the complete declared TechnologyKind set unless the explicit incomplete-release override is enabled.
 
-`algitesPublish` is the common orchestration entry point. Technology-specific adapters remain distinct tasks (for example Java `publish` and Python `publishPython`). MPS build/publication adapters are a separate TechnologyKind implementation concern and MUST NOT be implied merely by declaring `mps` as a supported metadata kind.
+`modustroPublish` is the common orchestration entry point. Technology-specific adapters remain distinct tasks (for example Java `publish` and Python `publishPython`). MPS build/publication adapters are a separate TechnologyKind implementation concern and MUST NOT be implied merely by declaring `mps` as a supported metadata kind.
 
 #### 3.9.10 Gradle bootstrap repositories vs artifact repositories
 
@@ -1508,9 +1510,9 @@ The normative stem convention is:
 The initial schema version therefore uses suffix `_1`; an unversioned canonical schema filename MUST NOT be used as the authoritative schema contract. Conceptual examples are:
 
 ```text
-algites-source-repository_1.yamldef.schema.json
-algites-artifact_1.yamldef.schema.json
-algites-artifact-set_1.yamldef.schema.json
+modustro-source-repository_1.yamldef.schema.json
+modustro-artifact_1.yamldef.schema.json
+modustro-artifact-set_1.yamldef.schema.json
 ```
 
 The exact schema serialization/extension is defined by the schema TechnologyKind/SourceType conventions, but the `_N` version suffix is independent of serialization. An incompatible schema-contract change requires a new schema version (for example `_2`) rather than silently changing the meaning of `_1`. Multiple schema versions MAY coexist when compatibility requires it.
@@ -1976,7 +1978,7 @@ Maven permits importing any POM via `<scope>import</scope>` and will effectively
 
 - PBBOM artifacts **MUST** be generated from Policy Artifacts.
 - PBBOM generation is deterministic:
-    - inputs: resolved `algites-artifact.yml` metadata
+    - inputs: resolved `modustro-artifact.yml` metadata
     - outputs: `*-pbbom.pom` (and optionally metadata)
 - If policy `Y` inherits from policy `X`:
     - `PBBOM-Y` **MUST import** `PBBOM-X`.
@@ -2121,7 +2123,7 @@ This section is intentionally placed at the end and is **temporary**.
     - parent edges define baseline dependency intents.
 - Legacy `javagen` and `javaextgen` directories migrate respectively to `java.gen` and `java.extgen`; equivalent suffix rules apply to all SourceTypes.
 - Existing Java/Maven publication coordinates remain valid as the Java mapping of the logical artifact identity. Other technologies add parallel publication mappings rather than redefining the logical artifact.
-- Legacy repository configuration that assumes only Maven repositories should be normalized into `ResourceEndpoints` with ResourceKind `native_build_output`.
+- Legacy repository configuration that assumes only Maven repositories should be normalized into `ResourceEndpoints` with ResourceKind `native_binary_output`.
 
 [[/PROPOSAL]]
 
