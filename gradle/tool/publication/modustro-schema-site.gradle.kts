@@ -16,24 +16,6 @@ import eu.algites.pltf.modustro.builder.model.publication.AInPublishingStability
 import java.io.File
 import java.security.MessageDigest
 
-buildscript {
-    repositories {
-        mavenCentral()
-        maven {
-            name = "algites_public_snapshots_bootstrap"
-            url = uri("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/")
-            mavenContent {
-                snapshotsOnly()
-            }
-        }
-    }
-    dependencies {
-        classpath("eu.algites.tool.build:pub.gov.Algites_devops.build.modustrobuild:1.0-SNAPSHOT")
-        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreintf:1.0-SNAPSHOT")
-        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
-    }
-}
-
 val locPublicationBridgeScript = rootProject.file("gradle/tool/publication/modustro-publication.gradle.kts")
 if (locPublicationBridgeScript.isFile) {
     apply(from = locPublicationBridgeScript)

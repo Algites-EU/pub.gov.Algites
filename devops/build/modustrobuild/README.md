@@ -36,7 +36,7 @@ The current source artifact declares its build-support dependencies in `modustro
 
 The current dependency requirement uses the exact Algites v1 snapshot version `1.0-SNAPSHOT`; repository version metadata separately uses `ReleaseLineVersion`, `Revision`, and `QualifierKind`. Changing the build-support dependency set or its versions is therefore a governed source-metadata change of this artifact.
 
-The bootstrap remains intentionally asymmetric: the shared root build script obtains its directly imported build-runtime classes from an already-published `modustrobuild:1.0-SNAPSHOT`. The published `product_api` dependency graph of that bundle supplies Modustro Builder `coreimpl`/`coreintf`, Defs Codegen, naming support, and the remaining build-runtime libraries transitively. The current source artifacts are then rebuilt and republished using the repository dependency declarations. A new build-runtime API therefore has to be published in a bootstrap stage before a subsequent root/settings script revision starts importing it; this avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency model.
+The bootstrap remains intentionally asymmetric: the root `settings.gradle.kts` obtains the build-runtime classes once from an already-published `modustrobuild:1.0-SNAPSHOT`. Gradle propagates classes loaded by the settings script to project build scripts, so every Modustro script in the same build domain observes one shared Builder API/class identity. The published `product_api` dependency graph of that bundle supplies Modustro Builder `coreimpl`/`coreintf`, Defs Codegen, naming support, and the remaining build-runtime libraries transitively. The current source artifacts are then rebuilt and republished using the repository dependency declarations. A new build-runtime API therefore has to be published in a bootstrap stage before a subsequent root/settings script revision starts importing it; this avoids a same-build self-dependency while allowing the build infrastructure to dogfood its own dependency model.
 
 ## Publication identity
 
@@ -51,7 +51,7 @@ The artifact version follows the version of `pub.gov.Algites`, so a published `m
 
 ## Intended bootstrap use
 
-The current source artifact is published as `pub.gov.Algites_devops.build.modustrobuild`. During the rename bootstrap, the shared root Gradle build still consumes the already-published previous-generation external bootstrap coordinate:
+The current source artifact is published as `pub.gov.Algites_devops.build.modustrobuild`. During the bootstrap transition, the root settings script consumes the already-published external bootstrap coordinate:
 
 ```text
 eu.algites.tool.build:pub.gov.Algites_devops.build.modustrobuild:<bootstrap-version>
@@ -59,15 +59,15 @@ eu.algites.tool.build:pub.gov.Algites_devops.build.modustrobuild:<bootstrap-vers
 
 After `modustrobuild` has been published once, a following activation revision can switch the bootstrap coordinate without mixing old Builder names into the new source model.
 
-Its published API dependency graph supplies the concrete Builder, Defs Codegen, naming, versioning, and credential support required by the script. Settings-phase code that must execute before the root buildscript is available may declare the narrow already-published support artifact it needs explicitly; Phase 5.1B uses this only for the ResourceEndpoint resolver during metadata resolution.
+Its published API dependency graph supplies the concrete Builder, Defs Codegen, naming, versioning, and credential support required by the script. The settings-level bootstrap is the single Builder classpath owner for a Gradle build domain. Project and applied script plugins must not redeclare `modustrobuild`, `coreimpl`, or `coreintf` on independent buildscript classpaths.
 
 The build of a new `pub.gov.Algites` generation must still use already-published bootstrap versions of every API imported during bootstrap. After a bootstrap-stage publication has made a new Builder API available, a following activation revision can safely import that API from settings/root scripts.
 
 ## Current Gradle bootstrap
 
-The shared `gradle/tool/repository/modustro-root-build.gradle.kts` loads only `modustrobuild:1.0-SNAPSHOT` directly from the public Cloudsmith snapshot repository. Modustro Builder, Defs Codegen, and the Algites naming-profile implementation are supplied transitively by the published `modustrobuild` metadata.
+The root `settings.gradle.kts` loads only `modustrobuild:1.0-SNAPSHOT` directly from the public Cloudsmith snapshot repository, immediately after the required first `pluginManagement` block. Modustro Builder, Defs Codegen, the Algites naming-profile implementation, versioning support, and credential support are supplied transitively by the published `modustrobuild` metadata. Project and applied Gradle scripts rely on that inherited settings classpath rather than declaring their own Builder bootstrap dependencies.
 
-Phase 5.1A uses Defs Codegen directly from the Gradle adapter during `source_native_processing`; no CLI process is spawned. Phase 5.1B keeps the same root bootstrap boundary while allowing the settings metadata resolver to bootstrap the published Builder core narrowly for ResourceEndpoint declaration/effective-model resolution.
+Each isolated Gradle build domain performs the same settings-level bootstrap independently, which preserves class identity inside the domain without passing live JVM objects across build boundaries.
 
 The floating snapshot coordinate is intentional during the current development phase. It can later be replaced by an immutable/released bootstrap coordinate without changing the dependency-model implementation or its consumers.
 

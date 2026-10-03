@@ -14,22 +14,6 @@ import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 
-buildscript {
-    repositories {
-        mavenCentral()
-        maven {
-            name = "algites_modustro_builder_bootstrap"
-            url = uri("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/")
-            mavenContent {
-                snapshotsOnly()
-            }
-        }
-    }
-    dependencies {
-        classpath("eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.coreimpl:1.0-SNAPSHOT")
-    }
-}
-
 val AIcModustroResourceEndpointResolver = AIcResourceEndpointResolver.builtin()
 val AIcModustroResourceEndpointMetadataBridge = AIcResourceEndpointMetadataBridge(AIcModustroResourceEndpointResolver)
 
