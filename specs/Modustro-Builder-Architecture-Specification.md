@@ -429,3 +429,20 @@ $schema: <URI>
 Strict validation that these three values are identical and equal to the publication base URL plus the definition sidecar `GlobalPublicationPathId` is intentionally deferred until global definition deployment is operational.
 
 `GlobalPublicationPathId` is always the logical/package-relative definition path below its canonical definition source root. Technical source-root segments and synthetic representation directories are not inserted. The publication endpoint provides `/api/yamldefs/`, `/api/jsondefs/`, or `/api/xmldefs/` separately.
+
+## Compiled Gradle initialization boundary
+
+The `builder/gradleinit` artifact implements the Settings and Project adapters.
+Consumer Settings resolve one bootstrap coordinate and activate the Settings
+plugin. The artifact exports `modustrobuild` transitively; Project scripts inherit
+that Settings classpath instead of declaring their own Builder dependencies.
+Metadata orchestration is compiled into gradleinit and calls portable Builder
+Core for ResourceEndpoint inheritance, defaulting and validation. Core artifacts
+have no Gradle dependency. Public governance defaults are packaged with gradleinit.
+
+Each Settings domain constructs one typed runtime. Discovery and Project metadata
+adapters reuse it; isolated included builds reconstruct their own state. There is
+no applied Settings script with Builder imports and no opaque endpoint-operation
+registry. The first plugin publication uses the standalone bootstrap script before
+activating the new root Settings. Metadata-only helper builds initialize the same
+runtime with discovery disabled through `modustro.gradleinit.metadataOnly=true`.

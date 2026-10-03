@@ -447,38 +447,21 @@ jobs:
           rm -rf "${locResolverProjectDir}"
           mkdir -p "${locResolverProjectDir}"
 
-          cat > "${locResolverProjectDir}/settings.gradle.kts" <<'KTS'
-          pluginManagement {
-              repositories {
-                  gradlePluginPortal()
-                  mavenCentral()
-                  google()
-              }
-          }
-
-          dependencyResolutionManagement {
-              repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
-              repositories {
-                  mavenCentral()
-                  google()
-              }
-          }
-
-          rootProject.name = "algites-resolve-artifact-metadata"
-          KTS
+          locBootstrapTemplate="${PWD}/gradle/tool/repository/modustro-bootstrap-settings.template.gradle.kts"
+          if [[ -f "${locBootstrapTemplate}" ]]; then
+            cp "${locBootstrapTemplate}" "${locResolverProjectDir}/settings.gradle.kts"
+          else
+            curl -fsSL \
+              "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-bootstrap-settings.template.gradle.kts" \
+              > "${locResolverProjectDir}/settings.gradle.kts"
+          fi
+          echo 'modustro.gradleinit.metadataOnly=true' > "${locResolverProjectDir}/gradle.properties"
+          echo 'rootProject.name = "algites-resolve-artifact-metadata"' >> "${locResolverProjectDir}/settings.gradle.kts"
 
           cat > "${locResolverProjectDir}/build.gradle.kts" <<'KTS'
           import java.io.File
 
           val locRepositoryDirectory = File(System.getenv("_TMP_ALGITES_METADATA_REPOSITORY_DIR"))
-          val locResolverCoreScript = File(locRepositoryDirectory, "gradle/tool/repository/modustro-artifact-directory-metadata-resolver.gradle.kts")
-
-          if (locResolverCoreScript.isFile) {
-              apply(from = locResolverCoreScript)
-          } else {
-              apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver.gradle.kts"))
-          }
-
           tasks.register("writeAlgitesResolvedArtifactMetadataProperties") {
               group = "algites"
               description = "Writes resolved Algites artifact metadata properties for GitHub Actions."

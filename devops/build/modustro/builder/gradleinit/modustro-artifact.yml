@@ -1,0 +1,19 @@
+Artifact:
+  TechnologyKinds: [java]
+  Name: Modustro Builder Gradle initialization
+  Description: Compiled Settings and Project adapters with a single Builder classpath per build domain.
+Dependencies:
+  - DependencyKind: modustro
+    Items:
+      - GroupId: eu.algites.tool.build
+        ArtifactId: pub.gov.Algites_devops.build.modustrobuild
+        Usages: [product_api]
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
+  - DependencyKind: java
+    Items:
+      - GroupId: org.testng
+        ArtifactId: testng
+        Usages: [develop_implementation]
+        VersionRequirement:
+          Exact: "7.11.0"

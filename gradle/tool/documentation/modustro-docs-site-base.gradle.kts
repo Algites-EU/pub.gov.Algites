@@ -72,10 +72,7 @@ if (!rootProject.extra.has("modustroResolveSourceRootFiles")) {
 val locAlgitesDocsResolveSourceRootFiles = rootProject.extra["modustroResolveSourceRootFiles"] as
     (File, String, String) -> List<File>
 
-val locAlgitesRepositoryMetadataResolverScript = (findProperty("modustro.docs.repositoryMetadataResolverScript") as String?)
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts"
-
-apply(from = uri(locAlgitesRepositoryMetadataResolverScript))
+rootProject.pluginManager.apply("eu.algites.pltf.modustro.builder.repository")
 
 @Suppress("UNCHECKED_CAST")
 val locAlgitesDocsResolvedMetadata = rootProject.extra.properties["modustroResolvedArtifactDirectoryMetadata"] as? Map<String, Any?>

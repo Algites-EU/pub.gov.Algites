@@ -1,7 +1,9 @@
+package eu.algites.pltf.modustro.builder.gradleinit
+
 /*
  * Modustro Builder artifact directory metadata resolver core.
  *
- * This script intentionally contains only Settings/Project compatible orchestration logic.
+ * Compiled metadata orchestration with no Gradle API dependency.
  * It resolves structural metadata, TechnologyKinds, inherited groupId, credential profiles,
  * and version contexts while delegating ResourceEndpoint declaration merge/defaulting/validation
  * to the Gradle-independent Modustro Builder core implementation.
@@ -431,26 +433,20 @@ val AIcAlgitesExternalRepositoryDefaultsEnvironmentVariables = listOf(
     "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE"
 )
 
-val AIcAlgitesPublicRepositoryDefaultsUrl =
-    "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/repository/defaults/algites-repository-download-defaults-public.yml"
+/* Public defaults are versioned with the plugin; no raw GitHub download is needed. */
+private class AIcBundledDefaultsResource
 
-fun AIcAlgitesDownloadPublicRepositoryDefaults(): File {
+fun AIcAlgitesLoadPublicRepositoryDefaults(): File {
+    val locBytes = AIcBundledDefaultsResource::class.java.getResourceAsStream(
+        "/algites-repository-download-defaults-public.yml"
+    )?.use { it.readBytes() } ?: error("Modustro gradleinit artifact is missing bundled public repository defaults.")
+    val locHash = MessageDigest.getInstance("SHA-256").digest(locBytes)
+        .joinToString("") { "%02x".format(it) }
     val locGradleUserHome = System.getenv("GRADLE_USER_HOME")?.trim()?.takeIf { it.isNotBlank() }?.let(::File)
         ?: File(System.getProperty("user.home"), ".gradle")
-    val locFile = locGradleUserHome.resolve(
-        "caches/algites/public-governance/repository/defaults/algites-repository-download-defaults-public.yml"
-    )
+    val locFile = locGradleUserHome.resolve("caches/algites/gradleinit/$locHash/public-defaults.yml")
     locFile.parentFile.mkdirs()
-    try {
-        val locBytes = URI(AIcAlgitesPublicRepositoryDefaultsUrl).toURL().openStream().use { locInput -> locInput.readBytes() }
-        locFile.writeBytes(locBytes)
-    } catch (locException: Exception) {
-        throw IllegalStateException(
-            "Algites public repository defaults are unavailable from '$AIcAlgitesPublicRepositoryDefaultsUrl'. " +
-                "Set ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE to a local defaults file to override the public GitHub fallback.",
-            locException
-        )
-    }
+    if (!locFile.isFile || !locFile.readBytes().contentEquals(locBytes)) locFile.writeBytes(locBytes)
     return locFile.canonicalFile
 }
 
@@ -465,7 +461,7 @@ fun AIcAlgitesExternalDefaultsState(): AIcdModustroResolvedState {
                 }
             }
         } else if (locVariableName == "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE") {
-            AIcAlgitesDownloadPublicRepositoryDefaults()
+            AIcAlgitesLoadPublicRepositoryDefaults()
         } else {
             return@forEach
         }
@@ -1668,6 +1664,7 @@ fun AIcEnvironmentRequirementsMapForOutput(aRequirements: Map<String, AIcdAlgite
     aRequirements.toSortedMap().mapValues { (_, locRequirement) -> AIcVersionRequirementMapForOutput(locRequirement) }
 
 fun AIcToMap(aResult: AIcdModustroResolutionResult): Map<String, Any?> = linkedMapOf(
+    "isolatedBuildDirectories" to aResult.isolatedBuildDirectories,
     "repository" to linkedMapOf(
         "id" to aResult.repository.id,
         "name" to aResult.repository.name,
@@ -1796,23 +1793,3 @@ fun AIcFormatOutput(aResult: AIcdModustroResolutionResult, aOutputKind: String):
     else -> error("Unsupported Modustro artifact directory output kind '$aOutputKind'. Supported values are: yml, yaml, dotted-properties.")
 }
 
-extra["modustroResolveArtifactDirectoryMetadata"] = ::AIcResolveModustroArtifactDirectoryMetadata
-extra["modustroResolveArtifactDirectoryMetadataMap"] = fun(
-    aRepositoryRoot: File,
-    aArtifactDirectoryPath: String?,
-    aResolutionKind: String?,
-    aRepositoryNameOverride: String?,
-    aRepositoryVisibilityOverride: String?
-): Map<String, Any?> = AIcToMap(AIcResolveModustroArtifactDirectoryMetadata(aRepositoryRoot, aArtifactDirectoryPath, aResolutionKind, aRepositoryNameOverride, aRepositoryVisibilityOverride))
-extra["modustroResolveArtifactDirectoryMetadataText"] = fun(
-    aRepositoryRoot: File,
-    aArtifactDirectoryPath: String?,
-    aResolutionKind: String?,
-    aRepositoryNameOverride: String?,
-    aRepositoryVisibilityOverride: String?,
-    aOutputKind: String?
-): String = AIcFormatOutput(
-    AIcResolveModustroArtifactDirectoryMetadata(aRepositoryRoot, aArtifactDirectoryPath, aResolutionKind, aRepositoryNameOverride, aRepositoryVisibilityOverride),
-    aOutputKind?.takeIf { it.isNotBlank() } ?: "yaml"
-)
-extra["modustroFlattenArtifactDirectoryMetadata"] = ::AIcFlattenDottedProperties

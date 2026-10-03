@@ -864,19 +864,7 @@ abstract class AIcValidatePythonDistributionPathsTask : DefaultTask() {
 
 apply(plugin = "base")
 
-val locAlgitesResolverWrapperScript = rootProject.file("gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts")
-if (locAlgitesResolverWrapperScript.isFile) {
-    apply(from = locAlgitesResolverWrapperScript)
-} else {
-    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
-}
-
-val locAlgitesCredentialValuesScript = rootProject.file("gradle/tool/repository/modustro-credential-values.gradle.kts")
-if (locAlgitesCredentialValuesScript.isFile) {
-    apply(from = locAlgitesCredentialValuesScript)
-} else {
-    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-credential-values.gradle.kts"))
-}
+apply(plugin = "eu.algites.pltf.modustro.builder.repository")
 
 val locAlgitesLicensingScript = rootProject.file("gradle/tool/licensing/algites-licensing.gradle.kts")
 if (locAlgitesLicensingScript.isFile) {

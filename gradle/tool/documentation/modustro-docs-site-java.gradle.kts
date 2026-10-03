@@ -85,6 +85,8 @@ class AIcGenerateJavaDocsSiteAction(
 }
 
 val locAlgitesDocsBaseScript = (findProperty("modustro.docs.baseScript") as String?)
+    ?: rootProject.file("gradle/tool/documentation/modustro-docs-site-base.gradle.kts")
+        .takeIf { it.isFile }?.toURI()?.toString()
     ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/modustro-docs-site-base.gradle.kts"
 
 apply(from = uri(locAlgitesDocsBaseScript))

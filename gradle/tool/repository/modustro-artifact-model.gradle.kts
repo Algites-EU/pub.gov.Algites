@@ -2,17 +2,12 @@
  * Deprecated compatibility adapter for the old Modustro Builder artifact metadata model.
  *
  * New code should apply:
- *   modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts
+ *   the compiled eu.algites.pltf.modustro.builder.repository plugin
  *
  * This file intentionally contains no repository scanning or YAML parsing.
  */
 
-val locModustroResolverWrapperScript = rootProject.file("gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts")
-if (locModustroResolverWrapperScript.isFile) {
-    apply(from = locModustroResolverWrapperScript)
-} else {
-    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts"))
-}
+rootProject.pluginManager.apply("eu.algites.pltf.modustro.builder.repository")
 
 @Suppress("UNCHECKED_CAST")
 val locModustroResolvedArtifactDirectories = rootProject.extra["modustroResolvedArtifactDirectories"] as List<Map<String, Any?>>

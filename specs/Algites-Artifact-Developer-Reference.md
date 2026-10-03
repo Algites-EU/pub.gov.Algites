@@ -910,7 +910,7 @@ Important documentation inputs include:
 -Pmodustro.docs.repositoryHomeUrl=<url>
 ```
 
-The documentation system may also be given script/adapter overrides such as `modustro.docs.baseScript`, `modustro.docs.javaScript`, `modustro.docs.pythonScript`, `modustro.docs.mpsScript`, and `modustro.docs.repositoryMetadataResolverScript`. These are infrastructure override points rather than normal artifact-author settings.
+The documentation system may also be given script/adapter overrides such as `modustro.docs.baseScript`, `modustro.docs.javaScript`, `modustro.docs.pythonScript`, `modustro.docs.mpsScript`. These are infrastructure override points rather than normal artifact-author settings.
 
 ## 17. Public GitHub workflow entry points
 

@@ -6,16 +6,7 @@
  */
 
 if (!rootProject.extra.has("modustroResolvedArtifactDirectoryMetadata")) {
-    val locMetadataResolverWrapper = rootProject.file(
-        "gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts"
-    )
-    if (locMetadataResolverWrapper.isFile) {
-        apply(from = locMetadataResolverWrapper)
-    } else {
-        apply(from = uri(
-            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gradle.kts"
-        ))
-    }
+    rootProject.pluginManager.apply("eu.algites.pltf.modustro.builder.repository")
 }
 
 if (!rootProject.extra.has("modustroEffectivePublishingPlan")) {
@@ -73,7 +64,7 @@ val locResolvePublishingPlan = fun(
         }
         aPublishingDestinationIds.map { locId -> locById.getValue(locId) }
     }
-    linkedMapOf(
+    return linkedMapOf(
         "publishingEnabled" to locEnabled,
         "publishingEndpoints" to locSelectedEndpoints
     )

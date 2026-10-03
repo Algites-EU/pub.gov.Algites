@@ -1,0 +1,10 @@
+Gradleinit verification (2026-10-03)
+Gradle 9.2.1, JDK 17.
+Standalone bootstrap: compileKotlin, jar, Maven POM/module metadata, validatePlugins and publishToMavenLocal succeeded.
+TestNG/Gradle TestKit: 3 tests, 0 failures, 0 errors, 0 skipped.
+Settings/Project/applied-Project Builder DTO class identity verified.
+Core endpoint inheritance, Gradle project discovery, metadata-only helper mode and isolated-build metadata/Gradle paths verified.
+Public repository CI credential preflight task succeeded with configuration cache enabled:
+resolveModustroRequiredCredentials -Palgites.credential.usages=download -Palgites.credential.download.stabilities=release,snapshot
+Public CI task used a locally published bootstrap and cached runtime dependencies (--offline).
+Maven publication to the public snapshot service has not been performed.

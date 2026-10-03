@@ -1,12 +1,12 @@
 # Modustro Builder
 
-`modustro/builder` contains the Gradle-independent core model and implementation of the Modustro build system.
+`modustro/builder` contains the portable core and its separate integration adapters of the Modustro build system.
 
 The staged migration deliberately separates the portable Builder model from the existing Gradle integration:
 
 - `coreintf` contains public Java contracts, immutable model types, and canonical machine-readable definitions;
 - `coreimpl` contains reusable Gradle-independent implementations such as inheritance resolution, model validation, and Java/Python dependency technology bridges;
-- `devops/build/modustrobuild` and shared Gradle scripts remain the current execution/integration edge.
+- `gradleinit` is the compiled Settings/Project integration edge; `devops/build/modustrobuild` supplies its runtime dependency bundle, and shared Gradle scripts provide execution adapters.
 
 Phase 2 connects the active Algites dependency metadata bridge to the new semantics: `DependencyKind: modustro`, merge-only `Usages`, `RequiredBuildOutputTypes`, and per-technology Java/Python mapping. Phase 3 adds `PreparedSourceSet`, the hard-wired Gradle-independent BuildOutput producer registry, portable production plans, hierarchical `BuildOutputTypes` selection, and the active Gradle adapter for Java JAR/source/Javadoc outputs and Python wheel/sdist outputs.
 
@@ -35,3 +35,11 @@ Structured-data loading remains separate from effective-model construction. Phas
 ## Phase 6 publication layer
 
 The Phase-6 portable core separates publication planning from provider execution. `PublicationDestinations` contains only effective PublishingEndpoint ids; omitted destinations select every enabled endpoint for the selected output kind and stability. Global schema publication validates `GlobalPublicationPathId` at the trust boundary and maintains server-controlled draft/release metadata with monotonic draft revisions and immutable releases. Provider-specific publication is performed by PublishingAdapter implementations; generic ordering, retries, failure handling, deadlines, and progress remain scheduler responsibilities.
+
+## Compiled Gradle initialization
+
+`gradleinit` replaces applied Settings discovery, metadata resolver and credential
+initialization scripts. Root Settings bootstrap a single artifact and activate its
+Settings plugin. Public defaults are packaged in the artifact; Builder Core keeps
+endpoint semantics and remains Gradle-independent. See [gradleinit](gradleinit/README.md)
+for the first-publication bootstrap and metadata-only helper mode.
