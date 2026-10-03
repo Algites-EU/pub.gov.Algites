@@ -217,16 +217,19 @@ subprojects.forEach { locSubproject ->
         .map { locDemand -> locDemand.key().capabilityId() }
         .toSet()
 
-    if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
-        locSubproject.tasks.matching { locTask -> locTask.name == "processModustroJavaNativeSources" }.configureEach {
-            val locNativeSourceProcessingTask = this
-            locGenerateJavaDocsSite.configure { dependsOn(locNativeSourceProcessingTask) }
+    gradle.projectsEvaluated {
+        val locDocumentationDependencies = buildList {
+            if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
+                add("processModustroJavaNativeSources")
+            }
+            if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
+                add("resolveJavaDependencies")
+            }
         }
-    }
-    if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
-        locSubproject.tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach {
-            val locDependencyResolutionTask = this
-            locGenerateJavaDocsSite.configure { dependsOn(locDependencyResolutionTask) }
+            .filter { locName -> locName in locSubproject.tasks.names }
+            .map { locName -> locSubproject.tasks.named(locName) }
+        locGenerateJavaDocsSite.configure {
+            dependsOn(locDocumentationDependencies)
         }
     }
 

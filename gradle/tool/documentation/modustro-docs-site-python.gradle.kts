@@ -403,26 +403,29 @@ locPythonDocsEntries.forEach { locEntry ->
         .toSet()
     val locGradleProjectPath = locEntry.locArtifactMetadata["gradleProjectPath"].orEmpty()
     val locGradleProject = rootProject.findProject(locGradleProjectPath)
-    if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
-        locGradleProject?.tasks
-            ?.matching { locTask -> locTask.name == "processModustroPythonNativeSources" }
-            ?.configureEach {
-                val locNativeSourceProcessingTask = this
-                locGeneratePythonDocsSite.configure { dependsOn(locNativeSourceProcessingTask) }
+    if (locGradleProject != null) {
+        gradle.projectsEvaluated {
+            val locDocumentationDependencies = buildList {
+                if ("source_native_processing" in locNativeDocumentationCapabilityIds) {
+                    add("processModustroPythonNativeSources")
+                }
+                if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
+                    add("resolvePythonDependencies")
+                }
             }
-    }
-    if ("dependency_resolution" in locNativeDocumentationCapabilityIds) {
-        locGradleProject?.tasks
-            ?.matching { locTask -> locTask.name == "resolvePythonDependencies" }
-            ?.configureEach {
-                val locDependencyResolutionTask = this
-                locGeneratePythonDocsSite.configure { dependsOn(locDependencyResolutionTask) }
+                .filter { locName -> locName in locGradleProject.tasks.names }
+                .map { locName -> locGradleProject.tasks.named(locName) }
+            locGeneratePythonDocsSite.configure {
+                dependsOn(locDocumentationDependencies)
             }
+        }
     }
 }
 
 locGeneratePythonDocsSite.configure {
-    tasks.findByName("generateJavaDocsSite")?.let { locJavaDocsTask -> mustRunAfter(locJavaDocsTask) }
+    if ("generateJavaDocsSite" in tasks.names) {
+        mustRunAfter(tasks.named("generateJavaDocsSite"))
+    }
 }
 
 @Suppress("UNCHECKED_CAST")

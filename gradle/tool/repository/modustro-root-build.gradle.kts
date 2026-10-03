@@ -2009,6 +2009,10 @@ allprojects {
                     listOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath")
                         .mapNotNull { locName -> configurations.findByName(locName) }
                         .filter { locConfiguration -> locConfiguration.isCanBeResolved }
+                        // Resolve coordinates and downloads here, but retain only file
+                        // paths. Configuration build dependencies would run local
+                        // compilation/packaging before the prepare phase.
+                        .map { locConfiguration -> locConfiguration.files }
                 )
             }
         }
@@ -2624,19 +2628,9 @@ subprojects {
     }
 
     if ("java" in locEffectiveTechnologyKinds && locHasCapabilityDemand("java", "dependency_resolution")) {
-        tasks.matching { locTask -> locTask.name == "resolveJavaDependencies" }.configureEach {
-            val locDependencyResolutionTask = this
-            rootProject.tasks.named("modustroDependencyPreflight").configure {
-                dependsOn(locDependencyResolutionTask)
-            }
-        }
-    }
-    if ("python" in locEffectiveTechnologyKinds && locHasCapabilityDemand("python", "dependency_resolution")) {
-        tasks.matching { locTask -> locTask.name == "resolvePythonDependencies" }.configureEach {
-            val locDependencyResolutionTask = this
-            rootProject.tasks.named("modustroDependencyPreflight").configure {
-                dependsOn(locDependencyResolutionTask)
-            }
+        val locDependencyResolutionTask = tasks.named("resolveJavaDependencies")
+        rootProject.tasks.named("modustroDependencyPreflight").configure {
+            dependsOn(locDependencyResolutionTask)
         }
     }
 
@@ -3116,6 +3110,11 @@ subprojects {
             credentialBaseDirectoryPath.set(rootProject.projectDir.absolutePath)
             if (locPythonTemplateFile.asFile.isFile) pyprojectTemplateFile.set(locPythonTemplateFile)
             selectedPhaseFile.set(layout.buildDirectory.file("algites/python/dependency-resolution-phase.txt"))
+        }
+        if ("python" in locEffectiveTechnologyKinds && locHasCapabilityDemand("python", "dependency_resolution")) {
+            rootProject.tasks.named("modustroDependencyPreflight").configure {
+                dependsOn(locResolvePythonDependencies)
+            }
         }
         val locGeneratePythonProjectMetadata = tasks.register<AIcGeneratePythonProjectMetadataTask>("generatePythonProjectMetadata") {
             group = "modustro"

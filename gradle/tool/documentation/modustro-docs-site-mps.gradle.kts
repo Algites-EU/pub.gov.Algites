@@ -939,8 +939,9 @@ tasks.register("generateDummyMpsDocs") {
 }
 
 tasks.named("generateDummyMpsDocs") {
-    tasks.findByName("generateJavaDocsSite")?.let { locJavaDocsTask -> mustRunAfter(locJavaDocsTask) }
-    tasks.findByName("generatePythonDocsSite")?.let { locPythonDocsTask -> mustRunAfter(locPythonDocsTask) }
+    listOf("generateJavaDocsSite", "generatePythonDocsSite")
+        .filter { locName -> locName in tasks.names }
+        .forEach { locName -> mustRunAfter(tasks.named(locName)) }
 }
 
 @Suppress("UNCHECKED_CAST")

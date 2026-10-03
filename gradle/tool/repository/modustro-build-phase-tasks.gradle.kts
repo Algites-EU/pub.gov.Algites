@@ -10,9 +10,10 @@
 import org.gradle.api.Task
 import org.gradle.api.tasks.TaskProvider
 
-fun AIcModustroExistingTasks(aNames: Set<String>): List<Task> =
+fun AIcModustroExistingTaskProviders(aNames: Set<String>): List<TaskProvider<Task>> =
     allprojects.flatMap { locProject ->
-        aNames.mapNotNull { locName -> locProject.tasks.findByName(locName) }
+        aNames.filter { locName -> locName in locProject.tasks.names }
+            .map { locName -> locProject.tasks.named(locName) }
     }.distinct()
 
 fun AIcRegisterModustroPhase(
@@ -25,11 +26,14 @@ fun AIcRegisterModustroPhase(
         description = aDescription
     }
     gradle.projectsEvaluated {
+        // Collect providers after registration finishes, without realizing other
+        // tasks inside a phase task's configuration action.
+        val locLocalPhaseTasks = AIcModustroExistingTaskProviders(aLocalTaskNames)
+        val locIncludedPhaseTasks = gradle.includedBuilds.sortedBy { it.name }
+            .map { locIncludedBuild -> locIncludedBuild.task(":$aTaskName") }
         locPhaseTask.configure {
-            dependsOn(AIcModustroExistingTasks(aLocalTaskNames))
-            gradle.includedBuilds.sortedBy { it.name }.forEach { locIncludedBuild ->
-                dependsOn(locIncludedBuild.task(":$aTaskName"))
-            }
+            dependsOn(locLocalPhaseTasks)
+            dependsOn(locIncludedPhaseTasks)
         }
     }
     return locPhaseTask

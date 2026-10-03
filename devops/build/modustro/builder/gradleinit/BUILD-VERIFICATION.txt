@@ -8,3 +8,20 @@ Public repository CI credential preflight task succeeded with configuration cach
 resolveModustroRequiredCredentials -Palgites.credential.usages=download -Palgites.credential.download.stabilities=release,snapshot
 Public CI task used a locally published bootstrap and cached runtime dependencies (--offline).
 Maven publication to the public snapshot service has not been performed.
+
+Repository CI phase wiring verification (2026-10-03)
+Gradle 9.2.1, JDK 17; original production Settings and the published snapshot bootstrap.
+Original modustroPreparePhase task-configuration failure reproduced on the complete repository.
+Fixed lazy phase task wiring and Java/Python documentation consumer wiring through TaskProviders.
+Fixed mandatory Java/Python preflight registration; resolve now executes all five Java resolvers and the Python resolver.
+Resolved Java classpaths retain plain file paths, without pulling compilation/packaging into the resolve phase.
+Regression fixture: original failure reproduced; Java/Python resolve, prepare across an included isolated build, prepare cache reuse and documentation dependencies passed.
+Full public repository: modustroResolvePhase passed; a second run reused configuration cache and passed.
+Full public repository: prepare task graph and resolve/prepare/compile/verify/package task graphs passed with --dry-run.
+Full prepare execution reaches generator task actions, but remains blocked by two existing definition-generation errors:
+- :devops:build:modustro:builder:coreintf:generateModustroDefinitionSources: YAML/JSON document-common-metadata_1 definitions generate different Java content for AIcgdDocumentCommonMetadata_1.java.
+- :devops:build:yamldefs:generateModustroDefinitionSources: Defs Codegen raises "Definition version must be present in the file name for ".
+The complete compile/test/integration/package execution is therefore not verified as successful.
+An additional publishing graph check reaches all publishing task nodes, but configuration-cache storage rejects existing publishing actions that capture Project/Gradle script objects.
+No remote artifacts were published. The compiled gradleinit implementation and artifact coordinates are unchanged by this phase-wiring fix.
+No additional source files were removed.
