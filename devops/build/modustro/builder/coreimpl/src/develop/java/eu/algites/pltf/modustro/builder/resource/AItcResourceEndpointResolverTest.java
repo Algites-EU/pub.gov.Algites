@@ -157,4 +157,41 @@ public final class AItcResourceEndpointResolverTest {
         Assert.assertTrue(locCatalog.all().get(0).enabled());
     }
 
+    /** Covers the legacy source-upload ID reported by CI without weakening dimensional validation. */
+    @Test
+    public void AIcMigratesLegacySourceUploadBeforeInheritance() {
+        var bridge = AIcResourceEndpointMetadataBridge.builtin();
+        var resolver = AIcResourceEndpointResolver.builtin();
+        var source = bridge.declaration("java", "native_source_output", "public", "upload",
+            "algites-java-public-release-upload", "https://example.invalid/maven/", "source-upload", true, "release", "cloudsmith");
+        var binary = bridge.declaration("java", "native_binary_output", "public", "upload",
+            "algites-java-public-release-upload", "https://example.invalid/maven/", "binary-upload", true, "release", "cloudsmith");
+        var amendment = bridge.declaration("java", "native_source_output", "public", "upload",
+            "algites-java-native-source-output-public-release-upload", null, null, false, null, null);
+        var catalog = resolver.resolve(resolver.mergeDeclarations(List.of(source, binary), List.of(amendment)));
+        Assert.assertEquals(catalog.all().size(), 2);
+        var effective = catalog.all().stream().filter(e -> e.resourceKind().equals("native_source_output")).findFirst().orElseThrow();
+        Assert.assertEquals(effective.id(), "algites-java-native-source-output-public-release-upload");
+        Assert.assertEquals(effective.credentialProfile(), "source-upload");
+        Assert.assertEquals(effective.resourceEndpointProviderAdapter(), "cloudsmith");
+        Assert.assertFalse(effective.enabled());
+        Assert.assertEquals(effective.url().toString(), "https://example.invalid/maven/");
+        var oldAmendment = bridge.declaration("java", "native_source_output", "public", "upload",
+            "algites-java-public-release-upload", null, null, false, null, null);
+        Assert.assertEquals(resolver.mergeDeclarations(List.of(source), List.of(oldAmendment)).size(), 1);
+    }
+
+    /** Legacy source IDs still have to agree with visibility and stability dimensions. */
+    @Test
+    public void AIcRejectsMismatchedLegacySourceUploadDimensions() {
+        var bridge = AIcResourceEndpointMetadataBridge.builtin();
+        var resolver = AIcResourceEndpointResolver.builtin();
+        var wrongLane = bridge.declaration("java", "native_source_output", "public", "upload",
+            "algites-java-public-release-upload", "https://example.invalid/", null, true, "snapshot", null);
+        Assert.expectThrows(AIxModelValidationException.class, () -> resolver.resolve(List.of(wrongLane)));
+        var wrongVisibility = bridge.declaration("java", "native_source_output", "private", "upload",
+            "algites-java-public-release-upload", "https://example.invalid/", null, true, "release", null);
+        Assert.expectThrows(AIxModelValidationException.class, () -> resolver.resolve(List.of(wrongVisibility)));
+    }
+
 }

@@ -2003,11 +2003,12 @@ allprojects {
                         /* Resolve the complete graph and external downloads without consuming local project outputs.
                          * Local outputs belong to compile/package task dependencies; preflight must not pull those
                          * tasks into the resolve phase or declare their unbuilt class directories as classpath inputs.
+                         * Generated file dependencies (including Gradle TestKit metadata) are local outputs too.
                          */
                         .map { locConfiguration ->
                             locConfiguration.incoming.artifactView {
                                 componentFilter { locComponent ->
-                                    locComponent !is org.gradle.api.artifacts.component.ProjectComponentIdentifier
+                                    locComponent is org.gradle.api.artifacts.component.ModuleComponentIdentifier
                                 }
                             }.files.files
                         }
@@ -2957,7 +2958,43 @@ subprojects {
             elif requested_outputs != {"wheel", "sdist"}:
                 raise RuntimeError(f"Unsupported Python BuildOutput production set: {sorted(requested_outputs)}")
 
-            subprocess.run(build_command, cwd=project_dir, check=True)
+            # Setuptools cannot union two directories contributing modules to the same
+            # namespace package: its package_dir mapping silently selects one root.
+            # Merge only in a temporary build workspace and reject conflicting modules.
+            import re
+            import tomllib
+            with tempfile.TemporaryDirectory(prefix="modustro-python-build-") as temporary_project:
+                build_project = pathlib.Path(temporary_project) / "project"
+                shutil.copytree(project_dir, build_project, ignore=shutil.ignore_patterns("build", "*.egg-info", "__pycache__", "*.pyc"))
+                metadata_path = build_project / "pyproject.toml"
+                metadata_text = metadata_path.read_text(encoding="utf-8")
+                metadata = tomllib.loads(metadata_text)
+                source_roots = metadata["tool"]["setuptools"]["packages"]["find"]["where"]
+                merged_root = build_project / "modustro-python-package"
+                merged_root.mkdir()
+                for source_root in source_roots:
+                    source_path = (build_project / source_root).resolve()
+                    if not source_path.is_relative_to(build_project):
+                        raise RuntimeError(f"Python source root is outside the staged project: {source_root}")
+                    if not source_path.is_dir():
+                        continue
+                    for source_file in sorted(source_path.rglob("*")):
+                        if not source_file.is_file() or "__pycache__" in source_file.parts or source_file.suffix in (".pyc", ".pyo"):
+                            continue
+                        target = merged_root / source_file.relative_to(source_path)
+                        if target.exists() and target.read_bytes() != source_file.read_bytes():
+                            raise RuntimeError(f"Conflicting Python source module/resource: {source_file.relative_to(source_path)}")
+                        target.parent.mkdir(parents=True, exist_ok=True)
+                        shutil.copy2(source_file, target)
+                metadata_text, replacements = re.subn(
+                    r'(?ms)(^\[tool\.setuptools\.packages\.find\]\s*\n)(.*?)(?=^\[|\Z)',
+                    lambda match: match.group(1) + re.sub(r'(?m)^where\s*=.*$', 'where = ["modustro-python-package"]', match.group(2)),
+                    metadata_text,
+                )
+                if replacements != 1:
+                    raise RuntimeError("Expected one owned Python package discovery table")
+                metadata_path.write_text(metadata_text, encoding="utf-8")
+                subprocess.run(build_command, cwd=build_project, check=True)
 
             def inject_wheel(path):
                 with zipfile.ZipFile(path, "r") as source:

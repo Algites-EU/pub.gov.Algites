@@ -30,3 +30,28 @@ gradle/tool/repository/modustro-artifact-directory-metadata-resolver-wrapper.gra
 gradle/tool/repository/modustro-root-settings-discovery.gradle.kts
 gradle/tool/repository/modustro-credential-values.gradle.kts
 ```
+
+## Legacy source-output endpoint IDs (2026-10-04)
+
+Builder CoreImpl now migrates legacy source-output IDs before declaration
+inheritance and effective validation. For example, in the
+`java.native_source_output.public.upload` cell,
+`algites-java-public-release-upload` becomes
+`algites-java-native-source-output-public-release-upload`.
+Both legacy and canonical amendment IDs resolve to the same source endpoint;
+URL, CredentialProfile and provider adapter values remain inherited. Binary
+output endpoints keep their established compatibility behavior. Incorrect
+visibility/stability combinations still fail validation.
+
+This requires publishing the rebuilt Builder CoreImpl, not just replacing the
+Gradle script. The supplied Builder binary bundle contains the matching modules
+and an upload script, so bootstrapping does not depend on a working CI publish.
+The Java dependency preflight also excludes local generated file dependencies
+(such as Gradle TestKit metadata); combined resolve/verify/package builds no
+longer report a missing producer dependency for those files.
+
+Python wheel/sdist packaging now merges handwritten, generated and external
+source roots in an isolated temporary build workspace. Shared namespace packages
+retain all modules; conflicting files fail explicitly. A regression test covers
+namespace merging, resources and conflicts, and the generator wheels were tested
+with their actual packaged modules. This fix is in the root Gradle build adapter.
