@@ -2323,6 +2323,13 @@ val modustroResolveRequiredCredentials = tasks.register<AIcResolveModustroRequir
     }
 }
 
+/* Existing workflow copies may still invoke the former governance task name. */
+tasks.register("resolveAlgitesRequiredCredentials") {
+    group = "modustro"
+    description = "Delegates credential preflight to resolveModustroRequiredCredentials."
+    dependsOn(modustroResolveRequiredCredentials)
+}
+
 /* Publishing invocation overrides must be available before publication tasks resolve effective plans. */
 val locModustroSourceRepositoryRootForPublishingOverrides = generateSequence(rootProject.projectDir.canonicalFile) { it.parentFile }
     .firstOrNull { locDirectory -> locDirectory.resolve("modustro-source-repository.yml").isFile }
