@@ -162,16 +162,191 @@
       "additionalProperties": false,
       "properties": {
         "java": {
-          "$ref": "#/$defs/nativeOutputResourceKinds"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "OutputSelector": {
+                "type": "string",
+                "enum": [
+                  "native_product_sources",
+                  "native_product_binaries",
+                  "native_product_documentation",
+                  "native_develop_sources",
+                  "native_develop_binaries",
+                  "native_develop_documentation",
+                  "native_outputs",
+                  "native_product_outputs",
+                  "native_develop_outputs",
+                  "native_sources",
+                  "native_binaries",
+                  "native_documentation"
+                ]
+              },
+              "Enabled": {
+                "type": "boolean"
+              },
+              "public": {
+                "$ref": "#/$defs/stableActionMatrix"
+              },
+              "private": {
+                "$ref": "#/$defs/stableActionMatrix"
+              }
+            },
+            "required": [
+              "OutputSelector"
+            ]
+          }
         },
         "python": {
-          "$ref": "#/$defs/nativeOutputResourceKinds"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "OutputSelector": {
+                "type": "string",
+                "enum": [
+                  "native_product_sources",
+                  "native_product_binaries",
+                  "native_product_documentation",
+                  "native_develop_sources",
+                  "native_develop_binaries",
+                  "native_develop_documentation",
+                  "native_outputs",
+                  "native_product_outputs",
+                  "native_develop_outputs",
+                  "native_sources",
+                  "native_binaries",
+                  "native_documentation"
+                ]
+              },
+              "Enabled": {
+                "type": "boolean"
+              },
+              "public": {
+                "$ref": "#/$defs/stableActionMatrix"
+              },
+              "private": {
+                "$ref": "#/$defs/stableActionMatrix"
+              }
+            },
+            "required": [
+              "OutputSelector"
+            ]
+          }
         },
         "mps": {
-          "$ref": "#/$defs/nativeOutputResourceKinds"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "OutputSelector": {
+                "type": "string",
+                "enum": [
+                  "native_product_sources",
+                  "native_product_binaries",
+                  "native_product_documentation",
+                  "native_develop_sources",
+                  "native_develop_binaries",
+                  "native_develop_documentation",
+                  "native_outputs",
+                  "native_product_outputs",
+                  "native_develop_outputs",
+                  "native_sources",
+                  "native_binaries",
+                  "native_documentation"
+                ]
+              },
+              "Enabled": {
+                "type": "boolean"
+              },
+              "public": {
+                "$ref": "#/$defs/stableActionMatrix"
+              },
+              "private": {
+                "$ref": "#/$defs/stableActionMatrix"
+              }
+            },
+            "required": [
+              "OutputSelector"
+            ]
+          }
         },
         "modustro": {
-          "$ref": "#/$defs/modustroResourceKinds"
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "OutputSelector": {
+                "type": "string",
+                "enum": [
+                  "modustro_docs_site",
+                  "schema_site"
+                ]
+              },
+              "Enabled": {
+                "type": "boolean"
+              },
+              "public": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/stableActionMatrix"
+                  },
+                  {
+                    "$ref": "#/$defs/unstableActionMatrix"
+                  }
+                ]
+              },
+              "private": {
+                "anyOf": [
+                  {
+                    "$ref": "#/$defs/stableActionMatrix"
+                  },
+                  {
+                    "$ref": "#/$defs/unstableActionMatrix"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "OutputSelector"
+            ],
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "OutputSelector": {
+                      "const": "schema_site"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "public": {
+                      "$ref": "#/$defs/unstableActionMatrix"
+                    },
+                    "private": {
+                      "$ref": "#/$defs/unstableActionMatrix"
+                    }
+                  }
+                },
+                "else": {
+                  "properties": {
+                    "public": {
+                      "$ref": "#/$defs/stableActionMatrix"
+                    },
+                    "private": {
+                      "$ref": "#/$defs/stableActionMatrix"
+                    }
+                  }
+                }
+              }
+            ]
+          }
         }
       },
       "minProperties": 1
@@ -189,13 +364,13 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "native_binary_output": {
+        "native_product_binaries": {
           "$ref": "#/$defs/stableVisibilityMatrix"
         },
-        "native_source_output": {
+        "native_product_sources": {
           "$ref": "#/$defs/stableVisibilityMatrix"
         },
-        "native_documentation_output": {
+        "native_product_documentation": {
           "$ref": "#/$defs/stableVisibilityMatrix"
         }
       },

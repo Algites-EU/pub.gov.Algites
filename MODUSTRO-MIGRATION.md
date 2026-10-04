@@ -35,9 +35,9 @@ gradle/tool/repository/modustro-credential-values.gradle.kts
 
 Builder CoreImpl now migrates legacy source-output IDs before declaration
 inheritance and effective validation. For example, in the
-`java.native_source_output.public.upload` cell,
+`java.native_product_sources.public.upload` cell,
 `algites-java-public-release-upload` becomes
-`algites-java-native-source-output-public-release-upload`.
+`algites-java-native-product-sources-public-release-upload`.
 Both legacy and canonical amendment IDs resolve to the same source endpoint;
 URL, CredentialProfile and provider adapter values remain inherited. Binary
 output endpoints keep their established compatibility behavior. Incorrect

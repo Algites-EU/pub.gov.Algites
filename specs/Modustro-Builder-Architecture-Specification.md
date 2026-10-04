@@ -284,20 +284,20 @@ The built-in output/resource kinds are:
 
 | ResourceKind | TechnologyKinds | Stability | Role |
 | --- | --- | --- | --- |
-| `native_binary_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | native binary packages and dependency resources |
-| `native_source_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | native source packages |
-| `native_documentation_output` | `java`, `python`, `mps` | required (`release` / `snapshot`) | technology-native documentation packages |
+| `native_product_binaries` | `java`, `python`, `mps` | required (`release` / `snapshot`) | native binary packages and dependency resources |
+| `native_product_sources` | `java`, `python`, `mps` | required (`release` / `snapshot`) | native source packages |
+| `native_product_documentation` | `java`, `python`, `mps` | required (`release` / `snapshot`) | technology-native documentation packages |
 | `modustro_docs_site` | `modustro` | required (`release` / `snapshot`) | aggregate Modustro documentation site |
 | `schema_site` | `modustro` | forbidden as a ResourceEndpoint property | globally published canonical schemas |
 
-Concrete build outputs map to these publishing kinds independently of the build producer: `java_classes_jar` and `python_wheel` map to `native_binary_output`; `java_sources_jar` and `python_sdist` map to `native_source_output`; `java_javadoc_jar` maps to `native_documentation_output`. The mapping belongs to Builder core and is not encoded in individual artifact descriptors.
+Concrete build outputs map to these publishing kinds independently of the build producer: `java_classes_jar` and `python_wheel` map to `native_product_binaries`; `java_sources_jar` and `python_sdist` map to `native_product_sources`; `java_javadoc_jar` maps to `native_product_documentation`. The mapping belongs to Builder core and is not encoded in individual artifact descriptors.
 
 A canonical endpoint declaration therefore has the shape:
 
 ```yaml
 ResourceEndpoints:
   java:
-    native_binary_output:
+    - OutputSelector: native_product_binaries
       public:
         upload:
           - Id: algites-java-native-build-output-public-snapshot-upload
@@ -311,7 +311,7 @@ A schema-site endpoint intentionally omits Stability:
 ```yaml
 ResourceEndpoints:
   modustro:
-    schema_site:
+    - OutputSelector: schema_site
       public:
         upload:
           - Id: algites-modustro-schema-site-public-upload
@@ -320,24 +320,24 @@ ResourceEndpoints:
 
 Each endpoint may define `Id`, `Url`, `CredentialProfile`, `Enabled`, `Stability` when permitted/required by its ResourceKind, and optional `ResourceEndpointProviderAdapter`. `Enabled` defaults to true. Inheritance merges endpoints by `Id` inside the same four-dimensional cell, so a descendant can change one property or disable an inherited endpoint without copying the remaining endpoint definition.
 
-`ResourceEndpointProviderAdapter` is the generalized name for provider-specific **resource access/management** behavior. The TechnologyKind/ResourceKind/Action combination owns default protocol behavior; a provider adapter is used only when a concrete resource provider requires behavior outside that default contract. Publishing is no longer modeled as a ResourceEndpoint specialization in Phase 5.2. Publication targets use `PublishingEndpoints` and their separate `PublishingAdapter` contract, so generic publishing order/retry/failure/timeout/progress semantics do not leak into download or management endpoints.
+`ResourceEndpointProviderAdapter` is the generalized name for provider-specific **resource access/management** behavior. The TechnologyKind/ResourceKind/Action combination owns default protocol behavior; a provider adapter is used only when a concrete resource provider requires behavior outside that default contract. Publishing is no longer modeled as a ResourceEndpoint specialization in Phase 5.2. Publication targets use `EndpointPublications` and their separate `PublishingAdapter` contract, so generic publishing order/retry/failure/timeout/progress semantics do not leak into download or management endpoints.
 
 The source-repository visibility policy is preserved while resource access and publishing use separate endpoint models:
 
-- public source repositories may consume only public ResourceEndpoints; their publication targets come only from public-governance PublishingEndpoints;
+- public source repositories may consume only public ResourceEndpoints; their publication targets come only from public-governance EndpointPublications;
 - private source repositories may consume public and private ResourceEndpoints; publication targets for their own outputs come from authorized private PublishingEndpoint overlays.
 
-Phase 5.1 removes the former repository-matrix input and its compatibility projection. Phase 5.2 keeps `ResourceEndpoints` as the generalized resource-resolution/management representation and uses `PublishingEndpoints` exclusively for publishing.
+Phase 5.1 removes the former repository-matrix input and its compatibility projection. Phase 5.2 keeps `ResourceEndpoints` as the generalized resource-resolution/management representation and uses `EndpointPublications` exclusively for publishing.
 
 Phase 5.2 makes canonical definition code generation convention-driven at `source_native_processing`. The Gradle adapter discovers canonical product definition roots, derives SourceKind/package/targets, calls the reusable Defs Codegen Java API directly, and writes reproducible output to `.gen` source roots. Generated transport/data types remain distinct from handwritten effective Builder models.
 
-Phase 5.2 also separates **publishing configuration** from the generalized ResourceEndpoint catalog. Publication policy is declared directly under each publishing output kind and then under `Snapshot` / `Release`. Each branch carries `PublishingEnabled` plus `PublishingEndpoints`; endpoint arrays merge hierarchically by stable `Id`, while individual endpoint properties inherit independently. The effective endpoint defaults are `Enabled=true`, `PublishingOrder=0`, `PublishingFailurePolicy=FAIL_BUILD_ON_PUBLISHING_FAILURE`, `PublishingRetryCount=0`, `PublishingRetryDelayMillis=1000`, and `ShowPublishingProgressIfPossible=true`. Negative publishing orders are valid. `PublishingAttemptTimeoutMillis` is optional and, when present, must be positive.
+Phase 5.2 also separates **publishing configuration** from the generalized ResourceEndpoint catalog. Publication policy is declared directly under each publishing output kind and then under `Snapshot` / `Release`. Each branch carries `PublishingEnabled` plus `EndpointPublications`; endpoint arrays merge hierarchically by stable `Id`, while individual endpoint properties inherit independently. The effective endpoint defaults are `Enabled=true`, `PublishingOrder=0`, `PublishingFailurePolicy=FAIL_BUILD_ON_PUBLISHING_FAILURE`, `PublishingRetryCount=0`, `PublishingRetryDelayMillis=1000`, and `ShowPublishingProgressIfPossible=true`. Negative publishing orders are valid. `PublishingAttemptTimeoutMillis` is optional and, when present, must be positive.
 
-Snapshot invocations expose five independent `DEFAULT` / `FORCE_ON` / `FORCE_OFF` overrides for `native_binary_output`, `native_source_output`, `native_documentation_output`, `modustro_docs_site`, and `schema_site`. Overrides affect only the branch-level `PublishingEnabled`; they never rewrite endpoint `Enabled`. Release publishing is descriptor-only and rejects a non-default portable override. Publishing enablement is intentionally independent from code generation, compilation, verification, and packaging.
+Snapshot invocations expose five independent `DEFAULT` / `FORCE_ON` / `FORCE_OFF` overrides for `native_product_binaries`, `native_product_sources`, `native_product_documentation`, `modustro_docs_site`, and `schema_site`. Overrides affect only the branch-level `PublishingEnabled`; they never rewrite endpoint `Enabled`. Release publishing is descriptor-only and rejects a non-default portable override. Publishing enablement is intentionally independent from code generation, compilation, verification, and packaging.
 
 Phase 5.1B completes the ResourceEndpoint transport/effective-model split. Generated `AIcgdResourceEndpoint_1` values represent precedence-ordered declarations and therefore permit inherited amendment fields such as `Url`, `Enabled`, and `Stability` to remain absent. Builder Core merge-composes declarations by the four-dimensional cell plus `Id`, applies defaults only after inheritance, validates the effective ResourceKind contract, and exposes immutable typed selection through `AIcResourceEndpointCatalog`. Structured-data loaders perform YAML/JSON/XML representation mapping only; they do not apply inheritance or endpoint semantics. The Jackson implementation is packaged as the separate optional `builder/structureddata/jackson` artifact so the Builder core and Algites bootstrap path do not acquire Jackson transitively.
 
-`PublicationDestinations` in a publication capability configuration denotes an optional set of **PublishingEndpoint IDs** for the corresponding output kind and stability branch. It never contains URLs, credentials, or provider-specific state. When omitted, all enabled effective PublishingEndpoints of that output/stability branch participate. This is an optional selection/filter only; inheritance, endpoint enablement, runtime Snapshot overrides, ordering, retries, failure handling, attempt timeouts, cancellation, and progress remain properties of the Builder publishing model and scheduler.
+`PublicationDestinations` in a publication capability configuration denotes an optional set of **PublishingEndpoint IDs** for the corresponding output kind and stability branch. It never contains URLs, credentials, or provider-specific state. When omitted, all enabled effective EndpointPublications of that output/stability branch participate. This is an optional selection/filter only; inheritance, endpoint enablement, runtime Snapshot overrides, ordering, retries, failure handling, attempt timeouts, cancellation, and progress remain properties of the Builder publishing model and scheduler.
 
 Resource-endpoint and publishing-endpoint credential materialization remain separate from both endpoint models. Descriptors contain only credential-profile references; secret values continue to be resolved by the provider-independent credential document and trusted CI bridge at execution time.
 

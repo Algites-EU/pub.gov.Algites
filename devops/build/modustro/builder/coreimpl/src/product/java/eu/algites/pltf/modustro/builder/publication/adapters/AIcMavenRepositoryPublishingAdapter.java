@@ -53,6 +53,15 @@ public final class AIcMavenRepositoryPublishingAdapter implements AIiPublishingA
             AIcCheckCancellation(aContext);
             String locFileName = Path.of(locPayloadFile.logicalName()).getFileName().toString();
             URI locTarget = locRoot.resolve(locBasePath + locFileName);
+            byte[] existing=AIcGet(locTarget,aContext);
+            if(existing!=null){
+                var digest=java.security.MessageDigest.getInstance("SHA-256");
+                String remote=java.util.HexFormat.of().formatHex(digest.digest(existing));
+                String local=eu.algites.pltf.modustro.builder.publication.AIcBuildRecordPublicationProducer.hash(locPayloadFile.path());
+                if(!remote.equals(local))throw new IllegalStateException("Refusing to overwrite immutable Maven publication '"+locTarget+"' with different bytes.");
+                locCompleted+=Files.size(locPayloadFile.path());
+                continue;
+            }
             HttpURLConnection locConnection = (HttpURLConnection) new URL(locTarget.toString()).openConnection();
             locConnection.setRequestMethod("PUT");
             locConnection.setDoOutput(true);
@@ -93,8 +102,52 @@ public final class AIcMavenRepositoryPublishingAdapter implements AIiPublishingA
             }
             locConnection.disconnect();
         }
+        if(locCoordinates.containsKey("snapshotTimestamp"))AIcSnapshotMetadata(locRoot.resolve(locBasePath+"maven-metadata.xml"),aContext);
         aContext.progressReporter().completed("Maven repository publication completed.");
     }
+
+
+    private static final java.util.concurrent.ConcurrentHashMap<String,Object> METADATA_LOCKS=new java.util.concurrent.ConcurrentHashMap<>();
+    private static byte[] AIcGet(URI uri,AIcPublishingAttemptContext context)throws Exception{
+        HttpURLConnection connection=(HttpURLConnection)uri.toURL().openConnection();connection.setRequestMethod("GET");connection.setUseCaches(false);AIcApplyTimeouts(connection,context.deadline());AIcApplyCredentials(connection,context.credentials());
+        try{int code=connection.getResponseCode();if(code==404)return null;if(code!=200)throw new IllegalStateException("Maven repository GET failed for "+uri+": HTTP "+code);
+            try(var input=connection.getInputStream()){return input.readAllBytes();}
+        }finally{connection.disconnect();}
+    }
+    /** Compound extensions are ordinary Maven snapshotVersion entries; all forms share the reserved instance. */
+    private static void AIcSnapshotMetadata(URI uri,AIcPublishingAttemptContext context)throws Exception{
+        synchronized(METADATA_LOCKS.computeIfAbsent(uri.toString(),ignored->new Object())){
+            byte[] old=AIcGet(uri,context);var factory=javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl",true);
+            factory.setFeature("http://xml.org/sax/features/external-general-entities",false);
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities",false);
+            var builder=factory.newDocumentBuilder();var document=old==null?builder.newDocument():builder.parse(new java.io.ByteArrayInputStream(old));
+            var metadata=old==null?document.createElement("metadata"):document.getDocumentElement();if(old==null)document.appendChild(metadata);
+            if(!metadata.getTagName().equals("metadata"))throw new IllegalArgumentException("Invalid Maven metadata root.");
+            var coords=context.payload().coordinates();set(document,metadata,"groupId",coords.get("groupId"));set(document,metadata,"artifactId",coords.get("artifactId"));set(document,metadata,"version",coords.get("version"));
+            var versioning=child(document,metadata,"versioning");String updated=coords.get("snapshotTimestamp").replace(".","");
+            var last=child(document,versioning,"lastUpdated");
+            if(last.getTextContent().compareTo(updated)<=0){last.setTextContent(updated);var snapshot=child(document,versioning,"snapshot");set(document,snapshot,"timestamp",coords.get("snapshotTimestamp"));set(document,snapshot,"buildNumber",coords.get("snapshotBuildNumber"));}
+            var versions=child(document,versioning,"snapshotVersions");
+            for(var file:context.payload().files()){
+                boolean pom=file.logicalName().endsWith(".pom");String extension=pom?"pom":coords.get("extension");String classifier=pom?"":coords.getOrDefault("classifier","");
+                if(extension==null||extension.isBlank())throw new IllegalArgumentException("Snapshot payload requires extension coordinate.");
+                org.w3c.dom.Element entry=null;
+                for(var node=versions.getFirstChild();node!=null;node=node.getNextSibling())if(node instanceof org.w3c.dom.Element element&&element.getTagName().equals("snapshotVersion")&&text(element,"extension").equals(extension)&&text(element,"classifier").equals(classifier)){entry=element;break;}
+                if(entry==null){entry=document.createElement("snapshotVersion");versions.appendChild(entry);}else if(text(entry,"updated").compareTo(updated)>0)continue;
+                set(document,entry,"extension",extension);if(!classifier.isEmpty())set(document,entry,"classifier",classifier);set(document,entry,"value",context.payload().version());set(document,entry,"updated",updated);
+            }
+            var transformer=javax.xml.transform.TransformerFactory.newInstance().newTransformer();transformer.setOutputProperty(javax.xml.transform.OutputKeys.INDENT,"yes");var buffer=new java.io.ByteArrayOutputStream();transformer.transform(new javax.xml.transform.dom.DOMSource(document),new javax.xml.transform.stream.StreamResult(buffer));
+            HttpURLConnection connection=(HttpURLConnection)uri.toURL().openConnection();connection.setRequestMethod("PUT");connection.setDoOutput(true);AIcApplyTimeouts(connection,context.deadline());AIcApplyCredentials(connection,context.credentials());byte[] bytes=buffer.toByteArray();connection.setFixedLengthStreamingMode(bytes.length);
+            try{try(var out=connection.getOutputStream()){out.write(bytes);}int code=connection.getResponseCode();if(code<200||code>=300)throw new IllegalStateException("Maven metadata PUT failed: HTTP "+code);}finally{connection.disconnect();}
+        }
+    }
+    private static org.w3c.dom.Element child(org.w3c.dom.Document document,org.w3c.dom.Element parent,String name){
+        for(var node=parent.getFirstChild();node!=null;node=node.getNextSibling())if(node instanceof org.w3c.dom.Element element&&element.getTagName().equals(name))return element;
+        var element=document.createElement(name);parent.appendChild(element);return element;
+    }
+    private static void set(org.w3c.dom.Document document,org.w3c.dom.Element parent,String name,String value){child(document,parent,name).setTextContent(value);}
+    private static String text(org.w3c.dom.Element parent,String name){for(var node=parent.getFirstChild();node!=null;node=node.getNextSibling())if(node instanceof org.w3c.dom.Element element&&element.getTagName().equals(name))return element.getTextContent();return "";}
 
     private static URI AIcRepositoryRoot(URI aUri) {
         if (aUri == null || aUri.getScheme() == null) {

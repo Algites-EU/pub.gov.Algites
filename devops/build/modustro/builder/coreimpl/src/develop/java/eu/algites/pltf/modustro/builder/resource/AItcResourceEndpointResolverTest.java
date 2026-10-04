@@ -32,10 +32,10 @@ public final class AItcResourceEndpointResolverTest {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
         AIcgdResourceEndpoint_1 locBase = new AIcgdResourceEndpoint_1(
             "java",
-            "native_binary_output",
+            "native_product_binaries",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
-            "algites-java-native-binary-output-public-snapshot-download",
+            "algites-java-native-product-binaries-public-snapshot-download",
             "https://example.invalid/maven/",
             "example-download",
             null,
@@ -44,10 +44,10 @@ public final class AItcResourceEndpointResolverTest {
         );
         AIcgdResourceEndpoint_1 locOverride = new AIcgdResourceEndpoint_1(
             "java",
-            "native_binary_output",
+            "native_product_binaries",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
-            "algites-java-native-binary-output-public-snapshot-download",
+            "algites-java-native-product-binaries-public-snapshot-download",
             null,
             null,
             false,
@@ -66,7 +66,7 @@ public final class AItcResourceEndpointResolverTest {
         Assert.assertEquals(
             locCatalog.select(
                 "java",
-                "native_binary_output",
+                "native_product_binaries",
                 "public",
                 AInResourceEndpointAction.DOWNLOAD,
                 AInResourceStability.SNAPSHOT,
@@ -84,10 +84,10 @@ public final class AItcResourceEndpointResolverTest {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
         AIcgdResourceEndpoint_1 locDeclaration = new AIcgdResourceEndpoint_1(
             "java",
-            "native_binary_output",
+            "native_product_binaries",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.UPLOAD,
-            "algites-java-native-binary-output-public-snapshot-upload",
+            "algites-java-native-product-binaries-public-snapshot-upload",
             null,
             null,
             true,
@@ -103,10 +103,10 @@ public final class AItcResourceEndpointResolverTest {
     @Test
     public void AIcRejectsEndpointIdReuseAcrossCells() {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
-        String locId = "algites-java-native-binary-output-public-snapshot-download";
+        String locId = "algites-java-native-product-binaries-public-snapshot-download";
         AIcgdResourceEndpoint_1 locDownload = new AIcgdResourceEndpoint_1(
             "java",
-            "native_binary_output",
+            "native_product_binaries",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
             locId,
@@ -118,7 +118,7 @@ public final class AItcResourceEndpointResolverTest {
         );
         AIcgdResourceEndpoint_1 locUpload = new AIcgdResourceEndpoint_1(
             "java",
-            "native_binary_output",
+            "native_product_binaries",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.UPLOAD,
             locId,
@@ -141,7 +141,7 @@ public final class AItcResourceEndpointResolverTest {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
         AIcgdResourceEndpoint_1 locDeclaration = new AIcgdResourceEndpoint_1(
             "java",
-            "native_binary_output",
+            "native_product_binaries",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
             "algites-java-public-release-download",
@@ -162,21 +162,21 @@ public final class AItcResourceEndpointResolverTest {
     public void AIcMigratesLegacySourceUploadBeforeInheritance() {
         var bridge = AIcResourceEndpointMetadataBridge.builtin();
         var resolver = AIcResourceEndpointResolver.builtin();
-        var source = bridge.declaration("java", "native_source_output", "public", "upload",
+        var source = bridge.declaration("java", "native_product_sources", "public", "upload",
             "algites-java-public-release-upload", "https://example.invalid/maven/", "source-upload", true, "release", "cloudsmith");
-        var binary = bridge.declaration("java", "native_binary_output", "public", "upload",
+        var binary = bridge.declaration("java", "native_product_binaries", "public", "upload",
             "algites-java-public-release-upload", "https://example.invalid/maven/", "binary-upload", true, "release", "cloudsmith");
-        var amendment = bridge.declaration("java", "native_source_output", "public", "upload",
-            "algites-java-native-source-output-public-release-upload", null, null, false, null, null);
+        var amendment = bridge.declaration("java", "native_product_sources", "public", "upload",
+            "algites-java-native-product-sources-public-release-upload", null, null, false, null, null);
         var catalog = resolver.resolve(resolver.mergeDeclarations(List.of(source, binary), List.of(amendment)));
         Assert.assertEquals(catalog.all().size(), 2);
-        var effective = catalog.all().stream().filter(e -> e.resourceKind().equals("native_source_output")).findFirst().orElseThrow();
-        Assert.assertEquals(effective.id(), "algites-java-native-source-output-public-release-upload");
+        var effective = catalog.all().stream().filter(e -> e.resourceKind().equals("native_product_sources")).findFirst().orElseThrow();
+        Assert.assertEquals(effective.id(), "algites-java-native-product-sources-public-release-upload");
         Assert.assertEquals(effective.credentialProfile(), "source-upload");
         Assert.assertEquals(effective.resourceEndpointProviderAdapter(), "cloudsmith");
         Assert.assertFalse(effective.enabled());
         Assert.assertEquals(effective.url().toString(), "https://example.invalid/maven/");
-        var oldAmendment = bridge.declaration("java", "native_source_output", "public", "upload",
+        var oldAmendment = bridge.declaration("java", "native_product_sources", "public", "upload",
             "algites-java-public-release-upload", null, null, false, null, null);
         Assert.assertEquals(resolver.mergeDeclarations(List.of(source), List.of(oldAmendment)).size(), 1);
     }
@@ -186,10 +186,10 @@ public final class AItcResourceEndpointResolverTest {
     public void AIcRejectsMismatchedLegacySourceUploadDimensions() {
         var bridge = AIcResourceEndpointMetadataBridge.builtin();
         var resolver = AIcResourceEndpointResolver.builtin();
-        var wrongLane = bridge.declaration("java", "native_source_output", "public", "upload",
+        var wrongLane = bridge.declaration("java", "native_product_sources", "public", "upload",
             "algites-java-public-release-upload", "https://example.invalid/", null, true, "snapshot", null);
         Assert.expectThrows(AIxModelValidationException.class, () -> resolver.resolve(List.of(wrongLane)));
-        var wrongVisibility = bridge.declaration("java", "native_source_output", "private", "upload",
+        var wrongVisibility = bridge.declaration("java", "native_product_sources", "private", "upload",
             "algites-java-public-release-upload", "https://example.invalid/", null, true, "release", null);
         Assert.expectThrows(AIxModelValidationException.class, () -> resolver.resolve(List.of(wrongVisibility)));
     }

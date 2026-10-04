@@ -80,6 +80,7 @@ public final class AIcResourceEndpointResolver {
         List<AIcgdResourceEndpoint_1> locMerged = mergeDeclarations(List.of(), aDeclarations);
         ArrayList<AIcResourceEndpointDefinition> locEffective = new ArrayList<>();
         for (AIcgdResourceEndpoint_1 locDeclaration : locMerged) {
+            if (locDeclaration.id().equals("algites-selector-default")) continue;
             AIcResourceEndpointDefinition locEndpoint = AIcEffective(locDeclaration);
             validator.validate(locEndpoint);
             locEffective.add(locEndpoint);
@@ -97,14 +98,24 @@ public final class AIcResourceEndpointResolver {
         boolean aMerge
     ) {
         aDeclaration = AIcNormalizeLegacyEndpointId(aDeclaration);
+        String cell = aDeclaration.technologyKind()+"|"+aDeclaration.resourceKind()+"|"+aDeclaration.visibility()+"|"+aDeclaration.action();
+        if(aDeclaration.id().equals("algites-selector-default")) {
+            AIcgdResourceEndpoint_1 change=aDeclaration;
+            aTarget.replaceAll((key,old)-> sameCell(old,change) ? withEnabled(old,change.enabled()) : old);
+        } else if(aDeclaration.enabled()==null) {
+            for(var old:aTarget.values())if(old.id().equals("algites-selector-default")&&sameCell(old,aDeclaration))aDeclaration=withEnabled(aDeclaration,old.enabled());
+        }
         String locIdentity = AIcIdentity(aDeclaration);
         AIcgdResourceEndpoint_1 locPrevious = aTarget.get(locIdentity);
         aTarget.put(locIdentity, aMerge && locPrevious != null ? AIcMerge(locPrevious, aDeclaration) : aDeclaration);
     }
 
+    private static boolean sameCell(AIcgdResourceEndpoint_1 a,AIcgdResourceEndpoint_1 b){return a.technologyKind().equals(b.technologyKind())&&a.resourceKind().equals(b.resourceKind())&&a.visibility()==b.visibility()&&a.action()==b.action();}
+    private static AIcgdResourceEndpoint_1 withEnabled(AIcgdResourceEndpoint_1 a,Boolean enabled){return new AIcgdResourceEndpoint_1(a.technologyKind(),a.resourceKind(),a.visibility(),a.action(),a.id(),a.url(),a.credentialProfile(),enabled,a.stability(),a.resourceEndpointProviderAdapter());}
+
     /** Migrates the former upload/download naming convention before inheritance and validation. */
     private static AIcgdResourceEndpoint_1 AIcNormalizeLegacyEndpointId(AIcgdResourceEndpoint_1 aDeclaration) {
-        boolean locSourceOutput = "native_source_output".equals(aDeclaration.resourceKind());
+        boolean locSourceOutput = "native_product_sources".equals(aDeclaration.resourceKind());
         boolean locDocsSite = "modustro_docs_site".equals(aDeclaration.resourceKind())
             && "modustro".equals(aDeclaration.technologyKind());
         if ((!locSourceOutput && !locDocsSite) || aDeclaration.visibility() == null

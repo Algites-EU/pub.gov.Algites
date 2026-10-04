@@ -19,16 +19,16 @@ public final class AIcBuiltinResourceKindDefinitions {
      * @return immutable ResourceKind-definition list
      */
     public static List<AIcResourceKindDefinition> all() {
-        return List.of(nativeBinaryOutput(), nativeSourceOutput(), nativeDocumentationOutput(), modustroDocsSite(), schemaSite());
+        return List.of(nativeProductBinaries(), nativeProductSources(), nativeProductDocumentation(), nativeDevelopSources(), nativeDevelopBinaries(), nativeDevelopDocumentation(), modustroDocsSite(), schemaSite());
     }
 
     /**
      * Returns the native binary-output ResourceKind.
      * @return native binary-output definition
      */
-    public static AIcResourceKindDefinition nativeBinaryOutput() {
+    public static AIcResourceKindDefinition nativeProductBinaries() {
         return new AIcResourceKindDefinition(
-            "native_binary_output",
+            "native_product_binaries",
             Set.of("java", "python", "mps"),
             Set.of(AInResourceEndpointAction.DOWNLOAD, AInResourceEndpointAction.UPLOAD, AInResourceEndpointAction.MANAGE),
             AInResourceStabilityRequirement.REQUIRED
@@ -39,9 +39,9 @@ public final class AIcBuiltinResourceKindDefinitions {
      * Returns the native source-output ResourceKind.
      * @return native source-output definition
      */
-    public static AIcResourceKindDefinition nativeSourceOutput() {
+    public static AIcResourceKindDefinition nativeProductSources() {
         return new AIcResourceKindDefinition(
-            "native_source_output",
+            "native_product_sources",
             Set.of("java", "python", "mps"),
             Set.of(AInResourceEndpointAction.DOWNLOAD, AInResourceEndpointAction.UPLOAD, AInResourceEndpointAction.MANAGE),
             AInResourceStabilityRequirement.REQUIRED
@@ -52,15 +52,27 @@ public final class AIcBuiltinResourceKindDefinitions {
      * Returns the native documentation-output ResourceKind.
      * @return native documentation-output definition
      */
-    public static AIcResourceKindDefinition nativeDocumentationOutput() {
+    public static AIcResourceKindDefinition nativeProductDocumentation() {
         return new AIcResourceKindDefinition(
-            "native_documentation_output",
+            "native_product_documentation",
             Set.of("java", "python", "mps"),
             Set.of(AInResourceEndpointAction.DOWNLOAD, AInResourceEndpointAction.UPLOAD, AInResourceEndpointAction.MANAGE),
             AInResourceStabilityRequirement.REQUIRED
         );
     }
 
+    public static AIcResourceKindDefinition nativeDevelopSources() {
+        return new AIcResourceKindDefinition("native_develop_sources", Set.of("java", "python", "mps"),
+            Set.of(AInResourceEndpointAction.DOWNLOAD, AInResourceEndpointAction.UPLOAD, AInResourceEndpointAction.MANAGE), AInResourceStabilityRequirement.REQUIRED);
+    }
+    public static AIcResourceKindDefinition nativeDevelopBinaries() {
+        return new AIcResourceKindDefinition("native_develop_binaries", Set.of("java", "python", "mps"),
+            Set.of(AInResourceEndpointAction.DOWNLOAD, AInResourceEndpointAction.UPLOAD, AInResourceEndpointAction.MANAGE), AInResourceStabilityRequirement.REQUIRED);
+    }
+    public static AIcResourceKindDefinition nativeDevelopDocumentation() {
+        return new AIcResourceKindDefinition("native_develop_documentation", Set.of("java", "python", "mps"),
+            Set.of(AInResourceEndpointAction.DOWNLOAD, AInResourceEndpointAction.UPLOAD, AInResourceEndpointAction.MANAGE), AInResourceStabilityRequirement.REQUIRED);
+    }
     /**
      * Returns the Modustro documentation-site ResourceKind.
      * @return Modustro documentation-site definition

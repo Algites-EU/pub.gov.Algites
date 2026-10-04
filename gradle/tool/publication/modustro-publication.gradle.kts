@@ -22,7 +22,7 @@ if (!rootProject.extra.has("modustroEffectivePublishingPlan")) {
         apply(from = locOverridesScript)
     } else {
         apply(from = uri(
-            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-publishing-overrides.gradle.kts"
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/repository/modustro-publishing-overrides.gradle.kts"
         ))
     }
 }
@@ -48,7 +48,7 @@ val locResolvePublishingPlan = fun(
 ): Map<String, Any?> {
     val locPlan = locEffectivePublishingPlanResolver(aMetadata, aOutputKind, aStability)
     val locEnabled = locPlan["publishingEnabled"] as? Boolean ?: false
-    val locAllEndpoints = (locPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+    val locAllEndpoints = (locPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty()
     val locEnabledEndpoints = if (locEnabled) {
         locAllEndpoints.filter { locEndpoint -> locEndpoint["enabled"] as? Boolean ?: true }
     } else {
@@ -62,14 +62,14 @@ val locResolvePublishingPlan = fun(
         if (locUnknown.isNotEmpty()) {
             throw GradleException(
                 "Publishing destination id(s) ${locUnknown.joinToString(", ")} do not identify enabled " +
-                    "$aOutputKind/$aStability PublishingEndpoints."
+                    "$aOutputKind/$aStability EndpointPublications."
             )
         }
         aPublishingDestinationIds.map { locId -> locById.getValue(locId) }
     }
     return linkedMapOf(
         "publishingEnabled" to locEnabled,
-        "publishingEndpoints" to locSelectedEndpoints
+        "endpointPublications" to locSelectedEndpoints
     )
 }
 

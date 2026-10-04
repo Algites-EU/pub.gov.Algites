@@ -37,7 +37,7 @@ public final class AItcModustroGovernanceScriptsTest {
             : "gradle/tool/publication/modustro-publication.gradle.kts"));
         if (aRootBuild) {
             locEntry = locEntry.substring(locEntry.indexOf("/* Publishing invocation overrides must be available"),
-                locEntry.indexOf("@Suppress(\"UNCHECKED_CAST\")\nval modustroPublishingService"));
+                locEntry.indexOf("val locAlgitesRequiredCredentialsPlan = run"));
         }
         AtomicInteger locDownloads = new AtomicInteger();
         HttpServer locServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
@@ -59,6 +59,7 @@ public final class AItcModustroGovernanceScriptsTest {
             }
             Path locBuild = Files.createDirectories(locFixture.resolve("nested"));
             Files.writeString(locBuild.resolve("settings.gradle.kts"), "rootProject.name = \"fallback-test\"\n");
+            locEntry = locEntry.replace("${System.getenv(\"MODUSTRO_PUBLIC_GOVERNANCE_REVISION\") ?: \"main\"}", "main");
             String locTestUrl = "http://127.0.0.1:" + locServer.getAddress().getPort() + "/overrides.gradle.kts";
             Files.writeString(locBuild.resolve("bridge.gradle.kts"), locEntry.replace(OVERRIDES_URL, locTestUrl));
             Files.writeString(locBuild.resolve("build.gradle.kts"), """
@@ -68,13 +69,13 @@ public final class AItcModustroGovernanceScriptsTest {
                 @Suppress("UNCHECKED_CAST")
                 val locResolve = extra["modustroEffectivePublishingPlan"] as (Map<String, Any?>, String, String) -> Map<String, Any?>
                 val locMetadata = mapOf<String, Any?>("outputPublishing" to mapOf(
-                    "native_binary_output" to mapOf("snapshot" to mapOf("publishingEnabled" to true))
+                    "native_product_binaries" to mapOf("snapshot" to mapOf("publishingEnabled" to true))
                 ))
-                check(locResolve(locMetadata, "native_binary_output", "snapshot")["publishingEnabled"] == false)
+                check(locResolve(locMetadata, "native_product_binaries", "snapshot")["publishingEnabled"] == false)
                 println("PUBLISHING_FALLBACK_OK")
                 """);
             var locResult = GradleRunner.create().withProjectDir(locBuild.toFile())
-                .withArguments("printModustroPublishingOverrides", "-Pmodustro.publishing.nativeBinaryOutput=FORCE_OFF",
+                .withArguments("printModustroPublishingOverrides", "-Pmodustro.publishing.nativeProductBinaries=FORCE_OFF",
                     "--stacktrace").build();
             Assert.assertTrue(locResult.getOutput().contains("PUBLISHING_FALLBACK_OK"));
             Assert.assertEquals(locDownloads.get(), aLocalCopy ? 0 : 1);
@@ -130,7 +131,7 @@ public final class AItcModustroGovernanceScriptsTest {
             Files.writeString(locBuild.resolve("settings.gradle.kts"), "rootProject.name = \"phase-test\"\n");
             String locRemotePrefix = "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/";
             String locTestPrefix = "http://127.0.0.1:" + locServer.getAddress().getPort() + "/";
-            Files.writeString(locBuild.resolve("bridge.gradle.kts"), locBridge.replace(locRemotePrefix, locTestPrefix));
+            Files.writeString(locBuild.resolve("bridge.gradle.kts"), locBridge.replace("${System.getenv(\"MODUSTRO_PUBLIC_GOVERNANCE_REVISION\") ?: \"main\"}", "main").replace(locRemotePrefix, locTestPrefix));
             Files.writeString(locBuild.resolve("build.gradle.kts"), """
                 tasks.register("modustroDependencyPreflight")
                 tasks.register("processModustroJavaNativeSources") {

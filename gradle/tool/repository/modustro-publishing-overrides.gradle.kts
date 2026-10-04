@@ -28,17 +28,29 @@ fun AIcModustroPublishingOverride(
 }
 
 val locModustroPublishingInvocationOverrides = linkedMapOf(
-    "native_binary_output" to AIcModustroPublishingOverride(
-        "modustro.publishing.nativeBinaryOutput",
-        "MODUSTRO_PUBLISHING_NATIVE_BINARY_OUTPUT"
+    "native_product_binaries" to AIcModustroPublishingOverride(
+        "modustro.publishing.nativeProductBinaries",
+        "MODUSTRO_PUBLISHING_NATIVE_PRODUCT_BINARIES"
     ),
-    "native_source_output" to AIcModustroPublishingOverride(
-        "modustro.publishing.nativeSourceOutput",
-        "MODUSTRO_PUBLISHING_NATIVE_SOURCE_OUTPUT"
+    "native_product_sources" to AIcModustroPublishingOverride(
+        "modustro.publishing.nativeProductSources",
+        "MODUSTRO_PUBLISHING_NATIVE_PRODUCT_SOURCES"
     ),
-    "native_documentation_output" to AIcModustroPublishingOverride(
-        "modustro.publishing.nativeDocumentationOutput",
-        "MODUSTRO_PUBLISHING_NATIVE_DOCUMENTATION_OUTPUT"
+    "native_product_documentation" to AIcModustroPublishingOverride(
+        "modustro.publishing.nativeProductDocumentation",
+        "MODUSTRO_PUBLISHING_NATIVE_PRODUCT_DOCUMENTATION"
+    ),
+    "native_develop_sources" to AIcModustroPublishingOverride(
+        "modustro.publishing.nativeDevelopSources",
+        "MODUSTRO_PUBLISHING_NATIVE_DEVELOP_SOURCES"
+    ),
+    "native_develop_binaries" to AIcModustroPublishingOverride(
+        "modustro.publishing.nativeDevelopBinaries",
+        "MODUSTRO_PUBLISHING_NATIVE_DEVELOP_BINARIES"
+    ),
+    "native_develop_documentation" to AIcModustroPublishingOverride(
+        "modustro.publishing.nativeDevelopDocumentation",
+        "MODUSTRO_PUBLISHING_NATIVE_DEVELOP_DOCUMENTATION"
     ),
     "modustro_docs_site" to AIcModustroPublishingOverride(
         "modustro.publishing.modustroDocsSite",
@@ -92,18 +104,19 @@ fun AIcModustroEffectivePublishingPlan(
     aStability: String
 ): Map<String, Any?> {
     val locOutputPublishing = aMetadata["outputPublishing"] as? Map<String, Any?> ?: emptyMap()
-    val locOutput = locOutputPublishing[aOutputKind] as? Map<String, Any?> ?: emptyMap()
+    val locKey = aMetadata["publishingTechnologyKind"]?.toString()?.let { "$it.$aOutputKind" } ?: aOutputKind
+    val locOutput = (locOutputPublishing[locKey] ?: locOutputPublishing[aOutputKind]) as? Map<String, Any?> ?: emptyMap()
     val locStabilityKey = aStability.trim().lowercase()
     val locBranch = locOutput[locStabilityKey] as? Map<String, Any?> ?: emptyMap()
     val locConfiguredEnabled = locBranch["publishingEnabled"] as? Boolean ?: false
-    val locEndpoints = (locBranch["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+    val locEndpoints = (locBranch["endpointPublications"] as? List<Map<String, Any?>>).orEmpty()
     return linkedMapOf(
         "publishingEnabled" to AIcModustroEffectivePublishingEnabled(
             aOutputKind,
             locStabilityKey,
             locConfiguredEnabled
         ),
-        "publishingEndpoints" to locEndpoints
+        "endpointPublications" to locEndpoints
     )
 }
 

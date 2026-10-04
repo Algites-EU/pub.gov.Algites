@@ -8,6 +8,8 @@ import eu.algites.pltf.modustro.builder.model.resource.AIngResourceEndpointVisib
 import eu.algites.pltf.modustro.builder.model.resource.AIngResourceStability_1;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.TreeSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -131,6 +133,38 @@ public final class AIcResourceEndpointMetadataBridge {
      */
     public AIcResourceEndpointCatalog resolve(Map<?, ?> aResourceEndpoints) {
         return resolver.resolve(declarations(aResourceEndpoints));
+    }
+
+
+    /** Expands ordered resource selectors; Enabled-only declarations are sparse defaults. */
+    public List<AIcgdResourceEndpoint_1> descriptorDeclarations(Map<String,String> values,String prefix){
+        String root=values.keySet().stream().anyMatch(key -> key.startsWith("ResourceEndpoints.")) ? "ResourceEndpoints." : (prefix.isEmpty()?"ResourceEndpoints.":prefix+".ResourceEndpoints.");
+        LinkedHashMap<String,TreeSet<Integer>> technologies=new LinkedHashMap<>();
+        for(String key:values.keySet())if(key.startsWith(root)){
+            String[] segments=key.substring(root.length()).split("\\.");
+            if(segments.length<3)continue;
+            int index;try{index=Integer.parseInt(segments[1]);}catch(NumberFormatException invalid){throw new IllegalArgumentException("ResourceEndpoints requires ordered OutputSelector lists.");}
+            technologies.computeIfAbsent(segments[0],k->new TreeSet<>()).add(index);
+        }
+        List<AIcgdResourceEndpoint_1> result=new ArrayList<>();
+        for(var tech:technologies.entrySet()){
+            List<Integer> ordered=new ArrayList<>(tech.getValue());ordered.sort(java.util.Comparator.comparingInt(n->eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.rank(values.get(root+tech.getKey()+"."+n+".OutputSelector"))));
+            for(int n:ordered){String p=root+tech.getKey()+"."+n+".";String selector=values.get(p+"OutputSelector");
+                List<String> outputs=eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.outputs(selector);
+                Boolean enabled=AIcBoolean(values.get(p+"Enabled"));
+                for(String output:outputs){
+                    for(String visibility:List.of("public","private"))for(String action:List.of("download","upload","manage")){
+                        if(enabled!=null)result.add(declaration(tech.getKey(),output,visibility,action,"algites-selector-default",null,null,enabled,null,null));
+                        String cell=p+visibility+"."+action;
+                        var items=eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.list(values,cell);
+                        for(var item:items){String id=AIcString(item.get("Id"));String suffix="-"+tech.getKey()+"-"+selector.replace('_','-')+"-"+visibility+"-";
+                            if(outputs.size()>1){if(!id.contains(suffix))throw new IllegalArgumentException("Aggregate ResourceEndpoint Id '"+id+"' must encode selector "+selector);id=id.replace(suffix,"-"+tech.getKey()+"-"+output.replace('_','-')+"-"+visibility+"-");}
+                            result.add(declaration(tech.getKey(),output,visibility,action,id,AIcString(item.get("Url")),AIcString(item.get("CredentialProfile")),item.containsKey("Enabled")?AIcBoolean(item.get("Enabled")):enabled,AIcString(item.get("Stability")),AIcString(item.get("ResourceEndpointProviderAdapter"))));
+                        }
+                    }
+                }
+            }
+        }return List.copyOf(result);
     }
 
     private static String AIcString(Object aValue) {

@@ -29,8 +29,8 @@ public final class AItcBuiltinResourceKindDefinitionsTest {
         AIcResourceEndpointValidator locValidator = AIcResourceEndpointValidator.builtin();
         locValidator.validate(
             new AIcResourceEndpointDefinition(
-                "java", "native_binary_output", "public", AInResourceEndpointAction.UPLOAD,
-                "algites-java-native-binary-output-public-snapshot-upload",
+                "java", "native_product_binaries", "public", AInResourceEndpointAction.UPLOAD,
+                "algites-java-native-product-binaries-public-snapshot-upload",
                 new URI("https://example.invalid/maven/"), null, true, AInResourceStability.SNAPSHOT, null
             )
         );
@@ -61,9 +61,12 @@ public final class AItcBuiltinResourceKindDefinitionsTest {
         Assert.assertEquals(
             AIcBuiltinResourceKindDefinitions.all().stream().map(locDefinition -> locDefinition.resourceKind()).toList(),
             java.util.List.of(
-                "native_binary_output",
-                "native_source_output",
-                "native_documentation_output",
+                "native_product_binaries",
+                "native_product_sources",
+                "native_product_documentation",
+                "native_develop_sources",
+                "native_develop_binaries",
+                "native_develop_documentation",
                 "modustro_docs_site",
                 "schema_site"
             )

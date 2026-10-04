@@ -131,7 +131,7 @@ internal fun AIcDiscover(aSettings: Settings, aRuntime: AIcModustroGradleRuntime
         val locResourceEndpoints = aResourceEndpoints as? Map<*, *> ?: return
         val locProfiles = AIcSettingsCredentialProfiles(aCredentialProfiles)
         locAllowedDownloadVisibilities.forEach visibilityLoop@ { locVisibility ->
-            val locCell = "java.native_binary_output.$locVisibility.download"
+            val locCell = "java.native_product_binaries.$locVisibility.download"
             val locItems = locResourceEndpoints[locCell] as? List<*> ?: return@visibilityLoop
             locItems.forEach endpointLoop@ { locItem ->
                 val locMap = locItem as? Map<*, *>

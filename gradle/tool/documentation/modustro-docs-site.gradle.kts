@@ -18,22 +18,22 @@ import eu.algites.pltf.modustro.builder.model.capability.AIcCapabilityDemandKey
 val locAlgitesDocsBaseScript = (findProperty("modustro.docs.baseScript") as String?)
     ?: rootProject.file("gradle/tool/documentation/modustro-docs-site-base.gradle.kts")
         .takeIf { it.isFile }?.toURI()?.toString()
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/modustro-docs-site-base.gradle.kts"
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/documentation/modustro-docs-site-base.gradle.kts"
 
 val locAlgitesDocsJavaScript = (findProperty("modustro.docs.javaScript") as String?)
     ?: rootProject.file("gradle/tool/documentation/modustro-docs-site-java.gradle.kts")
         .takeIf { it.isFile }?.toURI()?.toString()
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/modustro-docs-site-java.gradle.kts"
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/documentation/modustro-docs-site-java.gradle.kts"
 
 val locAlgitesDocsPythonScript = (findProperty("modustro.docs.pythonScript") as String?)
     ?: rootProject.file("gradle/tool/documentation/modustro-docs-site-python.gradle.kts")
         .takeIf { it.isFile }?.toURI()?.toString()
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/modustro-docs-site-python.gradle.kts"
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/documentation/modustro-docs-site-python.gradle.kts"
 
 val locAlgitesDocsMpsScript = (findProperty("modustro.docs.mpsScript") as String?)
     ?: rootProject.file("gradle/tool/documentation/modustro-docs-site-mps.gradle.kts")
         .takeIf { it.isFile }?.toURI()?.toString()
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/documentation/modustro-docs-site-mps.gradle.kts"
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/documentation/modustro-docs-site-mps.gradle.kts"
 
 apply(from = uri(locAlgitesDocsBaseScript))
 

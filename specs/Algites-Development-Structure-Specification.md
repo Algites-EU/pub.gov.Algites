@@ -58,7 +58,7 @@ Algites-controlled structured-data formats MUST use one common wire naming conve
 - environment variables and system-level constant identifiers use **UPPER_SNAKE_CASE**, for example `ALGITES_TECHNOLOGY_KINDS`;
 - controlled file and directory names use **lower-kebab-case** unless another established external syntax requires otherwise, for example `license-usage.yml` and `modustro-artifact-manifest.yml`;
 - keywords owned by an external schema/meta-language keep that language's spelling, for example JSON Schema `allOf`, `oneOf`, `additionalProperties`, and XML Schema `complexType`/`minOccurs`;
-- map keys that represent dynamic identifiers or symbolic dimensions are values rather than field names and therefore keep their identifier/value convention. Examples are credential profile IDs and ResourceEndpoint matrix dimension keys such as `java`, `modustro`, `native_binary_output`, `modustro_docs_site`, `public`, `release`, and `download`.
+- map keys that represent dynamic identifiers or symbolic dimensions are values rather than field names and therefore keep their identifier/value convention. Examples are credential profile IDs and ResourceEndpoint matrix dimension keys such as `java`, `modustro`, `native_product_binaries`, `modustro_docs_site`, `public`, `release`, and `download`.
 
 The convention applies to the serialized wire representation. Language bindings SHOULD use the idiomatic naming of their target language; for example wire `ArtifactId` maps naturally to Java/Kotlin `artifactId` and Python `artifact_id`. Acronyms in UpperCamelCase field names are treated as words (`ArtifactId`, `GroupId`, `Url`, `ApiKey`, `Sha256`) so conversion is deterministic.
 
@@ -1264,9 +1264,9 @@ External build and publication targets are modeled by `ResourceEndpoints`. A Res
 
 | ResourceKind | TechnologyKinds | Stability |
 | --- | --- | --- |
-| `native_binary_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `native_source_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `native_documentation_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_product_binaries` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_product_sources` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_product_documentation` | `java`, `python`, `mps` | required: `release` or `snapshot` |
 | `modustro_docs_site` | `modustro` | required: `release` or `snapshot` |
 | `schema_site` | `modustro` | forbidden |
 
@@ -1275,7 +1275,7 @@ For example:
 ```yaml
 ResourceEndpoints:
   java:
-    native_binary_output:
+    - OutputSelector: native_product_binaries
       private:
         download:
           - Id: algites-java-native-build-output-private-release-download
@@ -1302,7 +1302,7 @@ ResourceEndpoints:
 ```yaml
 ResourceEndpoints:
   java:
-    native_binary_output:
+    - OutputSelector: native_product_binaries
       private:
         download:
           - Id: algites-java-native-build-output-private-release-download
@@ -1317,11 +1317,11 @@ Standard new endpoint IDs SHOULD encode their dimensions in this order:
 algites-<technology-kind>-<resource-kind>-<visibility>-[<stability>-]<action>
 ```
 
-The stability segment is present exactly when the ResourceKind uses Stability. Qualified external endpoint IDs MAY insert an additional owner/provider qualifier before the dimensional suffix. During the Phase-5 migration, existing `native_binary_output` endpoint IDs in the legacy form `algites-<technology-kind>-<visibility>-<stability>-<action>` remain valid so lower-level overrides keep the same identity.
+The stability segment is present exactly when the ResourceKind uses Stability. Qualified external endpoint IDs MAY insert an additional owner/provider qualifier before the dimensional suffix. During the Phase-5 migration, existing `native_product_binaries` endpoint IDs in the legacy form `algites-<technology-kind>-<visibility>-<stability>-<action>` remain valid so lower-level overrides keep the same identity.
 
 ResourceEndpoint visibility is distinct from source-repository visibility, but source-repository visibility constrains which endpoint branches may be used:
 
-- artifacts from a `pub` source repository MUST resolve dependencies only from public ResourceEndpoints; publication targets MUST come from public-governance PublishingEndpoints.
+- artifacts from a `pub` source repository MUST resolve dependencies only from public ResourceEndpoints; publication targets MUST come from public-governance EndpointPublications.
 - artifacts from a `priv` source repository MAY resolve dependencies from public and private ResourceEndpoints; publication targets for its own outputs MUST come from authorized private PublishingEndpoint overlays.
 
 The default protocol/client behavior is owned by the effective TechnologyKind/ResourceKind/action adapter. Any endpoint MAY additionally declare `ResourceEndpointProviderAdapter` when a concrete provider needs behavior that cannot be expressed by the standard adapter. Adapter identity belongs to the individual endpoint. `manage` remains deliberately distinct because management operations such as package deletion do not have a technology-wide standard. An enabled native-build-output `manage` endpoint currently MUST declare a supported provider adapter; the generic lifecycle never infers that an upload URL accepts a generic HTTP `DELETE`.
@@ -1333,7 +1333,7 @@ Supported native-build-output management provider adapters remain:
 
 `PublicationDestinations` on publication capability configuration is an optional list of PublishingEndpoint IDs. It narrows publishing endpoint selection but never embeds URLs, credentials, or provider-specific state.
 
-Phase 5.2 uses `ResourceEndpoints` only for generalized resource resolution/management and `PublishingEndpoints` exclusively for publishing. The superseded repository-matrix input and compatibility projection are removed.
+Phase 5.2 uses `ResourceEndpoints` only for generalized resource resolution/management and `EndpointPublications` exclusively for publishing. The superseded repository-matrix input and compatibility projection are removed.
 
 A repository MAY configure ResourceEndpoints for TechnologyKinds or ResourceKinds that are not currently selected by an artifact. `TechnologyKinds` controls artifact build participation; ResourceEndpoints define available external resource targets.
 
@@ -1345,7 +1345,7 @@ A repository MAY configure ResourceEndpoints for TechnologyKinds or ResourceKind
 DeleteSnapshotWhenReleased: false
 ```
 
-When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `native_binary_output` manage ResourceEndpoints with `Stability: snapshot`. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
+When `true`, a successfully completed release MAY perform a final best-effort maintenance phase that removes the snapshot version corresponding to that release from enabled `native_product_binaries` manage ResourceEndpoints with `Stability: snapshot`. Cleanup is performed only after the release itself is complete. Cleanup failure MUST NOT roll back, invalidate, or change the success state of an already completed release; it is reported as a maintenance warning/failure that can be remediated manually.
 
 For example, release `1.4.0` targets only the corresponding snapshot line. For Java that is the exact `1.4.0-SNAPSHOT` version; for Python it is every immutable development release whose version starts with `1.4.0.dev`. It MUST NOT remove later snapshot lines such as Java `1.4.1-SNAPSHOT` / `1.5.0-SNAPSHOT` or Python `1.4.1.dev*` / `1.5.0.dev*`. A multi-TechnologyKind artifact is cleaned only after all release publication processing has completed, and only TechnologyKinds actually selected for that release are eligible for cleanup.
 
@@ -1360,7 +1360,7 @@ CredentialProfiles:
 
 ResourceEndpoints:
   java:
-    native_binary_output:
+    - OutputSelector: native_product_binaries
       private:
         download:
           - Id: algites-java-private-release-download
@@ -1464,7 +1464,7 @@ Private-governance overlay files use `algites-repository-defaults_1.yamldef.sche
 
 Actual credential values MUST NOT be stored in governance YAML. Upload credential values likewise MUST NOT be made available to ordinary target-repository builds. Provider implementations SHOULD keep publication workers in the private-governance execution context and pass only non-secret target identity/revision information from target repositories.
 
-Concrete public download endpoints are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`; they are not hard-coded in the resolver. The standard private-governance overlays are separated by purpose and visibility:
+Concrete public download endpoints are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-defaults-public.yml`; they are not hard-coded in the resolver. The standard private-governance overlays are separated by purpose and visibility:
 
 - private download defaults;
 - public upload defaults;
@@ -2123,7 +2123,7 @@ This section is intentionally placed at the end and is **temporary**.
     - parent edges define baseline dependency intents.
 - Legacy `javagen` and `javaextgen` directories migrate respectively to `java.gen` and `java.extgen`; equivalent suffix rules apply to all SourceTypes.
 - Existing Java/Maven publication coordinates remain valid as the Java mapping of the logical artifact identity. Other technologies add parallel publication mappings rather than redefining the logical artifact.
-- Legacy repository configuration that assumes only Maven repositories should be normalized into `ResourceEndpoints` with ResourceKind `native_binary_output`.
+- Legacy repository configuration that assumes only Maven repositories should be normalized into `ResourceEndpoints` with ResourceKind `native_product_binaries`.
 
 [[/PROPOSAL]]
 

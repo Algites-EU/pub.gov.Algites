@@ -472,7 +472,7 @@ fun AIcLicensingMergeUsages(
 }
 
 val AIcAlgitesPublicLicensingGovernanceBaseUrl =
-    "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/licensing"
+    "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/licensing"
 
 fun AIcLicensingDownloadRemoteFile(aRelativePath: String, aTargetFile: File) {
     val locUrl = "$AIcAlgitesPublicLicensingGovernanceBaseUrl/$aRelativePath"

@@ -39,10 +39,10 @@ public final class AItcModustroGradleInitTest {
                   QualifierKind: snapshot
                 ResourceEndpoints:
                   java:
-                    native_binary_output:
+                    - OutputSelector: native_product_binaries
                       public:
                         download:
-                          - Id: algites-test-java-native-binary-output-public-release-download
+                          - Id: algites-test-java-native-product-binaries-public-release-download
                             Url: https://repo.example.test/releases/
                             Stability: release
                             Enabled: false
@@ -54,10 +54,10 @@ public final class AItcModustroGradleInitTest {
                   TechnologyKinds: [java]
                 ResourceEndpoints:
                   java:
-                    native_binary_output:
+                    - OutputSelector: native_product_binaries
                       public:
                         download:
-                          - Id: algites-test-java-native-binary-output-public-release-download
+                          - Id: algites-test-java-native-product-binaries-public-release-download
                             Enabled: true
                 """);
 
@@ -88,7 +88,7 @@ public final class AItcModustroGradleInitTest {
                 val locArtifacts = locMetadata["artifactDirectories"] as List<Map<String, Any?>>
                 @Suppress("UNCHECKED_CAST")
                 val locEndpoints = locArtifacts.single { it["path"] == "child" }["resourceEndpoints"] as Map<String, List<Map<String, Any?>>>
-                val locEndpoint = locEndpoints["java.native_binary_output.public.download"]!!.single { it["id"] == "algites-test-java-native-binary-output-public-release-download" }
+                val locEndpoint = locEndpoints["java.native_product_binaries.public.download"]!!.single { it["id"] == "algites-test-java-native-product-binaries-public-release-download" }
                 check(locEndpoint["enabled"] == true)
                 check(locEndpoint["url"] == "https://repo.example.test/releases/")
                 println("SETTINGS_PROJECT_IDENTITY_AND_INHERITANCE_OK")
@@ -162,7 +162,7 @@ public final class AItcModustroGradleInitTest {
                 val locService = gradle.sharedServices.registerIfAbsent("modustroPublishing", AIcModustroPublishingService::class.java) {
                     parameters.credentialBaseDirectory.set(layout.projectDirectory)
                 }
-                val locPlan = JsonOutput.toJson(mapOf("publishingEnabled" to true, "publishingEndpoints" to listOf(
+                val locPlan = JsonOutput.toJson(mapOf("publishingEnabled" to true, "endpointPublications" to listOf(
                     mapOf("id" to "local", "publishingAdapter" to "local-copy", "publishingUrl" to file("published").toURI().toString())
                 )))
                 val locAwait = tasks.register<AIcModustroAwaitPublishingTask>("awaitPublishing") {
@@ -171,8 +171,9 @@ public final class AItcModustroGradleInitTest {
                 }
                 tasks.register<AIcModustroPublishFilesTask>("publishFixture") {
                     publishingPlanJson.set(locPlan)
-                    outputKind.set("NATIVE_BINARY_OUTPUT")
+                    outputKind.set("NATIVE_PRODUCT_BINARIES")
                     stability.set("snapshot")
+                    coordinates.set(mapOf("groupId" to "eu.algites.test", "artifactId" to "fixture", "technologyKind" to "java"))
                     artifactIdentity.set("fixture")
                     publicationVersion.set("1.0-SNAPSHOT")
                     payloadFiles.from(layout.projectDirectory.file("payload.txt"))
@@ -186,10 +187,23 @@ public final class AItcModustroGradleInitTest {
                 .withArguments("publishFixture", "--configuration-cache", "--offline", "--stacktrace");
         Assert.assertTrue(locRunner.build().getOutput().contains("Configuration cache entry stored"));
         Assert.assertEquals(Files.readString(locFixture.resolve("published/nested/payload.txt")), "first payload");
+        Assert.assertTrue(Files.isRegularFile(locFixture.resolve("published/nested/payload.txt.modustro-build-record.yml")));
         Files.writeString(locFixture.resolve("payload.txt"), "second payload");
         String locSecondOutput = locRunner.build().getOutput();
         Assert.assertTrue(locSecondOutput.contains("Configuration cache entry reused"), locSecondOutput);
         Assert.assertEquals(Files.readString(locFixture.resolve("published/nested/payload.txt")), "second payload");
+    }
+
+    @Test
+    public void AIcMissingEffectiveGroupIdFailsBeforeBuild() throws IOException {
+        Path fixture=AIcFixture();
+        Path descriptor=fixture.resolve("modustro-source-repository.yml");
+        Files.writeString(descriptor,Files.readString(descriptor).replace("GroupId: eu.algites.test\n", ""));
+        Files.writeString(fixture.resolve("settings.gradle.kts"),AIcBootstrap());
+        Files.writeString(fixture.resolve("build.gradle.kts"),"tasks.register(\"mustNotRun\") { doLast { error(\"TASK_EXECUTED\") } }\n");
+        String output=GradleRunner.create().withProjectDir(fixture.toFile()).withArguments("mustNotRun","--offline","--stacktrace").buildAndFail().getOutput();
+        Assert.assertTrue(output.contains("requires an effective GroupId"),output);
+        Assert.assertFalse(output.contains("TASK_EXECUTED"),output);
     }
 
 }

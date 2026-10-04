@@ -25,7 +25,7 @@ if (locPublicationBridgeScript.isFile) {
     apply(from = locPublicationBridgeScript)
 } else {
     apply(from = uri(
-        "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/publication/modustro-publication.gradle.kts"
+        "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/publication/modustro-publication.gradle.kts"
     ))
 }
 
@@ -68,7 +68,7 @@ val locSchemaSiteRoot = layout.projectDirectory.dir(
 )
 val locSchemaManifestFile = locSchemaSiteRoot.file(".modustro-publishing/schema-site.tsv")
 val locSchemaEndpointSelectionFile = locSchemaSiteRoot.file(".modustro-publishing/schema-endpoints.properties")
-val locSchemaHasPublishingEndpoints = locSchemaArtifactDirectories
+val locSchemaHasEndpointPublications = locSchemaArtifactDirectories
     .filter { locArtifact -> locArtifact["structureKind"]?.toString() == "artifact" }
     .any { locArtifact ->
         val locPlan = locResolveSchemaPublishingPlan(
@@ -79,7 +79,7 @@ val locSchemaHasPublishingEndpoints = locSchemaArtifactDirectories
         )
         val locEnabled = locPlan["publishingEnabled"] as? Boolean ?: false
         @Suppress("UNCHECKED_CAST")
-        val locEndpoints = (locPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+        val locEndpoints = (locPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty()
         locEnabled && locEndpoints.isNotEmpty()
     }
 
@@ -154,8 +154,8 @@ val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite")
                     locSchemaPublicationDestinationIds
                 )
                 @Suppress("UNCHECKED_CAST")
-                val locPublishingEndpoints = (locPublishingPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty()
-                val locEndpointIds = locPublishingEndpoints.map { locEndpoint ->
+                val locEndpointPublications = (locPublishingPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty()
+                val locEndpointIds = locEndpointPublications.map { locEndpoint ->
                     val locEndpointId = locEndpoint["id"]?.toString()
                         ?: throw GradleException("schema_site PublishingEndpoint is missing Id.")
                     val locPrevious = locSeenEndpoints.putIfAbsent(locEndpointId, locEndpoint)
@@ -284,9 +284,9 @@ if (tasks.findByName("publishModustroSchemaSite") == null) {
     }
     val locEndpointSets = locArtifactPlans.map { (locPlan, _) ->
         @Suppress("UNCHECKED_CAST")
-        (locPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty().mapNotNull { it["id"]?.toString() }.toSet()
+        (locPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty().mapNotNull { it["id"]?.toString() }.toSet()
     }.distinct()
-    if (locSchemaHasPublishingEndpoints && locEndpointSets.size > 1) {
+    if (locSchemaHasEndpointPublications && locEndpointSets.size > 1) {
         throw GradleException("Global schema site resolves inconsistent PublishingEndpoint sets across artifacts.")
     }
     val locCredentialProfiles = linkedMapOf<String, Any?>()
@@ -306,7 +306,7 @@ if (tasks.findByName("publishModustroSchemaSite") == null) {
     tasks.register<AIcModustroPublishFilesTask>("publishModustroSchemaSite") {
         group = "publishing"
         description = "Publishes the staged global schema site through the common publishing scheduler."
-        if (locSchemaHasPublishingEndpoints) {
+        if (locSchemaHasEndpointPublications) {
             dependsOn("prepareModustroSchemaPublishing")
             payloadFiles.from(locFiles)
         }

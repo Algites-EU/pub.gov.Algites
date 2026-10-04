@@ -19,9 +19,21 @@ public final class AIcBuiltinPublishingOutputKindMapper {
     public static AInPublishingOutputKind publishingOutputKind(AInBuildOutputProductionKind aProductionKind) {
         Objects.requireNonNull(aProductionKind, "productionKind");
         return switch (aProductionKind) {
-            case JAVA_CLASSES_JAR, PYTHON_WHEEL -> AInPublishingOutputKind.NATIVE_BINARY_OUTPUT;
-            case JAVA_SOURCES_JAR, PYTHON_SDIST -> AInPublishingOutputKind.NATIVE_SOURCE_OUTPUT;
-            case JAVA_JAVADOC_JAR -> AInPublishingOutputKind.NATIVE_DOCUMENTATION_OUTPUT;
+            case JAVA_CLASSES_JAR, PYTHON_WHEEL -> AInPublishingOutputKind.NATIVE_PRODUCT_BINARIES;
+            case JAVA_SOURCES_JAR, PYTHON_SDIST -> AInPublishingOutputKind.NATIVE_PRODUCT_SOURCES;
+            case JAVA_JAVADOC_JAR -> AInPublishingOutputKind.NATIVE_PRODUCT_DOCUMENTATION;
+        };
+    }
+    /** Scope changes publication classification, never the technology's physical format. */
+    public static AInPublishingOutputKind publishingOutputKind(AInBuildOutputProductionKind kind,String scope) {
+        var product=publishingOutputKind(kind);
+        if("product".equals(scope))return product;
+        if(!"develop".equals(scope))throw new IllegalArgumentException("Unknown content scope '"+scope+"'.");
+        return switch(product){
+            case NATIVE_PRODUCT_BINARIES->AInPublishingOutputKind.NATIVE_DEVELOP_BINARIES;
+            case NATIVE_PRODUCT_SOURCES->AInPublishingOutputKind.NATIVE_DEVELOP_SOURCES;
+            case NATIVE_PRODUCT_DOCUMENTATION->AInPublishingOutputKind.NATIVE_DEVELOP_DOCUMENTATION;
+            default->throw new IllegalArgumentException("Not a native production kind.");
         };
     }
 }

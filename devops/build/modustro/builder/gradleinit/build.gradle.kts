@@ -12,11 +12,11 @@ kotlin {
     sourceSets.main { kotlin.setSrcDirs(listOf("src/product/kotlin")) }
 }
 
-sourceSets.test { java.setSrcDirs(listOf("src/develop/java")) }
+sourceSets.test { java.setSrcDirs(listOf("src/develop/java")); resources.setSrcDirs(listOf("src/develop/resources")) }
 
 sourceSets.main {
     resources.srcDir("../../../../../repository/defaults")
-    resources.include("algites-repository-download-defaults-public.yml")
+    resources.include("algites-repository-defaults-public.yml")
 }
 
 dependencies {

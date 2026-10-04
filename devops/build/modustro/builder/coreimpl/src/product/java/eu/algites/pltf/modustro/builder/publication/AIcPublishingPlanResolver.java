@@ -26,6 +26,6 @@ public final class AIcPublishingPlanResolver {
             case FORCE_ON -> true;
             case FORCE_OFF -> false;
         };
-        return new AIcPublishingStabilityConfiguration(locEnabled, aConfigured.publishingEndpoints());
+        return new AIcPublishingStabilityConfiguration(locEnabled, aConfigured.endpointPublications());
     }
 }

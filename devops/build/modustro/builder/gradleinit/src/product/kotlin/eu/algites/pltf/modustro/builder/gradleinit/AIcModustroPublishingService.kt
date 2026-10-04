@@ -20,7 +20,7 @@ import org.gradle.api.services.BuildServiceParameters
 import org.gradle.api.tasks.*
 
 /** Owns invocation-scoped publishing work without retaining Settings, Project or script instances. */
-abstract class AIcModustroPublishingService : BuildService<AIcModustroPublishingService.AIiParameters>, AutoCloseable {
+abstract class AIcModustroPublishingService : BuildService<AIcModustroPublishingService.AIiParameters>, AutoCloseable, org.gradle.tooling.events.OperationCompletionListener {
     interface AIiParameters : BuildServiceParameters {
         val credentialBaseDirectory: DirectoryProperty
     }
@@ -38,24 +38,10 @@ abstract class AIcModustroPublishingService : BuildService<AIcModustroPublishing
 
     /** Uses the Core scheduler's barriers, retries and failure policies for one payload. */
     fun AIcPublish(aPayload: AIcPublishingPayload, aPlan: Map<String, Any?>, aProfiles: Map<String, Any?>) {
-        @Suppress("UNCHECKED_CAST")
-        val locEndpoints = (aPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty().map { locEndpoint ->
-            AIcPublishingEndpoint(
-                locEndpoint["id"]?.toString() ?: throw GradleException("Publishing endpoint is missing id."),
-                locEndpoint["enabled"] as? Boolean ?: true,
-                locEndpoint["publishingUrl"]?.toString()?.takeIf(String::isNotBlank)?.let(URI::create),
-                locEndpoint["publishingAdapter"]?.toString(),
-                locEndpoint["publishingCredentialProfile"]?.toString()?.takeIf(String::isNotBlank),
-                (locEndpoint["publishingOrder"] as? Number)?.toInt() ?: 0,
-                AInPublishingFailurePolicy.valueOf(locEndpoint["publishingFailurePolicy"]?.toString() ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"),
-                (locEndpoint["publishingRetryCount"] as? Number)?.toInt() ?: 0,
-                (locEndpoint["publishingRetryDelayMillis"] as? Number)?.toLong() ?: 1000L,
-                (locEndpoint["publishingAttemptTimeoutMillis"] as? Number)?.toLong(),
-                locEndpoint["showPublishingProgressIfPossible"] as? Boolean ?: true
-            )
-        }
-        val locHandle = AIcScheduler().schedule(aPayload,
-            AIcPublishingStabilityConfiguration(aPlan["publishingEnabled"] as? Boolean ?: false, locEndpoints),
+        val locContext = AIcContext()
+        val locDirectory = parameters.credentialBaseDirectory.get().asFile.toPath().resolve("build/run/publication-records")
+        val locJobs = AIcPublicationPlanner().plan(aPayload, aPlan, locContext, locDirectory)
+        val locHandle = AIcScheduler().schedule(locJobs,
             { locEndpoint -> AIcCredentials(locEndpoint, aProfiles) },
             { locEndpoint -> object : AIiPublishingProgressReporter {
                 override fun started(aMessage: String) { locLogger.lifecycle("[${locEndpoint.id()}] $aMessage") }
@@ -71,6 +57,55 @@ abstract class AIcModustroPublishingService : BuildService<AIcModustroPublishing
             throw GradleException("Required publishing failed for '${aPayload.artifactIdentity()}' ${aPayload.outputKind()}.", locFailure)
         }
     }
+
+    private var locContext: Map<String, Any?>? = null
+    /** Runs at execution, including when Gradle reuses its configuration cache. */
+    @Synchronized private fun AIcContext(): Map<String, Any?> {
+        locContext?.let { return it }
+        var locRoot = parameters.credentialBaseDirectory.get().asFile
+        while (!java.io.File(locRoot, "modustro-source-repository.yml").isFile && locRoot.parentFile != null) locRoot = locRoot.parentFile
+        val locDescriptor = java.io.File(locRoot, "modustro-source-repository.yml")
+        val locId = if (locDescriptor.isFile) AIcReadSimpleYamlScalars(locDescriptor)["SourceRepository.Id"] ?: locRoot.name else locRoot.name
+        fun git(vararg args: String): String? = try {
+            val p = ProcessBuilder(listOf("git", "-C", locRoot.path) + args).redirectError(ProcessBuilder.Redirect.DISCARD).start()
+            val t = p.inputStream.bufferedReader().use { it.readText() }.trim()
+            if (p.waitFor() == 0) t else null
+        } catch (failure: java.io.IOException) { null }
+        val locSource = linkedMapOf<String, Any>("RepositoryId" to locId, "Revision" to (git("rev-parse", "HEAD") ?: "unknown"))
+        git("status", "--porcelain")?.let { locSource["Dirty"] = it.isNotEmpty() }
+        val locSources = mutableListOf<Map<String, Any>>(locSource)
+        listOf("pub.gov.Algites" to "MODUSTRO_PUBLIC_GOVERNANCE_REVISION", "priv.gov.Algites" to "MODUSTRO_PRIVATE_GOVERNANCE_REVISION").forEach { (id, env) ->
+            providers.environmentVariable(env).orNull?.takeIf { it.isNotBlank() }?.let { locSources.add(mapOf("RepositoryId" to id, "Revision" to it)) }
+        }
+        val locTools = mutableListOf<Map<String, Any>>()
+        val locClasses = mutableListOf(AIcModustroSettingsPlugin::class.java, AIcPublicationPlanner::class.java)
+        try { locClasses.add(Class.forName("eu.algites.tool.codegen.defs.AIcDefaultDefsCodegenService")) } catch (failure: ClassNotFoundException) { }
+        locClasses.forEach { type ->
+            type.protectionDomain?.codeSource?.location?.takeIf { it.protocol == "file" }?.let { url ->
+                val file = java.io.File(url.toURI())
+                if (file.isFile) {
+                    val identity = linkedMapOf<String, Any>("Role" to (if (type.name.contains("codegen")) "source-generator" else if (type == AIcModustroSettingsPlugin::class.java) "gradle-init" else "builder-core"), "Coordinate" to "unknown", "Sha256" to AIcBuildRecordPublicationProducer.hash(file.toPath()), "ProducerRevision" to "unknown")
+                    java.util.zip.ZipFile(file).use { zip -> zip.getEntry("META-INF/modustro/modustro-artifact-manifest.yml")?.let { entry ->
+                        val manifest = zip.getInputStream(entry).bufferedReader().use { it.readText() }
+                        fun field(name: String) = Regex("(?m)^  " + name + ": *([^\n]+)").find(manifest)?.groupValues?.get(1)?.trim()?.trim('"', '\'')
+                        val group = field("GroupId"); val artifact = field("ArtifactCoordinateId"); val version = field("Version")
+                        if (group != null && artifact != null && version != null) identity["Coordinate"] = "$group:$artifact:$version"
+                    } }
+                    locTools.add(identity)
+                }
+            }
+        }
+        val locInvocation = linkedMapOf<String, Any>("Id" to (providers.environmentVariable("MODUSTRO_BUILD_INVOCATION_ID").orNull ?: java.util.UUID.randomUUID().toString()), "StartedAt" to java.time.Instant.now().toString())
+        val server = providers.environmentVariable("GITHUB_SERVER_URL").orNull
+        val repository = providers.environmentVariable("GITHUB_REPOSITORY").orNull
+        val run = providers.environmentVariable("GITHUB_RUN_ID").orNull
+        if (server != null && repository != null && run != null) locInvocation["LogUrl"] = "$server/$repository/actions/runs/$run"
+        val context = linkedMapOf<String, Any?>("RepositoryId" to locId, "Invocation" to locInvocation, "Sources" to locSources, "Tools" to locTools, "OutputOrigin" to mapOf("Kind" to "unknown"))
+        locLogger.lifecycle("Modustro invocation: {}", AIcBuildRecordPublicationProducer.json(context))
+        locContext = context
+        return context
+    }
+    override fun onFinish(event: org.gradle.tooling.events.FinishEvent) { AIcContext() }
 
     private fun AIcCredentials(aEndpoint: AIcPublishingEndpoint, aProfiles: Map<String, Any?>): Map<String, String> {
         val locId = aEndpoint.publishingCredentialProfile() ?: return emptyMap()
@@ -136,7 +171,7 @@ abstract class AIcModustroPublishFilesTask : DefaultTask() {
         @Suppress("UNCHECKED_CAST")
         val locPlan = JsonSlurper().parseText(publishingPlanJson.get()) as Map<String, Any?>
         if (locPlan["publishingEnabled"] != true) return
-        val locEndpoints = (locPlan["publishingEndpoints"] as? List<*>).orEmpty()
+        val locEndpoints = (locPlan["endpointPublications"] as? List<*>).orEmpty()
         if (locEndpoints.none { (it as? Map<*, *>)?.get("enabled") != false }) return
         if (requiresSnapshotInstance.get() && stability.get() == "snapshot" && snapshotInstanceId.get().isBlank()) {
             throw GradleException("Publishing a Python snapshot requires an immutable snapshot instance id. " +

@@ -5,7 +5,8 @@ import org.gradle.api.initialization.Settings
 import org.gradle.api.initialization.resolve.RepositoriesMode
 import org.gradle.kotlin.dsl.*
 
-class AIcModustroSettingsPlugin : Plugin<Settings> {
+abstract class AIcModustroSettingsPlugin : Plugin<Settings> {
+    @get:javax.inject.Inject abstract val buildEvents: org.gradle.build.event.BuildEventsListenerRegistry
     override fun apply(aSettings: Settings) = with(aSettings) {
         val locUseMavenLocal = providers.gradleProperty("modustro.useMavenLocalForResolution")
             .orElse(providers.environmentVariable("MODUSTRO_USE_MAVEN_LOCAL_FOR_RESOLUTION"))
@@ -25,6 +26,10 @@ class AIcModustroSettingsPlugin : Plugin<Settings> {
             if (locUseMavenLocal) mavenLocal()
             mavenCentral()
         }
+        val locService = gradle.sharedServices.registerIfAbsent("modustroPublishing", AIcModustroPublishingService::class.java) {
+            parameters.credentialBaseDirectory.set(settingsDir)
+        }
+        buildEvents.onTaskCompletion(locService)
         val locRuntime = AIcModustroGradleRuntime(aSettings)
         gradle.extra["modustroGradleRuntime"] = locRuntime
         locRuntime.install(extensions.extraProperties)

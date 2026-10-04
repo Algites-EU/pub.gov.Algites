@@ -72,15 +72,30 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
 
+      - name: Record governance and source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          locPublicRevision="$(curl -fsSL https://api.github.com/repos/Algites-EU/pub.gov.Algites/commits/main | jq -er .sha)"
+          echo "MODUSTRO_PUBLIC_GOVERNANCE_REVISION=${locPublicRevision}" >> "${GITHUB_ENV}"
+          echo "MODUSTRO_BUILD_INVOCATION_ID=github:${GITHUB_REPOSITORY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}" >> "${GITHUB_ENV}"
+          echo "Modustro invocation github:${GITHUB_REPOSITORY}:${GITHUB_RUN_ID}:${GITHUB_RUN_ATTEMPT}"
+          echo "pub.gov.Algites=${locPublicRevision}"
+          for locSourceDir in "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE/source" "$GITHUB_WORKSPACE/target"; do
+            if git -C "$locSourceDir" rev-parse --show-toplevel >/dev/null 2>&1; then
+              echo "source[$locSourceDir]=$(git -C "$locSourceDir" rev-parse HEAD)"
+            fi
+          done
+
       - name: Fetch Algites public download repository defaults
         shell: bash
         run: |
           set -euo pipefail
           locDefaultsDir="${RUNNER_TEMP}/algites-governance-defaults"
-          locPublicDownloadFile="${locDefaultsDir}/algites-repository-download-defaults-public.yml"
+          locPublicDownloadFile="${locDefaultsDir}/algites-repository-defaults-public.yml"
           mkdir -p "${locDefaultsDir}"
           curl -fsSL \
-            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/repository/defaults/algites-repository-download-defaults-public.yml" \
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${MODUSTRO_PUBLIC_GOVERNANCE_REVISION}/repository/defaults/algites-repository-defaults-public.yml" \
             > "${locPublicDownloadFile}"
           echo "ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE=${locPublicDownloadFile}" >> "${GITHUB_ENV}"
 
@@ -108,7 +123,7 @@ jobs:
 
           gh api \
             -H "Accept: application/vnd.github.raw+json" \
-            "repos/Algites-EU/priv.gov.Algites/contents/repository/defaults/algites-repository-defaults-private.yml?ref=main" \
+            "repos/Algites-EU/priv.gov.Algites/contents/repository/defaults/algites-repository-defaults-private.yml?ref=${MODUSTRO_PRIVATE_GOVERNANCE_REVISION}" \
             > "${locPrivateFile}"
 
           echo "ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE=${locPrivateFile}" >> "${GITHUB_ENV}"
@@ -198,7 +213,7 @@ jobs:
           if [[ ! -f "${locController}" ]]; then
             locController="${RUNNER_TEMP}/modustro-phase-controller.sh"
             curl -fsSL \
-              "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-phase-controller.sh" \
+              "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${MODUSTRO_PUBLIC_GOVERNANCE_REVISION}/gradle/tool/repository/modustro-phase-controller.sh" \
               > "${locController}"
           fi
           chmod +x "${locController}"
@@ -445,7 +460,7 @@ jobs:
             cp "${LOC_BOOTSTRAP_TEMPLATE}" "${LOC_RESOLVER_PROJECT_DIR}/settings.gradle.kts"
           else
             curl -fsSL \
-              "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-bootstrap-settings.template.gradle.kts" \
+              "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${MODUSTRO_PUBLIC_GOVERNANCE_REVISION}/gradle/tool/repository/modustro-bootstrap-settings.template.gradle.kts" \
               > "${LOC_RESOLVER_PROJECT_DIR}/settings.gradle.kts"
           fi
           echo 'modustro.gradleinit.metadataOnly=true' > "${LOC_RESOLVER_PROJECT_DIR}/gradle.properties"

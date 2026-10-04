@@ -1,0 +1,242 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-build-record_1.yamldef.schema.json",
+  "title": "Modustro build record",
+  "allOf": [
+    {
+      "$ref": "#/$defs/DocumentContent"
+    }
+  ],
+  "$defs": {
+    "DocumentContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "BuildRecordVersion": {
+          "const": 1
+        },
+        "Artifact": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "RepositoryId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "GroupId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "ArtifactCoordinateId": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Version": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "RepositoryId",
+            "GroupId",
+            "ArtifactCoordinateId",
+            "Version"
+          ]
+        },
+        "Output": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "TechnologyKind": {
+              "type": "string",
+              "minLength": 1
+            },
+            "OutputType": {
+              "enum": [
+                "native_product_sources",
+                "native_product_binaries",
+                "native_product_documentation",
+                "native_develop_sources",
+                "native_develop_binaries",
+                "native_develop_documentation",
+                "modustro_docs_site",
+                "schema_site"
+              ]
+            },
+            "PublishedVersion": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Classifier": {
+              "type": "string"
+            },
+            "Extension": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Files": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "Filename": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "Sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "Size": {
+                    "type": "integer",
+                    "minimum": 0
+                  }
+                },
+                "required": [
+                  "Filename",
+                  "Sha256",
+                  "Size"
+                ]
+              }
+            }
+          },
+          "required": [
+            "TechnologyKind",
+            "OutputType",
+            "PublishedVersion",
+            "Classifier",
+            "Extension",
+            "Files"
+          ]
+        },
+        "Invocation": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "StartedAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "LogUrl": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "Id",
+            "StartedAt"
+          ]
+        },
+        "Sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "RepositoryId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "Revision": {
+                "type": "string",
+                "minLength": 1
+              },
+              "Dirty": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "RepositoryId",
+              "Revision"
+            ]
+          }
+        },
+        "Tools": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "Role": {
+                "type": "string",
+                "minLength": 1
+              },
+              "Coordinate": {
+                "type": "string",
+                "minLength": 1
+              },
+              "Sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "ProducerRevision": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": [
+              "Role",
+              "Coordinate",
+              "Sha256",
+              "ProducerRevision"
+            ]
+          }
+        },
+        "OutputOrigin": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Kind": {
+              "enum": [
+                "built",
+                "cache_reused",
+                "unknown"
+              ]
+            }
+          },
+          "required": [
+            "Kind"
+          ]
+        },
+        "ParentPublication": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "Attempts": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "Id",
+            "Attempts"
+          ]
+        }
+      },
+      "required": [
+        "BuildRecordVersion",
+        "Artifact",
+        "Output",
+        "Invocation",
+        "Sources",
+        "Tools",
+        "OutputOrigin",
+        "ParentPublication"
+      ]
+    },
+    "EmbeddedContent": {
+      "$anchor": "EmbeddedContent",
+      "$ref": "#/$defs/DocumentContent"
+    }
+  }
+}

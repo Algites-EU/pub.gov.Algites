@@ -1,46 +1,34 @@
 # yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
 # $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
+# Default publication policy preserves the pre-5.2 behavior when publishing is explicitly invoked.
+# Snapshot invocation overrides may force each output kind on/off without affecting build/test/package.
 $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
-
 SourceRepository:
   Id: pub.gov.Algites
   Name: Algites public governance repository
-
 GroupId: eu.algites.gov.pub
-
 Version:
-  ReleaseLineVersion: "1"
+  ReleaseLineVersion: '1'
   Revision: 0
   QualifierKind: snapshot
-
-# Default publication policy preserves the pre-5.2 behavior when publishing is explicitly invoked.
-# Snapshot invocation overrides may force each output kind on/off without affecting build/test/package.
-native_binary_output:
-  Snapshot:
-    PublishingEnabled: true
-  Release:
-    PublishingEnabled: true
-
-native_source_output:
-  Snapshot:
-    PublishingEnabled: true
-  Release:
-    PublishingEnabled: true
-
-native_documentation_output:
-  Snapshot:
-    PublishingEnabled: true
-  Release:
-    PublishingEnabled: true
-
 modustro_docs_site:
   Snapshot:
     PublishingEnabled: true
   Release:
     PublishingEnabled: true
-
 schema_site:
   Snapshot:
     PublishingEnabled: true
   Release:
     PublishingEnabled: true
+OutputPublishing:
+- OutputSelector: native_product_outputs
+  Snapshot:
+    PublishingEnabled: true
+  Release:
+    PublishingEnabled: true
+- OutputSelector: native_develop_outputs
+  Snapshot:
+    PublishingEnabled: false
+  Release:
+    PublishingEnabled: false

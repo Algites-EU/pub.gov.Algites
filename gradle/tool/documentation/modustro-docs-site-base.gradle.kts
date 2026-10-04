@@ -68,7 +68,7 @@ if (!rootProject.extra.has("modustroResolveSourceRootFiles")) {
     if (locAlgitesSourceRootResolverScript.isFile) {
         apply(from = locAlgitesSourceRootResolverScript)
     } else {
-        apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-source-root-resolver.gradle.kts"))
+        apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/repository/modustro-source-root-resolver.gradle.kts"))
     }
 }
 
@@ -170,7 +170,7 @@ val locAlgitesPublicationScript = rootProject.file("gradle/tool/publication/modu
 if (locAlgitesPublicationScript.isFile) {
     apply(from = locAlgitesPublicationScript)
 } else {
-    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/publication/modustro-publication.gradle.kts"))
+    apply(from = uri("https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/publication/modustro-publication.gradle.kts"))
 }
 
 extra["modustroDocsResolvedMetadataProperties"] = locAlgitesDocsResolvedMetadataProperties
@@ -343,10 +343,10 @@ val locDocsPublishingPlan = locResolveDocsPublishingPlan(
     locDocsPublicationDestinationIds
 )
 @Suppress("UNCHECKED_CAST")
-val locDocsPublishingEndpoints = (locDocsPublishingPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty()
-extra["modustroDocsPublishingEndpoints"] = locDocsPublishingEndpoints
-val locDocsHasPublishingEndpoints =
-    (locDocsPublishingPlan["publishingEnabled"] as? Boolean ?: false) && locDocsPublishingEndpoints.isNotEmpty()
+val locDocsEndpointPublications = (locDocsPublishingPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty()
+extra["modustroDocsEndpointPublications"] = locDocsEndpointPublications
+val locDocsHasEndpointPublications =
+    (locDocsPublishingPlan["publishingEnabled"] as? Boolean ?: false) && locDocsEndpointPublications.isNotEmpty()
 
 val locDocsPublicationSelectionFile = locDocsSiteRoot.file(".modustro-publishing/docs-site.properties")
 if (tasks.findByName("writeModustroDocsPublishingSelection") == null) {
@@ -357,7 +357,7 @@ if (tasks.findByName("writeModustroDocsPublishingSelection") == null) {
         doLast {
             val locOutput = locDocsPublicationSelectionFile.asFile
             locOutput.parentFile.mkdirs()
-            val locEndpoints = locDocsPublishingEndpoints
+            val locEndpoints = locDocsEndpointPublications
             val locLines = mutableListOf(
                 "outputKind=modustro_docs_site",
                 "stability=$locDocsPublicationStability",
@@ -1646,22 +1646,26 @@ if (tasks.findByName("publishModustroDocsSite") == null) {
     @Suppress("UNCHECKED_CAST")
     val locPublishingService = rootProject.extra["modustroPublishingService"] as Provider<AIcModustroPublishingService>
     val locPublishingBranch = providers.gradleProperty("modustro.docs.publishingBranch").orNull?.trim()?.takeIf(String::isNotBlank) ?: "documentation"
-    val locFiles = fileTree(locDocsSiteRoot) { exclude(".git/**", ".modustro-publishing/**") }
+    val locFiles = fileTree(locDocsSiteRoot) { exclude(".git/**", ".modustro-publishing/**", "**/*.modustro-build-record.yml") }
     tasks.register<AIcModustroPublishFilesTask>("publishModustroDocsSite") {
         group = "publishing"
         description = "Publishes the generated Modustro documentation site through the common publishing scheduler."
-        if (locDocsHasPublishingEndpoints) {
+        if (locDocsHasEndpointPublications) {
             dependsOn("generateModustroDocsSite")
             payloadFiles.from(locFiles)
         }
-        publishingPlanJson.set(JsonOutput.toJson(locDocsPublishingPlan))
+        val locBoundPlan = locDocsPublishingPlan + ("endpointPublications" to (locDocsPublishingPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty().map { endpoint ->
+            val url = endpoint["publishingUrl"]?.toString()
+            if (endpoint["publishingAdapter"] == "git-branch" && url == "https://github.com/Algites-EU/") endpoint + ("publishingUrl" to (url + locAlgitesDocsRepositoryId + ".git")) else endpoint
+        })
+        publishingPlanJson.set(JsonOutput.toJson(locBoundPlan))
         credentialProfilesJson.set(JsonOutput.toJson(locDocsRepositoryMetadata["credentialProfiles"] ?: emptyMap<String, Any>()))
         outputKind.set("MODUSTRO_DOCS_SITE")
         stability.set(locDocsPublicationStability)
         artifactIdentity.set(locAlgitesDocsRepositoryId)
         publicationVersion.set(locAlgitesDocsEffectivePublicationId)
         payloadRoot.set(locDocsSiteRoot)
-        coordinates.set(mapOf("workingTree" to locDocsSiteRoot.asFile.path, "branch" to locPublishingBranch,
+        coordinates.set(mapOf("groupId" to locDocsRepositoryMetadata["groupId"].toString(), "artifactId" to locAlgitesDocsRepositoryId, "technologyKind" to "modustro", "logicalVersion" to rootProject.version.toString(), "workingTree" to locDocsSiteRoot.asFile.path, "branch" to locPublishingBranch,
             "commitMessage" to "Publish documentation for $locAlgitesDocsEffectivePublicationKind/$locAlgitesDocsEffectivePublicationId"))
         publishingService.set(locPublishingService)
         usesService(locPublishingService)

@@ -14,7 +14,7 @@ import java.io.File
 import java.net.URI
 
 val locAlgitesMpsManagerScript = (findProperty("algites.mps.managerScript") as String?)
-    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/mps/algites-mps-manager.gradle.kts"
+    ?: "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/mps/algites-mps-manager.gradle.kts"
 
 apply(from = uri(locAlgitesMpsManagerScript))
 

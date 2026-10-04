@@ -32,9 +32,9 @@ public final class AItcModustroCredentialTaskTest {
         if (locRepository == null) throw new IOException("Cannot locate governance sources.");
         String locSource = Files.readString(locRepository.resolve("gradle/tool/repository/modustro-root-build.gradle.kts"));
         String locTask = locSource.substring(locSource.indexOf("abstract class AIcResolveModustroRequiredCredentialsTask"),
-            locSource.indexOf("val locAlgitesRequiredCredentialsPlan = run"));
-        String locRegistration = locSource.substring(locSource.indexOf("val modustroResolveRequiredCredentials = tasks.register"),
             locSource.indexOf("/* Publishing invocation overrides must be available"));
+        String locRegistration = locSource.substring(locSource.indexOf("val modustroResolveRequiredCredentials = tasks.register"),
+            locSource.indexOf("@Suppress(\"UNCHECKED_CAST\")\nval modustroPublishingService"));
         Path locFixture = Files.createTempDirectory("modustro-credential-entry-");
         Files.writeString(locFixture.resolve("settings.gradle.kts"), "rootProject.name = \"credential-entry-test\"\n");
         Files.writeString(locFixture.resolve("build.gradle.kts"), """

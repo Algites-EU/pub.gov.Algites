@@ -189,7 +189,7 @@ Version:
 | `SourceRepository.ResourceEndpoints` | no | General ResourceEndpoint contribution at repository scope. New metadata should use this field. |
 
 Wire names in all examples below follow the Algites structured-data naming convention from the Development Structure Specification: Algites fields use `UpperCamelCase` and symbolic values use `lower_snake_case`.
-ResourceEndpoint matrix dimensions are symbolic values used as map keys, so TechnologyKind, ResourceKind, visibility, stability, and action keys such as `modustro`, `native_binary_output`, `modustro_docs_site`, `public`, `snapshot`, and `upload` intentionally retain their symbolic `lower_snake_case` spelling.
+ResourceEndpoint matrix dimensions are symbolic values used as map keys, so TechnologyKind, ResourceKind, visibility, stability, and action keys such as `modustro`, `native_product_binaries`, `modustro_docs_site`, `public`, `snapshot`, and `upload` intentionally retain their symbolic `lower_snake_case` spelling.
 
 The repository descriptor may also contain these top-level inheritable properties:
 
@@ -467,7 +467,7 @@ ResourceEndpoints merge by stable endpoint `Id` within the same `TechnologyKind 
 Artifact:
   ResourceEndpoints:
     java:
-      native_binary_output:
+      - OutputSelector: native_product_binaries
         public:
           download:
             - Id: algites-java-public-snapshot-download
@@ -545,7 +545,7 @@ TechnologyKind -> ResourceKind -> visibility -> action -> endpoint list
 The four structural dimensions are:
 
 - TechnologyKind: `java`, `python`, `mps`, `modustro`;
-- ResourceKind: `native_binary_output`, `native_source_output`, `native_documentation_output`, `modustro_docs_site`, `schema_site`;
+- ResourceKind: `native_product_binaries`, `native_product_sources`, `native_product_documentation`, `modustro_docs_site`, `schema_site`;
 - visibility: `public`, `private`;
 - action: `download`, `upload`, `manage`.
 
@@ -556,7 +556,7 @@ Example:
 ```yaml
 ResourceEndpoints:
   java:
-    native_binary_output:
+    - OutputSelector: native_product_binaries
       public:
         download:
           - Id: algites-java-public-snapshot-download
@@ -583,7 +583,7 @@ algites-<technology-kind>-<resource-kind>-<visibility>-[<stability>-]<action>
 
 Legacy native-build-output ids without the explicit `native-build-output` segment remain accepted during the Phase-5 migration so inherited overrides do not change identity.
 
-Public **download** defaults are maintained in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`. The historical filename and `ALGITES_REPOSITORY_*` environment-variable names are retained for workflow compatibility; the contained canonical metadata now uses `ResourceEndpoints`.
+Public **download** defaults are maintained in `pub.gov.Algites/repository/defaults/algites-repository-defaults-public.yml`. The historical filename and `ALGITES_REPOSITORY_*` environment-variable names are retained for workflow compatibility; the contained canonical metadata now uses `ResourceEndpoints`.
 
 Phase 5.1 accepts only the canonical `ResourceEndpoints` shape. Repository-matrix input and its compatibility projection are no longer part of the descriptor/resolver contract.
 
@@ -603,22 +603,22 @@ The precedence is therefore:
 Phase 5.2 separates Builder publishing from the generalized ResourceEndpoint catalog. Publication policy is declared directly at the descriptor root under one of these publishing output kinds:
 
 ```text
-native_binary_output
-native_source_output
-native_documentation_output
+native_product_binaries
+native_product_sources
+native_product_documentation
 modustro_docs_site
 schema_site
 ```
 
-Each output kind contains `Snapshot` and/or `Release`, and each stability branch contains `PublishingEnabled` plus `PublishingEndpoints`. Endpoint lists merge by stable `Id`; omitted endpoint properties inherit independently. The effective defaults are `Enabled: true`, `PublishingOrder: 0`, `PublishingFailurePolicy: FAIL_BUILD_ON_PUBLISHING_FAILURE`, `PublishingRetryCount: 0`, `PublishingRetryDelayMillis: 1000`, and `ShowPublishingProgressIfPossible: true`. Negative `PublishingOrder` values are valid. `PublishingAttemptTimeoutMillis` has no implicit value and must be positive when specified.
+Each output kind contains `Snapshot` and/or `Release`, and each stability branch contains `PublishingEnabled` plus `EndpointPublications`. Endpoint lists merge by stable `Id`; omitted endpoint properties inherit independently. The effective defaults are `Enabled: true`, `PublishingOrder: 0`, `PublishingFailurePolicy: FAIL_BUILD_ON_PUBLISHING_FAILURE`, `PublishingRetryCount: 0`, `PublishingRetryDelayMillis: 1000`, and `ShowPublishingProgressIfPossible: true`. Negative `PublishingOrder` values are valid. `PublishingAttemptTimeoutMillis` has no implicit value and must be positive when specified.
 
 Example:
 
 ```yaml
-native_binary_output:
+native_product_binaries:
   Snapshot:
     PublishingEnabled: true
-    PublishingEndpoints:
+    EndpointPublications:
       - Id: snapshot-repository
         Enabled: true
         PublishingUrl: https://example.invalid/maven/
@@ -637,14 +637,14 @@ Snapshot invocation overrides are independent for all five output kinds and acce
 The Gradle adapter accepts the following properties (with equivalent `MODUSTRO_PUBLISHING_*` environment variables):
 
 ```text
-modustro.publishing.nativeBinaryOutput
-modustro.publishing.nativeSourceOutput
-modustro.publishing.nativeDocumentationOutput
+modustro.publishing.nativeProductBinaries
+modustro.publishing.nativeProductSources
+modustro.publishing.nativeProductDocumentation
 modustro.publishing.modustroDocsSite
 modustro.publishing.schemaSite
 ```
 
-`ResourceEndpoints` remain the generalized resource-resolution contract used for dependency/resource access and management. Builder publication destinations are governed by `PublishingEndpoints`.
+`ResourceEndpoints` remain the generalized resource-resolution contract used for dependency/resource access and management. Builder publication destinations are governed by `EndpointPublications`.
 
 ## 12. Credential profiles vs credential values
 
@@ -660,7 +660,7 @@ CredentialProfiles:
 Artifact:
   ResourceEndpoints:
     java:
-      native_binary_output:
+      - OutputSelector: native_product_binaries
         private:
           download:
             - Id: algites-example-java-native-build-output-private-release-download

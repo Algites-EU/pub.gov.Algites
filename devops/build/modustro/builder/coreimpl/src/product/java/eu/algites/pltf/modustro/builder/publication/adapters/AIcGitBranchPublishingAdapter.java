@@ -30,8 +30,17 @@ public final class AIcGitBranchPublishingAdapter implements AIiPublishingAdapter
         return true;
     }
 
+    private static final java.util.concurrent.ConcurrentHashMap<Path,Object> WORKING_TREE_LOCKS = new java.util.concurrent.ConcurrentHashMap<>();
+
     @Override
     public void publish(AIcPublishingAttemptContext aContext) throws Exception {
+        Path tree=Path.of(AIcRequiredCoordinate(aContext.payload().coordinates(), "workingTree")).toRealPath();
+        synchronized(WORKING_TREE_LOCKS.computeIfAbsent(tree, ignored -> new Object())) {
+            AIcPublishLocked(aContext);
+        }
+    }
+
+    private void AIcPublishLocked(AIcPublishingAttemptContext aContext) throws Exception {
         Map<String, String> locCoordinates = aContext.payload().coordinates();
         Path locWorkingTree = Path.of(AIcRequiredCoordinate(locCoordinates, "workingTree")).toAbsolutePath().normalize();
         if (!Files.isDirectory(locWorkingTree.resolve(".git"))) {
@@ -61,6 +70,12 @@ public final class AIcGitBranchPublishingAdapter implements AIiPublishingAdapter
                 "Publish " + aContext.payload().artifactIdentity() + " " + aContext.payload().version());
 
         aContext.progressReporter().started("Publishing Git branch '" + locBranch + "' to " + locRemoteUri);
+        for (var file : aContext.payload().files()) {
+            Path target=locWorkingTree.resolve(file.logicalName()).normalize();
+            if(!target.startsWith(locWorkingTree)||target.startsWith(locWorkingTree.resolve(".git")))throw new IllegalArgumentException("Invalid Git payload path.");
+            Files.createDirectories(target.getParent());
+            if(!target.equals(file.path().toAbsolutePath().normalize()))Files.copy(file.path(),target,java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
         AIcRun(aContext, locWorkingTree, List.of("git", "add", "-A"), true);
         int locDiffExit = AIcRun(aContext, locWorkingTree, List.of("git", "diff", "--cached", "--quiet"), false);
         if (locDiffExit == 1) {

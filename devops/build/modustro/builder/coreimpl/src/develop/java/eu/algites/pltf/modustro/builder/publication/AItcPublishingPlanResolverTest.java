@@ -40,7 +40,7 @@ public class AItcPublishingPlanResolverTest {
             AInPublishingInvocationOverride.FORCE_ON
         );
         Assert.assertTrue(locResolved.publishingEnabled());
-        Assert.assertFalse(locResolved.publishingEndpoints().get(0).enabled());
+        Assert.assertFalse(locResolved.endpointPublications().get(0).enabled());
     }
 
     /** Verifies that snapshot FORCE_OFF disables publishing without modifying endpoint configuration. */
@@ -54,7 +54,7 @@ public class AItcPublishingPlanResolverTest {
             AInPublishingInvocationOverride.FORCE_OFF
         );
         Assert.assertFalse(locResolved.publishingEnabled());
-        Assert.assertTrue(locResolved.publishingEndpoints().get(0).enabled());
+        Assert.assertTrue(locResolved.endpointPublications().get(0).enabled());
     }
 
     /** Verifies that release publishing rejects invocation-time publishing overrides. */

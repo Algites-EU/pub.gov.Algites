@@ -1,0 +1,58 @@
+GroupId: eu.algites.test
+ResourceEndpoints:
+  java:
+    - OutputSelector: native_outputs
+      Enabled: true
+      public:
+        upload:
+          - Id: algites-java-native-outputs-public-snapshot-upload
+            Url: file:///tmp/resource-upload
+            Stability: snapshot
+    - OutputSelector: native_develop_outputs
+      Enabled: false
+    - OutputSelector: native_develop_binaries
+      Enabled: true
+OutputPublishing:
+  - OutputSelector: native_outputs
+    Snapshot:
+      PublishingEnabled: true
+      EndpointPublications:
+        - Id: primary
+          PublishingUrl: file:///tmp/publication-upload
+          PublishingAdapter: local-copy
+          PublishingOrder: -1
+          PublishingRetryCount: 2
+          PublishingRetryDelayMillis: 0
+          PublishingAttemptTimeoutMillis: 10000
+          ShowPublishingProgressIfPossible: false
+          Publications:
+            - Id: standard
+              Classifier: ""
+              Extension: jar
+              ExtendedPublications:
+                - Id: build-record
+                  PublicationProducer: modustro-build-record
+                  PublishingEnabled: true
+                  PublishingUrl: file:///tmp/records
+                  PublishingAdapter: local-copy
+                  PublishingFailurePolicy: IGNORE_PUBLISHING_FAILURE
+                  ExtendedPublications:
+                    - Id: record-of-record
+                      PublicationProducer: modustro-build-record
+                      PublishingEnabled: true
+            - Id: custom
+              Classifier: tests.custom
+              Extension: jar
+              ExtendedPublications:
+                - Id: build-record
+                  PublicationProducer: modustro-build-record
+                  PublishingEnabled: false
+  - OutputSelector: native_sources
+    Snapshot:
+      PublishingEnabled: false
+  - OutputSelector: native_develop_outputs
+    Snapshot:
+      PublishingEnabled: false
+  - OutputSelector: native_develop_binaries
+    Snapshot:
+      PublishingEnabled: true

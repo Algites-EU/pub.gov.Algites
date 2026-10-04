@@ -379,9 +379,9 @@ Before dependency download or resource management, the lifecycle resolves effect
 
 | ResourceKind | TechnologyKinds | Stability |
 | --- | --- | --- |
-| `native_binary_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `native_source_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `native_documentation_output` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_product_binaries` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_product_sources` | `java`, `python`, `mps` | required: `release` or `snapshot` |
+| `native_product_documentation` | `java`, `python`, `mps` | required: `release` or `snapshot` |
 | `modustro_docs_site` | `modustro` | required: `release` or `snapshot` |
 | `schema_site` | `modustro` | forbidden |
 
@@ -402,7 +402,7 @@ Canonical example:
 ```yaml
 ResourceEndpoints:
   java:
-    native_binary_output:
+    - OutputSelector: native_product_binaries
       private:
         download:
           - Id: algites-java-private-release-download
@@ -415,24 +415,24 @@ New canonical endpoint IDs SHOULD include TechnologyKind, ResourceKind, visibili
 
 `ResourceEndpointProviderAdapter` optionally selects provider-specific behavior when the standard TechnologyKind/ResourceKind/action adapter is insufficient. Native-build-output `manage` currently supports the `cloudsmith` and `repsy` provider adapters and requires an adapter because the lifecycle never assumes that an upload URL also supports package deletion.
 
-Phase 5.2 retains `ResourceEndpoints` for generalized resource resolution and management, while all publishing targets are represented exclusively by `PublishingEndpoints`. The superseded repository-matrix input and compatibility projection are not part of the active lifecycle contract.
+Phase 5.2 retains `ResourceEndpoints` for generalized resource resolution and management, while all publishing targets are represented exclusively by `EndpointPublications`. The superseded repository-matrix input and compatibility projection are not part of the active lifecycle contract.
 
 Credential profiles remain independent inherited metadata. A ResourceEndpoint contains only a non-secret `CredentialProfile` reference. Secret values use the provider-independent `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document governed by `algites-credentials_1.yamldef.schema.json`. Provider adapters may materialize only the profile/type pairs selected by credential preflight and MUST preserve the same credential-document schema.
 
 For GitHub Actions, `resolveModustroRequiredCredentials` evaluates enabled native-build-output ResourceEndpoints for the requested download/upload/manage and release/snapshot context without reading secret values. The trusted credential bridge then filters and materializes only the required credential profile/type pairs before ordinary Gradle processing starts. The preflight plan exposes canonical `resourceEndpoints`; the historical `repositories` property is retained as a compatibility alias while downstream workflow code migrates.
 
-Concrete public native-build-output download locations remain public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-download-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`. The historical filename and `ALGITES_REPOSITORY_*` environment-variable names are intentionally retained during Phase 5. Governed public upload/manage endpoints and all private endpoints remain governance overlays and MUST NOT contain secret credential values.
+Concrete public native-build-output download locations remain public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`. The historical filename and `ALGITES_REPOSITORY_*` environment-variable names are intentionally retained during Phase 5. Governed public upload/manage endpoints and all private endpoints remain governance overlays and MUST NOT contain secret credential values.
 
 ResourceEndpoint visibility remains constrained by source-repository visibility:
 
-- `pub` repositories resolve only public ResourceEndpoint download/manage branches; their publishing configuration must target only public PublishingEndpoints supplied by public governance.
+- `pub` repositories resolve only public ResourceEndpoint download/manage branches; their publishing configuration must target only public EndpointPublications supplied by public governance.
 - `priv` repositories may resolve public and private ResourceEndpoints; their own publication targets are supplied by authorized private PublishingEndpoint overlays.
 
 `PublicationDestinations` in a publication capability configuration is an optional list of PublishingEndpoint IDs. It narrows the effective PublishingEndpoint set and never embeds URLs, credential values, provider state, or publication metadata.
 
 Publication workflows continue to invoke the common `modustroPublish` orchestration task. Technology-specific native publication remains adapter-specific. Python snapshot publication continues to use immutable PEP 440 development releases (`1.0.dev<snapshotInstanceId>`) while the logical Algites version remains `1.0-SNAPSHOT`.
 
-After a complete release workflow succeeds, released-snapshot cleanup selects `native_binary_output` manage ResourceEndpoints with `Stability: snapshot`. For Java it deletes the exact corresponding `-SNAPSHOT` version. For Python it selects the complete timestamped development-release series for the released line. Cleanup failure remains non-fatal for an already completed release.
+After a complete release workflow succeeds, released-snapshot cleanup selects `native_product_binaries` manage ResourceEndpoints with `Stability: snapshot`. For Java it deletes the exact corresponding `-SNAPSHOT` version. For Python it selects the complete timestamped development-release series for the released line. Cleanup failure remains non-fatal for an already completed release.
 
 The GitHub private-governance licensing bootstrap uses an authenticated sparse partial clone. Because `--filter=blob:none` may lazy-fetch blobs during the later `git sparse-checkout set` operation, the workflow installs the `gh` credential helper with `gh auth setup-git` before cloning; authentication must therefore cover both the initial clone and subsequent promisor-remote fetches.
 

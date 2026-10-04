@@ -96,7 +96,7 @@ public final class AIcPublishingScheduler implements AutoCloseable {
             return new AIcPublishingScheduleHandle(CompletableFuture.completedFuture(null), Map.of());
         }
 
-        List<AIcPublishingEndpoint> locEndpoints = aConfiguration.publishingEndpoints().stream()
+        List<AIcPublishingEndpoint> locEndpoints = aConfiguration.endpointPublications().stream()
                 .filter(AIcPublishingEndpoint::enabled)
                 .sorted(Comparator.comparingInt(AIcPublishingEndpoint::publishingOrder).thenComparing(AIcPublishingEndpoint::id))
                 .toList();
@@ -136,6 +136,39 @@ public final class AIcPublishingScheduler implements AutoCloseable {
                 aProgressReporterFactory));
 
         return new AIcPublishingScheduleHandle(locRequiredCompletion, locResultFutures);
+    }
+
+
+    /** Schedules a validated finite dependency graph; every form/extension owns its retry policy. */
+    public AIcPublishingScheduleHandle schedule(List<AIcPublicationJob> jobs,
+            AIiPublishingCredentialResolver credentials,AIiPublishingProgressReporterFactory progress){
+        Map<String,AIcPublicationJob> byId=new LinkedHashMap<>();
+        Map<String,CompletableFuture<AIcPublishingEndpointResult>> results=new LinkedHashMap<>();
+        Map<String,AIcPublishingPayload> payloads=new java.util.concurrent.ConcurrentHashMap<>();
+        for(var job:jobs){if(byId.putIfAbsent(job.id(),job)!=null)throw new IllegalArgumentException("Duplicate publication path "+job.id());results.put(job.id(),new CompletableFuture<>());
+            if(!adapters.containsKey(job.endpoint().publishingAdapter()))throw new IllegalArgumentException("Unknown publishing adapter "+job.endpoint().publishingAdapter());
+            if(job.parentId()!=null&&(!byId.containsKey(job.parentId())||job.parentId().equals(job.id())))throw new IllegalArgumentException("Parent must precede child in publication plan.");
+        }
+        CompletableFuture<Void> required=new CompletableFuture<>();
+        TreeMap<Integer,List<AIcPublicationJob>> groups=new TreeMap<>();for(var job:jobs)groups.computeIfAbsent(job.endpoint().publishingOrder(),k->new ArrayList<>()).add(job);
+        orchestrationExecutor.execute(()->{
+            Throwable failure=null;
+            for(var group:groups.values()){
+                if(failure!=null){for(var job:group)results.get(job.id()).complete(new AIcPublishingEndpointResult(job.id(),false,false,false,0,Duration.ZERO,failure));continue;}
+                for(var job:group){CompletableFuture<AIcPublishingEndpointResult> parent=job.parentId()==null?CompletableFuture.completedFuture(null):results.get(job.parentId());
+                    parent.thenApplyAsync(parentResult->{
+                        if(parentResult!=null&&!parentResult.success())return new AIcPublishingEndpointResult(job.id(),false,false,job.endpoint().publishingFailurePolicy()==AInPublishingFailurePolicy.IGNORE_PUBLISHING_FAILURE,0,Duration.ZERO,new IllegalStateException("Parent publication did not succeed."));
+                        try{
+                            AIcPublishingPayload payload=job.payloadFactory().prepare(job.parentId()==null?null:payloads.get(job.parentId()),parentResult);payloads.put(job.id(),payload);
+                            if(job.endpoint().publishingRetryCount()>0&&!adapters.get(job.endpoint().publishingAdapter()).isRetrySafe(payload,job.endpoint()))throw new IllegalArgumentException("Adapter does not permit retries.");
+                            return AIcRunEndpoint(payload,job.endpoint(),credentials,progress);
+                        }catch(Throwable error){return new AIcPublishingEndpointResult(job.id(),true,false,job.endpoint().publishingFailurePolicy()==AInPublishingFailurePolicy.IGNORE_PUBLISHING_FAILURE,0,Duration.ZERO,error);}
+                    },endpointControlExecutor).whenComplete((value,error)->{if(error==null)results.get(job.id()).complete(value);else results.get(job.id()).complete(new AIcPublishingEndpointResult(job.id(),true,false,false,0,Duration.ZERO,AIcUnwrap(error)));});
+                }
+                for(var job:group)if(job.endpoint().publishingFailurePolicy()==AInPublishingFailurePolicy.FAIL_BUILD_ON_PUBLISHING_FAILURE){var result=results.get(job.id()).join();if(result.started()&&!result.success()&&failure==null)failure=result.failure();}
+            }
+            if(failure==null)required.complete(null);else required.completeExceptionally(failure);
+        });return new AIcPublishingScheduleHandle(required,results);
     }
 
     private void AIcRunGroups(

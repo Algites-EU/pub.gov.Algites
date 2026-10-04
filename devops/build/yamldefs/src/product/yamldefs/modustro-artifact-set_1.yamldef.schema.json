@@ -153,19 +153,34 @@
         "NestedGradleSettingsBuildPolicy": {
           "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/NestedGradleSettingsBuildPolicy"
         },
-        "native_binary_output": {
+        "native_product_binaries": {
           "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
         },
-        "native_source_output": {
+        "native_product_sources": {
           "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
         },
-        "native_documentation_output": {
+        "native_product_documentation": {
           "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
         },
         "modustro_docs_site": {
           "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
         },
         "schema_site": {
+          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
+        },
+        "OutputPublishing": {
+          "type": "array",
+          "items": {
+            "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingDeclaration"
+          }
+        },
+        "native_develop_sources": {
+          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
+        },
+        "native_develop_binaries": {
+          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
+        },
+        "native_develop_documentation": {
           "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
         }
       },

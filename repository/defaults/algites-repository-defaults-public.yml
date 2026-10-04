@@ -1,0 +1,60 @@
+# Public download and documentation publication governance; no private governance dependency.
+ResourceEndpoints:
+  java:
+  - OutputSelector: native_product_binaries
+    public:
+      download:
+      - Id: algites-java-native-product-binaries-public-release-download
+        Url: https://repo1.maven.org/maven2
+        Stability: release
+      - Id: algites-java-native-product-binaries-public-snapshot-download
+        Url: https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/
+        Stability: snapshot
+  python:
+  - OutputSelector: native_product_binaries
+    public:
+      download:
+      - Id: algites-python-native-product-binaries-public-release-download
+        Url: https://pypi.org/simple/
+        Stability: release
+      - Id: algites-python-native-product-binaries-public-snapshot-download
+        Url: https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/
+        Stability: snapshot
+  mps:
+  - OutputSelector: native_product_binaries
+    public:
+      download:
+      - Id: algites-mps-native-product-binaries-public-release-download
+        Url: https://dummy.invalid/algites/mps/public/release/download/
+        Stability: release
+        Enabled: false
+      - Id: algites-mps-native-product-binaries-public-snapshot-download
+        Url: https://dummy.invalid/algites/mps/public/snapshot/download/
+        Stability: snapshot
+        Enabled: false
+  modustro:
+  - OutputSelector: modustro_docs_site
+    public:
+      upload:
+      - Id: algites-modustro-modustro-docs-site-public-release-upload
+        Url: https://github.com/Algites-EU/
+        Stability: release
+        ResourceEndpointProviderAdapter: github-pages
+      - Id: algites-modustro-modustro-docs-site-public-snapshot-upload
+        Url: https://github.com/Algites-EU/
+        Stability: snapshot
+        ResourceEndpointProviderAdapter: github-pages
+OutputPublishing:
+- OutputSelector: modustro_docs_site
+  Snapshot:
+    PublishingEnabled: true
+    EndpointPublications:
+    - Id: github-documentation-branch
+      PublishingUrl: https://github.com/Algites-EU/
+      PublishingAdapter: git-branch
+  Release:
+    PublishingEnabled: true
+    EndpointPublications:
+    - Id: github-documentation-branch
+      PublishingUrl: https://github.com/Algites-EU/
+      PublishingAdapter: git-branch

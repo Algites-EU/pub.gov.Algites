@@ -13,23 +13,23 @@ public class AItcBuiltinPublishingOutputKindMapperTest {
     public void testPublishingOutputKindMapping() {
         Assert.assertEquals(
             AIcBuiltinPublishingOutputKindMapper.publishingOutputKind(AInBuildOutputProductionKind.JAVA_CLASSES_JAR),
-            AInPublishingOutputKind.NATIVE_BINARY_OUTPUT
+            AInPublishingOutputKind.NATIVE_PRODUCT_BINARIES
         );
         Assert.assertEquals(
             AIcBuiltinPublishingOutputKindMapper.publishingOutputKind(AInBuildOutputProductionKind.JAVA_SOURCES_JAR),
-            AInPublishingOutputKind.NATIVE_SOURCE_OUTPUT
+            AInPublishingOutputKind.NATIVE_PRODUCT_SOURCES
         );
         Assert.assertEquals(
             AIcBuiltinPublishingOutputKindMapper.publishingOutputKind(AInBuildOutputProductionKind.JAVA_JAVADOC_JAR),
-            AInPublishingOutputKind.NATIVE_DOCUMENTATION_OUTPUT
+            AInPublishingOutputKind.NATIVE_PRODUCT_DOCUMENTATION
         );
         Assert.assertEquals(
             AIcBuiltinPublishingOutputKindMapper.publishingOutputKind(AInBuildOutputProductionKind.PYTHON_WHEEL),
-            AInPublishingOutputKind.NATIVE_BINARY_OUTPUT
+            AInPublishingOutputKind.NATIVE_PRODUCT_BINARIES
         );
         Assert.assertEquals(
             AIcBuiltinPublishingOutputKindMapper.publishingOutputKind(AInBuildOutputProductionKind.PYTHON_SDIST),
-            AInPublishingOutputKind.NATIVE_SOURCE_OUTPUT
+            AInPublishingOutputKind.NATIVE_PRODUCT_SOURCES
         );
     }
 }

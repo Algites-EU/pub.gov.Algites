@@ -65,7 +65,8 @@
             "SourcePath",
             "StructureKind",
             "Name",
-            "Description"
+            "Description",
+            "GroupId"
           ]
         },
         "SourceMetadata": {

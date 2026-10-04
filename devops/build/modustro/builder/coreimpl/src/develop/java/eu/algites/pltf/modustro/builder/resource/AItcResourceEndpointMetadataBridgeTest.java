@@ -25,13 +25,13 @@ public final class AItcResourceEndpointMetadataBridgeTest {
     @Test
     public void AIcResolvesNormalizedMetadataMap() {
         Map<String, Object> locItem = Map.of(
-            "id", "algites-java-native-binary-output-public-release-download",
+            "id", "algites-java-native-product-binaries-public-release-download",
             "url", "https://example.invalid/releases/",
             "enabled", true,
             "stability", "release"
         );
         Map<String, Object> locMetadata = Map.of(
-            "java.native_binary_output.public.download",
+            "java.native_product_binaries.public.download",
             List.of(locItem)
         );
 
@@ -39,7 +39,7 @@ public final class AItcResourceEndpointMetadataBridgeTest {
         Assert.assertEquals(
             locCatalog.select(
                 "java",
-                "native_binary_output",
+                "native_product_binaries",
                 "public",
                 AInResourceEndpointAction.DOWNLOAD,
                 AInResourceStability.RELEASE,

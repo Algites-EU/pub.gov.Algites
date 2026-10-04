@@ -78,6 +78,12 @@
         "ShowPublishingProgressIfPossible": {
           "type": "boolean",
           "default": true
+        },
+        "Publications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Publication"
+          }
         }
       },
       "required": [
@@ -85,7 +91,7 @@
       ],
       "minProperties": 1
     },
-    "PublishingEndpoints": {
+    "EndpointPublications": {
       "type": "array",
       "items": {
         "$ref": "#/$defs/PublishingEndpoint"
@@ -101,8 +107,8 @@
           "description": "Enables publishing for this output kind and stability. It inherits when omitted and defaults to false when no ancestor defines it. It does not control compilation, verification, packaging, or creation of the output itself.",
           "default": false
         },
-        "PublishingEndpoints": {
-          "$ref": "#/$defs/PublishingEndpoints"
+        "EndpointPublications": {
+          "$ref": "#/$defs/EndpointPublications"
         }
       },
       "minProperties": 1
@@ -119,6 +125,153 @@
         }
       },
       "minProperties": 1
+    },
+    "Publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "Stable endpoint identity used for hierarchical merging."
+        },
+        "Enabled": {
+          "type": "boolean"
+        },
+        "Classifier": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]*$"
+        },
+        "Extension": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+        },
+        "ExtendedPublications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExtendedPublication"
+          }
+        }
+      },
+      "required": [
+        "Id"
+      ]
+    },
+    "ExtendedPublication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "Stable endpoint identity used for hierarchical merging."
+        },
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "PublishingUrl": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Destination URL or URI understood by the selected publishing adapter.",
+          "format": "uri"
+        },
+        "PublishingAdapter": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "PublishingCredentialProfile": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "PublishingOrder": {
+          "type": "integer",
+          "default": 0,
+          "description": "Lower values may start earlier. Equal effective values are eligible for concurrent start; negative values are valid."
+        },
+        "PublishingFailurePolicy": {
+          "$ref": "#/$defs/PublishingFailurePolicy"
+        },
+        "PublishingRetryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0,
+          "description": "Number of retries after the initial attempt."
+        },
+        "PublishingRetryDelayMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000
+        },
+        "PublishingAttemptTimeoutMillis": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Maximum duration of one publishing attempt. The scheduler owns the deadline and the adapter receives it for native timeout/cancellation handling."
+        },
+        "ShowPublishingProgressIfPossible": {
+          "type": "boolean",
+          "default": true
+        },
+        "PublicationProducer": {
+          "type": "string",
+          "minLength": 1
+        },
+        "PublishingEnabled": {
+          "type": "boolean"
+        },
+        "ExtendedPublications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ExtendedPublication"
+          }
+        }
+      },
+      "required": [
+        "Id"
+      ]
+    },
+    "OutputPublishingDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "OutputSelector": {
+          "type": "string",
+          "enum": [
+            "native_product_sources",
+            "native_product_binaries",
+            "native_product_documentation",
+            "native_develop_sources",
+            "native_develop_binaries",
+            "native_develop_documentation",
+            "modustro_docs_site",
+            "schema_site",
+            "native_outputs",
+            "native_product_outputs",
+            "native_develop_outputs",
+            "native_sources",
+            "native_binaries",
+            "native_documentation"
+          ]
+        },
+        "TechnologyKind": {
+          "type": "string",
+          "enum": [
+            "java",
+            "python",
+            "mps",
+            "modustro"
+          ]
+        },
+        "Snapshot": {
+          "$ref": "#/$defs/PublishingStabilityConfiguration"
+        },
+        "Release": {
+          "$ref": "#/$defs/PublishingStabilityConfiguration"
+        }
+      },
+      "required": [
+        "OutputSelector"
+      ]
     }
   },
   "type": "object",
@@ -127,13 +280,13 @@
     "NestedGradleSettingsBuildPolicy": {
       "$ref": "#/$defs/NestedGradleSettingsBuildPolicy"
     },
-    "native_binary_output": {
+    "native_product_binaries": {
       "$ref": "#/$defs/OutputPublishingConfiguration"
     },
-    "native_source_output": {
+    "native_product_sources": {
       "$ref": "#/$defs/OutputPublishingConfiguration"
     },
-    "native_documentation_output": {
+    "native_product_documentation": {
       "$ref": "#/$defs/OutputPublishingConfiguration"
     },
     "modustro_docs_site": {

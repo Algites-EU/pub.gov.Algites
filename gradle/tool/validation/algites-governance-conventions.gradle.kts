@@ -74,9 +74,9 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
             "java", "python", "mps", "modustro"
         )
         val locResourceKindSymbolicPropertyNames = setOf(
-            "native_binary_output",
-            "native_source_output",
-            "native_documentation_output",
+            "native_product_binaries",
+            "native_product_sources",
+            "native_product_documentation", "native_develop_sources", "native_develop_binaries", "native_develop_documentation",
             "modustro_docs_site",
             "schema_site"
         )

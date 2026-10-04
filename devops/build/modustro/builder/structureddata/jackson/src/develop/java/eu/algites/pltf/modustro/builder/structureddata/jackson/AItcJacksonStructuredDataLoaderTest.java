@@ -31,7 +31,7 @@ public final class AItcJacksonStructuredDataLoaderTest {
         try {
             Files.writeString(locFile, """
                 TechnologyKind: java
-                ResourceKind: native_binary_output
+                ResourceKind: native_product_binaries
                 Visibility: public
                 Action: download
                 Id: algites-java-native-build-output-public-snapshot-download
@@ -96,7 +96,7 @@ public final class AItcJacksonStructuredDataLoaderTest {
             Files.writeString(locFile, """
                 <ResourceModel>
                   <TechnologyKind>java</TechnologyKind>
-                  <ResourceKind>native_binary_output</ResourceKind>
+                  <ResourceKind>native_product_binaries</ResourceKind>
                   <Visibility>private</Visibility>
                   <Action>manage</Action>
                   <Id>algites-java-native-build-output-private-release-manage</Id>

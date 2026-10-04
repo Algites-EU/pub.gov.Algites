@@ -2,9 +2,12 @@ package eu.algites.pltf.modustro.builder.model.publication;
 
 /** Built-in Modustro Builder publishing output classes. */
 public enum AInPublishingOutputKind {
-    NATIVE_BINARY_OUTPUT("native_binary_output"),
-    NATIVE_SOURCE_OUTPUT("native_source_output"),
-    NATIVE_DOCUMENTATION_OUTPUT("native_documentation_output"),
+    NATIVE_PRODUCT_BINARIES("native_product_binaries"),
+    NATIVE_PRODUCT_SOURCES("native_product_sources"),
+    NATIVE_PRODUCT_DOCUMENTATION("native_product_documentation"),
+    NATIVE_DEVELOP_SOURCES("native_develop_sources"),
+    NATIVE_DEVELOP_BINARIES("native_develop_binaries"),
+    NATIVE_DEVELOP_DOCUMENTATION("native_develop_documentation"),
     MODUSTRO_DOCS_SITE("modustro_docs_site"),
     SCHEMA_SITE("schema_site");
 
