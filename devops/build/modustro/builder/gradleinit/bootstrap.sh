@@ -10,6 +10,7 @@ cat > "${locBootstrapDir}/settings.gradle.kts" <<'KTS'
 pluginManagement { repositories { gradlePluginPortal(); mavenCentral() } }
 dependencyResolutionManagement {
     repositories {
+        if (providers.gradleProperty("modustro.useMavenLocalForResolution").orNull == "true") { mavenLocal() }
         mavenCentral()
         maven { url = uri("https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/") }
     }

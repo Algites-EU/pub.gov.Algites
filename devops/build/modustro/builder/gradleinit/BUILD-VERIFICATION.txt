@@ -1,27 +1,27 @@
-Gradleinit verification (2026-10-03)
-Gradle 9.2.1, JDK 17.
-Standalone bootstrap: compileKotlin, jar, Maven POM/module metadata, validatePlugins and publishToMavenLocal succeeded.
-TestNG/Gradle TestKit: 3 tests, 0 failures, 0 errors, 0 skipped.
-Settings/Project/applied-Project Builder DTO class identity verified.
-Core endpoint inheritance, Gradle project discovery, metadata-only helper mode and isolated-build metadata/Gradle paths verified.
-Public repository CI credential preflight task succeeded with configuration cache enabled:
-resolveModustroRequiredCredentials -Palgites.credential.usages=download -Palgites.credential.download.stabilities=release,snapshot
-Public CI task used a locally published bootstrap and cached runtime dependencies (--offline).
-Maven publication to the public snapshot service has not been performed.
+Modustro generator and Gradleinit verification (2026-10-04)
+Gradle 9.2.1, JDK 17, Python 3.12.
 
-Repository CI phase wiring verification (2026-10-03)
-Gradle 9.2.1, JDK 17; original production Settings and the published snapshot bootstrap.
-Original modustroPreparePhase task-configuration failure reproduced on the complete repository.
-Fixed lazy phase task wiring and Java/Python documentation consumer wiring through TaskProviders.
-Fixed mandatory Java/Python preflight registration; resolve now executes all five Java resolvers and the Python resolver.
-Resolved Java classpaths retain plain file paths, without pulling compilation/packaging into the resolve phase.
-Regression fixture: original failure reproduced; Java/Python resolve, prepare across an included isolated build, prepare cache reuse and documentation dependencies passed.
-Full public repository: modustroResolvePhase passed; a second run reused configuration cache and passed.
-Full public repository: prepare task graph and resolve/prepare/compile/verify/package task graphs passed with --dry-run.
-Full prepare execution reaches generator task actions, but remains blocked by two existing definition-generation errors:
-- :devops:build:modustro:builder:coreintf:generateModustroDefinitionSources: YAML/JSON document-common-metadata_1 definitions generate different Java content for AIcgdDocumentCommonMetadata_1.java.
-- :devops:build:yamldefs:generateModustroDefinitionSources: Defs Codegen raises "Definition version must be present in the file name for ".
-The complete compile/test/integration/package execution is therefore not verified as successful.
-An additional publishing graph check reaches all publishing task nodes, but configuration-cache storage rejects existing publishing actions that capture Project/Gradle script objects.
-No remote artifacts were published. The compiled gradleinit implementation and artifact coordinates are unchanged by this phase-wiring fix.
-No additional source files were removed.
+147 Java tests passed across the three repositories: pub.lib.General 97,
+pub.tool.General 3, pub.gov.Algites 47. No failures, errors or skipped tests.
+4 Python tests passed, including canonical YAML/JSON representation regressions.
+The generator regression compiles generated Java and executes generated Python.
+The original common-metadata schemas remain as fixtures under src/develop/yamldefs
+and src/develop/jsondefs; documentation and canonical origins are retained.
+
+The standalone generator bootstrap test and publishToMavenLocal succeeded.
+The standalone Gradleinit bootstrap passed its 4 TestKit tests, validatePlugins,
+and publishToMavenLocal. These tests cover class identity, descriptor-only project
+discovery, isolated metadata resolution, and local-copy publishing with payload
+renaming and configuration-cache reuse. No remote artifacts were published.
+
+Resolve, prepare, compile, verify and package phases were executed successfully
+locally across the repositories. Publishing task graph dry-run and configuration
+cache reuse succeeded. Java dependency preflight excludes local project artifacts
+so the resolve phase does not implicitly compile or package project dependencies.
+A final repeated Python preflight was blocked by Cloudsmith HTTP 403; final
+verification uses locally built wheels instead of that external Python index.
+This is local verification, not a successful run of remote GitHub Actions.
+
+Activation order: bootstrap/publish the updated Defs Codegen first; then bootstrap/
+publish the updated Gradleinit artifact; then use the updated governance scripts
+and repository Settings. Instructions and coordinates are in the respective READMEs.

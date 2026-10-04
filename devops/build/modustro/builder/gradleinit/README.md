@@ -83,3 +83,12 @@ TestNG/Gradle TestKit integration tests exercise the actual top-level buildscrip
 bootstrap, Settings/Project/applied-Project class identity, endpoint inheritance,
 project discovery, metadata-only helper initialization and isolated-build inheritance with domain-local Gradle paths. Gradle plugin validation
 checks the compiled adapter. Core classes are not shaded or copied into the plugin.
+
+
+Native Java/Python, documentation and schema publication tasks now pass only
+serializable payload paths, coordinates, publishing plans and credential-profile
+metadata to compiled task classes. A shared invocation-scoped BuildService owns
+the Core scheduler and resolves credentials at execution, keeping secrets and
+live Project/script objects out of configuration cache. It preserves required
+completion barriers and awaits best-effort attempts before teardown. A TestKit
+regression publishes a local payload on two invocations with cache reuse.

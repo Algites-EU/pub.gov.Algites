@@ -7,6 +7,10 @@
  * scheduler and the PublishingAdapter selected by each effective PublishingEndpoint.
  */
 
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishingService
+import org.gradle.api.provider.Provider
+import groovy.json.JsonOutput
 import eu.algites.pltf.modustro.builder.publication.AIcGlobalPublicationPathValidator
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayload
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayloadFile
@@ -275,83 +279,45 @@ if (tasks.findByName("prepareModustroSchemaPublishing") == null) {
 
 
 if (tasks.findByName("publishModustroSchemaSite") == null) {
-    tasks.register("publishModustroSchemaSite") {
+    val locArtifactPlans = locSchemaArtifactDirectories.filter { it["structureKind"]?.toString() == "artifact" }.map {
+        locResolveSchemaPublishingPlan(it, "schema_site", locSchemaPublishingStability, locSchemaPublicationDestinationIds) to it
+    }
+    val locEndpointSets = locArtifactPlans.map { (locPlan, _) ->
+        @Suppress("UNCHECKED_CAST")
+        (locPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty().mapNotNull { it["id"]?.toString() }.toSet()
+    }.distinct()
+    if (locSchemaHasPublishingEndpoints && locEndpointSets.size > 1) {
+        throw GradleException("Global schema site resolves inconsistent PublishingEndpoint sets across artifacts.")
+    }
+    val locCredentialProfiles = linkedMapOf<String, Any?>()
+    locArtifactPlans.forEach { (_, locArtifact) ->
+        @Suppress("UNCHECKED_CAST")
+        val locProfiles = locArtifact["credentialProfiles"] as? Map<String, Any?> ?: emptyMap()
+        locProfiles.forEach { (locId, locProfile) ->
+            val locPrevious = locCredentialProfiles.putIfAbsent(locId, locProfile)
+            if (locPrevious != null && locPrevious != locProfile) {
+                throw GradleException("Credential profile '$locId' resolves inconsistently across schema-site artifacts.")
+            }
+        }
+    }
+    @Suppress("UNCHECKED_CAST")
+    val locPublishingService = rootProject.extra["modustroPublishingService"] as Provider<AIcModustroPublishingService>
+    val locFiles = fileTree(locSchemaSiteRoot) { exclude(".git/**", ".modustro-publishing/**") }
+    tasks.register<AIcModustroPublishFilesTask>("publishModustroSchemaSite") {
         group = "publishing"
         description = "Publishes the staged global schema site through the common publishing scheduler."
         if (locSchemaHasPublishingEndpoints) {
             dependsOn("prepareModustroSchemaPublishing")
+            payloadFiles.from(locFiles)
         }
-        onlyIf { locSchemaHasPublishingEndpoints }
-        doLast {
-            val locArtifactPlans = locSchemaArtifactDirectories
-                .filter { locArtifact -> locArtifact["structureKind"]?.toString() == "artifact" }
-                .map { locArtifact ->
-                    locResolveSchemaPublishingPlan(
-                        locArtifact,
-                        "schema_site",
-                        locSchemaPublishingStability,
-                        locSchemaPublicationDestinationIds
-                    ) to locArtifact
-                }
-            if (locArtifactPlans.isEmpty()) {
-                return@doLast
-            }
-            val locEndpointSets = locArtifactPlans.map { (locPlan, _) ->
-                @Suppress("UNCHECKED_CAST")
-                ((locPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty())
-                    .mapNotNull { it["id"]?.toString() }
-                    .toSet()
-            }.distinct()
-            if (locEndpointSets.size > 1) {
-                throw GradleException("Global schema site resolves inconsistent PublishingEndpoint sets across artifacts.")
-            }
-            val locPlan = locArtifactPlans.first().first
-            @Suppress("UNCHECKED_CAST")
-            val locConfigurationFactory = rootProject.extra["modustroPublishingConfigurationFromPlan"] as
-                (Map<String, Any?>) -> AIcPublishingStabilityConfiguration
-            @Suppress("UNCHECKED_CAST")
-            val locSchedulePublishing = rootProject.extra["modustroSchedulePublishingPayload"] as
-                (AIcPublishingPayload, AIcPublishingStabilityConfiguration, Any?) -> Unit
-            val locCredentialProfiles = linkedMapOf<String, Any?>()
-            locArtifactPlans.forEach { (_, locArtifact) ->
-                @Suppress("UNCHECKED_CAST")
-                val locProfiles = locArtifact["credentialProfiles"] as? Map<String, Any?> ?: emptyMap()
-                locProfiles.forEach { (locId, locProfile) ->
-                    val locPrevious = locCredentialProfiles.putIfAbsent(locId, locProfile)
-                    if (locPrevious != null && locPrevious != locProfile) {
-                        throw GradleException("Credential profile '$locId' resolves inconsistently across schema-site artifacts.")
-                    }
-                }
-            }
-            val locRoot = locSchemaSiteRoot.asFile.canonicalFile
-            val locFiles = locRoot.walkTopDown()
-                .filter(File::isFile)
-                .filterNot { locFile -> locFile.relativeTo(locRoot).invariantSeparatorsPath.startsWith(".modustro-publishing/") }
-                .sortedBy { locFile -> locFile.relativeTo(locRoot).invariantSeparatorsPath }
-                .map { locFile ->
-                    AIcPublishingPayloadFile(
-                        locFile.toPath(),
-                        locFile.relativeTo(locRoot).invariantSeparatorsPath
-                    )
-                }
-                .toList()
-            val locStability = if (locSchemaPublishingStability == "release") {
-                AInPublishingStability.RELEASE
-            } else {
-                AInPublishingStability.SNAPSHOT
-            }
-            locSchedulePublishing(
-                AIcPublishingPayload(
-                    AInPublishingOutputKind.SCHEMA_SITE,
-                    locStability,
-                    rootProject.name,
-                    locSchemaPublicationState,
-                    locFiles,
-                    emptyMap()
-                ),
-                locConfigurationFactory(locPlan),
-                locCredentialProfiles
-            )
-        }
+        publishingPlanJson.set(JsonOutput.toJson(locArtifactPlans.firstOrNull()?.first ?: mapOf("publishingEnabled" to false)))
+        credentialProfilesJson.set(JsonOutput.toJson(locCredentialProfiles))
+        outputKind.set("SCHEMA_SITE")
+        stability.set(locSchemaPublishingStability)
+        artifactIdentity.set(rootProject.name)
+        publicationVersion.set(locSchemaPublicationState)
+        payloadRoot.set(locSchemaSiteRoot)
+        publishingService.set(locPublishingService)
+        usesService(locPublishingService)
     }
 }

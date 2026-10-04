@@ -43,3 +43,16 @@ initialization scripts. Root Settings bootstrap a single artifact and activate i
 Settings plugin. Public defaults are packaged in the artifact; Builder Core keeps
 endpoint semantics and remains Gradle-independent. See [gradleinit](gradleinit/README.md)
 for the first-publication bootstrap and metadata-only helper mode.
+
+
+Compatible YAML/JSON definitions targeting one native type are merged by their
+canonical contract; format-specific IDs and descriptions do not cause a source
+collision, and documentation from every representation is preserved. XML
+contracts use an `xmldefs` subnamespace because their element names and document
+structure are independent of the YAML/JSON wire model. This also avoids silently
+substituting one representation for an incompatible XML contract.
+
+The conventions now consume `AIcCanonicalDefinitionMerger` from the Defs Codegen
+CoreImpl artifact. Bootstrap/publish the updated `pub.tool.General` generator
+artifacts before activating these scripts in remote CI. Local verification uses
+Maven Local explicitly; credentials are resolved only at task execution.

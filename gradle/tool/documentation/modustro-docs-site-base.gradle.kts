@@ -8,6 +8,10 @@
  * index. Technology-specific scripts should apply this script automatically.
  */
 
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishingService
+import org.gradle.api.provider.Provider
+import groovy.json.JsonOutput
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayload
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayloadFile
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingStabilityConfiguration
@@ -1639,63 +1643,28 @@ if (tasks.findByName("generateModustroDocsSite") == null) {
 
 
 if (tasks.findByName("publishModustroDocsSite") == null) {
-    tasks.register("publishModustroDocsSite") {
+    @Suppress("UNCHECKED_CAST")
+    val locPublishingService = rootProject.extra["modustroPublishingService"] as Provider<AIcModustroPublishingService>
+    val locPublishingBranch = providers.gradleProperty("modustro.docs.publishingBranch").orNull?.trim()?.takeIf(String::isNotBlank) ?: "documentation"
+    val locFiles = fileTree(locDocsSiteRoot) { exclude(".git/**", ".modustro-publishing/**") }
+    tasks.register<AIcModustroPublishFilesTask>("publishModustroDocsSite") {
         group = "publishing"
         description = "Publishes the generated Modustro documentation site through the common publishing scheduler."
         if (locDocsHasPublishingEndpoints) {
             dependsOn("generateModustroDocsSite")
+            payloadFiles.from(locFiles)
         }
-        onlyIf { locDocsHasPublishingEndpoints }
-        doLast {
-            @Suppress("UNCHECKED_CAST")
-            val locConfigurationFactory = rootProject.extra["modustroPublishingConfigurationFromPlan"] as
-                (Map<String, Any?>) -> AIcPublishingStabilityConfiguration
-            @Suppress("UNCHECKED_CAST")
-            val locSchedulePublishing = rootProject.extra["modustroSchedulePublishingPayload"] as
-                (AIcPublishingPayload, AIcPublishingStabilityConfiguration, Any?) -> Unit
-            val locConfiguration = locConfigurationFactory(locDocsPublishingPlan)
-            val locStability = if (locDocsPublicationStability == "release") {
-                AInPublishingStability.RELEASE
-            } else {
-                AInPublishingStability.SNAPSHOT
-            }
-            val locRoot = locDocsSiteRoot.asFile.canonicalFile
-            val locFiles = if (locRoot.isDirectory) {
-                locRoot.walkTopDown()
-                    .filter(File::isFile)
-                    .filterNot { locFile ->
-                        val locRelative = locFile.relativeTo(locRoot).invariantSeparatorsPath
-                        locRelative.startsWith(".git/") || locRelative.startsWith(".modustro-publishing/")
-                    }
-                    .sortedBy { locFile -> locFile.relativeTo(locRoot).invariantSeparatorsPath }
-                    .map { locFile ->
-                        AIcPublishingPayloadFile(
-                            locFile.toPath(),
-                            locFile.relativeTo(locRoot).invariantSeparatorsPath
-                        )
-                    }
-                    .toList()
-            } else {
-                emptyList()
-            }
-            val locPublishingBranch = (findProperty("modustro.docs.publishingBranch") as String?)
-                ?.trim()
-                ?.takeIf(String::isNotBlank)
-                ?: "documentation"
-            val locPayload = AIcPublishingPayload(
-                AInPublishingOutputKind.MODUSTRO_DOCS_SITE,
-                locStability,
-                locAlgitesDocsRepositoryId,
-                locAlgitesDocsEffectivePublicationId,
-                locFiles,
-                mapOf(
-                    "workingTree" to locRoot.path,
-                    "branch" to locPublishingBranch,
-                    "commitMessage" to "Publish documentation for $locAlgitesDocsEffectivePublicationKind/$locAlgitesDocsEffectivePublicationId"
-                )
-            )
-            locSchedulePublishing(locPayload, locConfiguration, locDocsRepositoryMetadata["credentialProfiles"])
-        }
+        publishingPlanJson.set(JsonOutput.toJson(locDocsPublishingPlan))
+        credentialProfilesJson.set(JsonOutput.toJson(locDocsRepositoryMetadata["credentialProfiles"] ?: emptyMap<String, Any>()))
+        outputKind.set("MODUSTRO_DOCS_SITE")
+        stability.set(locDocsPublicationStability)
+        artifactIdentity.set(locAlgitesDocsRepositoryId)
+        publicationVersion.set(locAlgitesDocsEffectivePublicationId)
+        payloadRoot.set(locDocsSiteRoot)
+        coordinates.set(mapOf("workingTree" to locDocsSiteRoot.asFile.path, "branch" to locPublishingBranch,
+            "commitMessage" to "Publish documentation for $locAlgitesDocsEffectivePublicationKind/$locAlgitesDocsEffectivePublicationId"))
+        publishingService.set(locPublishingService)
+        usesService(locPublishingService)
     }
 }
 

@@ -62,7 +62,8 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
          * JSON Schema keywords retain their external spelling. Keys below a
          * "properties" object are Algites wire names, except for the explicit
          * symbolic map dimensions listed here. String enum values use the
-         * lower_snake_case symbolic-value convention.
+         * lower_snake_case symbolic-value convention unless a schema explicitly
+         * declares the upper_snake_case convention used by Java policy wire enums.
          */
         val locUpperCamelPattern = Regex("^[A-Z][A-Za-z0-9]*$")
         val locLowerSnakePattern = Regex("^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$")
@@ -167,11 +168,17 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
 
                                 val locEnum = aValue["enum"]
                                 if (locEnum is List<*>) {
+                                    val locEnumConvention = aValue["x-algites-enum-value-convention"]?.toString() ?: "lower_snake_case"
+                                    val locEnumPattern = when (locEnumConvention) {
+                                        "lower_snake_case" -> locLowerSnakePattern
+                                        "upper_snake_case" -> Regex("^[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)*$")
+                                        else -> throw GradleException("Unsupported enum value convention '$locEnumConvention' in '${locFile.path}' at $aPath.")
+                                    }
                                     locEnum.filterIsInstance<String>().forEach { locEnumValue ->
-                                        if (!locLowerSnakePattern.matches(locEnumValue)) {
+                                        if (!locEnumPattern.matches(locEnumValue)) {
                                             locProblems.add(
                                                 "${locRepositoryDirectory.toPath().relativize(locFile.toPath()).toString().replace(File.separatorChar, '/')}: " +
-                                                    "enum value '$locEnumValue' at $aPath.enum must use lower_snake_case."
+                                                    "enum value '$locEnumValue' at $aPath.enum must use $locEnumConvention."
                                             )
                                         }
                                     }

@@ -30,7 +30,7 @@ public final class AItcBuiltinResourceKindDefinitionsTest {
         locValidator.validate(
             new AIcResourceEndpointDefinition(
                 "java", "native_binary_output", "public", AInResourceEndpointAction.UPLOAD,
-                "algites-java-native-build-output-public-snapshot-upload",
+                "algites-java-native-binary-output-public-snapshot-upload",
                 new URI("https://example.invalid/maven/"), null, true, AInResourceStability.SNAPSHOT, null
             )
         );

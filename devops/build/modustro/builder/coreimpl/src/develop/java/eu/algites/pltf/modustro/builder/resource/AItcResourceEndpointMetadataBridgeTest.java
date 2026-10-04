@@ -25,7 +25,7 @@ public final class AItcResourceEndpointMetadataBridgeTest {
     @Test
     public void AIcResolvesNormalizedMetadataMap() {
         Map<String, Object> locItem = Map.of(
-            "id", "algites-java-native-build-output-public-release-download",
+            "id", "algites-java-native-binary-output-public-release-download",
             "url", "https://example.invalid/releases/",
             "enabled", true,
             "stability", "release"

@@ -11,7 +11,8 @@
         "USE_ISOLATED_BUILD_ON_NESTED_SETTINGS"
       ],
       "default": "IGNORE_NESTED_SETTINGS",
-      "description": "Controls whether nested Gradle settings files are ignored as build boundaries or create isolated Gradle build domains."
+      "description": "Controls whether nested Gradle settings files are ignored as build boundaries or create isolated Gradle build domains.",
+      "x-algites-enum-value-convention": "upper_snake_case"
     },
     "PublishingFailurePolicy": {
       "type": "string",
@@ -20,7 +21,8 @@
         "IGNORE_PUBLISHING_FAILURE"
       ],
       "default": "FAIL_BUILD_ON_PUBLISHING_FAILURE",
-      "description": "Controls whether final failure of this endpoint fails the required build path."
+      "description": "Controls whether final failure of this endpoint fails the required build path.",
+      "x-algites-enum-value-convention": "upper_snake_case"
     },
     "PublishingEndpoint": {
       "type": "object",

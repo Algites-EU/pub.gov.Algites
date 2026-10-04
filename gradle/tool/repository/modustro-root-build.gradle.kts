@@ -6,6 +6,10 @@
  * modustro-artifact.yml files.
  */
 
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroAwaitPublishingTask
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishingService
+import org.gradle.api.provider.Provider
 import org.gradle.api.Action
 import org.gradle.api.Project
 import org.gradle.api.artifacts.Configuration
@@ -32,26 +36,12 @@ import eu.algites.pltf.modustro.builder.model.resource.AIcResourceEndpointDefini
 import eu.algites.pltf.modustro.builder.model.resource.AInResourceEndpointAction
 import eu.algites.pltf.modustro.builder.model.resource.AInResourceStability
 import eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet
-import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingEndpoint
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayload
-import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayloadFile
-import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingStabilityConfiguration
-import eu.algites.pltf.modustro.builder.model.publication.AInPublishingFailurePolicy
-import eu.algites.pltf.modustro.builder.model.publication.AInPublishingOutputKind
-import eu.algites.pltf.modustro.builder.model.publication.AInPublishingStability
-import eu.algites.pltf.modustro.builder.publication.AIcPublishingScheduler
-import eu.algites.pltf.modustro.builder.publication.AIcPublishingScheduleHandle
-import eu.algites.pltf.modustro.builder.publication.AIiPublishingProgressReporter
-import eu.algites.pltf.modustro.builder.publication.adapters.AIcGitBranchPublishingAdapter
-import eu.algites.pltf.modustro.builder.publication.adapters.AIcHttpDirectoryPublishingAdapter
-import eu.algites.pltf.modustro.builder.publication.adapters.AIcLocalCopyPublishingAdapter
-import eu.algites.pltf.modustro.builder.publication.adapters.AIcMavenLocalRepositoryPublishingAdapter
-import eu.algites.pltf.modustro.builder.publication.adapters.AIcMavenRepositoryPublishingAdapter
-import eu.algites.pltf.modustro.builder.publication.adapters.AIcPythonRepositoryPublishingAdapter
 import eu.algites.pltf.modustro.builder.output.AIcBuiltinBuildOutputProducers
 import eu.algites.pltf.modustro.builder.resource.AIcResourceEndpointMetadataBridge
 import eu.algites.lib.naming.convention.AIcAlgitesNamingProfiles
 import eu.algites.tool.codegen.defs.AIcDefaultDefsCodegenService
+import eu.algites.tool.codegen.defs.AIcCanonicalDefinitionMerger
 import eu.algites.tool.codegen.defs.AIcdCanonicalDefinition
 import eu.algites.tool.codegen.defs.AIcdCodeGenerationRequest
 import eu.algites.tool.codegen.defs.AIcdDefinitionLoadRequest
@@ -261,6 +251,7 @@ abstract class AIcGenerateModustroDefinitionSourcesTask : DefaultTask() {
         val locDefinitions = AIcDiscoverDefinitions()
         val locService = AIcDefaultDefsCodegenService()
         val locPending = mutableListOf<AIcdPendingSource>()
+        val locRequests = linkedMapOf<Pair<String, String>, MutableList<AIcdCodeGenerationRequest>>()
 
         locDefinitions.forEach { locEntry ->
             val locInput = File(locArtifactDirectory, locEntry.source).canonicalFile
@@ -284,24 +275,24 @@ abstract class AIcGenerateModustroDefinitionSourcesTask : DefaultTask() {
                     locLoadedDefinition.properties(),
                     locLoadedDefinition.enumValues()
                 )
-                val locGenerated = locService.generate(
-                    AIcdCodeGenerationRequest(locDefinition, locTarget, locEntry.packageName, locProfile)
-                )
+                val locRequest = AIcdCodeGenerationRequest(locDefinition, locTarget, if (locEntry.sourceKind == "xmldefs") locEntry.packageName + ".xmldefs" else locEntry.packageName, locProfile)
+                val locGenerated = locService.generate(locRequest)
                 val locRelativePath = locGenerated.relativePath().replace('\\', '/')
-                val locOrigin = "${locEntry.sourceKind}:${locEntry.source}"
-                val locCollision = locPending.firstOrNull { locPendingSource ->
-                    locPendingSource.target == locTargetText && locPendingSource.relativePath == locRelativePath
-                }
-                if (locCollision == null) {
-                    locPending.add(AIcdPendingSource(locTargetText, locRelativePath, locGenerated.source(), locOrigin))
-                } else if (locCollision.source != locGenerated.source()) {
-                    throw GradleException(
-                        "Canonical definitions '${locCollision.origin}' and '$locOrigin' generate different " +
-                            "$locTargetText source content for '$locRelativePath'. Representation-specific definitions " +
-                            "that share a generated type must remain code-generation compatible."
-                    )
-                }
+                locRequests.getOrPut(locTargetText to locRelativePath) { mutableListOf() }.add(locRequest)
             }
+        }
+
+        locRequests.forEach { (locKey, locRepresentations) ->
+            val locPrimary = locRepresentations.first()
+            val locDefinition = try {
+                AIcCanonicalDefinitionMerger.AIcMerge(locRepresentations.map { it.definition() })
+            } catch (locFailure: IllegalArgumentException) {
+                throw GradleException("Incompatible canonical definitions for '${locKey.second}'.", locFailure)
+            }
+            val locGenerated = locService.generate(AIcdCodeGenerationRequest(
+                locDefinition, locPrimary.target(), locPrimary.packageName(), locPrimary.namingProfile()
+            ))
+            locPending.add(AIcdPendingSource(locKey.first, locKey.second, locGenerated.source(), locDefinition.sourceResource()))
         }
 
         listOf("java", "python").forEach { locTarget ->
@@ -2009,10 +2000,17 @@ allprojects {
                     listOf("compileClasspath", "runtimeClasspath", "testCompileClasspath", "testRuntimeClasspath")
                         .mapNotNull { locName -> configurations.findByName(locName) }
                         .filter { locConfiguration -> locConfiguration.isCanBeResolved }
-                        // Resolve coordinates and downloads here, but retain only file
-                        // paths. Configuration build dependencies would run local
-                        // compilation/packaging before the prepare phase.
-                        .map { locConfiguration -> locConfiguration.files }
+                        /* Resolve the complete graph and external downloads without consuming local project outputs.
+                         * Local outputs belong to compile/package task dependencies; preflight must not pull those
+                         * tasks into the resolve phase or declare their unbuilt class directories as classpath inputs.
+                         */
+                        .map { locConfiguration ->
+                            locConfiguration.incoming.artifactView {
+                                componentFilter { locComponent ->
+                                    locComponent !is org.gradle.api.artifacts.component.ProjectComponentIdentifier
+                                }
+                            }.files.files
+                        }
                 )
             }
         }
@@ -2334,110 +2332,8 @@ if (!rootProject.extra.has("modustroEffectivePublishingPlan")) {
     apply(from = locModustroPublishingOverridesScript)
 }
 
-val modustroPublishingScheduler = AIcPublishingScheduler(
-    listOf(
-        AIcGitBranchPublishingAdapter(),
-        AIcHttpDirectoryPublishingAdapter(),
-        AIcLocalCopyPublishingAdapter(),
-        AIcMavenLocalRepositoryPublishingAdapter(),
-        AIcMavenRepositoryPublishingAdapter(),
-        AIcPythonRepositoryPublishingAdapter()
-    )
-)
-val modustroPublishingScheduleHandles = Collections.synchronizedList(mutableListOf<AIcPublishingScheduleHandle>())
-
-fun AIcModustroPublishingConfigurationFromPlan(aPlan: Map<String, Any?>): AIcPublishingStabilityConfiguration {
-    val locEnabled = aPlan["publishingEnabled"] as? Boolean ?: false
-    @Suppress("UNCHECKED_CAST")
-    val locEndpointMaps = (aPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty()
-    val locEndpoints = locEndpointMaps.map { locEndpoint ->
-        val locUrl = locEndpoint["publishingUrl"]?.toString()?.takeIf { it.isNotBlank() }?.let(URI::create)
-        AIcPublishingEndpoint(
-            locEndpoint["id"]?.toString() ?: throw GradleException("Publishing endpoint is missing id."),
-            locEndpoint["enabled"] as? Boolean ?: true,
-            locUrl,
-            locEndpoint["publishingAdapter"]?.toString(),
-            locEndpoint["publishingCredentialProfile"]?.toString()?.takeIf { it.isNotBlank() },
-            (locEndpoint["publishingOrder"] as? Number)?.toInt() ?: 0,
-            AInPublishingFailurePolicy.valueOf(
-                locEndpoint["publishingFailurePolicy"]?.toString() ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"
-            ),
-            (locEndpoint["publishingRetryCount"] as? Number)?.toInt() ?: 0,
-            (locEndpoint["publishingRetryDelayMillis"] as? Number)?.toLong() ?: 1000L,
-            (locEndpoint["publishingAttemptTimeoutMillis"] as? Number)?.toLong(),
-            locEndpoint["showPublishingProgressIfPossible"] as? Boolean ?: true
-        )
-    }
-    return AIcPublishingStabilityConfiguration(locEnabled, locEndpoints)
-}
-
-fun AIcModustroPublishingCredentialsForProfiles(
-    aEndpoint: AIcPublishingEndpoint,
-    aCredentialProfiles: Any?
-): Map<String, String> {
-    val locProfileId = aEndpoint.publishingCredentialProfile() ?: return emptyMap()
-    val locProfiles = AIcModustroCredentialProfiles(aCredentialProfiles)
-    val locProfile = locProfiles[locProfileId]
-        ?: throw GradleException("Publishing endpoint '${aEndpoint.id()}' references undefined credential profile '$locProfileId'.")
-    return when (locProfile.type) {
-        "basic" -> {
-            val locCredential = AIcModustroRequireBasicCredential(locProfile)
-            mapOf("username" to locCredential.first, "password" to locCredential.second)
-        }
-        "bearer" -> mapOf(
-            "bearerToken" to (AIcModustroCredentialValue(locProfile, "Token")
-                ?: throw GradleException("Credential profile '$locProfileId' does not resolve Bearer.Token."))
-        )
-        "api_key" -> mapOf(
-            "apiKey" to (AIcModustroCredentialValue(locProfile, "ApiKey")
-                ?: throw GradleException("Credential profile '$locProfileId' does not resolve ApiKey.ApiKey.")),
-            "apiKeyHeader" to (locProfile.configuration["headerName"]
-                ?: throw GradleException("Credential profile '$locProfileId' requires configuration.headerName."))
-        )
-        else -> throw GradleException(
-            "Publishing endpoint '${aEndpoint.id()}' uses unsupported credential profile type '${locProfile.type}'."
-        )
-    }
-}
-
-fun AIcModustroPublishingProgressReporterForEndpoint(aEndpoint: AIcPublishingEndpoint): AIiPublishingProgressReporter =
-    object : AIiPublishingProgressReporter {
-        override fun started(aMessage: String) { logger.lifecycle("[${aEndpoint.id()}] $aMessage") }
-        override fun progress(aCompleted: Long, aTotal: Long, aUnit: String, aMessage: String) {
-            logger.lifecycle("[${aEndpoint.id()}] $aCompleted/$aTotal $aUnit - $aMessage")
-        }
-        override fun indeterminate(aMessage: String) { logger.lifecycle("[${aEndpoint.id()}] $aMessage") }
-        override fun completed(aMessage: String) { logger.lifecycle("[${aEndpoint.id()}] $aMessage") }
-    }
-
-fun AIcModustroSchedulePublishingPayload(
-    aPayload: AIcPublishingPayload,
-    aConfiguration: AIcPublishingStabilityConfiguration,
-    aCredentialProfiles: Any?
-) {
-    val locHandle = modustroPublishingScheduler.schedule(
-        aPayload,
-        aConfiguration,
-        { locEndpoint -> AIcModustroPublishingCredentialsForProfiles(locEndpoint, aCredentialProfiles) },
-        { locEndpoint -> AIcModustroPublishingProgressReporterForEndpoint(locEndpoint) }
-    )
-    modustroPublishingScheduleHandles.add(locHandle)
-    try {
-        locHandle.requiredCompletion().toCompletableFuture().get()
-    } catch (locFailure: Exception) {
-        throw GradleException(
-            "Required publishing failed for '${aPayload.artifactIdentity()}' ${aPayload.outputKind()}.",
-            locFailure
-        )
-    }
-}
-
-rootProject.extra["modustroPublishingConfigurationFromPlan"] =
-    { aPlan: Map<String, Any?> -> AIcModustroPublishingConfigurationFromPlan(aPlan) }
-rootProject.extra["modustroSchedulePublishingPayload"] =
-    { aPayload: AIcPublishingPayload, aConfiguration: AIcPublishingStabilityConfiguration, aCredentialProfiles: Any? ->
-        AIcModustroSchedulePublishingPayload(aPayload, aConfiguration, aCredentialProfiles)
-    }
+@Suppress("UNCHECKED_CAST")
+val modustroPublishingService = rootProject.extra["modustroPublishingService"] as Provider<AIcModustroPublishingService>
 
 val locModustroSchemaSiteScript = rootProject.file("gradle/tool/publication/modustro-schema-site.gradle.kts")
 if (locModustroSchemaSiteScript.isFile) {
@@ -2454,31 +2350,11 @@ listOf("publishModustroDocsSite", "publishModustroSchemaSite").forEach { locTask
     }
 }
 
-val modustroAwaitBackgroundPublishing = tasks.register("modustroAwaitBackgroundPublishing") {
+val modustroAwaitBackgroundPublishing = tasks.register<AIcModustroAwaitPublishingTask>("modustroAwaitBackgroundPublishing") {
     group = "publishing"
     description = "Waits for best-effort publishing attempts that may outlive required publishing barriers."
-    doLast {
-        val locHandles = synchronized(modustroPublishingScheduleHandles) {
-            modustroPublishingScheduleHandles.toList()
-        }
-        val locIgnoredFailures = mutableListOf<String>()
-        locHandles.forEach { locHandle ->
-            locHandle.endpointResults().forEach { (locEndpointId, locResultStage) ->
-                val locResult = try {
-                    locResultStage.toCompletableFuture().get()
-                } catch (locFailure: Exception) {
-                    throw GradleException("Publishing endpoint '$locEndpointId' did not complete cleanly.", locFailure)
-                }
-                if (!locResult.success() && locResult.ignoredFailure()) {
-                    locIgnoredFailures.add("$locEndpointId: ${locResult.failure()?.message ?: "unknown failure"}")
-                }
-            }
-        }
-        locIgnoredFailures.sorted().forEach { locFailure ->
-            logger.warn("Ignored Modustro publishing failure: $locFailure")
-        }
-        modustroPublishingScheduler.close()
-    }
+    publishingService.set(modustroPublishingService)
+    usesService(modustroPublishingService)
 }
 modustroPublish.configure { finalizedBy(modustroAwaitBackgroundPublishing) }
 
@@ -2601,6 +2477,11 @@ subprojects {
             group = "modustro"
             description = "Discovers canonical product definitions and generates native source types for the artifact TechnologyKinds."
             artifactDirectory.set(project.layout.projectDirectory)
+            /* Referenced canonical schemas may be owned by another artifact in the same source repository. */
+            sourceFiles.from(rootProject.fileTree(locModustroSourceRepositoryRootForPublishingOverrides) {
+                include("**/src/product/yamldefs/**/*.yamldef.schema.json", "**/src/product/jsondefs/**/*.jsondef.schema.json")
+                exclude("**/.gradle/**", "**/.git/**", "**/.run/**", "**/build/**")
+            })
             manifestDirectory.set(locCanonicalDefinitionGenerationManifestDirectory)
             javaOutputDirectory.set(project.layout.projectDirectory.dir("src/product/java.gen"))
             pythonOutputDirectory.set(project.layout.projectDirectory.dir("src/product/python.gen"))
@@ -2674,85 +2555,12 @@ subprojects {
     val locEffectiveCredentialProfiles = AIcModustroCredentialProfiles(locAlgitesArtifactDirectory?.get("credentialProfiles"))
 
     @Suppress("UNCHECKED_CAST")
-    fun locModustroPublishingConfiguration(aOutputKind: String): AIcPublishingStabilityConfiguration {
+    fun locModustroPublishingPlanJson(aOutputKind: String): String {
         val locResolver = rootProject.extra["modustroEffectivePublishingPlan"]
             as (Map<String, Any?>, String, String) -> Map<String, Any?>
-        val locMetadata = locAlgitesArtifactDirectory ?: emptyMap()
-        val locPlan = locResolver(locMetadata, aOutputKind, locModustroPublishingStability)
-        val locEnabled = locPlan["publishingEnabled"] as? Boolean ?: false
-        val locEndpoints = (locPlan["publishingEndpoints"] as? List<Map<String, Any?>>).orEmpty().map { locEndpoint ->
-            val locUrl = locEndpoint["publishingUrl"]?.toString()?.takeIf { it.isNotBlank() }?.let(URI::create)
-            AIcPublishingEndpoint(
-                locEndpoint["id"]?.toString() ?: throw GradleException("Publishing endpoint is missing id."),
-                locEndpoint["enabled"] as? Boolean ?: true,
-                locUrl,
-                locEndpoint["publishingAdapter"]?.toString(),
-                locEndpoint["publishingCredentialProfile"]?.toString()?.takeIf { it.isNotBlank() },
-                (locEndpoint["publishingOrder"] as? Number)?.toInt() ?: 0,
-                AInPublishingFailurePolicy.valueOf(
-                    locEndpoint["publishingFailurePolicy"]?.toString() ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"
-                ),
-                (locEndpoint["publishingRetryCount"] as? Number)?.toInt() ?: 0,
-                (locEndpoint["publishingRetryDelayMillis"] as? Number)?.toLong() ?: 1000L,
-                (locEndpoint["publishingAttemptTimeoutMillis"] as? Number)?.toLong(),
-                locEndpoint["showPublishingProgressIfPossible"] as? Boolean ?: true
-            )
-        }
-        return AIcPublishingStabilityConfiguration(locEnabled, locEndpoints)
+        return JsonOutput.toJson(locResolver(locAlgitesArtifactDirectory ?: emptyMap(), aOutputKind, locModustroPublishingStability))
     }
-
-    fun locModustroPublishingCredentials(aEndpoint: AIcPublishingEndpoint): Map<String, String> {
-        val locProfileId = aEndpoint.publishingCredentialProfile() ?: return emptyMap()
-        val locProfile = locEffectiveCredentialProfiles[locProfileId]
-            ?: throw GradleException("Publishing endpoint '${aEndpoint.id()}' references undefined credential profile '$locProfileId'.")
-        return when (locProfile.type) {
-            "basic" -> {
-                val locCredential = AIcModustroRequireBasicCredential(locProfile)
-                mapOf("username" to locCredential.first, "password" to locCredential.second)
-            }
-            "bearer" -> mapOf(
-                "bearerToken" to (AIcModustroCredentialValue(locProfile, "Token")
-                    ?: throw GradleException("Credential profile '$locProfileId' does not resolve Bearer.Token."))
-            )
-            "api_key" -> mapOf(
-                "apiKey" to (AIcModustroCredentialValue(locProfile, "ApiKey")
-                    ?: throw GradleException("Credential profile '$locProfileId' does not resolve ApiKey.ApiKey.")),
-                "apiKeyHeader" to (locProfile.configuration["headerName"]
-                    ?: throw GradleException("Credential profile '$locProfileId' requires configuration.headerName."))
-            )
-            else -> throw GradleException(
-                "Publishing endpoint '${aEndpoint.id()}' uses unsupported credential profile type '${locProfile.type}'."
-            )
-        }
-    }
-
-    fun locModustroPublishingProgressReporter(aEndpoint: AIcPublishingEndpoint): AIiPublishingProgressReporter =
-        object : AIiPublishingProgressReporter {
-            override fun started(aMessage: String) { logger.lifecycle("[${aEndpoint.id()}] $aMessage") }
-            override fun progress(aCompleted: Long, aTotal: Long, aUnit: String, aMessage: String) {
-                logger.lifecycle("[${aEndpoint.id()}] $aCompleted/$aTotal $aUnit - $aMessage")
-            }
-            override fun indeterminate(aMessage: String) { logger.lifecycle("[${aEndpoint.id()}] $aMessage") }
-            override fun completed(aMessage: String) { logger.lifecycle("[${aEndpoint.id()}] $aMessage") }
-        }
-
-    fun locScheduleModustroPublishing(
-        aPayload: AIcPublishingPayload,
-        aConfiguration: AIcPublishingStabilityConfiguration
-    ) {
-        val locHandle = modustroPublishingScheduler.schedule(
-            aPayload,
-            aConfiguration,
-            { locEndpoint -> locModustroPublishingCredentials(locEndpoint) },
-            { locEndpoint -> locModustroPublishingProgressReporter(locEndpoint) }
-        )
-        modustroPublishingScheduleHandles.add(locHandle)
-        try {
-            locHandle.requiredCompletion().toCompletableFuture().get()
-        } catch (locFailure: Exception) {
-            throw GradleException("Required publishing failed for '${aPayload.artifactIdentity()}' ${aPayload.outputKind()}.", locFailure)
-        }
-    }
+    val locPublishingCredentialProfilesJson = JsonOutput.toJson(locAlgitesArtifactDirectory?.get("credentialProfiles") ?: emptyMap<String, Any>())
 
     val locAlgitesArtifactDirectoryPath = locAlgitesArtifactDirectory?.get("path")?.toString()?.takeIf { it.isNotBlank() } ?: "."
     val locAlgitesProductLicenses = locAlgitesLicensesForPathAndContentKind(locAlgitesArtifactDirectoryPath, "product")
@@ -2897,98 +2705,40 @@ subprojects {
 
         if ("java" in locEffectiveTechnologyKinds && locAnyNativePublishingEnabled) {
             plugins.withId("maven-publish") {
-                val locPublishingStability = if (locModustroPublishingStability == "snapshot") {
-                    AInPublishingStability.SNAPSHOT
-                } else {
-                    AInPublishingStability.RELEASE
-                }
-                val locArtifactIdentity = listOfNotNull(locAlgitesResolvedProjectGroup, locAlgitesEffectiveArtifactId)
-                    .joinToString(":")
-                val locCoordinates = mapOf(
-                    "groupId" to (locAlgitesResolvedProjectGroup ?: ""),
-                    "artifactId" to locAlgitesEffectiveArtifactId,
-                    "version" to locAlgitesProjectVersion
-                )
-
-                if (AInBuildOutputProductionKind.JAVA_CLASSES_JAR in locJavaProductionKinds) {
-                    val locPublishJavaBinary = tasks.register("publishModustroJavaNativeBinary") {
-                        group = "publishing"
-                        description = "Publishes the Java native binary output through the Modustro publishing scheduler."
-                        dependsOn(modustroPublishingBuildGate)
-                        dependsOn(tasks.named("jar"))
-                        dependsOn(tasks.named("generatePomFileForMavenJavaPublication"))
-                        doLast {
-                            val locJar = tasks.named<Jar>("jar").get().archiveFile.get().asFile
-                            val locPom = layout.buildDirectory.file("publications/mavenJava/pom-default.xml").get().asFile
-                            val locPayload = AIcPublishingPayload(
-                                AInPublishingOutputKind.NATIVE_BINARY_OUTPUT,
-                                locPublishingStability,
-                                locArtifactIdentity,
-                                locAlgitesProjectVersion,
-                                listOf(
-                                    AIcPublishingPayloadFile(locJar.toPath(), locJar.name),
-                                    AIcPublishingPayloadFile(
-                                        locPom.toPath(),
-                                        "$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion.pom"
-                                    )
-                                ),
-                                locCoordinates
-                            )
-                            locScheduleModustroPublishing(
-                                locPayload,
-                                locModustroPublishingConfiguration("native_binary_output")
-                            )
-                        }
+                listOf(
+                    Triple(AInBuildOutputProductionKind.JAVA_CLASSES_JAR, "publishModustroJavaNativeBinary", "jar"),
+                    Triple(AInBuildOutputProductionKind.JAVA_SOURCES_JAR, "publishModustroJavaNativeSources", "sourcesJar"),
+                    Triple(AInBuildOutputProductionKind.JAVA_JAVADOC_JAR, "publishModustroJavaNativeDocumentation", "javadocJar")
+                ).filter { it.first in locJavaProductionKinds }.forEach { (_, locTaskName, locArchiveTaskName) ->
+                    val locOutputKind = when (locArchiveTaskName) {
+                        "jar" -> "native_binary_output"
+                        "sourcesJar" -> "native_source_output"
+                        else -> "native_documentation_output"
                     }
-                    modustroPublish.configure { dependsOn(locPublishJavaBinary) }
-                }
-
-                if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
-                    val locPublishJavaSources = tasks.register("publishModustroJavaNativeSources") {
+                    val locArchive = tasks.named<Jar>(locArchiveTaskName).flatMap { it.archiveFile }
+                    val locPom = layout.buildDirectory.file("publications/mavenJava/pom-default.xml")
+                    val locPlanJson = locModustroPublishingPlanJson(locOutputKind)
+                    val locPublish = tasks.register<AIcModustroPublishFilesTask>(locTaskName) {
                         group = "publishing"
-                        description = "Publishes the Java native source output through the Modustro publishing scheduler."
+                        description = "Publishes the Java native output through the Modustro publishing scheduler."
                         dependsOn(modustroPublishingBuildGate)
-                        dependsOn(tasks.named("sourcesJar"))
-                        doLast {
-                            val locJar = tasks.named<Jar>("sourcesJar").get().archiveFile.get().asFile
-                            locScheduleModustroPublishing(
-                                AIcPublishingPayload(
-                                    AInPublishingOutputKind.NATIVE_SOURCE_OUTPUT,
-                                    locPublishingStability,
-                                    locArtifactIdentity,
-                                    locAlgitesProjectVersion,
-                                    listOf(AIcPublishingPayloadFile(locJar.toPath(), locJar.name)),
-                                    locCoordinates
-                                ),
-                                locModustroPublishingConfiguration("native_source_output")
-                            )
+                        payloadFiles.from(locArchive)
+                        if (locArchiveTaskName == "jar") {
+                            dependsOn("generatePomFileForMavenJavaPublication")
+                            payloadFiles.from(locPom)
+                            publishedFileNames.put("pom-default.xml", "$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion.pom")
                         }
+                        publishingPlanJson.set(locPlanJson)
+                        credentialProfilesJson.set(locPublishingCredentialProfilesJson)
+                        outputKind.set(locOutputKind.uppercase())
+                        stability.set(locModustroPublishingStability)
+                        artifactIdentity.set(listOfNotNull(locAlgitesResolvedProjectGroup, locAlgitesEffectiveArtifactId).joinToString(":"))
+                        publicationVersion.set(locAlgitesProjectVersion)
+                        coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId, "version" to locAlgitesProjectVersion))
+                        publishingService.set(modustroPublishingService)
+                        usesService(modustroPublishingService)
                     }
-                    modustroPublish.configure { dependsOn(locPublishJavaSources) }
-                }
-
-                if (AInBuildOutputProductionKind.JAVA_JAVADOC_JAR in locJavaProductionKinds) {
-                    val locPublishJavaDocumentation = tasks.register("publishModustroJavaNativeDocumentation") {
-                        group = "publishing"
-                        description = "Publishes the Java native documentation output through the Modustro publishing scheduler."
-                        dependsOn(modustroPublishingBuildGate)
-                        dependsOn(tasks.named("javadocJar"))
-                        doLast {
-                            val locJar = tasks.named<Jar>("javadocJar").get().archiveFile.get().asFile
-                            locScheduleModustroPublishing(
-                                AIcPublishingPayload(
-                                    AInPublishingOutputKind.NATIVE_DOCUMENTATION_OUTPUT,
-                                    locPublishingStability,
-                                    locArtifactIdentity,
-                                    locAlgitesProjectVersion,
-                                    listOf(AIcPublishingPayloadFile(locJar.toPath(), locJar.name)),
-                                    locCoordinates
-                                ),
-                                locModustroPublishingConfiguration("native_documentation_output")
-                            )
-                        }
-                    }
-                    modustroPublish.configure { dependsOn(locPublishJavaDocumentation) }
+                    modustroPublish.configure { dependsOn(locPublish) }
                 }
             }
         }
@@ -3327,93 +3077,34 @@ subprojects {
             outputs.dir(locPythonDistDirectory)
         }
 
-        val locPythonPublishingStability = if (locModustroPublishingStability == "snapshot") {
-            AInPublishingStability.SNAPSHOT
-        } else {
-            AInPublishingStability.RELEASE
-        }
-        val locPythonArtifactIdentity = listOfNotNull(locAlgitesResolvedProjectGroup, locAlgitesEffectiveArtifactId)
-            .joinToString(":")
-        val locPythonPublishingCoordinates = mapOf(
-            "groupId" to (locAlgitesResolvedProjectGroup ?: ""),
-            "artifactId" to locAlgitesEffectiveArtifactId,
-            "version" to locPythonProjectVersion,
-            "pythonExecutable" to (modustroGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3")
-        )
-
-        fun locPythonDistributionFiles(aSuffix: String): List<File> =
-            locPythonDistDirectory.asFile.listFiles()
-                ?.filter { locFile -> locFile.isFile && locFile.name.endsWith(aSuffix) }
-                ?.sortedBy(File::getName)
-                .orEmpty()
-
-        if (AInBuildOutputProductionKind.PYTHON_WHEEL in locPythonProductionKinds) {
-            val locPublishPythonWheel = tasks.register("publishModustroPythonNativeBinary") {
+        listOf(
+            Triple(AInBuildOutputProductionKind.PYTHON_WHEEL, "publishModustroPythonNativeBinary", "*.whl"),
+            Triple(AInBuildOutputProductionKind.PYTHON_SDIST, "publishModustroPythonNativeSources", "*.tar.gz")
+        ).filter { it.first in locPythonProductionKinds }.forEach { (_, locTaskName, locPattern) ->
+            val locOutputKind = if (locPattern == "*.whl") "native_binary_output" else "native_source_output"
+            val locPlanJson = locModustroPublishingPlanJson(locOutputKind)
+            val locDistributionFiles = fileTree(locPythonDistDirectory) { include(locPattern) }
+            val locPythonExecutable = modustroGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3"
+            val locPublish = tasks.register<AIcModustroPublishFilesTask>(locTaskName) {
                 group = "publishing"
-                description = "Publishes Python wheel output through the Modustro publishing scheduler."
-                dependsOn(modustroPublishingBuildGate)
-                dependsOn(locBuildPython)
-                doLast {
-                    if (locModustroPublishingStability == "snapshot" && algitesSnapshotInstanceId.isNullOrBlank()) {
-                        throw GradleException(
-                            "Publishing a Python snapshot requires an immutable snapshot instance id. " +
-                                "Set -Palgites.snapshot.instanceId=<UTC timestamp> or ALGITES_SNAPSHOT_INSTANCE_ID."
-                        )
-                    }
-                    val locFiles = locPythonDistributionFiles(".whl")
-                    if (locFiles.isEmpty()) {
-                        throw GradleException("Python build did not produce a wheel for '${project.path}'.")
-                    }
-                    locScheduleModustroPublishing(
-                        AIcPublishingPayload(
-                            AInPublishingOutputKind.NATIVE_BINARY_OUTPUT,
-                            locPythonPublishingStability,
-                            locPythonArtifactIdentity,
-                            locPythonProjectVersion,
-                            locFiles.map { locFile -> AIcPublishingPayloadFile(locFile.toPath(), locFile.name) },
-                            locPythonPublishingCoordinates
-                        ),
-                        locModustroPublishingConfiguration("native_binary_output")
-                    )
-                }
+                description = "Publishes the Python distribution through the Modustro publishing scheduler."
+                dependsOn(modustroPublishingBuildGate, locBuildPython)
+                publishingPlanJson.set(locPlanJson)
+                credentialProfilesJson.set(locPublishingCredentialProfilesJson)
+                outputKind.set(locOutputKind.uppercase())
+                stability.set(locModustroPublishingStability)
+                artifactIdentity.set(listOfNotNull(locAlgitesResolvedProjectGroup, locAlgitesEffectiveArtifactId).joinToString(":"))
+                publicationVersion.set(locPythonProjectVersion)
+                coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId,
+                    "version" to locPythonProjectVersion, "pythonExecutable" to locPythonExecutable))
+                requiresSnapshotInstance.set(true)
+                snapshotInstanceId.set(algitesSnapshotInstanceId ?: "")
+                payloadFiles.from(locDistributionFiles)
+                publishingService.set(modustroPublishingService)
+                usesService(modustroPublishingService)
             }
             if ("python" in locEffectiveTechnologyKinds && locAnyNativePublishingEnabled) {
-                modustroPublish.configure { dependsOn(locPublishPythonWheel) }
-            }
-        }
-
-        if (AInBuildOutputProductionKind.PYTHON_SDIST in locPythonProductionKinds) {
-            val locPublishPythonSdist = tasks.register("publishModustroPythonNativeSources") {
-                group = "publishing"
-                description = "Publishes Python source distribution through the Modustro publishing scheduler."
-                dependsOn(modustroPublishingBuildGate)
-                dependsOn(locBuildPython)
-                doLast {
-                    if (locModustroPublishingStability == "snapshot" && algitesSnapshotInstanceId.isNullOrBlank()) {
-                        throw GradleException(
-                            "Publishing a Python snapshot requires an immutable snapshot instance id. " +
-                                "Set -Palgites.snapshot.instanceId=<UTC timestamp> or ALGITES_SNAPSHOT_INSTANCE_ID."
-                        )
-                    }
-                    val locFiles = locPythonDistributionFiles(".tar.gz")
-                    if (locFiles.isEmpty()) {
-                        throw GradleException("Python build did not produce an sdist for '${project.path}'.")
-                    }
-                    locScheduleModustroPublishing(
-                        AIcPublishingPayload(
-                            AInPublishingOutputKind.NATIVE_SOURCE_OUTPUT,
-                            locPythonPublishingStability,
-                            locPythonArtifactIdentity,
-                            locPythonProjectVersion,
-                            locFiles.map { locFile -> AIcPublishingPayloadFile(locFile.toPath(), locFile.name) },
-                            locPythonPublishingCoordinates
-                        ),
-                        locModustroPublishingConfiguration("native_source_output")
-                    )
-                }
-            }
-            if ("python" in locEffectiveTechnologyKinds && locAnyNativePublishingEnabled) {
-                modustroPublish.configure { dependsOn(locPublishPythonSdist) }
+                modustroPublish.configure { dependsOn(locPublish) }
             }
         }
 

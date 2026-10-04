@@ -61,7 +61,7 @@ internal fun AIcDiscover(aSettings: Settings, aRuntime: AIcModustroGradleRuntime
             val locTechnologyKinds = (locArtifactDirectory["technologyKinds"] as? List<*>)
                 .orEmpty().mapNotNull { it?.toString()?.trim()?.lowercase() }
             locArtifactDirectory["hasGradleBuild"] == true ||
-                (locArtifactDirectory["structureKind"]?.toString() == "artifact" && "python" in locTechnologyKinds)
+                (locArtifactDirectory["structureKind"]?.toString() == "artifact" && locTechnologyKinds.any { it in setOf("java", "python") })
         }
         .forEach { locArtifactDirectory ->
             val locArtifactDirectoryPath = locArtifactDirectory["path"]?.toString() ?: return@forEach

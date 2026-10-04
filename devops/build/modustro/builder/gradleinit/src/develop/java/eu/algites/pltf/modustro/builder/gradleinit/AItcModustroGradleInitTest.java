@@ -60,7 +60,7 @@ public final class AItcModustroGradleInitTest {
                           - Id: algites-test-java-native-binary-output-public-release-download
                             Enabled: true
                 """);
-        Files.writeString(locChild.resolve("build.gradle.kts"), "");
+
         return locDirectory;
     }
 
@@ -143,6 +143,53 @@ public final class AItcModustroGradleInitTest {
         BuildResult locResult = GradleRunner.create().withProjectDir(locFixture.toFile())
                 .withArguments("help", ":child:help", "--offline", "--stacktrace").build();
         Assert.assertTrue(locResult.getOutput().contains("ISOLATED_DOMAIN_OK"));
+    }
+
+    /** Publishes through a runtime BuildService twice and proves that configuration cache is reusable. */
+    @Test
+    public void AIcPublishingReusesConfigurationCache() throws IOException {
+        Path locFixture = AIcFixture();
+        Files.writeString(locFixture.resolve("settings.gradle.kts"), AIcBootstrap());
+        Files.writeString(locFixture.resolve("gradle.properties"), "modustro.gradleinit.metadataOnly=true\n");
+        Files.writeString(locFixture.resolve("payload.txt"), "first payload");
+        Files.createDirectories(locFixture.resolve("published/nested"));
+        Files.writeString(locFixture.resolve("published/nested/payload.txt"), "initial destination");
+        Files.writeString(locFixture.resolve("build.gradle.kts"), """
+                import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishingService
+                import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
+                import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroAwaitPublishingTask
+                import groovy.json.JsonOutput
+                val locService = gradle.sharedServices.registerIfAbsent("modustroPublishing", AIcModustroPublishingService::class.java) {
+                    parameters.credentialBaseDirectory.set(layout.projectDirectory)
+                }
+                val locPlan = JsonOutput.toJson(mapOf("publishingEnabled" to true, "publishingEndpoints" to listOf(
+                    mapOf("id" to "local", "publishingAdapter" to "local-copy", "publishingUrl" to file("published").toURI().toString())
+                )))
+                val locAwait = tasks.register<AIcModustroAwaitPublishingTask>("awaitPublishing") {
+                    publishingService.set(locService)
+                    usesService(locService)
+                }
+                tasks.register<AIcModustroPublishFilesTask>("publishFixture") {
+                    publishingPlanJson.set(locPlan)
+                    outputKind.set("NATIVE_BINARY_OUTPUT")
+                    stability.set("snapshot")
+                    artifactIdentity.set("fixture")
+                    publicationVersion.set("1.0-SNAPSHOT")
+                    payloadFiles.from(layout.projectDirectory.file("payload.txt"))
+                    publishedFileNames.put("payload.txt", "nested/payload.txt")
+                    publishingService.set(locService)
+                    usesService(locService)
+                    finalizedBy(locAwait)
+                }
+                """);
+        var locRunner = GradleRunner.create().withProjectDir(locFixture.toFile())
+                .withArguments("publishFixture", "--configuration-cache", "--offline", "--stacktrace");
+        Assert.assertTrue(locRunner.build().getOutput().contains("Configuration cache entry stored"));
+        Assert.assertEquals(Files.readString(locFixture.resolve("published/nested/payload.txt")), "first payload");
+        Files.writeString(locFixture.resolve("payload.txt"), "second payload");
+        String locSecondOutput = locRunner.build().getOutput();
+        Assert.assertTrue(locSecondOutput.contains("Configuration cache entry reused"), locSecondOutput);
+        Assert.assertEquals(Files.readString(locFixture.resolve("published/nested/payload.txt")), "second payload");
     }
 
 }

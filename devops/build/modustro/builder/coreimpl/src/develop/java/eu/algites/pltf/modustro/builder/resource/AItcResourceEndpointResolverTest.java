@@ -35,7 +35,7 @@ public final class AItcResourceEndpointResolverTest {
             "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
-            "algites-java-native-build-output-public-snapshot-download",
+            "algites-java-native-binary-output-public-snapshot-download",
             "https://example.invalid/maven/",
             "example-download",
             null,
@@ -47,7 +47,7 @@ public final class AItcResourceEndpointResolverTest {
             "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.DOWNLOAD,
-            "algites-java-native-build-output-public-snapshot-download",
+            "algites-java-native-binary-output-public-snapshot-download",
             null,
             null,
             false,
@@ -87,7 +87,7 @@ public final class AItcResourceEndpointResolverTest {
             "native_binary_output",
             AIngResourceEndpointVisibility_1.PUBLIC,
             AIngResourceEndpointAction_1.UPLOAD,
-            "algites-java-native-build-output-public-snapshot-upload",
+            "algites-java-native-binary-output-public-snapshot-upload",
             null,
             null,
             true,
@@ -103,7 +103,7 @@ public final class AItcResourceEndpointResolverTest {
     @Test
     public void AIcRejectsEndpointIdReuseAcrossCells() {
         AIcResourceEndpointResolver locResolver = AIcResourceEndpointResolver.builtin();
-        String locId = "algites-java-native-build-output-public-snapshot-download";
+        String locId = "algites-java-native-binary-output-public-snapshot-download";
         AIcgdResourceEndpoint_1 locDownload = new AIcgdResourceEndpoint_1(
             "java",
             "native_binary_output",
