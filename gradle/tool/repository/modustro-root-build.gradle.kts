@@ -3321,6 +3321,11 @@ val locModustroSourceRepositoryRootForPhases = generateSequence(rootProject.proj
     ?: throw GradleException("Cannot locate modustro-source-repository.yml on the ancestor path of Gradle build root '${rootProject.projectDir.path}'.")
 listOf("modustro-build-phase-tasks.gradle.kts").forEach { locScriptName ->
     val locScript = locModustroSourceRepositoryRootForPhases.resolve("gradle/tool/repository/$locScriptName")
-    if (!locScript.isFile) throw GradleException("Modustro Builder 5.2 script is missing: '${locScript.path}'.")
-    apply(from = locScript)
+    if (locScript.isFile) {
+        apply(from = locScript)
+    } else {
+        apply(from = uri(
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/$locScriptName"
+        ))
+    }
 }
