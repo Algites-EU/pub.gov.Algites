@@ -194,4 +194,59 @@ public final class AItcResourceEndpointResolverTest {
         Assert.expectThrows(AIxModelValidationException.class, () -> resolver.resolve(List.of(wrongVisibility)));
     }
 
+    /** Verifies all legacy documentation endpoint dimensions migrate to the current canonical ID. */
+    @Test
+    public void AIcMigratesLegacyDocsSiteDimensions() {
+        var locBridge = AIcResourceEndpointMetadataBridge.builtin();
+        var locResolver = AIcResourceEndpointResolver.builtin();
+        for (String locVisibility : List.of("public", "private")) {
+            for (String locStability : List.of("release", "snapshot")) {
+                for (String locAction : List.of("download", "upload", "manage")) {
+                    String locSuffix = locVisibility + "-" + locStability + "-" + locAction;
+                    var locDeclaration = locBridge.declaration("modustro", "modustro_docs_site", locVisibility,
+                        locAction, "algites-modustro-docs-site-" + locSuffix, "https://example.invalid/docs/",
+                        "docs-credentials", true, locStability, "github-pages");
+                    var locEndpoint = locResolver.resolve(List.of(locDeclaration)).all().get(0);
+                    Assert.assertEquals(locEndpoint.id(), "algites-modustro-modustro-docs-site-" + locSuffix);
+                    Assert.assertEquals(locEndpoint.credentialProfile(), "docs-credentials");
+                    Assert.assertEquals(locEndpoint.resourceEndpointProviderAdapter(), "github-pages");
+                }
+            }
+        }
+    }
+
+    /** Verifies old and current documentation IDs amend one inherited endpoint without losing metadata. */
+    @Test
+    public void AIcMergesLegacyDocsSiteAmendments() {
+        var locBridge = AIcResourceEndpointMetadataBridge.builtin();
+        var locResolver = AIcResourceEndpointResolver.builtin();
+        var locBase = locBridge.declaration("modustro", "modustro_docs_site", "public", "upload",
+            "algites-modustro-docs-site-public-snapshot-upload", "https://example.invalid/docs/",
+            "docs-credentials", true, "snapshot", "github-pages");
+        for (String locId : List.of("algites-modustro-docs-site-public-snapshot-upload",
+            "algites-modustro-modustro-docs-site-public-snapshot-upload")) {
+            var locAmendment = locBridge.declaration("modustro", "modustro_docs_site", "public", "upload",
+                locId, null, null, false, null, null);
+            var locEndpoints = locResolver.resolve(locResolver.mergeDeclarations(List.of(locBase), List.of(locAmendment))).all();
+            Assert.assertEquals(locEndpoints.size(), 1);
+            Assert.assertFalse(locEndpoints.get(0).enabled());
+            Assert.assertEquals(locEndpoints.get(0).url().toString(), "https://example.invalid/docs/");
+            Assert.assertEquals(locEndpoints.get(0).credentialProfile(), "docs-credentials");
+        }
+    }
+
+    /** Verifies legacy documentation IDs still reject conflicting visibility, stability and action. */
+    @Test
+    public void AIcRejectsMismatchedLegacyDocsSiteDimensions() {
+        var locBridge = AIcResourceEndpointMetadataBridge.builtin();
+        var locResolver = AIcResourceEndpointResolver.builtin();
+        for (List<String> locDimensions : List.of(List.of("private", "release", "upload"),
+            List.of("public", "snapshot", "upload"), List.of("public", "release", "download"))) {
+            var locDeclaration = locBridge.declaration("modustro", "modustro_docs_site", locDimensions.get(0),
+                locDimensions.get(2), "algites-modustro-docs-site-public-release-upload",
+                "https://example.invalid/docs/", null, true, locDimensions.get(1), null);
+            Assert.expectThrows(AIxModelValidationException.class, () -> locResolver.resolve(List.of(locDeclaration)));
+        }
+    }
+
 }

@@ -18,10 +18,13 @@ if (!rootProject.extra.has("modustroEffectivePublishingPlan")) {
     val locOverridesScript = locSourceRepositoryRoot.resolve(
         "gradle/tool/repository/modustro-publishing-overrides.gradle.kts"
     )
-    if (!locOverridesScript.isFile) {
-        throw GradleException("Modustro publishing override script is missing: '${locOverridesScript.path}'.")
+    if (locOverridesScript.isFile) {
+        apply(from = locOverridesScript)
+    } else {
+        apply(from = uri(
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-publishing-overrides.gradle.kts"
+        ))
     }
-    apply(from = locOverridesScript)
 }
 
 fun AIcPublishingDestinationIds(aValue: String?): List<String> = aValue

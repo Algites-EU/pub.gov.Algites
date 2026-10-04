@@ -96,24 +96,33 @@ public final class AIcResourceEndpointResolver {
         AIcgdResourceEndpoint_1 aDeclaration,
         boolean aMerge
     ) {
-        aDeclaration = AIcNormalizeLegacySourceOutputId(aDeclaration);
+        aDeclaration = AIcNormalizeLegacyEndpointId(aDeclaration);
         String locIdentity = AIcIdentity(aDeclaration);
         AIcgdResourceEndpoint_1 locPrevious = aTarget.get(locIdentity);
         aTarget.put(locIdentity, aMerge && locPrevious != null ? AIcMerge(locPrevious, aDeclaration) : aDeclaration);
     }
 
     /** Migrates the former upload/download naming convention before inheritance and validation. */
-    private static AIcgdResourceEndpoint_1 AIcNormalizeLegacySourceOutputId(AIcgdResourceEndpoint_1 aDeclaration) {
-        if (!"native_source_output".equals(aDeclaration.resourceKind()) || aDeclaration.visibility() == null
+    private static AIcgdResourceEndpoint_1 AIcNormalizeLegacyEndpointId(AIcgdResourceEndpoint_1 aDeclaration) {
+        boolean locSourceOutput = "native_source_output".equals(aDeclaration.resourceKind());
+        boolean locDocsSite = "modustro_docs_site".equals(aDeclaration.resourceKind())
+            && "modustro".equals(aDeclaration.technologyKind());
+        if ((!locSourceOutput && !locDocsSite) || aDeclaration.visibility() == null
             || aDeclaration.action() == null || aDeclaration.technologyKind() == null || aDeclaration.id() == null) {
             return aDeclaration;
         }
         for (String locStability : List.of("release", "snapshot")) {
-            String locLegacySuffix = "-" + aDeclaration.technologyKind() + "-" + aDeclaration.visibility().wireValue()
+            String locCurrentSuffix = "-" + aDeclaration.technologyKind() + "-"
+                + aDeclaration.resourceKind().replace('_', '-') + "-" + aDeclaration.visibility().wireValue()
+                + "-" + locStability + "-" + aDeclaration.action().wireValue();
+            if (aDeclaration.id().endsWith(locCurrentSuffix)) return aDeclaration;
+            String locLegacySuffix = "-" + aDeclaration.technologyKind()
+                + (locDocsSite ? "-docs-site" : "") + "-" + aDeclaration.visibility().wireValue()
                 + "-" + locStability + "-" + aDeclaration.action().wireValue();
             if (!aDeclaration.id().endsWith(locLegacySuffix)) continue;
             String locPrefix = aDeclaration.id().substring(0, aDeclaration.id().length() - locLegacySuffix.length());
-            String locId = locPrefix + "-" + aDeclaration.technologyKind() + "-native-source-output-"
+            String locId = locPrefix + "-" + aDeclaration.technologyKind() + "-"
+                + aDeclaration.resourceKind().replace('_', '-') + "-"
                 + aDeclaration.visibility().wireValue() + "-" + locStability + "-" + aDeclaration.action().wireValue();
             return new AIcgdResourceEndpoint_1(aDeclaration.technologyKind(), aDeclaration.resourceKind(),
                 aDeclaration.visibility(), aDeclaration.action(), locId, aDeclaration.url(),

@@ -386,6 +386,23 @@ jobs:
           distribution: temurin
           java-version: ${{ inputs.java-version != '' && inputs.java-version || steps.detect-java.outputs.version }}
 
+      - name: Set up Python packaging toolchain
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.14"
+
+      - name: Install Python packaging tooling
+        if: ${{ steps.mode.outputs.mode != 'skip' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            "build==1.6.1" \
+            "twine==7.0.0"
+          locPythonExecutable="$(python -c 'import sys; print(sys.executable)')"
+          echo "ALGITES_PYTHON_EXECUTABLE=${locPythonExecutable}" >> "${GITHUB_ENV}"
+
       - name: Resolve required Algites credentials
         id: algites-credential-plan
         if: ${{ steps.mode.outputs.mode != 'skip' }}

@@ -2327,10 +2327,13 @@ val locModustroSourceRepositoryRootForPublishingOverrides = generateSequence(roo
 val locModustroPublishingOverridesScript =
     locModustroSourceRepositoryRootForPublishingOverrides.resolve("gradle/tool/repository/modustro-publishing-overrides.gradle.kts")
 if (!rootProject.extra.has("modustroEffectivePublishingPlan")) {
-    if (!locModustroPublishingOverridesScript.isFile) {
-        throw GradleException("Modustro Builder 5.2 publishing override script is missing: '${locModustroPublishingOverridesScript.path}'.")
+    if (locModustroPublishingOverridesScript.isFile) {
+        apply(from = locModustroPublishingOverridesScript)
+    } else {
+        apply(from = uri(
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/gradle/tool/repository/modustro-publishing-overrides.gradle.kts"
+        ))
     }
-    apply(from = locModustroPublishingOverridesScript)
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -2965,7 +2968,13 @@ subprojects {
             import tomllib
             with tempfile.TemporaryDirectory(prefix="modustro-python-build-") as temporary_project:
                 build_project = pathlib.Path(temporary_project) / "project"
-                shutil.copytree(project_dir, build_project, ignore=shutil.ignore_patterns("build", "*.egg-info", "__pycache__", "*.pyc"))
+                def ignore_build_outputs(directory, names):
+                    # Only the project-level build directory is transient. A namespace
+                    # such as eu/algites/tool/build is part of the package source.
+                    return [name for name in names
+                            if name == "__pycache__" or name.endswith((".egg-info", ".pyc", ".pyo"))
+                            or (name == "build" and pathlib.Path(directory).resolve() == project_dir)]
+                shutil.copytree(project_dir, build_project, ignore=ignore_build_outputs)
                 metadata_path = build_project / "pyproject.toml"
                 metadata_text = metadata_path.read_text(encoding="utf-8")
                 metadata = tomllib.loads(metadata_text)
