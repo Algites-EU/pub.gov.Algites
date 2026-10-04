@@ -1080,32 +1080,37 @@ fun AIcAlgitesPythonImportNamespace(aRepositoryId: String, aModulePath: String):
         .joinToString(".")
 }
 
-fun AIcAlgitesSnapshotInstanceId(): String? {
+/** Provides a fresh UTC timestamp even when a previous configuration was cached. */
+abstract class AIcAlgitesSnapshotTimestamp : org.gradle.api.provider.ValueSource<String, org.gradle.api.provider.ValueSourceParameters.None> {
+    override fun obtain(): String = java.time.format.DateTimeFormatter.ofPattern("yyyyMMddHHmmssSSS")
+        .withZone(java.time.ZoneOffset.UTC).format(java.time.Instant.now())
+}
+
+fun AIcAlgitesSnapshotInstanceId(): String {
     val locValue = (providers.gradleProperty("algites.snapshot.instanceId").orNull
         ?: providers.environmentVariable("ALGITES_SNAPSHOT_INSTANCE_ID").orNull)
         ?.trim()
         ?.takeIf { it.isNotBlank() }
-        ?: return null
-    if (!Regex("^[0-9]+$").matches(locValue)) {
+        ?: return providers.of(AIcAlgitesSnapshotTimestamp::class.java) {}.get()
+    if (!Regex("^[0-9]{14,20}$").matches(locValue)) {
         throw GradleException(
-            "Algites snapshot instance id must contain decimal digits only, but got '$locValue'. " +
+            "Algites snapshot instance id must be a UTC timestamp (14 to 20 decimal digits), but got '$locValue'. " +
                 "Use -Palgites.snapshot.instanceId=<UTC timestamp> or ALGITES_SNAPSHOT_INSTANCE_ID."
         )
     }
     return locValue
 }
 
-fun AIcAlgitesPythonVersion(aVersion: String, aSnapshotInstanceId: String? = null): String {
+fun AIcAlgitesPythonVersion(aVersion: String, aSnapshotInstanceId: String): String {
     val locSnapshotSuffix = "-SNAPSHOT"
     if (aVersion.endsWith(locSnapshotSuffix, ignoreCase = true)) {
-        val locInstanceId = aSnapshotInstanceId ?: "0"
-        return aVersion.dropLast(locSnapshotSuffix.length).replace('-', '.') + ".dev$locInstanceId"
+        return aVersion.dropLast(locSnapshotSuffix.length).replace('-', '.') + ".dev$aSnapshotInstanceId"
     }
     return aVersion.replace('-', '.')
 }
 
 fun AIcAlgitesPythonSnapshotVersionPrefix(aReleaseVersion: String): String =
-    AIcAlgitesPythonVersion("$aReleaseVersion-SNAPSHOT", "0").dropLast(1)
+    aReleaseVersion.replace('-', '.') + ".dev"
 
 
 fun AIcAlgitesCanonicalArtifactId(aProjectPath: String): String {

@@ -80,6 +80,11 @@ if [[ ! -x "$wrapper" ]]; then
   exit 2
 fi
 
+# Share one instance across all phases and isolated child builds in this invocation.
+if [[ -z "${ALGITES_SNAPSHOT_INSTANCE_ID:-}" ]]; then
+  export ALGITES_SNAPSHOT_INSTANCE_ID="$(date -u +%Y%m%d%H%M%S%3N)"
+fi
+
 phases=(resolve prepare compile verify package publish)
 tasks=(modustroResolvePhase modustroPreparePhase modustroCompilePhase modustroVerifyPhase modustroPackagePhase modustroPublishPhase)
 for i in "${!phases[@]}"; do

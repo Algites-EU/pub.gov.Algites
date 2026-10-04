@@ -697,6 +697,7 @@ jobs:
           _TMP_ALGITES_VERSION="${{ steps.lanever.outputs.snapshot_version }}"
           EXTRA=""
           if [[ -n "$_TMP_ALGITES_VERSION" ]]; then EXTRA="-PalgitesVersion=$_TMP_ALGITES_VERSION"; fi
+          export ALGITES_SNAPSHOT_INSTANCE_ID="${ALGITES_SNAPSHOT_INSTANCE_ID:-$(date -u +%Y%m%d%H%M%S%3N)}"
           echo "=== Gradle approval (test+integration test, with packaging) ==="
           if [[ "${{ steps.modustro_phase_controller.outputs.enabled }}" == "true" ]]; then
             locArgs=()
