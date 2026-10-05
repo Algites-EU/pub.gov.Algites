@@ -173,8 +173,8 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_NATIVE_PRODUCT_BINARIES=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.nativeProductBinaries=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_NATIVE_PRODUCT_BINARIES=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.nativeProductBinaries=${locOverride}" >> "${locArgumentsFile}"
           locOverride="$(jq -r '.publishingOverrides.native_product_sources // "DEFAULT"' <<< "${locRequest}")"
           case "${locOverride}" in
             DEFAULT|FORCE_ON|FORCE_OFF) ;;
@@ -184,8 +184,8 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_NATIVE_PRODUCT_SOURCES=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.nativeProductSources=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_NATIVE_PRODUCT_SOURCES=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.nativeProductSources=${locOverride}" >> "${locArgumentsFile}"
           locOverride="$(jq -r '.publishingOverrides.native_product_documentation // "DEFAULT"' <<< "${locRequest}")"
           case "${locOverride}" in
             DEFAULT|FORCE_ON|FORCE_OFF) ;;
@@ -195,8 +195,8 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_NATIVE_PRODUCT_DOCUMENTATION=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.nativeProductDocumentation=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_NATIVE_PRODUCT_DOCUMENTATION=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.nativeProductDocumentation=${locOverride}" >> "${locArgumentsFile}"
           locOverride="$(jq -r '.publishingOverrides.native_develop_sources // "DEFAULT"' <<< "${locRequest}")"
           case "${locOverride}" in
             DEFAULT|FORCE_ON|FORCE_OFF) ;;
@@ -206,8 +206,8 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_NATIVE_DEVELOP_SOURCES=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.nativeDevelopSources=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_NATIVE_DEVELOP_SOURCES=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.nativeDevelopSources=${locOverride}" >> "${locArgumentsFile}"
           locOverride="$(jq -r '.publishingOverrides.native_develop_binaries // "DEFAULT"' <<< "${locRequest}")"
           case "${locOverride}" in
             DEFAULT|FORCE_ON|FORCE_OFF) ;;
@@ -217,8 +217,8 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_NATIVE_DEVELOP_BINARIES=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.nativeDevelopBinaries=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_NATIVE_DEVELOP_BINARIES=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.nativeDevelopBinaries=${locOverride}" >> "${locArgumentsFile}"
           locOverride="$(jq -r '.publishingOverrides.native_develop_documentation // "DEFAULT"' <<< "${locRequest}")"
           case "${locOverride}" in
             DEFAULT|FORCE_ON|FORCE_OFF) ;;
@@ -228,8 +228,8 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_NATIVE_DEVELOP_DOCUMENTATION=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.nativeDevelopDocumentation=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_NATIVE_DEVELOP_DOCUMENTATION=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.nativeDevelopDocumentation=${locOverride}" >> "${locArgumentsFile}"
           locOverride="$(jq -r '.publishingOverrides.modustro_docs_site // "DEFAULT"' <<< "${locRequest}")"
           case "${locOverride}" in
             DEFAULT|FORCE_ON|FORCE_OFF) ;;
@@ -239,8 +239,8 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_MODUSTRO_DOCS_SITE=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.modustroDocsSite=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_MODUSTRO_DOCS_SITE=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.modustroDocsSite=${locOverride}" >> "${locArgumentsFile}"
           locOverride="$(jq -r '.publishingOverrides.schema_site // "DEFAULT"' <<< "${locRequest}")"
           case "${locOverride}" in
             DEFAULT|FORCE_ON|FORCE_OFF) ;;
@@ -250,9 +250,9 @@ jobs:
             echo "::error::Release publishing does not permit snapshot publishing overrides."
             exit 1
           fi
-          echo "MODUSTRO_PUBLISHING_SCHEMA_SITE=${locOverride}" >> "${GITHUB_ENV}"
-          printf '%s\n' "-Pmodustro.publishing.schemaSite=${locOverride}" >> "${locArgumentsFile}"
-          echo "MODUSTRO_PUBLISHING_ARGUMENTS_FILE=${locArgumentsFile}" >> "${GITHUB_ENV}"
+          echo "MODUSTRO_PUBLICATION_SCHEMA_SITE=${locOverride}" >> "${GITHUB_ENV}"
+          printf '%s\n' "-Pmodustro.publication.schemaSite=${locOverride}" >> "${locArgumentsFile}"
+          echo "MODUSTRO_PUBLICATION_ARGUMENTS_FILE=${locArgumentsFile}" >> "${GITHUB_ENV}"
 
           locPublishPages="$(jq -r '.publishPages // empty | if type == "boolean" then tostring elif type == "string" then . else tostring end' <<< "${locRequest}")"
           if [[ -z "${locPublishPages}" ]]; then
@@ -450,7 +450,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t locPublishingArgs < "${MODUSTRO_PUBLISHING_ARGUMENTS_FILE}"
+          mapfile -t locPublishingArgs < "${MODUSTRO_PUBLICATION_ARGUMENTS_FILE}"
 
           locResolverProjectDir="${RUNNER_TEMP}/algites-resolve-artifact-metadata-project"
           locResolvedPropertiesFile="${RUNNER_TEMP}/algites-resolved-artifact-metadata.properties"
@@ -606,7 +606,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t locPublishingArgs < "${MODUSTRO_PUBLISHING_ARGUMENTS_FILE}"
+          mapfile -t locPublishingArgs < "${MODUSTRO_PUBLICATION_ARGUMENTS_FILE}"
 
           ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
             ${{ steps.request.outputs.gradle-task }} \
@@ -621,7 +621,7 @@ jobs:
             ${{ steps.request.outputs.gradle-arguments }} \
             "${locPublishingArgs[@]}"
 
-      - name: Resolve effective documentation publishing policy
+      - name: Resolve effective documentation publication policy
         id: docs_publishing_policy
         shell: bash
         run: |
@@ -631,10 +631,10 @@ jobs:
             echo "::error::Generated Modustro documentation publishing selection is missing: ${locSelection}"
             exit 1
           fi
-          locEnabled="$(sed -n 's/^publishingEnabled=//p' "${locSelection}")"
+          locEnabled="$(sed -n 's/^publicationEnabled=//p' "${locSelection}")"
           case "${locEnabled}" in
             true|false) ;;
-            *) echo "::error::Invalid effective documentation PublishingEnabled: ${locEnabled}"; exit 1 ;;
+            *) echo "::error::Invalid effective documentation PublicationEnabled: ${locEnabled}"; exit 1 ;;
           esac
           echo "publishing_enabled=${locEnabled}" >> "${GITHUB_OUTPUT}"
 
@@ -643,7 +643,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mapfile -t locPublishingArgs < "${MODUSTRO_PUBLISHING_ARGUMENTS_FILE}"
+          mapfile -t locPublishingArgs < "${MODUSTRO_PUBLICATION_ARGUMENTS_FILE}"
 
           ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
             publishModustroDocsSite \

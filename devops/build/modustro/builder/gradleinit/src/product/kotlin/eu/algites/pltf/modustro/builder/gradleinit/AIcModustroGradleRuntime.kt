@@ -11,7 +11,7 @@ class AIcModustroGradleRuntime(aSettings: Settings) {
     internal var buildRootRelativePath: String = "."
     internal var resolvedMetadata: Map<String, Any?>? = null
 
-    val endpointDeclarationClass: Class<*> = eu.algites.pltf.modustro.builder.model.resource.AIcgdResourceEndpoint_1::class.java
+    val inputSubscriptionClass: Class<*> = eu.algites.pltf.modustro.builder.model.subscription.AIcInputSubscription::class.java
     val resolveMap = fun(aRoot: File, aPath: String?, aKind: String?, aName: String?, aVisibility: String?): Map<String, Any?> =
         AIcToMap(AIcResolveModustroArtifactDirectoryMetadata(aRoot, aPath, aKind, aName, aVisibility))
     val resolveText = fun(aRoot: File, aPath: String?, aKind: String?, aName: String?, aVisibility: String?, aOutput: String?): String =

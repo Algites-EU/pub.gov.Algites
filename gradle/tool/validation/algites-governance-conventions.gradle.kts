@@ -86,16 +86,12 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
         val locStabilitySymbolicPropertyNames = setOf(
             "release", "snapshot"
         )
-        val locResourceEndpointActionSymbolicPropertyNames = setOf(
-            "download", "upload", "manage"
-        )
         val locSymbolicPropertyNames =
             locCredentialTypeSymbolicPropertyNames +
                 locTechnologyKindSymbolicPropertyNames +
                 locResourceKindSymbolicPropertyNames +
                 locVisibilitySymbolicPropertyNames +
-                locStabilitySymbolicPropertyNames +
-                locResourceEndpointActionSymbolicPropertyNames
+                locStabilitySymbolicPropertyNames
 
         /*
          * Representation-specific JSON Schema filenames.

@@ -14,7 +14,7 @@ import org.testng.annotations.Test;
 public final class AItcModustroCredentialTaskTest {
     private static final String CANONICAL = "resolveModustroRequiredCredentials";
     private static final String LEGACY = "resolveAlgitesRequiredCredentials";
-    private static final String PLAN = "{\"resourceEndpoints\":[],\"credentials\":[]}";
+    private static final String PLAN = "{\"inputSubscriptions\":[],\"publicationEndpoints\":[],\"credentials\":[]}";
 
     /** Covers both individual entry points and their simultaneous invocation. */
     @DataProvider(name = "taskNames")
@@ -32,9 +32,9 @@ public final class AItcModustroCredentialTaskTest {
         if (locRepository == null) throw new IOException("Cannot locate governance sources.");
         String locSource = Files.readString(locRepository.resolve("gradle/tool/repository/modustro-root-build.gradle.kts"));
         String locTask = locSource.substring(locSource.indexOf("abstract class AIcResolveModustroRequiredCredentialsTask"),
-            locSource.indexOf("/* Publishing invocation overrides must be available"));
+            locSource.indexOf("/* Publication invocation overrides must be available"));
         String locRegistration = locSource.substring(locSource.indexOf("val modustroResolveRequiredCredentials = tasks.register"),
-            locSource.indexOf("@Suppress(\"UNCHECKED_CAST\")\nval modustroPublishingService"));
+            locSource.indexOf("@Suppress(\"UNCHECKED_CAST\")\nval modustroPublicationService"));
         Path locFixture = Files.createTempDirectory("modustro-credential-entry-");
         Files.writeString(locFixture.resolve("settings.gradle.kts"), "rootProject.name = \"credential-entry-test\"\n");
         Files.writeString(locFixture.resolve("build.gradle.kts"), """
@@ -43,7 +43,7 @@ public final class AItcModustroCredentialTaskTest {
             import org.gradle.api.file.RegularFileProperty
             import org.gradle.api.tasks.*
             fun modustroGradleOrEnvironmentValue(aName: String): String? = providers.gradleProperty(aName).orNull
-            val locAlgitesRequiredCredentialsPlan = Triple("{\\\"resourceEndpoints\\\":[],\\\"credentials\\\":[]}", 0, listOf("java"))
+            val locAlgitesRequiredCredentialsPlan = Triple("{\\\"inputSubscriptions\\\":[],\\\"publicationEndpoints\\\":[],\\\"credentials\\\":[]}", 0, listOf("java"))
             """ + locTask + locRegistration);
         Path locPlan = locFixture.resolve("output with spaces/credentials.json");
         var locArgs = new java.util.ArrayList<>(aTasks);

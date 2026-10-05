@@ -5,19 +5,14 @@ package eu.algites.pltf.modustro.builder.gradleinit
  *
  * Compiled metadata orchestration with no Gradle API dependency.
  * It resolves structural metadata, TechnologyKinds, inherited groupId, credential profiles,
- * and version contexts while delegating ResourceEndpoint declaration merge/defaulting/validation
- * to the Gradle-independent Modustro Builder core implementation.
+ * input subscriptions, and version contexts. InputSubscriptions and OutputPublications are
+ * resolved as independent, symmetric input/output concerns.
  */
 
-import eu.algites.pltf.modustro.builder.model.resource.AIcgdResourceEndpoint_1
-import eu.algites.pltf.modustro.builder.resource.AIcResourceEndpointMetadataBridge
-import eu.algites.pltf.modustro.builder.resource.AIcResourceEndpointResolver
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
 
-val AIcModustroResourceEndpointResolver = AIcResourceEndpointResolver.builtin()
-val AIcModustroResourceEndpointMetadataBridge = AIcResourceEndpointMetadataBridge(AIcModustroResourceEndpointResolver)
 
 data class AIcdAlgitesVersion(
     val releaseLineVersion: String? = null,
@@ -98,73 +93,123 @@ data class AIcdModustroTechnologyKindsConfig(
         .associate { locItem -> locItem.technologyKind to locItem.buildOutputTypes.orEmpty() }
 }
 
-data class AIcdModustroPublishingEndpoint(
+data class AIcdModustroInputSubscription(
     val id: String,
     val enabled: Boolean? = null,
-    val publishingUrl: String? = null,
-    val publishingAdapter: String? = null,
-    val publishingCredentialProfile: String? = null,
-    val publishingOrder: Int? = null,
-    val publishingFailurePolicy: String? = null,
-    val publishingRetryCount: Int? = null,
-    val publishingRetryDelayMillis: Long? = null,
-    val publishingAttemptTimeoutMillis: Long? = null,
-    val showPublishingProgressIfPossible: Boolean? = null,
-    val publications: List<Map<String, Any?>>? = null
+    val visibility: String? = null,
+    val stability: String? = null,
+    val subscriptionUri: String? = null,
+    val subscriptionAdapter: String? = null,
+    val subscriptionCredentialProfile: String? = null,
+    val subscriptionOrder: Int? = null,
+    val configuration: Map<String, String> = emptyMap()
 ) {
-    fun AIcMerge(aOther: AIcdModustroPublishingEndpoint): AIcdModustroPublishingEndpoint {
-        require(id == aOther.id) { "Cannot merge publishing endpoints with different ids '$id' and '${aOther.id}'." }
-        return AIcdModustroPublishingEndpoint(
+    fun AIcMerge(aOther: AIcdModustroInputSubscription): AIcdModustroInputSubscription {
+        require(id == aOther.id) { "Cannot merge input subscriptions with different ids '$id' and '${aOther.id}'." }
+        return AIcdModustroInputSubscription(
             id = id,
             enabled = aOther.enabled ?: enabled,
-            publishingUrl = aOther.publishingUrl ?: publishingUrl,
-            publishingAdapter = aOther.publishingAdapter ?: publishingAdapter,
-            publishingCredentialProfile = aOther.publishingCredentialProfile ?: publishingCredentialProfile,
-            publishingOrder = aOther.publishingOrder ?: publishingOrder,
-            publishingFailurePolicy = aOther.publishingFailurePolicy ?: publishingFailurePolicy,
-            publishingRetryCount = aOther.publishingRetryCount ?: publishingRetryCount,
-            publishingRetryDelayMillis = aOther.publishingRetryDelayMillis ?: publishingRetryDelayMillis,
-            publishingAttemptTimeoutMillis = aOther.publishingAttemptTimeoutMillis ?: publishingAttemptTimeoutMillis,
-            showPublishingProgressIfPossible = aOther.showPublishingProgressIfPossible ?: showPublishingProgressIfPossible,
+            visibility = aOther.visibility ?: visibility,
+            stability = aOther.stability ?: stability,
+            subscriptionUri = aOther.subscriptionUri ?: subscriptionUri,
+            subscriptionAdapter = aOther.subscriptionAdapter ?: subscriptionAdapter,
+            subscriptionCredentialProfile = aOther.subscriptionCredentialProfile ?: subscriptionCredentialProfile,
+            subscriptionOrder = aOther.subscriptionOrder ?: subscriptionOrder,
+            configuration = configuration + aOther.configuration
+        )
+    }
+
+    fun AIcEffectiveEnabled(): Boolean = enabled ?: true
+    fun AIcEffectiveVisibility(): String = visibility ?: "public"
+    fun AIcEffectiveSubscriptionOrder(): Int = subscriptionOrder ?: 0
+}
+
+data class AIcdModustroInputSubscriptionsConfiguration(
+    val subscriptions: Map<String, AIcdModustroInputSubscription> = emptyMap(),
+    val clearSubscriptions: Boolean = false
+) {
+    fun AIcMerge(aOther: AIcdModustroInputSubscriptionsConfiguration): AIcdModustroInputSubscriptionsConfiguration {
+        val locSubscriptions = linkedMapOf<String, AIcdModustroInputSubscription>()
+        if (!aOther.clearSubscriptions) subscriptions.forEach { (locId, locSubscription) -> locSubscriptions[locId] = locSubscription }
+        aOther.subscriptions.forEach { (locId, locSubscription) ->
+            locSubscriptions[locId] = locSubscriptions[locId]?.AIcMerge(locSubscription) ?: locSubscription
+        }
+        return AIcdModustroInputSubscriptionsConfiguration(
+            subscriptions = locSubscriptions,
+            clearSubscriptions = aOther.clearSubscriptions || clearSubscriptions
+        )
+    }
+}
+
+data class AIcdModustroPublicationEndpoint(
+    val id: String,
+    val enabled: Boolean? = null,
+    val publicationUri: String? = null,
+    val publicationAdapter: String? = null,
+    val publicationCredentialProfile: String? = null,
+    val publicationOrder: Int? = null,
+    val publicationFailurePolicy: String? = null,
+    val publicationRetryCount: Int? = null,
+    val publicationWaitForNextAttemptMillis: Long? = null,
+    val publicationAttemptTimeoutMillis: Long? = null,
+    val showPublicationProgressIfPossible: Boolean? = null,
+    val configuration: Map<String, String> = emptyMap(),
+    val publications: List<Map<String, Any?>>? = null
+) {
+    fun AIcMerge(aOther: AIcdModustroPublicationEndpoint): AIcdModustroPublicationEndpoint {
+        require(id == aOther.id) { "Cannot merge publication endpoints with different ids '$id' and '${aOther.id}'." }
+        return AIcdModustroPublicationEndpoint(
+            id = id,
+            enabled = aOther.enabled ?: enabled,
+            publicationUri = aOther.publicationUri ?: publicationUri,
+            publicationAdapter = aOther.publicationAdapter ?: publicationAdapter,
+            publicationCredentialProfile = aOther.publicationCredentialProfile ?: publicationCredentialProfile,
+            publicationOrder = aOther.publicationOrder ?: publicationOrder,
+            publicationFailurePolicy = aOther.publicationFailurePolicy ?: publicationFailurePolicy,
+            publicationRetryCount = aOther.publicationRetryCount ?: publicationRetryCount,
+            publicationWaitForNextAttemptMillis = aOther.publicationWaitForNextAttemptMillis ?: publicationWaitForNextAttemptMillis,
+            publicationAttemptTimeoutMillis = aOther.publicationAttemptTimeoutMillis ?: publicationAttemptTimeoutMillis,
+            showPublicationProgressIfPossible = aOther.showPublicationProgressIfPossible ?: showPublicationProgressIfPossible,
+            configuration = configuration + aOther.configuration,
             publications = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.merge(publications, aOther.publications)
         )
     }
 
     fun AIcEffectiveEnabled(): Boolean = enabled ?: true
-    fun AIcEffectivePublishingOrder(): Int = publishingOrder ?: 0
-    fun AIcEffectivePublishingFailurePolicy(): String = publishingFailurePolicy ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"
-    fun AIcEffectivePublishingRetryCount(): Int = publishingRetryCount ?: 0
-    fun AIcEffectivePublishingRetryDelayMillis(): Long = publishingRetryDelayMillis ?: 1000L
-    fun AIcEffectiveShowPublishingProgressIfPossible(): Boolean = showPublishingProgressIfPossible ?: true
+    fun AIcEffectivePublicationOrder(): Int = publicationOrder ?: 0
+    fun AIcEffectivePublicationFailurePolicy(): String = publicationFailurePolicy ?: "FAIL_BUILD_ON_PUBLICATION_FAILURE"
+    fun AIcEffectivePublicationRetryCount(): Int = publicationRetryCount ?: 0
+    fun AIcEffectivePublicationWaitForNextAttemptMillis(): Long = publicationWaitForNextAttemptMillis ?: 1000L
+    fun AIcEffectiveShowPublicationProgressIfPossible(): Boolean = showPublicationProgressIfPossible ?: true
 }
 
-data class AIcdModustroPublishingStabilityConfiguration(
-    val publishingEnabled: Boolean? = null,
-    val endpointPublications: Map<String, AIcdModustroPublishingEndpoint> = emptyMap(),
-    val clearEndpointPublications: Boolean = false
+data class AIcdModustroPublicationStabilityConfiguration(
+    val publicationEnabled: Boolean? = null,
+    val publicationEndpoints: Map<String, AIcdModustroPublicationEndpoint> = emptyMap(),
+    val clearPublicationEndpoints: Boolean = false
 ) {
-    fun AIcEffectivePublishingEnabled(): Boolean = publishingEnabled ?: false
+    fun AIcEffectivePublicationEnabled(): Boolean = publicationEnabled ?: false
 
-    fun AIcMerge(aOther: AIcdModustroPublishingStabilityConfiguration): AIcdModustroPublishingStabilityConfiguration {
-        val locEndpoints = linkedMapOf<String, AIcdModustroPublishingEndpoint>()
-        if (!aOther.clearEndpointPublications) endpointPublications.forEach { (locId, locEndpoint) -> locEndpoints[locId] = locEndpoint }
-        aOther.endpointPublications.forEach { (locId, locEndpoint) ->
+    fun AIcMerge(aOther: AIcdModustroPublicationStabilityConfiguration): AIcdModustroPublicationStabilityConfiguration {
+        val locEndpoints = linkedMapOf<String, AIcdModustroPublicationEndpoint>()
+        if (!aOther.clearPublicationEndpoints) publicationEndpoints.forEach { (locId, locEndpoint) -> locEndpoints[locId] = locEndpoint }
+        aOther.publicationEndpoints.forEach { (locId, locEndpoint) ->
             locEndpoints[locId] = locEndpoints[locId]?.AIcMerge(locEndpoint) ?: locEndpoint
         }
-        return AIcdModustroPublishingStabilityConfiguration(
-            publishingEnabled = aOther.publishingEnabled ?: publishingEnabled,
-            endpointPublications = locEndpoints,
-            clearEndpointPublications = aOther.clearEndpointPublications || clearEndpointPublications
+        return AIcdModustroPublicationStabilityConfiguration(
+            publicationEnabled = aOther.publicationEnabled ?: publicationEnabled,
+            publicationEndpoints = locEndpoints,
+            clearPublicationEndpoints = aOther.clearPublicationEndpoints || clearPublicationEndpoints
         )
     }
 }
 
-data class AIcdModustroOutputPublishingConfiguration(
-    val snapshot: AIcdModustroPublishingStabilityConfiguration = AIcdModustroPublishingStabilityConfiguration(),
-    val release: AIcdModustroPublishingStabilityConfiguration = AIcdModustroPublishingStabilityConfiguration()
+data class AIcdModustroOutputPublicationsConfiguration(
+    val snapshot: AIcdModustroPublicationStabilityConfiguration = AIcdModustroPublicationStabilityConfiguration(),
+    val release: AIcdModustroPublicationStabilityConfiguration = AIcdModustroPublicationStabilityConfiguration()
 ) {
-    fun AIcMerge(aOther: AIcdModustroOutputPublishingConfiguration): AIcdModustroOutputPublishingConfiguration =
-        AIcdModustroOutputPublishingConfiguration(
+    fun AIcMerge(aOther: AIcdModustroOutputPublicationsConfiguration): AIcdModustroOutputPublicationsConfiguration =
+        AIcdModustroOutputPublicationsConfiguration(
             snapshot = snapshot.AIcMerge(aOther.snapshot),
             release = release.AIcMerge(aOther.release)
         )
@@ -288,7 +333,7 @@ data class AIcdModustroCredentialProfileDefinition(
 data class AIcdModustroResolvedState(
     val technologyKinds: AIcdModustroTechnologyKindsConfig? = null,
     val groupId: String? = null,
-    val resourceEndpoints: List<AIcgdResourceEndpoint_1> = emptyList(),
+    val inputSubscriptions: Map<String, AIcdModustroInputSubscriptionsConfiguration> = emptyMap(),
     val credentialProfiles: Map<String, AIcdModustroCredentialProfileDefinition> = emptyMap(),
     val version: AIcdAlgitesVersion = AIcdAlgitesVersion(),
     val dependencies: List<AIcdModustroDependencyDefinition> = emptyList(),
@@ -296,15 +341,15 @@ data class AIcdModustroResolvedState(
     val dependencyConstraints: List<AIcdModustroDependencyDefinition> = emptyList(),
     val dependencyConstraintItemsInheritancePoliciesByKind: Map<String, AInModustroItemsInheritancePolicy> = emptyMap(),
     val environmentRequirements: Map<String, AIcdAlgitesVersionRequirement> = emptyMap(),
-    val deleteSnapshotWhenReleased: Boolean? = null,
     val nestedGradleSettingsBuildPolicy: String? = null,
-    val outputPublishing: Map<String, AIcdModustroOutputPublishingConfiguration> = emptyMap()
+    val outputPublications: Map<String, AIcdModustroOutputPublicationsConfiguration> = emptyMap()
 ) {
     fun AIcMerge(aOther: AIcdModustroResolvedState): AIcdModustroResolvedState {
-        val locResourceEndpoints = AIcModustroResourceEndpointResolver.mergeDeclarations(
-            resourceEndpoints,
-            aOther.resourceEndpoints
-        )
+        val locInputSubscriptions = linkedMapOf<String, AIcdModustroInputSubscriptionsConfiguration>()
+        inputSubscriptions.forEach { (locKey, locConfiguration) -> locInputSubscriptions[locKey] = locConfiguration }
+        aOther.inputSubscriptions.forEach { (locKey, locConfiguration) ->
+            locInputSubscriptions[locKey] = locInputSubscriptions[locKey]?.AIcMerge(locConfiguration) ?: locConfiguration
+        }
 
         val locProfiles = linkedMapOf<String, AIcdModustroCredentialProfileDefinition>()
         credentialProfiles.forEach { (locId, locProfile) -> locProfiles[locId] = locProfile }
@@ -312,10 +357,10 @@ data class AIcdModustroResolvedState(
             locProfiles[locId] = locProfiles[locId]?.AIcMerge(locProfile) ?: locProfile
         }
 
-        val locOutputPublishing = linkedMapOf<String, AIcdModustroOutputPublishingConfiguration>()
-        outputPublishing.forEach { (locKind, locConfiguration) -> locOutputPublishing[locKind] = locConfiguration }
-        aOther.outputPublishing.forEach { (locKind, locConfiguration) ->
-            locOutputPublishing[locKind] = locOutputPublishing[locKind]?.AIcMerge(locConfiguration) ?: locConfiguration
+        val locOutputPublications = linkedMapOf<String, AIcdModustroOutputPublicationsConfiguration>()
+        outputPublications.forEach { (locKind, locConfiguration) -> locOutputPublications[locKind] = locConfiguration }
+        aOther.outputPublications.forEach { (locKind, locConfiguration) ->
+            locOutputPublications[locKind] = locOutputPublications[locKind]?.AIcMerge(locConfiguration) ?: locConfiguration
         }
 
         return AIcdModustroResolvedState(
@@ -325,7 +370,7 @@ data class AIcdModustroResolvedState(
                 else -> technologyKinds.AIcMerge(aOther.technologyKinds)
             },
             groupId = aOther.groupId ?: groupId,
-            resourceEndpoints = locResourceEndpoints,
+            inputSubscriptions = locInputSubscriptions,
             credentialProfiles = locProfiles,
             version = version.AIcMerge(aOther.version),
             dependencies = AIcMergeDependencyDefinitions(
@@ -341,9 +386,8 @@ data class AIcdModustroResolvedState(
             ),
             dependencyConstraintItemsInheritancePoliciesByKind = emptyMap(),
             environmentRequirements = environmentRequirements + aOther.environmentRequirements,
-            deleteSnapshotWhenReleased = aOther.deleteSnapshotWhenReleased ?: deleteSnapshotWhenReleased,
             nestedGradleSettingsBuildPolicy = aOther.nestedGradleSettingsBuildPolicy ?: nestedGradleSettingsBuildPolicy,
-            outputPublishing = locOutputPublishing
+            outputPublications = locOutputPublications
         )
     }
 }
@@ -369,7 +413,7 @@ data class AIcdModustroArtifactDirectoryMetadata(
     val description: String,
     val groupId: String?,
     val variantId: String?,
-    val resourceEndpoints: List<AIcgdResourceEndpoint_1>,
+    val inputSubscriptions: Map<String, AIcdModustroInputSubscriptionsConfiguration>,
     val credentialProfiles: Map<String, AIcdModustroCredentialProfileDefinition>,
     val contentsModel: String,
     val hasGradleBuild: Boolean,
@@ -378,9 +422,8 @@ data class AIcdModustroArtifactDirectoryMetadata(
     val dependencies: List<AIcdModustroDependencyDefinition>,
     val dependencyConstraints: List<AIcdModustroDependencyDefinition>,
     val environmentRequirements: Map<String, AIcdAlgitesVersionRequirement>,
-    val deleteSnapshotWhenReleased: Boolean,
     val nestedGradleSettingsBuildPolicy: String,
-    val outputPublishing: Map<String, AIcdModustroOutputPublishingConfiguration>,
+    val outputPublications: Map<String, AIcdModustroOutputPublicationsConfiguration>,
     val descriptorHierarchy: List<AIcdModustroDescriptorDigest>
 )
 
@@ -389,13 +432,12 @@ data class AIcdModustroRepositoryMetadata(
     val name: String,
     val visibility: String,
     val groupId: String?,
-    val resourceEndpoints: List<AIcgdResourceEndpoint_1>,
+    val inputSubscriptions: Map<String, AIcdModustroInputSubscriptionsConfiguration>,
     val credentialProfiles: Map<String, AIcdModustroCredentialProfileDefinition>,
     val dependencies: List<AIcdModustroDependencyDefinition>,
     val dependencyConstraints: List<AIcdModustroDependencyDefinition>,
-    val deleteSnapshotWhenReleased: Boolean,
     val nestedGradleSettingsBuildPolicy: String,
-    val outputPublishing: Map<String, AIcdModustroOutputPublishingConfiguration>
+    val outputPublications: Map<String, AIcdModustroOutputPublicationsConfiguration>
 )
 
 data class AIcdModustroResolutionResult(
@@ -411,11 +453,11 @@ data class AIcdModustroDirectoryScanResult(
 
 val AIcModustroSupportedTechnologyKinds = linkedSetOf("java", "python", "mps", "modustro")
 val AIcModustroCredentialTypes = linkedSetOf("basic", "bearer", "api_key", "certificate")
-val AIcModustroPublishingOutputKinds = linkedSetOf(
+val AIcModustroPublicationOutputKinds = linkedSetOf(
     "native_product_binaries", "native_product_sources", "native_product_documentation", "native_develop_sources", "native_develop_binaries", "native_develop_documentation", "modustro_docs_site", "schema_site"
 )
-val AIcModustroPublishingFailurePolicies = linkedSetOf(
-    "FAIL_BUILD_ON_PUBLISHING_FAILURE", "IGNORE_PUBLISHING_FAILURE"
+val AIcModustroPublicationFailurePolicies = linkedSetOf(
+    "FAIL_BUILD_ON_PUBLICATION_FAILURE", "IGNORE_PUBLICATION_FAILURE"
 )
 val AIcModustroNestedGradleSettingsBuildPolicies = linkedSetOf(
     "IGNORE_NESTED_SETTINGS", "USE_ISOLATED_BUILD_ON_NESTED_SETTINGS"
@@ -427,7 +469,6 @@ val AIcModustroRootIgnoredDirectoryNames = setOf(
 )
 
 fun AIcModustroBuiltInState(): AIcdModustroResolvedState = AIcdModustroResolvedState(
-    deleteSnapshotWhenReleased = true,
     nestedGradleSettingsBuildPolicy = "IGNORE_NESTED_SETTINGS"
 )
 
@@ -492,13 +533,12 @@ fun AIcResolveModustroArtifactDirectoryMetadata(
         name = locRepositoryBase.name,
         visibility = locRepositoryBase.visibility,
         groupId = locRootState.groupId ?: locRepositoryBase.groupId,
-        resourceEndpoints = locRootState.resourceEndpoints,
+        inputSubscriptions = locRootState.inputSubscriptions,
         credentialProfiles = locRootState.credentialProfiles,
         dependencies = locRootState.dependencies,
         dependencyConstraints = locRootState.dependencyConstraints,
-        deleteSnapshotWhenReleased = locRootState.deleteSnapshotWhenReleased ?: true,
-        nestedGradleSettingsBuildPolicy = locRootState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
-        outputPublishing = locRootState.outputPublishing
+                nestedGradleSettingsBuildPolicy = locRootState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
+        outputPublications = locRootState.outputPublications
     )
 
     val locNormalizedPath = aArtifactDirectoryPath?.trim()?.replace('\\', '/')?.trim('/')?.takeIf { it.isNotBlank() && it != "." }
@@ -740,7 +780,7 @@ fun AIcArtifactDirectoryMetadataFromConfig(
         description = locDescription,
         groupId = aState.groupId,
         variantId = locVariantId,
-        resourceEndpoints = aState.resourceEndpoints,
+        inputSubscriptions = aState.inputSubscriptions,
         credentialProfiles = aState.credentialProfiles,
         contentsModel = aContentsModel,
         hasGradleBuild = AIcHasGradleBuild(aDirectory),
@@ -749,9 +789,8 @@ fun AIcArtifactDirectoryMetadataFromConfig(
         dependencies = aState.dependencies,
         dependencyConstraints = aState.dependencyConstraints,
         environmentRequirements = aState.environmentRequirements,
-        deleteSnapshotWhenReleased = aState.deleteSnapshotWhenReleased ?: true,
-        nestedGradleSettingsBuildPolicy = aState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
-        outputPublishing = aState.outputPublishing,
+                nestedGradleSettingsBuildPolicy = aState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
+        outputPublications = aState.outputPublications,
         descriptorHierarchy = AIcDescriptorHierarchy(aRepositoryRoot, aDirectory)
     )
 }
@@ -1008,7 +1047,7 @@ fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String,
     val locDependencyConstraints = AIcDependencyDefinitionsFromConfig(aValues, "DependencyConstraints", aFile, true)
     return AIcdModustroResolvedState(
         groupId = locGroupId,
-        resourceEndpoints = AIcResourceEndpointsFromConfig(aValues, aPrefix, aFile),
+        inputSubscriptions = AIcInputSubscriptionsFromConfig(aValues, aFile),
         credentialProfiles = AIcCredentialProfilesFromConfig(aValues, aFile),
         version = locVersion,
         dependencies = locDependencies.definitions,
@@ -1016,9 +1055,6 @@ fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String,
         dependencyConstraints = locDependencyConstraints.definitions,
         dependencyConstraintItemsInheritancePoliciesByKind = locDependencyConstraints.itemsInheritancePoliciesByDependencyKind,
         environmentRequirements = AIcEnvironmentRequirementsFromConfig(aValues, aFile),
-        deleteSnapshotWhenReleased = AIcFirstValue(aValues, "DeleteSnapshotWhenReleased")
-            ?.takeIf { it.isNotBlank() }
-            ?.let { AIcParseBoolean(it, "DeleteSnapshotWhenReleased", aFile) },
         nestedGradleSettingsBuildPolicy = AIcFirstValue(aValues, "NestedGradleSettingsBuildPolicy")
             ?.takeIf { it.isNotBlank() }
             ?.also { locPolicy ->
@@ -1026,76 +1062,83 @@ fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String,
                     error("Unsupported NestedGradleSettingsBuildPolicy '$locPolicy' in '${aFile.path}'. Supported values: ${AIcModustroNestedGradleSettingsBuildPolicies.joinToString(", ")}.")
                 }
             },
-        outputPublishing = AIcOutputPublishingFromConfig(aValues, aFile)
+        outputPublications = AIcOutputPublicationsFromConfig(aValues, aFile)
     )
 }
 
-fun AIcOutputPublishingFromConfig(
+fun AIcOutputPublicationsFromConfig(
     aRawValues: Map<String, String>,
     aFile: File
-): Map<String, AIcdModustroOutputPublishingConfiguration> {
+): Map<String, AIcdModustroOutputPublicationsConfiguration> {
     val aValues = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.expand(aRawValues)
-    val locResult = linkedMapOf<String, AIcdModustroOutputPublishingConfiguration>()
-    AIcModustroPublishingOutputKinds.flatMap { kind -> listOf(kind) + AIcModustroSupportedTechnologyKinds.map { "$it.$kind" } }.forEach { locOutputKind ->
-        fun locStability(aStability: String): AIcdModustroPublishingStabilityConfiguration {
+    val locResult = linkedMapOf<String, AIcdModustroOutputPublicationsConfiguration>()
+    AIcModustroPublicationOutputKinds.flatMap { kind -> listOf(kind) + AIcModustroSupportedTechnologyKinds.map { "$it.$kind" } }.forEach { locOutputKind ->
+        fun locStability(aStability: String): AIcdModustroPublicationStabilityConfiguration {
             val locPrefix = "$locOutputKind.$aStability"
-            val locPublishingEnabled = aValues["$locPrefix.PublishingEnabled"]?.let { AIcParseBoolean(it, "$locPrefix.PublishingEnabled", aFile) }
+            val locPublicationEnabled = aValues["$locPrefix.PublicationEnabled"]?.let { AIcParseBoolean(it, "$locPrefix.PublicationEnabled", aFile) }
             data class AIcdBuilder(
-                var id: String? = null, var enabled: Boolean? = null, var publishingUrl: String? = null,
-                var publishingAdapter: String? = null, var publishingCredentialProfile: String? = null,
-                var publishingOrder: Int? = null, var publishingFailurePolicy: String? = null,
-                var publishingRetryCount: Int? = null, var publishingRetryDelayMillis: Long? = null,
-                var publishingAttemptTimeoutMillis: Long? = null, var showPublishingProgressIfPossible: Boolean? = null
+                var id: String? = null, var enabled: Boolean? = null, var publicationUri: String? = null,
+                var publicationAdapter: String? = null, var publicationCredentialProfile: String? = null,
+                var publicationOrder: Int? = null, var publicationFailurePolicy: String? = null,
+                var publicationRetryCount: Int? = null, var publicationWaitForNextAttemptMillis: Long? = null,
+                var publicationAttemptTimeoutMillis: Long? = null, var showPublicationProgressIfPossible: Boolean? = null,
+                val configuration: MutableMap<String, String> = linkedMapOf()
             )
             val locBuilders = linkedMapOf<String, AIcdBuilder>()
-            val locEndpointPrefix = "$locPrefix.EndpointPublications."
+            val locEndpointPrefix = "$locPrefix.PublicationEndpoints."
             aValues.forEach { (locKey, locValue) ->
                 if (!locKey.startsWith(locEndpointPrefix)) return@forEach
                 val locSegments = locKey.removePrefix(locEndpointPrefix).split('.')
                 if (locSegments.size < 2 || locSegments[0].toIntOrNull() == null) return@forEach
                 val locBuilder = locBuilders.getOrPut(locSegments[0]) { AIcdBuilder() }
-                when (locSegments.drop(1).joinToString(".")) {
+                val locProperty = locSegments.drop(1).joinToString(".")
+                if (locProperty.startsWith("Configuration.")) {
+                    locBuilder.configuration[locProperty.removePrefix("Configuration.")] = locValue
+                    return@forEach
+                }
+                when (locProperty) {
                     "Id" -> locBuilder.id = locValue.trim()
                     "Enabled" -> locBuilder.enabled = AIcParseBoolean(locValue, locKey, aFile)
-                    "PublishingUrl" -> locBuilder.publishingUrl = locValue.trim().takeIf { it.isNotBlank() }
-                    "PublishingAdapter" -> locBuilder.publishingAdapter = locValue.trim().takeIf { it.isNotBlank() }
-                    "PublishingCredentialProfile" -> locBuilder.publishingCredentialProfile = locValue.trim().takeIf { it.isNotBlank() }
-                    "PublishingOrder" -> locBuilder.publishingOrder = locValue.trim().toIntOrNull() ?: error("$locKey in '${aFile.path}' must be an integer.")
-                    "PublishingFailurePolicy" -> locBuilder.publishingFailurePolicy = locValue.trim().also { locPolicy -> if (locPolicy !in AIcModustroPublishingFailurePolicies) error("$locKey in '${aFile.path}' uses unsupported policy '$locPolicy'.") }
-                    "PublishingRetryCount" -> locBuilder.publishingRetryCount = locValue.trim().toIntOrNull()?.also { if (it < 0) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
-                    "PublishingRetryDelayMillis" -> locBuilder.publishingRetryDelayMillis = locValue.trim().toLongOrNull()?.also { if (it < 0L) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
-                    "PublishingAttemptTimeoutMillis" -> locBuilder.publishingAttemptTimeoutMillis = locValue.trim().toLongOrNull()?.also { if (it <= 0L) error("$locKey in '${aFile.path}' must be positive.") } ?: error("$locKey in '${aFile.path}' must be a positive integer.")
-                    "ShowPublishingProgressIfPossible" -> locBuilder.showPublishingProgressIfPossible = AIcParseBoolean(locValue, locKey, aFile)
+                    "PublicationUri" -> locBuilder.publicationUri = locValue.trim().takeIf { it.isNotBlank() }
+                    "PublicationAdapter" -> locBuilder.publicationAdapter = locValue.trim().takeIf { it.isNotBlank() }
+                    "PublicationCredentialProfile" -> locBuilder.publicationCredentialProfile = locValue.trim().takeIf { it.isNotBlank() }
+                    "PublicationOrder" -> locBuilder.publicationOrder = locValue.trim().toIntOrNull() ?: error("$locKey in '${aFile.path}' must be an integer.")
+                    "PublicationFailurePolicy" -> locBuilder.publicationFailurePolicy = locValue.trim().also { locPolicy -> if (locPolicy !in AIcModustroPublicationFailurePolicies) error("$locKey in '${aFile.path}' uses unsupported policy '$locPolicy'.") }
+                    "PublicationRetryCount" -> locBuilder.publicationRetryCount = locValue.trim().toIntOrNull()?.also { if (it < 0) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
+                    "PublicationWaitForNextAttemptMillis" -> locBuilder.publicationWaitForNextAttemptMillis = locValue.trim().toLongOrNull()?.also { if (it < 0L) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
+                    "PublicationAttemptTimeoutMillis" -> locBuilder.publicationAttemptTimeoutMillis = locValue.trim().toLongOrNull()?.also { if (it <= 0L) error("$locKey in '${aFile.path}' must be positive.") } ?: error("$locKey in '${aFile.path}' must be a positive integer.")
+                    "ShowPublicationProgressIfPossible" -> locBuilder.showPublicationProgressIfPossible = AIcParseBoolean(locValue, locKey, aFile)
                 }
             }
-            val locEndpoints = linkedMapOf<String, AIcdModustroPublishingEndpoint>()
+            val locEndpoints = linkedMapOf<String, AIcdModustroPublicationEndpoint>()
             locBuilders.toSortedMap(compareBy { it.toInt() }).values.forEach { locBuilder ->
-                val locId = locBuilder.id?.takeIf { it.isNotBlank() } ?: error("Publishing endpoint in '${aFile.path}' under '$locPrefix' is missing required Id.")
-                if (!Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(locId)) error("Publishing endpoint Id '$locId' in '${aFile.path}' must use lowercase dash-separated form.")
-                if (locEndpoints.containsKey(locId)) error("Duplicate publishing endpoint Id '$locId' in '${aFile.path}' under '$locPrefix'.")
-                locBuilder.publishingUrl?.let { locUrl ->
+                val locId = locBuilder.id?.takeIf { it.isNotBlank() } ?: error("Publication endpoint in '${aFile.path}' under '$locPrefix' is missing required Id.")
+                if (!Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(locId)) error("Publication endpoint Id '$locId' in '${aFile.path}' must use lowercase dash-separated form.")
+                if (locEndpoints.containsKey(locId)) error("Duplicate publication endpoint Id '$locId' in '${aFile.path}' under '$locPrefix'.")
+                locBuilder.publicationUri?.let { locUrl ->
                     val locUri = try { URI(locUrl) } catch (locException: Exception) {
-                        error("PublishingUrl '$locUrl' for endpoint '$locId' in '${aFile.path}' is not a valid URI: ${locException.message}")
+                        error("PublicationUri '$locUrl' for endpoint '$locId' in '${aFile.path}' is not a valid URI: ${locException.message}")
                     }
                     if (locUri.scheme.isNullOrBlank()) {
-                        error("PublishingUrl '$locUrl' for endpoint '$locId' in '${aFile.path}' must be an absolute URI with a scheme.")
+                        error("PublicationUri '$locUrl' for endpoint '$locId' in '${aFile.path}' must be an absolute URI with a scheme.")
                     }
                 }
-                locEndpoints[locId] = AIcdModustroPublishingEndpoint(
-                    id=locId, enabled=locBuilder.enabled, publishingUrl=locBuilder.publishingUrl,
-                    publishingAdapter=locBuilder.publishingAdapter, publishingCredentialProfile=locBuilder.publishingCredentialProfile,
-                    publishingOrder=locBuilder.publishingOrder, publishingFailurePolicy=locBuilder.publishingFailurePolicy,
-                    publishingRetryCount=locBuilder.publishingRetryCount, publishingRetryDelayMillis=locBuilder.publishingRetryDelayMillis,
-                    publishingAttemptTimeoutMillis=locBuilder.publishingAttemptTimeoutMillis,
-                    showPublishingProgressIfPossible=locBuilder.showPublishingProgressIfPossible,
-                    publications = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.list(aValues, "$locPrefix.EndpointPublications." + locBuilders.entries.first { it.value === locBuilder }.key + ".Publications").takeIf { aValues.keys.any { key -> key.startsWith("$locPrefix.EndpointPublications." + locBuilders.entries.first { it.value === locBuilder }.key + ".Publications") } }
+                locEndpoints[locId] = AIcdModustroPublicationEndpoint(
+                    id=locId, enabled=locBuilder.enabled, publicationUri=locBuilder.publicationUri,
+                    publicationAdapter=locBuilder.publicationAdapter, publicationCredentialProfile=locBuilder.publicationCredentialProfile,
+                    publicationOrder=locBuilder.publicationOrder, publicationFailurePolicy=locBuilder.publicationFailurePolicy,
+                    publicationRetryCount=locBuilder.publicationRetryCount, publicationWaitForNextAttemptMillis=locBuilder.publicationWaitForNextAttemptMillis,
+                    publicationAttemptTimeoutMillis=locBuilder.publicationAttemptTimeoutMillis,
+                    showPublicationProgressIfPossible=locBuilder.showPublicationProgressIfPossible,
+                    configuration = locBuilder.configuration.toMap(),
+                    publications = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.list(aValues, "$locPrefix.PublicationEndpoints." + locBuilders.entries.first { it.value === locBuilder }.key + ".Publications").takeIf { aValues.keys.any { key -> key.startsWith("$locPrefix.PublicationEndpoints." + locBuilders.entries.first { it.value === locBuilder }.key + ".Publications") } }
                 )
             }
-            return AIcdModustroPublishingStabilityConfiguration(locPublishingEnabled, locEndpoints, aValues["$locPrefix.EndpointPublications"] == "[]")
+            return AIcdModustroPublicationStabilityConfiguration(locPublicationEnabled, locEndpoints, aValues["$locPrefix.PublicationEndpoints"] == "[]")
         }
         val locSnapshot=locStability("Snapshot"); val locRelease=locStability("Release")
-        if (locSnapshot.publishingEnabled != null || locSnapshot.endpointPublications.isNotEmpty() || locSnapshot.clearEndpointPublications || locRelease.publishingEnabled != null || locRelease.endpointPublications.isNotEmpty() || locRelease.clearEndpointPublications) {
-            locResult[locOutputKind]=AIcdModustroOutputPublishingConfiguration(locSnapshot,locRelease)
+        if (locSnapshot.publicationEnabled != null || locSnapshot.publicationEndpoints.isNotEmpty() || locSnapshot.clearPublicationEndpoints || locRelease.publicationEnabled != null || locRelease.publicationEndpoints.isNotEmpty() || locRelease.clearPublicationEndpoints) {
+            locResult[locOutputKind]=AIcdModustroOutputPublicationsConfiguration(locSnapshot,locRelease)
         }
     }
     return locResult
@@ -1231,20 +1274,102 @@ fun AIcDependencyDefinitionsFromConfig(
 }
 
 
-fun AIcResourceEndpointOverridesFromConfig(
-    aValues: Map<String, String>, aPrefix: String, aFile: File
-): List<AIcgdResourceEndpoint_1> = try {
-    AIcModustroResourceEndpointMetadataBridge.descriptorDeclarations(aValues, aPrefix)
-} catch (failure: IllegalArgumentException) {
-    throw IllegalArgumentException("Invalid ResourceEndpoints in '${aFile.path}': ${failure.message}", failure)
-}
-
-fun AIcResourceEndpointsFromConfig(
+fun AIcInputSubscriptionsFromConfig(
     aValues: Map<String, String>,
-    aPrefix: String,
     aFile: File
-): List<AIcgdResourceEndpoint_1> =
-    AIcResourceEndpointOverridesFromConfig(aValues, aPrefix, aFile)
+): Map<String, AIcdModustroInputSubscriptionsConfiguration> {
+    val locConcreteSelectors = linkedSetOf(
+        "native_product_sources", "native_product_binaries", "native_product_documentation",
+        "native_develop_sources", "native_develop_binaries", "native_develop_documentation",
+        "modustro_docs_site", "schema_site"
+    )
+    fun locExpand(aSelector: String): List<String> = when (aSelector) {
+        "native_outputs" -> listOf(
+            "native_product_sources", "native_product_binaries", "native_product_documentation",
+            "native_develop_sources", "native_develop_binaries", "native_develop_documentation"
+        )
+        "native_product_outputs" -> listOf("native_product_sources", "native_product_binaries", "native_product_documentation")
+        "native_develop_outputs" -> listOf("native_develop_sources", "native_develop_binaries", "native_develop_documentation")
+        "native_sources" -> listOf("native_product_sources", "native_develop_sources")
+        "native_binaries" -> listOf("native_product_binaries", "native_develop_binaries")
+        "native_documentation" -> listOf("native_product_documentation", "native_develop_documentation")
+        in locConcreteSelectors -> listOf(aSelector)
+        else -> error("Unsupported InputSelector '$aSelector' in '${aFile.path}'.")
+    }
+    fun locRank(aSelector: String): Int = when {
+        aSelector == "native_outputs" -> 0
+        aSelector in locConcreteSelectors -> 2
+        else -> 1
+    }
+
+    val locIndices = aValues.keys.mapNotNull { locKey ->
+        Regex("^InputSubscriptions\\.(\\d+)\\.InputSelector$").matchEntire(locKey)?.groupValues?.get(1)?.toIntOrNull()
+    }.distinct().sortedWith(compareBy<Int> { locIndex ->
+        locRank(aValues["InputSubscriptions.$locIndex.InputSelector"]?.trim().orEmpty())
+    }.thenBy { it })
+
+    val locResult = linkedMapOf<String, AIcdModustroInputSubscriptionsConfiguration>()
+    locIndices.forEach { locIndex ->
+        val locPrefix = "InputSubscriptions.$locIndex"
+        val locSelector = aValues["$locPrefix.InputSelector"]?.trim()?.takeIf { it.isNotBlank() }
+            ?: error("$locPrefix in '${aFile.path}' is missing required InputSelector.")
+        val locTechnologyKind = aValues["$locPrefix.TechnologyKind"]?.trim()?.takeIf { it.isNotBlank() }
+            ?: error("$locPrefix in '${aFile.path}' is missing required TechnologyKind.")
+        if (locTechnologyKind !in AIcModustroSupportedTechnologyKinds) {
+            error("$locPrefix.TechnologyKind '$locTechnologyKind' in '${aFile.path}' is unsupported.")
+        }
+        val locSubscriptionIndices = aValues.keys.mapNotNull { locKey ->
+            Regex("^${Regex.escape(locPrefix)}\\.Subscriptions\\.(\\d+)\\.Id$").matchEntire(locKey)?.groupValues?.get(1)?.toIntOrNull()
+        }.distinct().sorted()
+        val locClear = aValues["$locPrefix.Subscriptions"] == "[]"
+        val locSubscriptions = linkedMapOf<String, AIcdModustroInputSubscription>()
+        locSubscriptionIndices.forEach { locSubscriptionIndex ->
+            val locSubscriptionPrefix = "$locPrefix.Subscriptions.$locSubscriptionIndex"
+            val locId = aValues["$locSubscriptionPrefix.Id"]?.trim()?.takeIf { it.isNotBlank() }
+                ?: error("$locSubscriptionPrefix in '${aFile.path}' is missing required Id.")
+            if (!Regex("^[a-z0-9]+(?:-[a-z0-9]+)*$").matches(locId)) {
+                error("Input subscription Id '$locId' in '${aFile.path}' must use lowercase dash-separated form.")
+            }
+            val locEnabled = aValues["$locSubscriptionPrefix.Enabled"]?.let { AIcParseBoolean(it, "$locSubscriptionPrefix.Enabled", aFile) }
+            val locVisibility = aValues["$locSubscriptionPrefix.Visibility"]?.trim()?.takeIf { it.isNotBlank() }
+            if (locVisibility != null && locVisibility !in setOf("public", "private")) {
+                error("$locSubscriptionPrefix.Visibility '$locVisibility' in '${aFile.path}' must be public or private.")
+            }
+            val locStability = aValues["$locSubscriptionPrefix.Stability"]?.trim()?.takeIf { it.isNotBlank() }
+            if (locStability != null && locStability !in setOf("snapshot", "release")) {
+                error("$locSubscriptionPrefix.Stability '$locStability' in '${aFile.path}' must be snapshot or release.")
+            }
+            val locUri = aValues["$locSubscriptionPrefix.SubscriptionUri"]?.trim()?.takeIf { it.isNotBlank() }
+            locUri?.let { locValue ->
+                val locParsed = try { URI(locValue) } catch (locException: Exception) {
+                    error("SubscriptionUri '$locValue' for '$locId' in '${aFile.path}' is invalid: ${locException.message}")
+                }
+                if (locParsed.scheme.isNullOrBlank()) error("SubscriptionUri '$locValue' for '$locId' must be absolute.")
+            }
+            val locConfigurationPrefix = "$locSubscriptionPrefix.Configuration."
+            val locConfiguration = aValues.filterKeys { it.startsWith(locConfigurationPrefix) }
+                .mapKeys { it.key.removePrefix(locConfigurationPrefix) }
+            val locSubscription = AIcdModustroInputSubscription(
+                id = locId,
+                enabled = locEnabled,
+                visibility = locVisibility,
+                stability = locStability,
+                subscriptionUri = locUri,
+                subscriptionAdapter = aValues["$locSubscriptionPrefix.SubscriptionAdapter"]?.trim()?.takeIf { it.isNotBlank() },
+                subscriptionCredentialProfile = aValues["$locSubscriptionPrefix.SubscriptionCredentialProfile"]?.trim()?.takeIf { it.isNotBlank() },
+                subscriptionOrder = aValues["$locSubscriptionPrefix.SubscriptionOrder"]?.trim()?.toIntOrNull(),
+                configuration = locConfiguration
+            )
+            locSubscriptions[locId] = locSubscriptions[locId]?.AIcMerge(locSubscription) ?: locSubscription
+        }
+        locExpand(locSelector).forEach { locConcreteSelector ->
+            val locKey = "$locTechnologyKind.$locConcreteSelector"
+            val locLocal = AIcdModustroInputSubscriptionsConfiguration(locSubscriptions, locClear)
+            locResult[locKey] = locResult[locKey]?.AIcMerge(locLocal) ?: locLocal
+        }
+    }
+    return locResult
+}
 
 fun AIcCredentialProfilesFromConfig(
     aValues: Map<String, String>,
@@ -1291,35 +1416,40 @@ fun AIcValidateEffectiveState(aState: AIcdModustroResolvedState, aContext: Strin
         }
     }
 
-    val locCatalog = try {
-        AIcModustroResourceEndpointResolver.resolve(aState.resourceEndpoints)
-    } catch (locException: IllegalArgumentException) {
-        throw IllegalArgumentException("Invalid effective ResourceEndpoints in $aContext: ${locException.message}", locException)
-    }
-    locCatalog.all().forEach { locEndpoint ->
-        val locProfileId = locEndpoint.credentialProfile()
-        if (!locProfileId.isNullOrBlank()) {
-            val locProfile = aState.credentialProfiles[locProfileId]
-                ?: error("ResourceEndpoint '${locEndpoint.id()}' in $aContext references undefined credential profile '$locProfileId'.")
-            if (locProfile.type.isNullOrBlank()) {
-                error("Credential profile '$locProfileId' referenced by '${locEndpoint.id()}' in $aContext has no type after inheritance.")
+    aState.inputSubscriptions.forEach { (locInputKey, locConfiguration) ->
+        locConfiguration.subscriptions.values.forEach { locSubscription ->
+            if (locSubscription.AIcEffectiveEnabled()) {
+                if (locSubscription.subscriptionUri.isNullOrBlank()) {
+                    error("Enabled input subscription '${locSubscription.id}' in $aContext $locInputKey has no SubscriptionUri after inheritance.")
+                }
+                if (locSubscription.subscriptionAdapter.isNullOrBlank()) {
+                    error("Enabled input subscription '${locSubscription.id}' in $aContext $locInputKey has no SubscriptionAdapter after inheritance.")
+                }
+            }
+            val locProfileId = locSubscription.subscriptionCredentialProfile
+            if (!locProfileId.isNullOrBlank()) {
+                val locProfile = aState.credentialProfiles[locProfileId]
+                    ?: error("Input subscription '${locSubscription.id}' in $aContext references undefined credential profile '$locProfileId'.")
+                if (locProfile.type.isNullOrBlank()) {
+                    error("Credential profile '$locProfileId' referenced by input subscription '${locSubscription.id}' in $aContext has no type after inheritance.")
+                }
             }
         }
     }
 
-    aState.outputPublishing.forEach { (locOutputKind, locConfiguration) ->
+    aState.outputPublications.forEach { (locOutputKind, locConfiguration) ->
         listOf("Snapshot" to locConfiguration.snapshot, "Release" to locConfiguration.release).forEach { (locStability, locPublishing) ->
-            locPublishing.endpointPublications.values.forEach { locEndpoint ->
-                if (locEndpoint.AIcEffectiveEnabled() && locPublishing.publishingEnabled == true) {
-                    if (locEndpoint.publishingUrl.isNullOrBlank()) error("Enabled publishing endpoint '${locEndpoint.id}' in $aContext $locOutputKind.$locStability has no PublishingUrl after inheritance.")
-                    if (locEndpoint.publishingAdapter.isNullOrBlank()) error("Enabled publishing endpoint '${locEndpoint.id}' in $aContext $locOutputKind.$locStability has no PublishingAdapter after inheritance.")
+            locPublishing.publicationEndpoints.values.forEach { locEndpoint ->
+                if (locEndpoint.AIcEffectiveEnabled() && locPublishing.publicationEnabled == true) {
+                    if (locEndpoint.publicationUri.isNullOrBlank()) error("Enabled publication endpoint '${locEndpoint.id}' in $aContext $locOutputKind.$locStability has no PublicationUri after inheritance.")
+                    if (locEndpoint.publicationAdapter.isNullOrBlank()) error("Enabled publication endpoint '${locEndpoint.id}' in $aContext $locOutputKind.$locStability has no PublicationAdapter after inheritance.")
                 }
-                val locProfileId = locEndpoint.publishingCredentialProfile
+                val locProfileId = locEndpoint.publicationCredentialProfile
                 if (!locProfileId.isNullOrBlank()) {
                     val locProfile = aState.credentialProfiles[locProfileId]
-                        ?: error("Publishing endpoint '${locEndpoint.id}' in $aContext references undefined credential profile '$locProfileId'.")
+                        ?: error("Publication endpoint '${locEndpoint.id}' in $aContext references undefined credential profile '$locProfileId'.")
                     if (locProfile.type.isNullOrBlank()) {
-                        error("Credential profile '$locProfileId' referenced by publishing endpoint '${locEndpoint.id}' in $aContext has no type after inheritance.")
+                        error("Credential profile '$locProfileId' referenced by publication endpoint '${locEndpoint.id}' in $aContext has no type after inheritance.")
                     }
                 }
             }
@@ -1538,25 +1668,25 @@ fun AIcYamlScalar(aValue: String?): String {
     return if (locNeeds) "\"" + aValue.replace("\\", "\\\\").replace("\"", "\\\"") + "\"" else aValue
 }
 
-fun AIcResourceEndpointMapForOutput(aResourceEndpoints: List<AIcgdResourceEndpoint_1>): Map<String, Any?> {
-    val locCatalog = AIcModustroResourceEndpointResolver.resolve(aResourceEndpoints)
-    return locCatalog.all()
-        .groupBy { locEndpoint -> locEndpoint.cell() }
-        .toSortedMap()
-        .mapValues { (_, locEndpoints) ->
-            locEndpoints.map { locEndpoint ->
-                linkedMapOf<String, Any?>(
-                    "id" to locEndpoint.id(),
-                    "url" to locEndpoint.url().toString(),
-                    "credentialProfile" to locEndpoint.credentialProfile(),
-                    "enabled" to locEndpoint.enabled(),
-                    "stability" to locEndpoint.stability()?.wireValue(),
-                    "resourceEndpointProviderAdapter" to locEndpoint.resourceEndpointProviderAdapter()
-                )
-            }
+fun AIcInputSubscriptionsMapForOutput(
+    aInputSubscriptions: Map<String, AIcdModustroInputSubscriptionsConfiguration>
+): Map<String, Any?> = aInputSubscriptions.toSortedMap().mapValues { (_, locConfiguration) ->
+    locConfiguration.subscriptions.values
+        .sortedWith(compareBy<AIcdModustroInputSubscription> { it.AIcEffectiveSubscriptionOrder() }.thenBy { it.id })
+        .map { locSubscription ->
+            linkedMapOf<String, Any?>(
+                "id" to locSubscription.id,
+                "enabled" to locSubscription.AIcEffectiveEnabled(),
+                "visibility" to locSubscription.AIcEffectiveVisibility(),
+                "stability" to locSubscription.stability,
+                "subscriptionUri" to locSubscription.subscriptionUri,
+                "subscriptionAdapter" to locSubscription.subscriptionAdapter,
+                "subscriptionCredentialProfile" to locSubscription.subscriptionCredentialProfile,
+                "subscriptionOrder" to locSubscription.AIcEffectiveSubscriptionOrder(),
+                "configuration" to locSubscription.configuration.toSortedMap()
+            )
         }
 }
-
 
 fun AIcCredentialProfilesMapForOutput(aProfiles: Map<String, AIcdModustroCredentialProfileDefinition>): Map<String, Any?> =
     aProfiles.toSortedMap().mapValues { (_, locProfile) ->
@@ -1586,31 +1716,32 @@ fun AIcDependencyMapForOutput(aDependency: AIcdModustroDependencyDefinition): Ma
 )
 
 
-fun AIcPublishingEndpointMapForOutput(aEndpoint: AIcdModustroPublishingEndpoint): Map<String, Any?> = linkedMapOf(
+fun AIcPublicationEndpointMapForOutput(aEndpoint: AIcdModustroPublicationEndpoint): Map<String, Any?> = linkedMapOf(
     "id" to aEndpoint.id,
     "enabled" to aEndpoint.AIcEffectiveEnabled(),
-    "publishingUrl" to aEndpoint.publishingUrl,
-    "publishingAdapter" to aEndpoint.publishingAdapter,
-    "publishingCredentialProfile" to aEndpoint.publishingCredentialProfile,
-    "publishingOrder" to aEndpoint.AIcEffectivePublishingOrder(),
-    "publishingFailurePolicy" to aEndpoint.AIcEffectivePublishingFailurePolicy(),
-    "publishingRetryCount" to aEndpoint.AIcEffectivePublishingRetryCount(),
-    "publishingRetryDelayMillis" to aEndpoint.AIcEffectivePublishingRetryDelayMillis(),
-    "publishingAttemptTimeoutMillis" to aEndpoint.publishingAttemptTimeoutMillis,
+    "publicationUri" to aEndpoint.publicationUri,
+    "publicationAdapter" to aEndpoint.publicationAdapter,
+    "publicationCredentialProfile" to aEndpoint.publicationCredentialProfile,
+    "publicationOrder" to aEndpoint.AIcEffectivePublicationOrder(),
+    "publicationFailurePolicy" to aEndpoint.AIcEffectivePublicationFailurePolicy(),
+    "publicationRetryCount" to aEndpoint.AIcEffectivePublicationRetryCount(),
+    "publicationWaitForNextAttemptMillis" to aEndpoint.AIcEffectivePublicationWaitForNextAttemptMillis(),
+    "publicationAttemptTimeoutMillis" to aEndpoint.publicationAttemptTimeoutMillis,
+    "configuration" to aEndpoint.configuration.toSortedMap(),
     "publications" to aEndpoint.publications,
-    "showPublishingProgressIfPossible" to aEndpoint.AIcEffectiveShowPublishingProgressIfPossible()
+    "showPublicationProgressIfPossible" to aEndpoint.AIcEffectiveShowPublicationProgressIfPossible()
 )
 
-fun AIcOutputPublishingMapForOutput(aPublishing: Map<String, AIcdModustroOutputPublishingConfiguration>): Map<String, Any?> =
+fun AIcOutputPublicationsMapForOutput(aPublishing: Map<String, AIcdModustroOutputPublicationsConfiguration>): Map<String, Any?> =
     aPublishing.toSortedMap().mapValues { (_, locConfiguration) ->
         linkedMapOf(
             "snapshot" to linkedMapOf(
-                "publishingEnabled" to locConfiguration.snapshot.AIcEffectivePublishingEnabled(),
-                "endpointPublications" to locConfiguration.snapshot.endpointPublications.values.map(::AIcPublishingEndpointMapForOutput)
+                "publicationEnabled" to locConfiguration.snapshot.AIcEffectivePublicationEnabled(),
+                "publicationEndpoints" to locConfiguration.snapshot.publicationEndpoints.values.map(::AIcPublicationEndpointMapForOutput)
             ),
             "release" to linkedMapOf(
-                "publishingEnabled" to locConfiguration.release.AIcEffectivePublishingEnabled(),
-                "endpointPublications" to locConfiguration.release.endpointPublications.values.map(::AIcPublishingEndpointMapForOutput)
+                "publicationEnabled" to locConfiguration.release.AIcEffectivePublicationEnabled(),
+                "publicationEndpoints" to locConfiguration.release.publicationEndpoints.values.map(::AIcPublicationEndpointMapForOutput)
             )
         )
     }
@@ -1625,13 +1756,12 @@ fun AIcToMap(aResult: AIcdModustroResolutionResult): Map<String, Any?> = linkedM
         "name" to aResult.repository.name,
         "visibility" to aResult.repository.visibility,
         "groupId" to aResult.repository.groupId,
-        "resourceEndpoints" to AIcResourceEndpointMapForOutput(aResult.repository.resourceEndpoints),
+        "inputSubscriptions" to AIcInputSubscriptionsMapForOutput(aResult.repository.inputSubscriptions),
         "credentialProfiles" to AIcCredentialProfilesMapForOutput(aResult.repository.credentialProfiles),
         "dependencies" to aResult.repository.dependencies.map(::AIcDependencyMapForOutput),
         "dependencyConstraints" to aResult.repository.dependencyConstraints.map(::AIcDependencyMapForOutput),
-        "deleteSnapshotWhenReleased" to aResult.repository.deleteSnapshotWhenReleased,
         "nestedGradleSettingsBuildPolicy" to aResult.repository.nestedGradleSettingsBuildPolicy,
-        "outputPublishing" to AIcOutputPublishingMapForOutput(aResult.repository.outputPublishing)
+        "outputPublications" to AIcOutputPublicationsMapForOutput(aResult.repository.outputPublications)
     ),
     "artifactDirectories" to aResult.artifactDirectories.map { locDirectory ->
         linkedMapOf<String, Any?>(
@@ -1643,14 +1773,13 @@ fun AIcToMap(aResult: AIcdModustroResolutionResult): Map<String, Any?> = linkedM
             "description" to locDirectory.description,
             "groupId" to locDirectory.groupId,
             "variantId" to locDirectory.variantId,
-            "resourceEndpoints" to AIcResourceEndpointMapForOutput(locDirectory.resourceEndpoints),
+            "inputSubscriptions" to AIcInputSubscriptionsMapForOutput(locDirectory.inputSubscriptions),
             "credentialProfiles" to AIcCredentialProfilesMapForOutput(locDirectory.credentialProfiles),
             "dependencies" to locDirectory.dependencies.map(::AIcDependencyMapForOutput),
             "dependencyConstraints" to locDirectory.dependencyConstraints.map(::AIcDependencyMapForOutput),
             "environmentRequirements" to AIcEnvironmentRequirementsMapForOutput(locDirectory.environmentRequirements),
-            "deleteSnapshotWhenReleased" to locDirectory.deleteSnapshotWhenReleased,
             "nestedGradleSettingsBuildPolicy" to locDirectory.nestedGradleSettingsBuildPolicy,
-            "outputPublishing" to AIcOutputPublishingMapForOutput(locDirectory.outputPublishing),
+            "outputPublications" to AIcOutputPublicationsMapForOutput(locDirectory.outputPublications),
             "contentsModel" to locDirectory.contentsModel,
             "hasGradleBuild" to locDirectory.hasGradleBuild,
             "gradleProjectPath" to locDirectory.gradleProjectPath,
@@ -1678,13 +1807,12 @@ fun AIcToYaml(aResult: AIcdModustroResolutionResult): String = buildString {
     appendLine("  Name: ${AIcYamlScalar(aResult.repository.name)}")
     appendLine("  Visibility: ${AIcYamlScalar(aResult.repository.visibility)}")
     appendLine("  GroupId: ${AIcYamlScalar(aResult.repository.groupId)}")
-    appendLine("  ResourceEndpoints: ${AIcYamlScalar(AIcResourceEndpointMapForOutput(aResult.repository.resourceEndpoints).toString())}")
+    appendLine("  InputSubscriptions: ${AIcYamlScalar(AIcInputSubscriptionsMapForOutput(aResult.repository.inputSubscriptions).toString())}")
     appendLine("  CredentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(aResult.repository.credentialProfiles).toString())}")
     appendLine("  Dependencies: ${AIcYamlScalar(aResult.repository.dependencies.map(::AIcDependencyMapForOutput).toString())}")
     appendLine("  DependencyConstraints: ${AIcYamlScalar(aResult.repository.dependencyConstraints.map(::AIcDependencyMapForOutput).toString())}")
-    appendLine("  DeleteSnapshotWhenReleased: ${aResult.repository.deleteSnapshotWhenReleased}")
     appendLine("  NestedGradleSettingsBuildPolicy: ${AIcYamlScalar(aResult.repository.nestedGradleSettingsBuildPolicy)}")
-    appendLine("  OutputPublishing: ${AIcYamlScalar(AIcOutputPublishingMapForOutput(aResult.repository.outputPublishing).toString())}")
+    appendLine("  OutputPublications: ${AIcYamlScalar(AIcOutputPublicationsMapForOutput(aResult.repository.outputPublications).toString())}")
     appendLine("ArtifactDirectories:")
     aResult.artifactDirectories.forEach { locDirectory ->
         appendLine("  - Path: ${AIcYamlScalar(locDirectory.path)}")
@@ -1695,14 +1823,13 @@ fun AIcToYaml(aResult: AIcdModustroResolutionResult): String = buildString {
         appendLine("    Description: ${AIcYamlScalar(locDirectory.description)}")
         appendLine("    GroupId: ${AIcYamlScalar(locDirectory.groupId)}")
         appendLine("    VariantId: ${AIcYamlScalar(locDirectory.variantId)}")
-        appendLine("    ResourceEndpoints: ${AIcYamlScalar(AIcResourceEndpointMapForOutput(locDirectory.resourceEndpoints).toString())}")
+        appendLine("    InputSubscriptions: ${AIcYamlScalar(AIcInputSubscriptionsMapForOutput(locDirectory.inputSubscriptions).toString())}")
         appendLine("    CredentialProfiles: ${AIcYamlScalar(AIcCredentialProfilesMapForOutput(locDirectory.credentialProfiles).toString())}")
         appendLine("    Dependencies: ${AIcYamlScalar(locDirectory.dependencies.map(::AIcDependencyMapForOutput).toString())}")
         appendLine("    DependencyConstraints: ${AIcYamlScalar(locDirectory.dependencyConstraints.map(::AIcDependencyMapForOutput).toString())}")
         appendLine("    EnvironmentRequirements: ${AIcYamlScalar(AIcEnvironmentRequirementsMapForOutput(locDirectory.environmentRequirements).toString())}")
-        appendLine("    DeleteSnapshotWhenReleased: ${locDirectory.deleteSnapshotWhenReleased}")
         appendLine("    NestedGradleSettingsBuildPolicy: ${AIcYamlScalar(locDirectory.nestedGradleSettingsBuildPolicy)}")
-        appendLine("    OutputPublishing: ${AIcYamlScalar(AIcOutputPublishingMapForOutput(locDirectory.outputPublishing).toString())}")
+        appendLine("    OutputPublications: ${AIcYamlScalar(AIcOutputPublicationsMapForOutput(locDirectory.outputPublications).toString())}")
         appendLine("    ContentsModel: ${AIcYamlScalar(locDirectory.contentsModel.replace('-', '_'))}")
         appendLine("    HasGradleBuild: ${locDirectory.hasGradleBuild}")
         appendLine("    GradleProjectPath: ${AIcYamlScalar(locDirectory.gradleProjectPath)}")

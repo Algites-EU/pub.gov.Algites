@@ -1,7 +1,3 @@
-# yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
-# $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
-# Default publication policy preserves the pre-5.2 behavior when publishing is explicitly invoked.
-# Snapshot invocation overrides may force each output kind on/off without affecting build/test/package.
 $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
 SourceRepository:
   Id: pub.gov.Algites
@@ -13,22 +9,48 @@ Version:
   QualifierKind: snapshot
 modustro_docs_site:
   Snapshot:
-    PublishingEnabled: true
+    PublicationEnabled: true
   Release:
-    PublishingEnabled: true
+    PublicationEnabled: true
 schema_site:
   Snapshot:
-    PublishingEnabled: true
+    PublicationEnabled: true
   Release:
-    PublishingEnabled: true
-OutputPublishing:
+    PublicationEnabled: true
+OutputPublications:
 - OutputSelector: native_product_outputs
   Snapshot:
-    PublishingEnabled: true
+    PublicationEnabled: true
   Release:
-    PublishingEnabled: true
+    PublicationEnabled: true
+  TechnologyKind: java
+- OutputSelector: native_product_outputs
+  Snapshot:
+    PublicationEnabled: true
+  Release:
+    PublicationEnabled: true
+  TechnologyKind: python
+- OutputSelector: native_product_outputs
+  Snapshot:
+    PublicationEnabled: true
+  Release:
+    PublicationEnabled: true
+  TechnologyKind: mps
 - OutputSelector: native_develop_outputs
   Snapshot:
-    PublishingEnabled: false
+    PublicationEnabled: false
   Release:
-    PublishingEnabled: false
+    PublicationEnabled: false
+  TechnologyKind: java
+- OutputSelector: native_develop_outputs
+  Snapshot:
+    PublicationEnabled: false
+  Release:
+    PublicationEnabled: false
+  TechnologyKind: python
+- OutputSelector: native_develop_outputs
+  Snapshot:
+    PublicationEnabled: false
+  Release:
+    PublicationEnabled: false
+  TechnologyKind: mps

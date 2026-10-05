@@ -19,25 +19,26 @@ The dependency model uses `DependencyKind: modustro` for Modustro-controlled art
 
 Modustro Builder automatically discovers canonical definitions below `src/product/yamldefs`, `src/product/jsondefs`, and `src/product/xmldefs`. During the `source_native_processing` lifecycle boundary it derives SourceKind from the source root, the generated package/module namespace from the path below that root, and Java/Python generation targets from the artifact TechnologyKinds. The reusable Defs Codegen Java API from `pub.tool.General` materializes reproducible generated sources below the standard `.gen` source roots. Generated files are derived state and MUST NOT be edited manually.
 
-The ResourceEndpoint model deliberately separates canonical serialized data from the effective Builder domain model:
+The external-I/O model deliberately separates canonical serialized data from the effective Builder domain model:
 
 ```text
 canonical yamldefs/jsondefs/xmldefs definition
     -> generated AIcgd..._N / AIng..._N source type
     -> structured-data loading
     -> inheritance/defaulting/semantic validation
-    -> handwritten effective Builder model
+    -> handwritten effective subscription/publication model
 ```
 
-Phase 5.1A establishes the generation and loading contracts. Phase 5.1B keeps the generated DTOs as transport declarations while moving ResourceEndpoint inheritance, defaulting, selection, and semantic validation into the handwritten Builder effective-model layer. Declaration fields that may be inherited, including `Url`, `Enabled`, and `Stability`, remain nullable until effective resolution; `Enabled` defaults to true only after inheritance.
-
-The generated ResourceEndpoint Java types are based on first-class canonical definitions for the endpoint object and its visibility, action and stability enums. Human-readable definition/property descriptions are propagated by Defs Codegen into generated source documentation.
+`InputSubscriptions` is the input-side contract. `OutputPublications` is the output-side contract. Publication execution
+adds portable `PublicationAdapter` and `PostPublicationActionAdapter` APIs, immutable publication payload/endpoint
+models, scheduler results, and execution-lineage types. The lineage records all ancestors visible to a post-action and
+keeps exactly one canonical input URI and one optional output URI per execution step.
 
 ## Structured-data loading
 
 `AIiStructuredDataLoader` is the representation-mapping boundary for YAML, JSON and XML. A loader maps a document to the requested generated or handwritten data-object class. It intentionally does not apply descriptor inheritance, effective defaults, cross-field semantic validation, or effective-model construction.
 
-`AInStructuredDataFormat` identifies the supported serialization family. Concrete loader implementations belong outside this public core-interface artifact. `AIcResourceEndpointCatalog` is the immutable effective endpoint view used by execution adapters after declaration resolution.
+`AInStructuredDataFormat` identifies the supported serialization family. Concrete loader implementations belong outside this public core-interface artifact. `AIcInputSubscriptionCatalog` is the immutable effective subscription view used by input-resolution adapters after declaration resolution.
 
 No Gradle API type is part of this artifact's public or implementation dependencies.
 

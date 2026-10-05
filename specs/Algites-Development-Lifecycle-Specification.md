@@ -194,29 +194,30 @@ The bootstrap defined in `settings.gradle.kts` is responsible only for the repos
 
 It must **not** become the authoritative configuration for artifact publication repositories, artifact versions, TechnologyKind selection, or build behavior.
 
-###### 2.1.5.1.5 Bootstrap repositories vs Algites ResourceEndpoints
+###### 2.1.5.1.5 Bootstrap repositories vs Algites subscriptions/publications
 
-Two endpoint concepts are intentionally distinct:
+Bootstrap repositories and governed artifact I/O are intentionally distinct:
 
-- **Bootstrap repositories** are explicit and repository-local in `settings.gradle.kts`. They exist only to make Gradle and shared build infrastructure resolvable.
-- **Algites ResourceEndpoints** are resolved after metadata loading from `TechnologyKind / ResourceKind / visibility / action` cells. Endpoint `Stability` is ResourceKind-specific data rather than a universal structural axis. ResourceEndpoints inherit from Algites defaults through `modustro-source-repository.yml` and nested artifact-set/artifact metadata.
+- **Bootstrap repositories** are explicit and repository-local in `settings.gradle.kts`. They exist only to make Gradle and the minimal shared Builder infrastructure resolvable before governed metadata can be loaded.
+- **InputSubscriptions** are resolved after metadata loading and describe resources consumed by the build.
+- **OutputPublications** are resolved after metadata loading and describe produced outputs, publication destinations, and post-publication actions.
 
-A Java/Maven repository used for dependency resolution or publication is therefore not automatically a bootstrap repository. Python, MPS, Modustro publication resources, and future ResourceKinds are resolved by their adapters and effective metadata.
+A Maven repository used later for dependency resolution or publication is therefore not automatically a bootstrap repository. Technology adapters consume the effective subscription/publication model instead of copying governed endpoints into repository-local bootstrap configuration.
 
 ###### 2.1.5.1.6 Public vs private trust domains
 
-Public repository bootstrap MUST NOT require private credentials or private-only endpoints. Private repositories MAY add private bootstrap endpoints when they are actually required for bootstrap. Artifact publication visibility is enforced independently by the effective Algites ResourceEndpoints and source-repository visibility policy.
+Public repository bootstrap MUST NOT require private credentials or private-only endpoints. Private repositories MAY add private bootstrap endpoints when they are actually required for bootstrap. Artifact input/output visibility is enforced independently by effective subscriptions/publications and source-repository visibility policy.
 
 ###### 2.1.5.1.7 Change management
 
-Bootstrap changes should remain rare, deliberate, explicit, and repository-local. ResourceEndpoint changes belong in Algites metadata/defaults and SHOULD NOT require copying technology-specific repository URLs into every `settings.gradle.kts`.
+Bootstrap changes should remain rare, deliberate, explicit, and repository-local. Subscription/publication changes belong in Algites metadata/defaults and SHOULD NOT require copying technology-specific repository URLs into every `settings.gradle.kts`.
 
 ###### 2.1.5.1.8 Normative summary
 
 - `settings.gradle.kts` remains the explicit source of Gradle bootstrap configuration.
 - No hidden global Gradle init/bootstrap mechanism is required.
-- Bootstrap configuration is minimal and distinct from the Algites ResourceEndpoint model.
-- Artifact-specific ResourceEndpoint policy is resolved only after Algites metadata and TechnologyKind/ResourceKind adapters are available.
+- Bootstrap configuration is minimal and distinct from the Algites subscription/publication model.
+- Artifact-specific subscription/publication policy is resolved only after Algites metadata and TechnologyKind adapters are available.
 
 
 ---
@@ -367,72 +368,35 @@ If issue references are detected (from branch name and/or commit subjects), CI w
 
 ---
 
-#### 2.1.7. ResourceEndpoint Resolution
+#### 2.1.7. Input subscription and output publication resolution
 
-Before dependency download or resource management, the lifecycle resolves effective ResourceEndpoints by:
-
-```text
-<technology-kind> x <resource-kind> x <public|private> x <download|upload|manage>
-```
-
-`Stability` is endpoint data and is interpreted according to the ResourceKind. The initial rules are:
-
-| ResourceKind | TechnologyKinds | Stability |
-| --- | --- | --- |
-| `native_product_binaries` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `native_product_sources` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `native_product_documentation` | `java`, `python`, `mps` | required: `release` or `snapshot` |
-| `modustro_docs_site` | `modustro` | required: `release` or `snapshot` |
-| `schema_site` | `modustro` | forbidden |
-
-Each cell contains zero or more ResourceEndpoints. Endpoints are merged by stable `Id`; `Enabled` defaults to `true`. Lower metadata levels can disable or re-enable inherited endpoints, change only one endpoint property, or add another endpoint without replacing the whole cell.
-
-Resolution order is unchanged:
+Before ordinary dependency resolution or publication, the lifecycle merges governed defaults and repository/artifact metadata in normal ancestor-to-descendant precedence order:
 
 ```text
 Algites public-governance defaults
-        -> optional governed/public and private-governance overlays
+        -> optional governed-public/private-governance overlays
         -> modustro-source-repository.yml
         -> ancestor modustro-artifact-set.yml / modustro-artifact.yml
         -> descendant modustro-artifact-set.yml / modustro-artifact.yml
 ```
 
-Canonical example:
+`InputSubscriptions` and `OutputPublications` are separate inherited structures. Every effective declaration identifies exactly one `TechnologyKind`; omission never means all technologies.
 
-```yaml
-ResourceEndpoints:
-  java:
-    - OutputSelector: native_product_binaries
-      private:
-        download:
-          - Id: algites-java-private-release-download
-            Url: https://example.invalid/maven/
-            Stability: release
-            CredentialProfile: algites-java-private-release-download
-```
+Input declarations are selected by `InputSelector`, expanded through the governed native-output selector groups, and merge `Subscriptions` by stable `Id`. A subscription defines one canonical `SubscriptionUri`, adapter, optional credential profile, visibility/stability, order, and adapter-specific non-secret configuration.
 
-New canonical endpoint IDs SHOULD include TechnologyKind, ResourceKind, visibility, optional Stability, and action. Existing native-build-output endpoint IDs without the explicit ResourceKind segment remain valid during the migration so inherited endpoint identity does not change.
+Output declarations are selected by `OutputSelector` and contain independent Snapshot/Release lanes. `PublicationEndpoints` merge by stable `Id`; root `Publications` and recursive `PostPublicationActions` also merge by stable Id within their immediate parent scope.
 
-`ResourceEndpointProviderAdapter` optionally selects provider-specific behavior when the standard TechnologyKind/ResourceKind/action adapter is insufficient. Native-build-output `manage` currently supports the `cloudsmith` and `repsy` provider adapters and requires an adapter because the lifecycle never assumes that an upload URL also supports package deletion.
+Post-publication actions execute only after their parent succeeds. They receive the complete ancestor lineage with one canonical input URI and optional output URI per step. `PublicationOrder` schedules direct root publications; action `Order` schedules only direct siblings. Tree nesting is the hard dependency/data-flow relation.
 
-Phase 5.2 retains `ResourceEndpoints` for generalized resource resolution and management, while all publishing targets are represented exclusively by `EndpointPublications`. The superseded repository-matrix input and compatibility projection are not part of the active lifecycle contract.
+The implicit root build-record action produces `<published-filename>.modustro-build-record.yml` unless explicitly overridden or disabled. Package indexes that cannot store arbitrary sidecars must disable it or target a separate metadata-capable publication endpoint.
 
-Credential profiles remain independent inherited metadata. A ResourceEndpoint contains only a non-secret `CredentialProfile` reference. Secret values use the provider-independent `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document governed by `algites-credentials_1.yamldef.schema.json`. Provider adapters may materialize only the profile/type pairs selected by credential preflight and MUST preserve the same credential-document schema.
+Credential profiles remain independent inherited metadata and contain no secret values in governance files. GitHub Actions preflight uses the two canonical usages `subscription` and `publication`; it selects only the profile/type pairs needed by the effective plan, including target endpoints referenced by enabled post-actions, and the trusted bridge materializes only those credentials before the build.
 
-For GitHub Actions, `resolveModustroRequiredCredentials` evaluates enabled native-build-output ResourceEndpoints for the requested download/upload/manage and release/snapshot context without reading secret values. The trusted credential bridge then filters and materializes only the required credential profile/type pairs before ordinary Gradle processing starts. The preflight plan exposes canonical `resourceEndpoints`; the historical `repositories` property is retained as a compatibility alias while downstream workflow code migrates.
+Public repositories may consume only public subscriptions and publish only through public-authorized publication configuration. Private repositories may add authorized private subscriptions and publication overlays.
 
-Concrete public native-build-output download locations remain public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-defaults-public.yml`, supplied through `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`. The historical filename and `ALGITES_REPOSITORY_*` environment-variable names are intentionally retained during Phase 5. Governed public upload/manage endpoints and all private endpoints remain governance overlays and MUST NOT contain secret credential values.
+Python snapshots continue to use immutable PEP 440 development releases (`1.0.dev<snapshotInstanceId>`) while the logical Algites version remains `1.0-SNAPSHOT`.
 
-ResourceEndpoint visibility remains constrained by source-repository visibility:
-
-- `pub` repositories resolve only public ResourceEndpoint download/manage branches; their publishing configuration must target only public EndpointPublications supplied by public governance.
-- `priv` repositories may resolve public and private ResourceEndpoints; their own publication targets are supplied by authorized private PublishingEndpoint overlays.
-
-`PublicationDestinations` in a publication capability configuration is an optional list of PublishingEndpoint IDs. It narrows the effective PublishingEndpoint set and never embeds URLs, credential values, provider state, or publication metadata.
-
-Publication workflows continue to invoke the common `modustroPublish` orchestration task. Technology-specific native publication remains adapter-specific. Python snapshot publication continues to use immutable PEP 440 development releases (`1.0.dev<snapshotInstanceId>`) while the logical Algites version remains `1.0-SNAPSHOT`.
-
-After a complete release workflow succeeds, released-snapshot cleanup selects `native_product_binaries` manage ResourceEndpoints with `Stability: snapshot`. For Java it deletes the exact corresponding `-SNAPSHOT` version. For Python it selects the complete timestamped development-release series for the released line. Cleanup failure remains non-fatal for an already completed release.
+Released-snapshot cleanup, where desired, is an explicit provider-specific `PostPublicationAction` attached to the successful release. It is not a generic management endpoint, top-level flag, or independent post-release task. The action may reference an existing snapshot `PublicationEndpoint` by Id and receives the successful release lineage plus the resolved target endpoint and credentials.
 
 The GitHub private-governance licensing bootstrap uses an authenticated sparse partial clone. Because `--filter=blob:none` may lazy-fetch blobs during the later `git sparse-checkout set` operation, the workflow installs the `gh` credential helper with `gh auth setup-git` before cloning; authentication must therefore cover both the initial clone and subsequent promisor-remote fetches.
 

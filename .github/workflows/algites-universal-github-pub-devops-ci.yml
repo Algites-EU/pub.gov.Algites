@@ -430,8 +430,8 @@ jobs:
           locPlanFile="${RUNNER_TEMP}/algites-required-credentials.json"
           "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q \
             resolveModustroRequiredCredentials \
-            -Palgites.credential.usages=download \
-            -Palgites.credential.download.stabilities=release,snapshot \
+            -Palgites.credential.usages=subscription \
+            -Palgites.credential.subscription.stabilities=release,snapshot \
             -Palgites.credential.output="${locPlanFile}"
           echo "plan_file=${locPlanFile}" >> "${GITHUB_OUTPUT}"
 

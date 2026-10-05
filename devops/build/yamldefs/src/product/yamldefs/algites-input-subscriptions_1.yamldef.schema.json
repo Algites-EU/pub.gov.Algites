@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-input-subscriptions_1.yamldef.schema.json",
+  "title": "Algites Input Subscriptions v1",
+  "description": "Defines inheritable subscriptions used by Modustro Builder to resolve external build inputs. InputSubscriptions are the input-side counterpart of OutputPublications and contain no upload or management actions.",
+  "$defs": {
+    "Subscription": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "Stable identity used for hierarchical merge."
+        },
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "Visibility": {
+          "type": "string",
+          "enum": [
+            "public",
+            "private"
+          ],
+          "default": "public"
+        },
+        "Stability": {
+          "type": "string",
+          "enum": [
+            "snapshot",
+            "release"
+          ]
+        },
+        "SubscriptionUri": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1
+        },
+        "SubscriptionAdapter": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "SubscriptionCredentialProfile": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "SubscriptionOrder": {
+          "type": "integer",
+          "default": 0
+        },
+        "Configuration": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "minProperties": 1
+    },
+    "InputSubscriptionsDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "InputSelector": {
+          "type": "string",
+          "enum": [
+            "native_product_sources",
+            "native_product_binaries",
+            "native_product_documentation",
+            "native_develop_sources",
+            "native_develop_binaries",
+            "native_develop_documentation",
+            "modustro_docs_site",
+            "schema_site",
+            "native_outputs",
+            "native_product_outputs",
+            "native_develop_outputs",
+            "native_sources",
+            "native_binaries",
+            "native_documentation"
+          ]
+        },
+        "TechnologyKind": {
+          "type": "string",
+          "enum": [
+            "java",
+            "python",
+            "mps",
+            "modustro"
+          ]
+        },
+        "Subscriptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Subscription"
+          }
+        }
+      },
+      "required": [
+        "InputSelector",
+        "TechnologyKind"
+      ],
+      "minProperties": 2
+    },
+    "InputSubscriptions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/InputSubscriptionsDeclaration"
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "InputSubscriptions": {
+      "$ref": "#/$defs/InputSubscriptions"
+    }
+  },
+  "required": [
+    "InputSubscriptions"
+  ]
+}

@@ -119,15 +119,15 @@
             "Description": {
               "type": "string"
             },
-            "ResourceEndpoints": {
-              "$ref": "algites-resource-endpoints_1.yamldef.schema.json#EmbeddedContent"
-            },
             "Version": {
               "$ref": "algites-version_1.yamldef.schema.json"
             },
             "VariantId": {
               "type": "string",
               "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+            },
+            "InputSubscriptions": {
+              "$ref": "algites-input-subscriptions_1.yamldef.schema.json#/$defs/InputSubscriptions"
             }
           },
           "required": [
@@ -150,45 +150,14 @@
         "DependencyConstraints": {
           "$ref": "algites-dependencies_1.yamldef.schema.json#/$defs/DependencyConstraints"
         },
-        "DeleteSnapshotWhenReleased": {
-          "type": "boolean",
-          "default": true
-        },
         "EnvironmentRequirements": {
           "$ref": "algites-environment-requirements_1.yamldef.schema.json"
         },
         "NestedGradleSettingsBuildPolicy": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/NestedGradleSettingsBuildPolicy"
+          "$ref": "modustro-builder-publications_1.yamldef.schema.json#/$defs/NestedGradleSettingsBuildPolicy"
         },
-        "native_product_binaries": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
-        },
-        "native_product_sources": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
-        },
-        "native_product_documentation": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
-        },
-        "modustro_docs_site": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
-        },
-        "schema_site": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
-        },
-        "OutputPublishing": {
-          "type": "array",
-          "items": {
-            "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingDeclaration"
-          }
-        },
-        "native_develop_sources": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
-        },
-        "native_develop_binaries": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
-        },
-        "native_develop_documentation": {
-          "$ref": "modustro-builder-publishing_1.yamldef.schema.json#/$defs/OutputPublishingConfiguration"
+        "OutputPublications": {
+          "$ref": "modustro-builder-publications_1.yamldef.schema.json#/$defs/OutputPublications"
         }
       },
       "required": [

@@ -25,7 +25,7 @@
       </xs:element>
       <xs:element name="PublicationDestinations" minOccurs="0" maxOccurs="1" type="xs:anyType">
         <xs:annotation>
-          <xs:documentation>PublishingEndpoint identifiers selected as global-definition publication destinations.</xs:documentation>
+          <xs:documentation>PublicationEndpoint identifiers selected as global-definition publication destinations.</xs:documentation>
         </xs:annotation>
       </xs:element>
       <xs:element name="ModustroSchemaVersionValidation" minOccurs="0" maxOccurs="1" type="xs:anyType">

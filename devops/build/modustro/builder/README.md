@@ -16,25 +16,40 @@ The package namespace is `eu.algites.pltf.modustro.builder`.
 
 Phase 4 adds the Gradle-independent capability demand graph and TechnologyKind-specific capability configuration contracts. Build-output production plans declare required capabilities; the built-in planner deduplicates them and expands prerequisites. Phase 4A published that portable model as a bootstrap stage. Phase 4B activates it in the Gradle adapter and documentation generation: dependency-resolution preflight is demand-driven, source-native processing has one shared lifecycle boundary per TechnologyKind/artifact, and native documentation expands through the same prerequisite graph.
 
-## Phase 5 ResourceEndpoints
+## Phase 5 input and output I/O model
 
-Phase 5 establishes `ResourceEndpoints` as the canonical generalized resource-access model. The portable model defines ResourceKinds, endpoint actions, ResourceKind-specific stability rules, effective endpoint definitions, and validation independent of Gradle.
+Phase 5 uses two explicit and symmetric external-I/O concepts. `InputSubscriptions` describes external inputs consumed
+by builds; `OutputPublications` describes outputs published by builds. Every declaration carries one explicit
+`TechnologyKind`. The former generalized endpoint action matrix is removed.
 
-The canonical selection dimensions are `TechnologyKind / ResourceKind / Visibility / Action`. `Stability` is endpoint data. Built-in output/resource kinds are `native_product_binaries`, `native_product_sources`, `native_product_documentation`, `modustro_docs_site`, and `schema_site`. Provider-specific resource behavior uses the generic `ResourceEndpointProviderAdapter` name.
+Subscriptions merge by stable `Id` inside an expanded `TechnologyKind + InputSelector` scope. Publication branches
+merge by `TechnologyKind + OutputSelector`, then recursively by stable `PublicationEndpoint`, `Publication`, and
+`PostPublicationAction` ids. Virtual selectors are expanded before effective configuration is consumed.
 
-Phase 5.2 separates Builder publishing policy from generalized resource access. Publishing configuration is declared directly under the five output kinds, split into `Snapshot` / `Release`, and contains branch-level `PublishingEnabled` plus independently inherited `EndpointPublications`. Concrete build outputs are classified by the portable `AIcBuiltinPublishingOutputKindMapper`; artifact metadata never enumerates that mapping. Snapshot invocation overrides use `DEFAULT`, `FORCE_ON`, or `FORCE_OFF` and affect only branch-level publishing enablement. Release publishing remains descriptor-only.
+Publication execution is a scheduler-owned tree. Root `PublicationOrder` orders direct root publications. Each
+`PostPublicationActions` sibling set has its own local `Order`; the parent is always a hard completion barrier, while a
+later sibling group need not wait for descendants of an earlier sibling. Post-action contexts expose the complete
+ordered ancestor lineage with one input URI and one optional output URI per step.
 
-The active dependency-resolution adapter continues to consume canonical `ResourceEndpoints`; publishing execution uses the dedicated Phase-5.2 PublishingEndpoint model and the common publishing scheduler. Phase 5.1 removes the superseded repository-matrix input completely.
+The default `build-record` behavior is implemented as an implicit root `PostPublicationAction`, not as a special second
+publication type. Provider operations such as released-snapshot cleanup use the same action contract.
 
 ## Phase 5.1 definition-driven generated sources
 
-Phase 5.1A connects the reusable `pub.tool.General` Defs Codegen API to the Builder `source_native_processing` lifecycle. Canonical definitions are discovered automatically below `src/product/yamldefs`, `src/product/jsondefs`, and `src/product/xmldefs`; SourceKind, package/module namespace, and Java/Python targets are derived from source placement and TechnologyKinds rather than enumerated in artifact metadata. Generated sources are written to canonical `.gen` source roots and are reproducible build state rather than handwritten source. The first active consumer is the Builder `coreintf` ResourceEndpoint model, which generates versioned `AIcgd..._1` data objects and `AIng..._1` enums from canonical definitions.
+Phase 5.1A connects the reusable `pub.tool.General` Defs Codegen API to the Builder `source_native_processing` lifecycle.
+Canonical definitions are discovered automatically below `src/product/yamldefs`, `src/product/jsondefs`, and
+`src/product/xmldefs`; SourceKind, package/module namespace, and Java/Python targets are derived from source placement
+and TechnologyKinds rather than enumerated in artifact metadata. Generated sources are written to canonical `.gen`
+source roots and are reproducible build state rather than handwritten source.
 
-Structured-data loading remains separate from effective-model construction. Phase 5.1B supplies a separate optional Jackson YAML/JSON/XML loader artifact and moves ResourceEndpoint declaration inheritance, `Enabled=true` defaulting, ResourceKind semantic validation, and typed endpoint selection into Modustro Builder. The metadata resolver now carries generated `AIcgdResourceEndpoint_1` declarations and delegates their merge/effective resolution to `coreimpl`; the root Gradle build consumes the resulting `AIcResourceEndpointCatalog` through a thin metadata bridge. Settings-level Java repository registration remains a bootstrap adapter over the already validated normalized endpoint output.
+Structured-data loading remains separate from effective-model construction. The metadata resolver normalizes canonical
+`InputSubscriptions` and `OutputPublications`, while Builder Core owns publication planning, recursive post-action
+execution, scheduling, retry/failure policy, URI/lineage semantics, and adapter contracts. Settings-level Java repository
+registration is a bootstrap adapter over normalized input subscriptions.
 
 ## Phase 6 publication layer
 
-The Phase-6 portable core separates publication planning from provider execution. `PublicationDestinations` contains only effective PublishingEndpoint ids; omitted destinations select every enabled endpoint for the selected output kind and stability. Global schema publication validates `GlobalPublicationPathId` at the trust boundary and maintains server-controlled draft/release metadata with monotonic draft revisions and immutable releases. Provider-specific publication is performed by PublishingAdapter implementations; generic ordering, retries, failure handling, deadlines, and progress remain scheduler responsibilities.
+The Phase-6 portable core separates publication planning from provider execution. Global schema publication validates `GlobalPublicationPathId` at the trust boundary and maintains server-controlled draft/release metadata with monotonic draft revisions and immutable releases. Provider-specific publication is performed by PublicationAdapter implementations; generic ordering, retries, failure handling, deadlines, and progress remain scheduler responsibilities.
 
 ## Compiled Gradle initialization
 

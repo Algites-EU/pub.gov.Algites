@@ -100,11 +100,12 @@ internal fun AIcDiscover(aSettings: Settings, aRuntime: AIcModustroGradleRuntime
         val configuration: Map<String, String>
     )
 
-    data class AIcdSettingsResourceEndpoint(
+    data class AIcdSettingsInputSubscription(
         val id: String,
-        val url: String,
+        val uri: String,
         val credentialProfile: AIcdSettingsCredentialProfile?,
-        val stability: String
+        val stability: String,
+        val order: Int
     )
 
     @Suppress("UNCHECKED_CAST")
@@ -123,63 +124,67 @@ internal fun AIcDiscover(aSettings: Settings, aRuntime: AIcModustroGradleRuntime
     }
 
     @Suppress("UNCHECKED_CAST")
-    fun AIcCollectJavaDownloadResourceEndpoints(
-        aResourceEndpoints: Any?,
+    fun AIcCollectJavaInputSubscriptions(
+        aInputSubscriptions: Any?,
         aCredentialProfiles: Any?,
-        aTarget: MutableMap<String, AIcdSettingsResourceEndpoint>
+        aTarget: MutableMap<String, AIcdSettingsInputSubscription>
     ) {
-        val locResourceEndpoints = aResourceEndpoints as? Map<*, *> ?: return
+        val locConfigurations = aInputSubscriptions as? Map<*, *> ?: return
+        val locItems = locConfigurations["java.native_product_binaries"] as? List<*> ?: return
         val locProfiles = AIcSettingsCredentialProfiles(aCredentialProfiles)
-        locAllowedDownloadVisibilities.forEach visibilityLoop@ { locVisibility ->
-            val locCell = "java.native_product_binaries.$locVisibility.download"
-            val locItems = locResourceEndpoints[locCell] as? List<*> ?: return@visibilityLoop
-            locItems.forEach endpointLoop@ { locItem ->
-                val locMap = locItem as? Map<*, *>
-                    ?: error("Effective ResourceEndpoint cell '$locCell' contains a non-object item.")
-                val locEnabled = locMap["enabled"] as? Boolean
-                    ?: error("Effective ResourceEndpoint in cell '$locCell' has no boolean enabled state.")
-                if (!locEnabled) return@endpointLoop
-                val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() }
-                    ?: error("Effective ResourceEndpoint in cell '$locCell' has no id.")
-                val locUrl = locMap["url"]?.toString()?.trim()?.takeIf { it.isNotBlank() }
-                    ?: error("Effective ResourceEndpoint '$locId' in cell '$locCell' has no URL.")
-                val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()?.takeIf { it.isNotBlank() }
-                    ?: error("Effective ResourceEndpoint '$locId' in cell '$locCell' has no Stability.")
-                val locProfileId = locMap["credentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-                val locProfile = locProfileId?.let { locIdValue ->
-                    locProfiles[locIdValue]
-                        ?: error("Effective ResourceEndpoint '$locId' references undefined credential profile '$locIdValue'.")
-                }
-                val locEndpoint = AIcdSettingsResourceEndpoint(locId, locUrl, locProfile, locStability)
-                val locPrevious = aTarget[locId]
-                if (locPrevious != null && locPrevious != locEndpoint) {
-                    error("ResourceEndpoint '$locId' resolves inconsistently across the repository build.")
-                }
-                aTarget[locId] = locEndpoint
+        locItems.forEach subscriptionLoop@ { locItem ->
+            val locMap = locItem as? Map<*, *>
+                ?: error("Effective InputSubscriptions java.native_product_binaries contains a non-object item.")
+            val locEnabled = locMap["enabled"] as? Boolean
+                ?: error("Effective input subscription has no boolean enabled state.")
+            if (!locEnabled) return@subscriptionLoop
+            val locVisibility = locMap["visibility"]?.toString()?.trim()?.lowercase() ?: "public"
+            if (locVisibility !in locAllowedDownloadVisibilities) return@subscriptionLoop
+            val locAdapter = locMap["subscriptionAdapter"]?.toString()?.trim()?.lowercase()
+                ?: error("Enabled Java input subscription has no SubscriptionAdapter.")
+            if (locAdapter != "maven-repository") return@subscriptionLoop
+            val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                ?: error("Enabled Java input subscription has no id.")
+            val locUri = locMap["subscriptionUri"]?.toString()?.trim()?.takeIf { it.isNotBlank() }
+                ?: error("Enabled Java input subscription '$locId' has no SubscriptionUri.")
+            val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()?.takeIf { it in setOf("snapshot", "release") }
+                ?: error("Enabled Java input subscription '$locId' has no valid Stability.")
+            val locOrder = (locMap["subscriptionOrder"] as? Number)?.toInt()
+                ?: locMap["subscriptionOrder"]?.toString()?.toIntOrNull() ?: 0
+            val locProfileId = locMap["subscriptionCredentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
+            val locProfile = locProfileId?.let { locIdValue ->
+                locProfiles[locIdValue]
+                    ?: error("Input subscription '$locId' references undefined credential profile '$locIdValue'.")
             }
+            val locSubscription = AIcdSettingsInputSubscription(locId, locUri, locProfile, locStability, locOrder)
+            val locPrevious = aTarget[locId]
+            if (locPrevious != null && locPrevious != locSubscription) {
+                error("Input subscription '$locId' resolves inconsistently across the repository build.")
+            }
+            aTarget[locId] = locSubscription
         }
     }
 
-    val locJavaDownloadResourceEndpoints = linkedMapOf<String, AIcdSettingsResourceEndpoint>()
-    AIcCollectJavaDownloadResourceEndpoints(
-        locAlgitesRepositoryMetadata["resourceEndpoints"],
+    val locJavaInputSubscriptions = linkedMapOf<String, AIcdSettingsInputSubscription>()
+    AIcCollectJavaInputSubscriptions(
+        locAlgitesRepositoryMetadata["inputSubscriptions"],
         locAlgitesRepositoryMetadata["credentialProfiles"],
-        locJavaDownloadResourceEndpoints
+        locJavaInputSubscriptions
     )
     locAlgitesArtifactDirectories.forEach { locArtifactDirectory ->
-        AIcCollectJavaDownloadResourceEndpoints(
-            locArtifactDirectory["resourceEndpoints"],
+        AIcCollectJavaInputSubscriptions(
+            locArtifactDirectory["inputSubscriptions"],
             locArtifactDirectory["credentialProfiles"],
-            locJavaDownloadResourceEndpoints
+            locJavaInputSubscriptions
         )
     }
 
     dependencyResolutionManagement.repositories {
-        locJavaDownloadResourceEndpoints.values.forEach { locEndpoint ->
+        locJavaInputSubscriptions.values.sortedWith(compareBy<AIcdSettingsInputSubscription> { it.order }.thenBy { it.id }).forEach { locEndpoint ->
             val locStability = locEndpoint.stability
             maven {
                 name = locEndpoint.id.replace('-', '_')
-                url = java.net.URI(locEndpoint.url)
+                url = java.net.URI(locEndpoint.uri)
                 mavenContent {
                     if (locStability == "snapshot") snapshotsOnly() else releasesOnly()
                 }
@@ -226,7 +231,7 @@ internal fun AIcDiscover(aSettings: Settings, aRuntime: AIcModustroGradleRuntime
                             authentication { create<HttpHeaderAuthentication>("header") }
                         }
                         else -> error(
-                            "Java/Maven download endpoint '${locEndpoint.id}' uses credential type '${locProfile.type}', " +
+                            "Java/Maven input subscription '${locEndpoint.id}' uses credential type '${locProfile.type}', " +
                                 "which is not supported by the Java/Maven repository adapter. Supported types: basic, bearer, api_key."
                         )
                     }
@@ -237,7 +242,7 @@ internal fun AIcDiscover(aSettings: Settings, aRuntime: AIcModustroGradleRuntime
 
     println(
         "Algites settings discovery included ${locIncludedProjectPaths.size} Gradle artifact project(s) and " +
-            "${locJavaDownloadResourceEndpoints.size} resolved Java native binary-output download ResourceEndpoint(s)."
+            "${locJavaInputSubscriptions.size} resolved Java native-product-binary input subscription(s)."
     )
 
 }

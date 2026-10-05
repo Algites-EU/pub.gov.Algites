@@ -4,19 +4,19 @@
  * The task validates author-controlled user sidecars, stages canonical
  * definitions under their GlobalPublicationPathId, and writes a deterministic
  * publication manifest. Actual upload is delegated to the common Modustro publishing
- * scheduler and the PublishingAdapter selected by each effective PublishingEndpoint.
+ * scheduler and the PublicationAdapter selected by each effective PublicationEndpoint.
  */
 
 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
-import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishingService
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublicationService
 import org.gradle.api.provider.Provider
 import groovy.json.JsonOutput
 import eu.algites.pltf.modustro.builder.publication.AIcGlobalPublicationPathValidator
-import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayload
-import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayloadFile
-import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingStabilityConfiguration
-import eu.algites.pltf.modustro.builder.model.publication.AInPublishingOutputKind
-import eu.algites.pltf.modustro.builder.model.publication.AInPublishingStability
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayloadFile
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationStabilityConfiguration
+import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind
+import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability
 import java.io.File
 import java.security.MessageDigest
 
@@ -32,7 +32,7 @@ if (locPublicationBridgeScript.isFile) {
 @Suppress("UNCHECKED_CAST")
 val locSchemaArtifactDirectories = rootProject.extra["modustroResolvedArtifactDirectories"] as List<Map<String, Any?>>
 @Suppress("UNCHECKED_CAST")
-val locResolveSchemaPublishingPlan = rootProject.extra["modustroResolvePublishingPlan"] as (
+val locResolveSchemaPublicationPlan = rootProject.extra["modustroResolvePublicationPlan"] as (
     Map<String, Any?>,
     String,
     String,
@@ -48,7 +48,7 @@ val locSchemaPublicationState = ((findProperty("modustro.schemas.publicationStat
             "modustro.schemas.publicationState must be 'draft' or 'release'."
         }
     }
-val locSchemaPublishingStability = if (locSchemaPublicationState == "release") "release" else "snapshot"
+val locSchemaPublicationStability = if (locSchemaPublicationState == "release") "release" else "snapshot"
 val locSchemaPublicationDestinationIds = (findProperty("modustro.schemas.publicationDestinations") as String?)
     ?.split(',')
     ?.map(String::trim)
@@ -68,18 +68,18 @@ val locSchemaSiteRoot = layout.projectDirectory.dir(
 )
 val locSchemaManifestFile = locSchemaSiteRoot.file(".modustro-publishing/schema-site.tsv")
 val locSchemaEndpointSelectionFile = locSchemaSiteRoot.file(".modustro-publishing/schema-endpoints.properties")
-val locSchemaHasEndpointPublications = locSchemaArtifactDirectories
+val locSchemaHasPublicationEndpoints = locSchemaArtifactDirectories
     .filter { locArtifact -> locArtifact["structureKind"]?.toString() == "artifact" }
     .any { locArtifact ->
-        val locPlan = locResolveSchemaPublishingPlan(
+        val locPlan = locResolveSchemaPublicationPlan(
             locArtifact,
             "schema_site",
-            locSchemaPublishingStability,
+            locSchemaPublicationStability,
             locSchemaPublicationDestinationIds
         )
-        val locEnabled = locPlan["publishingEnabled"] as? Boolean ?: false
+        val locEnabled = locPlan["publicationEnabled"] as? Boolean ?: false
         @Suppress("UNCHECKED_CAST")
-        val locEndpoints = (locPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty()
+        val locEndpoints = (locPlan["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty()
         locEnabled && locEndpoints.isNotEmpty()
     }
 
@@ -147,21 +147,21 @@ val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite")
                 } else {
                     File(rootProject.projectDir, locArtifactPath)
                 }
-                val locPublishingPlan = locResolveSchemaPublishingPlan(
+                val locPublicationPlan = locResolveSchemaPublicationPlan(
                     locArtifact,
                     "schema_site",
-                    locSchemaPublishingStability,
+                    locSchemaPublicationStability,
                     locSchemaPublicationDestinationIds
                 )
                 @Suppress("UNCHECKED_CAST")
-                val locEndpointPublications = (locPublishingPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty()
-                val locEndpointIds = locEndpointPublications.map { locEndpoint ->
+                val locPublicationEndpoints = (locPublicationPlan["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+                val locEndpointIds = locPublicationEndpoints.map { locEndpoint ->
                     val locEndpointId = locEndpoint["id"]?.toString()
-                        ?: throw GradleException("schema_site PublishingEndpoint is missing Id.")
+                        ?: throw GradleException("schema_site PublicationEndpoint is missing Id.")
                     val locPrevious = locSeenEndpoints.putIfAbsent(locEndpointId, locEndpoint)
                     if (locPrevious != null && locPrevious != locEndpoint) {
                         throw GradleException(
-                            "PublishingEndpoint id '$locEndpointId' resolves to inconsistent effective endpoint definitions across artifacts."
+                            "PublicationEndpoint id '$locEndpointId' resolves to inconsistent effective endpoint definitions across artifacts."
                         )
                     }
                     locEndpointId
@@ -173,7 +173,7 @@ val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite")
                     locExpectedEndpointIds = locEndpointIdSet
                 } else if (locExpected != locEndpointIdSet) {
                     throw GradleException(
-                        "Global schema site requires one consistent schema_site PublishingEndpoint set across all artifacts; " +
+                        "Global schema site requires one consistent schema_site PublicationEndpoint set across all artifacts; " +
                             "expected ${locExpected.sorted()} but artifact '$locArtifactPath' resolves ${locEndpointIdSet.sorted()}."
                     )
                 }
@@ -242,11 +242,11 @@ val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite")
                 appendLine("count=${locSeenEndpoints.size}")
                 locSeenEndpoints.toSortedMap().values.forEachIndexed { locIndex, locEndpoint ->
                     appendLine("endpoint.${locIndex}.id=${locEndpoint["id"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.url=${locEndpoint["publishingUrl"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.credentialProfile=${locEndpoint["publishingCredentialProfile"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.adapter=${locEndpoint["publishingAdapter"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.order=${locEndpoint["publishingOrder"] ?: 0}")
-                    appendLine("endpoint.${locIndex}.failurePolicy=${locEndpoint["publishingFailurePolicy"] ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"}")
+                    appendLine("endpoint.${locIndex}.url=${locEndpoint["publicationUri"]?.toString().orEmpty()}")
+                    appendLine("endpoint.${locIndex}.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}")
+                    appendLine("endpoint.${locIndex}.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}")
+                    appendLine("endpoint.${locIndex}.order=${locEndpoint["publicationOrder"] ?: 0}")
+                    appendLine("endpoint.${locIndex}.failurePolicy=${locEndpoint["publicationFailurePolicy"] ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"}")
                 }
             },
             Charsets.UTF_8
@@ -259,7 +259,7 @@ val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite")
 if (tasks.findByName("prepareModustroSchemaPublishing") == null) {
     tasks.register("prepareModustroSchemaPublishing") {
         group = "modustro"
-        description = "Prepares the validated global schema site and requires at least one enabled PublishingEndpoint for every published artifact."
+        description = "Prepares the validated global schema site and requires at least one enabled PublicationEndpoint for every published artifact."
         dependsOn(locGenerateModustroSchemaSite)
         doLast {
             val locRows = locSchemaManifestFile.asFile.readLines(Charsets.UTF_8).drop(1).filter(String::isNotBlank)
@@ -269,7 +269,7 @@ if (tasks.findByName("prepareModustroSchemaPublishing") == null) {
             }
             if (locMissing.isNotEmpty()) {
                 throw GradleException(
-                    "Global schema publication has no effective schema_site PublishingEndpoint for: " +
+                    "Global schema publication has no effective schema_site PublicationEndpoint for: " +
                         locMissing.distinct().sorted().joinToString(", ")
                 )
             }
@@ -280,14 +280,14 @@ if (tasks.findByName("prepareModustroSchemaPublishing") == null) {
 
 if (tasks.findByName("publishModustroSchemaSite") == null) {
     val locArtifactPlans = locSchemaArtifactDirectories.filter { it["structureKind"]?.toString() == "artifact" }.map {
-        locResolveSchemaPublishingPlan(it, "schema_site", locSchemaPublishingStability, locSchemaPublicationDestinationIds) to it
+        locResolveSchemaPublicationPlan(it, "schema_site", locSchemaPublicationStability, locSchemaPublicationDestinationIds) to it
     }
     val locEndpointSets = locArtifactPlans.map { (locPlan, _) ->
         @Suppress("UNCHECKED_CAST")
-        (locPlan["endpointPublications"] as? List<Map<String, Any?>>).orEmpty().mapNotNull { it["id"]?.toString() }.toSet()
+        (locPlan["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty().mapNotNull { it["id"]?.toString() }.toSet()
     }.distinct()
-    if (locSchemaHasEndpointPublications && locEndpointSets.size > 1) {
-        throw GradleException("Global schema site resolves inconsistent PublishingEndpoint sets across artifacts.")
+    if (locSchemaHasPublicationEndpoints && locEndpointSets.size > 1) {
+        throw GradleException("Global schema site resolves inconsistent PublicationEndpoint sets across artifacts.")
     }
     val locCredentialProfiles = linkedMapOf<String, Any?>()
     locArtifactPlans.forEach { (_, locArtifact) ->
@@ -301,23 +301,23 @@ if (tasks.findByName("publishModustroSchemaSite") == null) {
         }
     }
     @Suppress("UNCHECKED_CAST")
-    val locPublishingService = rootProject.extra["modustroPublishingService"] as Provider<AIcModustroPublishingService>
+    val locPublicationService = rootProject.extra["modustroPublicationService"] as Provider<AIcModustroPublicationService>
     val locFiles = fileTree(locSchemaSiteRoot) { exclude(".git/**", ".modustro-publishing/**") }
     tasks.register<AIcModustroPublishFilesTask>("publishModustroSchemaSite") {
         group = "publishing"
-        description = "Publishes the staged global schema site through the common publishing scheduler."
-        if (locSchemaHasEndpointPublications) {
+        description = "Publishes the staged global schema site through the common publication scheduler."
+        if (locSchemaHasPublicationEndpoints) {
             dependsOn("prepareModustroSchemaPublishing")
             payloadFiles.from(locFiles)
         }
-        publishingPlanJson.set(JsonOutput.toJson(locArtifactPlans.firstOrNull()?.first ?: mapOf("publishingEnabled" to false)))
+        publicationPlanJson.set(JsonOutput.toJson(locArtifactPlans.firstOrNull()?.first ?: mapOf("publicationEnabled" to false)))
         credentialProfilesJson.set(JsonOutput.toJson(locCredentialProfiles))
         outputKind.set("SCHEMA_SITE")
-        stability.set(locSchemaPublishingStability)
+        stability.set(locSchemaPublicationStability)
         artifactIdentity.set(rootProject.name)
         publicationVersion.set(locSchemaPublicationState)
         payloadRoot.set(locSchemaSiteRoot)
-        publishingService.set(locPublishingService)
-        usesService(locPublishingService)
+        publicationService.set(locPublicationService)
+        usesService(locPublicationService)
     }
 }

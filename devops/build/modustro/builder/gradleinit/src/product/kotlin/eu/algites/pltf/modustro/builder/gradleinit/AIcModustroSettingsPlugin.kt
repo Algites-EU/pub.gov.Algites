@@ -26,7 +26,7 @@ abstract class AIcModustroSettingsPlugin : Plugin<Settings> {
             if (locUseMavenLocal) mavenLocal()
             mavenCentral()
         }
-        val locService = gradle.sharedServices.registerIfAbsent("modustroPublishing", AIcModustroPublishingService::class.java) {
+        val locService = gradle.sharedServices.registerIfAbsent("modustroPublications", AIcModustroPublicationService::class.java) {
             parameters.credentialBaseDirectory.set(settingsDir)
         }
         buildEvents.onTaskCompletion(locService)

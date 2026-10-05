@@ -1,58 +1,125 @@
 GroupId: eu.algites.test
-ResourceEndpoints:
-  java:
-    - OutputSelector: native_outputs
-      Enabled: true
-      public:
-        upload:
-          - Id: algites-java-native-outputs-public-snapshot-upload
-            Url: file:///tmp/resource-upload
-            Stability: snapshot
-    - OutputSelector: native_develop_outputs
-      Enabled: false
-    - OutputSelector: native_develop_binaries
-      Enabled: true
-OutputPublishing:
-  - OutputSelector: native_outputs
-    Snapshot:
-      PublishingEnabled: true
-      EndpointPublications:
-        - Id: primary
-          PublishingUrl: file:///tmp/publication-upload
-          PublishingAdapter: local-copy
-          PublishingOrder: -1
-          PublishingRetryCount: 2
-          PublishingRetryDelayMillis: 0
-          PublishingAttemptTimeoutMillis: 10000
-          ShowPublishingProgressIfPossible: false
-          Publications:
-            - Id: standard
-              Classifier: ""
-              Extension: jar
-              ExtendedPublications:
-                - Id: build-record
-                  PublicationProducer: modustro-build-record
-                  PublishingEnabled: true
-                  PublishingUrl: file:///tmp/records
-                  PublishingAdapter: local-copy
-                  PublishingFailurePolicy: IGNORE_PUBLISHING_FAILURE
-                  ExtendedPublications:
-                    - Id: record-of-record
-                      PublicationProducer: modustro-build-record
-                      PublishingEnabled: true
-            - Id: custom
-              Classifier: tests.custom
-              Extension: jar
-              ExtendedPublications:
-                - Id: build-record
-                  PublicationProducer: modustro-build-record
-                  PublishingEnabled: false
-  - OutputSelector: native_sources
-    Snapshot:
-      PublishingEnabled: false
-  - OutputSelector: native_develop_outputs
-    Snapshot:
-      PublishingEnabled: false
-  - OutputSelector: native_develop_binaries
-    Snapshot:
-      PublishingEnabled: true
+OutputPublications:
+- OutputSelector: native_outputs
+  Snapshot:
+    PublicationEnabled: true
+    PublicationEndpoints:
+    - Id: primary
+      PublicationUri: file:///tmp/publication-upload
+      PublicationAdapter: local-copy
+      PublicationOrder: -1
+      PublicationRetryCount: 2
+      PublicationWaitForNextAttemptMillis: 0
+      PublicationAttemptTimeoutMillis: 10000
+      ShowPublicationProgressIfPossible: false
+      Publications:
+      - Id: standard
+        Classifier: ''
+        Extension: jar
+        PostPublicationActions:
+        - Id: build-record
+          PostPublicationActions:
+          - Id: record-of-record
+            PostPublicationActionAdapter: modustro-build-record
+          PostPublicationActionAdapter: modustro-build-record
+      - Id: custom
+        Classifier: tests.custom
+        Extension: jar
+        PostPublicationActions:
+        - Id: build-record
+          PostPublicationActionAdapter: modustro-build-record
+  TechnologyKind: java
+- OutputSelector: native_outputs
+  Snapshot:
+    PublicationEnabled: true
+    PublicationEndpoints:
+    - Id: primary
+      PublicationUri: file:///tmp/publication-upload
+      PublicationAdapter: local-copy
+      PublicationOrder: -1
+      PublicationRetryCount: 2
+      PublicationWaitForNextAttemptMillis: 0
+      PublicationAttemptTimeoutMillis: 10000
+      ShowPublicationProgressIfPossible: false
+      Publications:
+      - Id: standard
+        Classifier: ''
+        Extension: jar
+        PostPublicationActions:
+        - Id: build-record
+          PostPublicationActions:
+          - Id: record-of-record
+            PostPublicationActionAdapter: modustro-build-record
+          PostPublicationActionAdapter: modustro-build-record
+      - Id: custom
+        Classifier: tests.custom
+        Extension: jar
+        PostPublicationActions:
+        - Id: build-record
+          PostPublicationActionAdapter: modustro-build-record
+  TechnologyKind: python
+- OutputSelector: native_outputs
+  Snapshot:
+    PublicationEnabled: true
+    PublicationEndpoints:
+    - Id: primary
+      PublicationUri: file:///tmp/publication-upload
+      PublicationAdapter: local-copy
+      PublicationOrder: -1
+      PublicationRetryCount: 2
+      PublicationWaitForNextAttemptMillis: 0
+      PublicationAttemptTimeoutMillis: 10000
+      ShowPublicationProgressIfPossible: false
+      Publications:
+      - Id: standard
+        Classifier: ''
+        Extension: jar
+        PostPublicationActions:
+        - Id: build-record
+          PostPublicationActions:
+          - Id: record-of-record
+            PostPublicationActionAdapter: modustro-build-record
+          PostPublicationActionAdapter: modustro-build-record
+      - Id: custom
+        Classifier: tests.custom
+        Extension: jar
+        PostPublicationActions:
+        - Id: build-record
+          PostPublicationActionAdapter: modustro-build-record
+  TechnologyKind: mps
+- OutputSelector: native_sources
+  Snapshot:
+    PublicationEnabled: false
+  TechnologyKind: java
+- OutputSelector: native_sources
+  Snapshot:
+    PublicationEnabled: false
+  TechnologyKind: python
+- OutputSelector: native_sources
+  Snapshot:
+    PublicationEnabled: false
+  TechnologyKind: mps
+- OutputSelector: native_develop_outputs
+  Snapshot:
+    PublicationEnabled: false
+  TechnologyKind: java
+- OutputSelector: native_develop_outputs
+  Snapshot:
+    PublicationEnabled: false
+  TechnologyKind: python
+- OutputSelector: native_develop_outputs
+  Snapshot:
+    PublicationEnabled: false
+  TechnologyKind: mps
+- OutputSelector: native_develop_binaries
+  Snapshot:
+    PublicationEnabled: true
+  TechnologyKind: java
+- OutputSelector: native_develop_binaries
+  Snapshot:
+    PublicationEnabled: true
+  TechnologyKind: python
+- OutputSelector: native_develop_binaries
+  Snapshot:
+    PublicationEnabled: true
+  TechnologyKind: mps

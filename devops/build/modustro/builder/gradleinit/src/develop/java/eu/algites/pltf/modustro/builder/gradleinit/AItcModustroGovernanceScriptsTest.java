@@ -12,12 +12,12 @@ import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 
-/** Tests publishing bridge initialization in repositories without local governance copies. */
+/** Tests publication bridge initialization in repositories without local governance copies. */
 public final class AItcModustroGovernanceScriptsTest {
-    private static final String OVERRIDES_PATH = "gradle/tool/repository/modustro-publishing-overrides.gradle.kts";
+    private static final String OVERRIDES_PATH = "gradle/tool/repository/modustro-publication-overrides.gradle.kts";
     private static final String OVERRIDES_URL = "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/" + OVERRIDES_PATH;
 
-    /** Supplies both publishing entry points and both local and downloaded initialization paths. */
+    /** Supplies both publication entry points and both local and downloaded initialization paths. */
     @DataProvider(name = "entryPoints")
     public Object[][] AIcEntryPoints() {
         return new Object[][] {{false, false}, {false, true}, {true, false}, {true, true}};
@@ -25,7 +25,7 @@ public final class AItcModustroGovernanceScriptsTest {
 
     /** Verifies real Gradle script initialization, ancestor discovery and invocation overrides. */
     @Test(dataProvider = "entryPoints")
-    public void AIcInitializesPublishingOverrides(boolean aRootBuild, boolean aLocalCopy) throws IOException {
+    public void AIcInitializesPublicationOverrides(boolean aRootBuild, boolean aLocalCopy) throws IOException {
         Path locRepository = Path.of(System.getProperty("user.dir")).toAbsolutePath();
         while (locRepository != null && !Files.isRegularFile(locRepository.resolve("modustro-source-repository.yml"))) {
             locRepository = locRepository.getParent();
@@ -36,7 +36,7 @@ public final class AItcModustroGovernanceScriptsTest {
             ? "gradle/tool/repository/modustro-root-build.gradle.kts"
             : "gradle/tool/publication/modustro-publication.gradle.kts"));
         if (aRootBuild) {
-            locEntry = locEntry.substring(locEntry.indexOf("/* Publishing invocation overrides must be available"),
+            locEntry = locEntry.substring(locEntry.indexOf("/* Publication invocation overrides must be available"),
                 locEntry.indexOf("val locAlgitesRequiredCredentialsPlan = run"));
         }
         AtomicInteger locDownloads = new AtomicInteger();
@@ -67,17 +67,17 @@ public final class AItcModustroGovernanceScriptsTest {
                 apply(from = "bridge.gradle.kts")
                 apply(from = "bridge.gradle.kts")
                 @Suppress("UNCHECKED_CAST")
-                val locResolve = extra["modustroEffectivePublishingPlan"] as (Map<String, Any?>, String, String) -> Map<String, Any?>
-                val locMetadata = mapOf<String, Any?>("outputPublishing" to mapOf(
-                    "native_product_binaries" to mapOf("snapshot" to mapOf("publishingEnabled" to true))
+                val locResolve = extra["modustroEffectivePublicationPlan"] as (Map<String, Any?>, String, String) -> Map<String, Any?>
+                val locMetadata = mapOf<String, Any?>("outputPublications" to mapOf(
+                    "native_product_binaries" to mapOf("snapshot" to mapOf("publicationEnabled" to true))
                 ))
-                check(locResolve(locMetadata, "native_product_binaries", "snapshot")["publishingEnabled"] == false)
-                println("PUBLISHING_FALLBACK_OK")
+                check(locResolve(locMetadata, "native_product_binaries", "snapshot")["publicationEnabled"] == false)
+                println("PUBLICATION_FALLBACK_OK")
                 """);
             var locResult = GradleRunner.create().withProjectDir(locBuild.toFile())
-                .withArguments("printModustroPublishingOverrides", "-Pmodustro.publishing.nativeProductBinaries=FORCE_OFF",
+                .withArguments("printModustroPublicationOverrides", "-Pmodustro.publication.nativeProductBinaries=FORCE_OFF",
                     "--stacktrace").build();
-            Assert.assertTrue(locResult.getOutput().contains("PUBLISHING_FALLBACK_OK"));
+            Assert.assertTrue(locResult.getOutput().contains("PUBLICATION_FALLBACK_OK"));
             Assert.assertEquals(locDownloads.get(), aLocalCopy ? 0 : 1);
         } finally {
             locServer.stop(0);

@@ -1,0 +1,273 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/modustro-builder-publications_1.yamldef.schema.json",
+  "title": "Modustro Builder Output Publications v1",
+  "description": "Defines inheritable output-publication configuration and recursive post-publication action trees.",
+  "$defs": {
+    "NestedGradleSettingsBuildPolicy": {
+      "type": "string",
+      "enum": [
+        "IGNORE_NESTED_SETTINGS",
+        "USE_ISOLATED_BUILD_ON_NESTED_SETTINGS"
+      ],
+      "default": "IGNORE_NESTED_SETTINGS"
+    },
+    "PublicationFailurePolicy": {
+      "type": "string",
+      "enum": [
+        "FAIL_BUILD_ON_PUBLICATION_FAILURE",
+        "IGNORE_PUBLICATION_FAILURE"
+      ],
+      "default": "FAIL_BUILD_ON_PUBLICATION_FAILURE"
+    },
+    "FailurePolicy": {
+      "type": "string",
+      "enum": [
+        "FAIL_BUILD_ON_FAILURE",
+        "IGNORE_FAILURE"
+      ],
+      "default": "FAIL_BUILD_ON_FAILURE"
+    },
+    "PostPublicationAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "PostPublicationActionAdapter": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "TargetPublicationEndpointId": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Order": {
+          "type": "integer",
+          "default": 0,
+          "description": "Local order among direct sibling post-publication actions. Lower groups run first; equal values may run concurrently. Parent completion is always a hard barrier."
+        },
+        "Configuration": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "FailurePolicy": {
+          "$ref": "#/$defs/FailurePolicy"
+        },
+        "RetryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "WaitForNextAttemptMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000
+        },
+        "AttemptTimeoutMillis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ShowProgressIfPossible": {
+          "type": "boolean",
+          "default": true
+        },
+        "PostPublicationActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PostPublicationAction"
+          }
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "minProperties": 1
+    },
+    "Publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "Classifier": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]*$"
+        },
+        "Extension": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]*$"
+        },
+        "PostPublicationActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PostPublicationAction"
+          }
+        }
+      },
+      "required": [
+        "Id"
+      ]
+    },
+    "PublicationEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "Enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "PublicationUri": {
+          "type": "string",
+          "format": "uri",
+          "minLength": 1
+        },
+        "PublicationAdapter": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "PublicationCredentialProfile": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "PublicationOrder": {
+          "type": "integer",
+          "default": 0,
+          "description": "Global order among root publication endpoint groups. Lower values run first; equal values may run concurrently."
+        },
+        "PublicationFailurePolicy": {
+          "$ref": "#/$defs/PublicationFailurePolicy"
+        },
+        "PublicationRetryCount": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 0
+        },
+        "PublicationWaitForNextAttemptMillis": {
+          "type": "integer",
+          "minimum": 0,
+          "default": 1000
+        },
+        "PublicationAttemptTimeoutMillis": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "ShowPublicationProgressIfPossible": {
+          "type": "boolean",
+          "default": true
+        },
+        "Configuration": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "Publications": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Publication"
+          }
+        }
+      },
+      "required": [
+        "Id"
+      ],
+      "minProperties": 1
+    },
+    "PublicationEndpoints": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/PublicationEndpoint"
+      }
+    },
+    "PublicationStabilityConfiguration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "PublicationEnabled": {
+          "type": "boolean",
+          "default": false
+        },
+        "PublicationEndpoints": {
+          "$ref": "#/$defs/PublicationEndpoints"
+        }
+      },
+      "minProperties": 1
+    },
+    "OutputPublicationsDeclaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "OutputSelector": {
+          "type": "string",
+          "enum": [
+            "native_product_sources",
+            "native_product_binaries",
+            "native_product_documentation",
+            "native_develop_sources",
+            "native_develop_binaries",
+            "native_develop_documentation",
+            "modustro_docs_site",
+            "schema_site",
+            "native_outputs",
+            "native_product_outputs",
+            "native_develop_outputs",
+            "native_sources",
+            "native_binaries",
+            "native_documentation"
+          ]
+        },
+        "TechnologyKind": {
+          "type": "string",
+          "enum": [
+            "java",
+            "python",
+            "mps",
+            "modustro"
+          ]
+        },
+        "Snapshot": {
+          "$ref": "#/$defs/PublicationStabilityConfiguration"
+        },
+        "Release": {
+          "$ref": "#/$defs/PublicationStabilityConfiguration"
+        }
+      },
+      "required": [
+        "OutputSelector",
+        "TechnologyKind"
+      ],
+      "minProperties": 2
+    },
+    "OutputPublications": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/OutputPublicationsDeclaration"
+      }
+    }
+  },
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "NestedGradleSettingsBuildPolicy": {
+      "$ref": "#/$defs/NestedGradleSettingsBuildPolicy"
+    },
+    "OutputPublications": {
+      "$ref": "#/$defs/OutputPublications"
+    }
+  }
+}

@@ -1,60 +1,61 @@
-# Public download and documentation publication governance; no private governance dependency.
-ResourceEndpoints:
-  java:
-  - OutputSelector: native_product_binaries
-    public:
-      download:
-      - Id: algites-java-native-product-binaries-public-release-download
-        Url: https://repo1.maven.org/maven2
-        Stability: release
-      - Id: algites-java-native-product-binaries-public-snapshot-download
-        Url: https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/
-        Stability: snapshot
-  python:
-  - OutputSelector: native_product_binaries
-    public:
-      download:
-      - Id: algites-python-native-product-binaries-public-release-download
-        Url: https://pypi.org/simple/
-        Stability: release
-      - Id: algites-python-native-product-binaries-public-snapshot-download
-        Url: https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/
-        Stability: snapshot
-  mps:
-  - OutputSelector: native_product_binaries
-    public:
-      download:
-      - Id: algites-mps-native-product-binaries-public-release-download
-        Url: https://dummy.invalid/algites/mps/public/release/download/
-        Stability: release
-        Enabled: false
-      - Id: algites-mps-native-product-binaries-public-snapshot-download
-        Url: https://dummy.invalid/algites/mps/public/snapshot/download/
-        Stability: snapshot
-        Enabled: false
-  modustro:
-  - OutputSelector: modustro_docs_site
-    public:
-      upload:
-      - Id: algites-modustro-modustro-docs-site-public-release-upload
-        Url: https://github.com/Algites-EU/
-        Stability: release
-        ResourceEndpointProviderAdapter: github-pages
-      - Id: algites-modustro-modustro-docs-site-public-snapshot-upload
-        Url: https://github.com/Algites-EU/
-        Stability: snapshot
-        ResourceEndpointProviderAdapter: github-pages
-OutputPublishing:
+OutputPublications:
 - OutputSelector: modustro_docs_site
   Snapshot:
-    PublishingEnabled: true
-    EndpointPublications:
+    PublicationEnabled: true
+    PublicationEndpoints:
     - Id: github-documentation-branch
-      PublishingUrl: https://github.com/Algites-EU/
-      PublishingAdapter: git-branch
+      PublicationUri: https://github.com/Algites-EU/
+      PublicationAdapter: git-branch
+      Publications:
+      - Id: standard
   Release:
-    PublishingEnabled: true
-    EndpointPublications:
+    PublicationEnabled: true
+    PublicationEndpoints:
     - Id: github-documentation-branch
-      PublishingUrl: https://github.com/Algites-EU/
-      PublishingAdapter: git-branch
+      PublicationUri: https://github.com/Algites-EU/
+      PublicationAdapter: git-branch
+      Publications:
+      - Id: standard
+  TechnologyKind: modustro
+InputSubscriptions:
+- InputSelector: native_product_binaries
+  TechnologyKind: java
+  Subscriptions:
+  - Id: algites-java-native-product-binaries-public-release-subscription
+    Visibility: public
+    SubscriptionUri: https://repo1.maven.org/maven2
+    SubscriptionAdapter: maven-repository
+    Stability: release
+  - Id: algites-java-native-product-binaries-public-snapshot-subscription
+    Visibility: public
+    SubscriptionUri: https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/
+    SubscriptionAdapter: maven-repository
+    Stability: snapshot
+- InputSelector: native_product_binaries
+  TechnologyKind: python
+  Subscriptions:
+  - Id: algites-python-native-product-binaries-public-release-subscription
+    Visibility: public
+    SubscriptionUri: https://pypi.org/simple/
+    SubscriptionAdapter: python-repository
+    Stability: release
+  - Id: algites-python-native-product-binaries-public-snapshot-subscription
+    Visibility: public
+    SubscriptionUri: https://dl.cloudsmith.io/public/algites/python-snapshots-pub/python/simple/
+    SubscriptionAdapter: python-repository
+    Stability: snapshot
+- InputSelector: native_product_binaries
+  TechnologyKind: mps
+  Subscriptions:
+  - Id: algites-mps-native-product-binaries-public-release-subscription
+    Visibility: public
+    SubscriptionUri: https://dummy.invalid/algites/mps/public/release/download/
+    SubscriptionAdapter: mps-repository
+    Stability: release
+    Enabled: false
+  - Id: algites-mps-native-product-binaries-public-snapshot-subscription
+    Visibility: public
+    SubscriptionUri: https://dummy.invalid/algites/mps/public/snapshot/download/
+    SubscriptionAdapter: mps-repository
+    Stability: snapshot
+    Enabled: false

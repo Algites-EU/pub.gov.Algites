@@ -8,12 +8,12 @@ import org.gradle.kotlin.dsl.*
 class AIcModustroRepositoryPlugin : Plugin<Project> {
     override fun apply(aProject: Project) = with(aProject) {
         require(aProject == rootProject) { "Modustro repository plugin must be applied to the root Project." }
-        val locPublishingService = gradle.sharedServices.registerIfAbsent(
-            "modustroPublishing", AIcModustroPublishingService::class.java
+        val locPublicationService = gradle.sharedServices.registerIfAbsent(
+            "modustroPublications", AIcModustroPublicationService::class.java
         ) {
             parameters.credentialBaseDirectory.set(layout.projectDirectory)
         }
-        extra["modustroPublishingService"] = locPublishingService
+        extra["modustroPublicationService"] = locPublicationService
         val aRuntime = gradle.extra["modustroGradleRuntime"] as AIcModustroGradleRuntime
         aRuntime.install(extensions.extraProperties)
         @Suppress("UNCHECKED_CAST")

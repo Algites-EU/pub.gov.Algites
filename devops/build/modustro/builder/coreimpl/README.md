@@ -29,11 +29,16 @@ Phase 3 adds the build-output producer layer and activates it in the Gradle adap
 
 Phase 4 adds demand-driven capabilities. Production plans declare their capability requirements, `AIcBuiltinCapabilityDemandPlanner` deduplicates them and expands prerequisites, and the active Gradle adapter materializes the resulting source-processing and dependency-resolution boundaries. Native documentation is represented by the same graph rather than by a separate dependency chain.
 
-Phase 5.1B adds the effective ResourceEndpoint pipeline:
+Phase 5 adds the effective external-I/O pipeline:
 
-- `AIcResourceEndpointResolver` merge-composes generated `AIcgdResourceEndpoint_1` declarations, applies `Enabled=true` after inheritance, constructs the handwritten effective model, and runs ResourceKind semantic validation;
-- `AIcResourceEndpointMetadataBridge` converts the normalized Algites metadata representation used by execution adapters into the same generated DTO/effective-model pipeline;
-- `AIcResourceEndpointCatalog` provides globally unique endpoint-id lookup and typed operation-context selection.
+- `AIcInputSubscriptionResolver` merges inherited subscriptions by technology, selector and stable `Id`;
+- `AIcPublicationConfiguration` expands output selectors and recursively merge-composes publication endpoints, concrete
+  publications and post-publication actions;
+- `AIcPublicationPlanner` creates independent root publication jobs, injects the implicit root build-record action and
+  resolves the cross-lane endpoint registry used by target actions;
+- `AIcPublicationScheduler` owns root and local-sibling order barriers, retries, timeouts, cancellation, failure policy,
+  progress and required-completion propagation;
+- publication and post-action adapters execute one attempt and remain independent of Gradle.
 
 The optional `builder/structureddata/jackson` artifact supplies YAML/JSON/XML representation mapping without putting Jackson on the core/bootstrap dependency path.
 

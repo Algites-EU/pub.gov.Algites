@@ -7,8 +7,8 @@
  */
 
 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
-import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroAwaitPublishingTask
-import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishingService
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroAwaitPublicationsTask
+import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublicationService
 import org.gradle.api.provider.Provider
 import org.gradle.api.Action
 import org.gradle.api.Project
@@ -32,13 +32,9 @@ import eu.algites.lib.common.version.scheme.pep440.AIcPep440VersionScheme
 import eu.algites.lib.common.version.scheme.pep440.AInPythonBuildPhase
 import eu.algites.pltf.modustro.builder.capability.AIcBuiltinCapabilityDemandPlanner
 import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputProductionKind
-import eu.algites.pltf.modustro.builder.model.resource.AIcResourceEndpointDefinition
-import eu.algites.pltf.modustro.builder.model.resource.AInResourceEndpointAction
-import eu.algites.pltf.modustro.builder.model.resource.AInResourceStability
 import eu.algites.pltf.modustro.builder.model.source.AIcPreparedSourceSet
-import eu.algites.pltf.modustro.builder.model.publication.AIcPublishingPayload
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload
 import eu.algites.pltf.modustro.builder.output.AIcBuiltinBuildOutputProducers
-import eu.algites.pltf.modustro.builder.resource.AIcResourceEndpointMetadataBridge
 import eu.algites.lib.naming.convention.AIcAlgitesNamingProfiles
 import eu.algites.tool.codegen.defs.AIcDefaultDefsCodegenService
 import eu.algites.tool.codegen.defs.AIcCanonicalDefinitionMerger
@@ -80,7 +76,6 @@ import org.gradle.api.tasks.testing.Test
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import java.io.File
-import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -973,43 +968,49 @@ data class AIcdModustroCredentialProfile(
     val configuration: Map<String, String>
 )
 
-val AIcModustroResourceEndpointMetadataBridge = AIcResourceEndpointMetadataBridge.builtin()
+data class AIcdModustroInputSubscription(
+    val id: String,
+    val enabled: Boolean,
+    val visibility: String,
+    val stability: String?,
+    val subscriptionUri: String?,
+    val subscriptionAdapter: String?,
+    val subscriptionCredentialProfile: String?,
+    val subscriptionOrder: Int,
+    val configuration: Map<String, String>
+)
 
 @Suppress("UNCHECKED_CAST")
-fun AIcModustroResourceEndpoints(
+fun AIcModustroInputSubscriptions(
     aValue: Any?,
-    aCell: String,
-    aStability: String? = null
-): List<AIcResourceEndpointDefinition> {
-    val locResourceEndpoints = aValue as? Map<*, *> ?: return emptyList()
-    val locSegments = aCell.split('.')
-    if (locSegments.size != 4) {
-        throw GradleException("Invalid ResourceEndpoint cell '$aCell'.")
-    }
-    val locStability = aStability?.let { locValue ->
-        try {
-            AInResourceStability.fromWireValue(locValue)
-        } catch (locException: IllegalArgumentException) {
-            throw GradleException("Unsupported ResourceEndpoint Stability '$locValue'.", locException)
+    aTechnologyKind: String,
+    aInputSelector: String,
+    aAllowedVisibilities: Set<String> = setOf("public", "private"),
+    aAllowedStabilities: Set<String> = setOf("snapshot", "release")
+): List<AIcdModustroInputSubscription> {
+    val locSubscriptions = aValue as? Map<*, *> ?: return emptyList()
+    val locItems = locSubscriptions["$aTechnologyKind.$aInputSelector"] as? List<*> ?: return emptyList()
+    return locItems.mapNotNull { locRaw ->
+        val locMap = locRaw as? Map<*, *> ?: return@mapNotNull null
+        val locId = locMap["id"]?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+        val locEnabled = locMap["enabled"] as? Boolean ?: true
+        val locVisibility = locMap["visibility"]?.toString()?.trim()?.lowercase() ?: "public"
+        val locStability = locMap["stability"]?.toString()?.trim()?.lowercase()
+        if (!locEnabled || locVisibility !in aAllowedVisibilities || (locStability != null && locStability !in aAllowedStabilities)) {
+            return@mapNotNull null
         }
-    }
-    val locAction = try {
-        AInResourceEndpointAction.fromWireValue(locSegments[3])
-    } catch (locException: IllegalArgumentException) {
-        throw GradleException("Unsupported ResourceEndpoint action '${locSegments[3]}' in cell '$aCell'.", locException)
-    }
-    return try {
-        AIcModustroResourceEndpointMetadataBridge.resolve(locResourceEndpoints).select(
-            locSegments[0],
-            locSegments[1],
-            locSegments[2],
-            locAction,
-            locStability,
-            true
+        AIcdModustroInputSubscription(
+            id = locId,
+            enabled = locEnabled,
+            visibility = locVisibility,
+            stability = locStability,
+            subscriptionUri = locMap["subscriptionUri"]?.toString()?.trim()?.takeIf { it.isNotBlank() },
+            subscriptionAdapter = locMap["subscriptionAdapter"]?.toString()?.trim()?.takeIf { it.isNotBlank() },
+            subscriptionCredentialProfile = locMap["subscriptionCredentialProfile"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" },
+            subscriptionOrder = (locMap["subscriptionOrder"] as? Number)?.toInt() ?: locMap["subscriptionOrder"]?.toString()?.toIntOrNull() ?: 0,
+            configuration = (locMap["configuration"] as? Map<*, *>)?.entries?.associate { it.key.toString() to it.value.toString() } ?: emptyMap()
         )
-    } catch (locException: IllegalArgumentException) {
-        throw GradleException("Invalid effective ResourceEndpoints while selecting cell '$aCell': ${locException.message}", locException)
-    }
+    }.sortedWith(compareBy<AIcdModustroInputSubscription> { it.subscriptionOrder }.thenBy { it.id })
 }
 
 @Suppress("UNCHECKED_CAST")
@@ -1124,253 +1125,6 @@ fun AIcAlgitesSnapshotVersionForTechnology(aReleaseVersion: String, aTechnology:
     else -> "$aReleaseVersion-SNAPSHOT"
 }
 
-fun AIcModustroCloudsmithHeaders(aEndpoint: AIcResourceEndpointDefinition, aProfiles: Map<String, AIcdModustroCredentialProfile>): Map<String, String> {
-    val locProfileId = aEndpoint.credentialProfile()
-        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id()}' requires a credentialProfile.")
-    val locProfile = aProfiles[locProfileId]
-        ?: throw GradleException("Cloudsmith manage endpoint '${aEndpoint.id()}' references undefined credential profile '$locProfileId'.")
-    return when (locProfile.type) {
-        "api_key" -> {
-            val locApiKey = AIcModustroCredentialValue(locProfile, "ApiKey")
-                ?: throw GradleException("Credential profile '$locProfileId' does not provide required apiKey.")
-            val locHeaderName = locProfile.configuration["headerName"]?.takeIf { it.isNotBlank() } ?: "Authorization"
-            val locPrefix = locProfile.configuration["headerValuePrefix"] ?: "token "
-            mapOf(locHeaderName to "$locPrefix$locApiKey")
-        }
-        "bearer" -> {
-            val locToken = AIcModustroCredentialValue(locProfile, "Token")
-                ?: throw GradleException("Credential profile '$locProfileId' does not provide required token.")
-            mapOf("Authorization" to "Bearer $locToken")
-        }
-        else -> throw GradleException(
-            "Cloudsmith manage endpoint '${aEndpoint.id()}' uses credential type '${locProfile.type}'. " +
-                "The Cloudsmith management adapter supports 'api_key' and 'bearer'."
-        )
-    }
-}
-
-fun AIcModustroHttpRequest(aMethod: String, aUrl: String, aHeaders: Map<String, String>): Pair<Int, String> {
-    val locConnection = URI(aUrl).toURL().openConnection() as HttpURLConnection
-    locConnection.requestMethod = aMethod
-    locConnection.connectTimeout = 30_000
-    locConnection.readTimeout = 60_000
-    locConnection.instanceFollowRedirects = true
-    locConnection.setRequestProperty("Accept", "application/json")
-    aHeaders.forEach { (locName, locValue) -> locConnection.setRequestProperty(locName, locValue) }
-    return try {
-        val locStatus = locConnection.responseCode
-        val locStream = if (locStatus in 200..299) locConnection.inputStream else locConnection.errorStream
-        val locBody = locStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-        locStatus to locBody
-    } finally {
-        locConnection.disconnect()
-    }
-}
-
-fun AIcModustroHttpJsonRequest(
-    aMethod: String,
-    aUrl: String,
-    aHeaders: Map<String, String>,
-    aBody: String
-): Pair<Int, String> {
-    val locConnection = URI(aUrl).toURL().openConnection() as HttpURLConnection
-    locConnection.requestMethod = aMethod
-    locConnection.connectTimeout = 30_000
-    locConnection.readTimeout = 60_000
-    locConnection.instanceFollowRedirects = true
-    locConnection.doOutput = true
-    locConnection.setRequestProperty("Accept", "application/json")
-    locConnection.setRequestProperty("Content-Type", "application/json")
-    aHeaders.forEach { (locName, locValue) -> locConnection.setRequestProperty(locName, locValue) }
-    return try {
-        locConnection.outputStream.use { locStream ->
-            locStream.write(aBody.toByteArray(Charsets.UTF_8))
-        }
-        val locStatus = locConnection.responseCode
-        val locStream = if (locStatus in 200..299) locConnection.inputStream else locConnection.errorStream
-        val locResponseBody = locStream?.bufferedReader(Charsets.UTF_8)?.use { it.readText() } ?: ""
-        locStatus to locResponseBody
-    } finally {
-        locConnection.disconnect()
-    }
-}
-
-fun AIcModustroUrlPathSegment(aValue: String): String =
-    URLEncoder.encode(aValue, StandardCharsets.UTF_8.toString()).replace("+", "%20")
-
-fun AIcModustroRepsyLoginUrl(aEndpointUrl: String): String {
-    val locMarker = "/api/"
-    val locMarkerIndex = aEndpointUrl.indexOf(locMarker)
-    if (locMarkerIndex < 0) {
-        throw GradleException(
-            "Repsy manage URL '$aEndpointUrl' must contain '/api/' so the adapter can derive the Repsy authentication endpoint."
-        )
-    }
-    return aEndpointUrl.substring(0, locMarkerIndex).trimEnd('/') + "/api/auth/login"
-}
-
-@Suppress("UNCHECKED_CAST")
-fun AIcModustroRepsyHeaders(
-    aEndpoint: AIcResourceEndpointDefinition,
-    aProfiles: Map<String, AIcdModustroCredentialProfile>
-): Map<String, String> {
-    val locProfileId = aEndpoint.credentialProfile()
-        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id()}' requires a credentialProfile.")
-    val locProfile = aProfiles[locProfileId]
-        ?: throw GradleException("Repsy manage endpoint '${aEndpoint.id()}' references undefined credential profile '$locProfileId'.")
-    val locToken = when (locProfile.type) {
-        "bearer" -> AIcModustroCredentialValue(locProfile, "Token")
-            ?: throw GradleException("Credential profile '$locProfileId' does not provide required token.")
-        "basic" -> {
-            val (locUsername, locPassword) = AIcModustroRequireBasicCredential(locProfile)
-            val locLoginBody = JsonOutput.toJson(mapOf("username" to locUsername, "password" to locPassword))
-            val (locStatus, locBody) = AIcModustroHttpJsonRequest(
-                "POST",
-                AIcModustroRepsyLoginUrl(aEndpoint.url().toString()),
-                emptyMap(),
-                locLoginBody
-            )
-            if (locStatus !in 200..299) {
-                throw GradleException(
-                    "Repsy authentication failed for endpoint '${aEndpoint.id()}' with HTTP $locStatus: $locBody"
-                )
-            }
-            val locParsed = JsonSlurper().parseText(locBody) as? Map<*, *>
-            val locData = locParsed?.get("data") as? Map<*, *>
-            locData?.get("token")?.toString()?.takeIf { it.isNotBlank() }
-                ?: throw GradleException("Repsy authentication response for endpoint '${aEndpoint.id()}' did not contain data.token.")
-        }
-        else -> throw GradleException(
-            "Repsy manage endpoint '${aEndpoint.id()}' uses credential type '${locProfile.type}'. " +
-                "The Repsy management adapter supports 'basic' and 'bearer'."
-        )
-    }
-    return mapOf("Authorization" to "Bearer $locToken")
-}
-
-fun AIcModustroDeleteRepsySnapshot(
-    aEndpoint: AIcResourceEndpointDefinition,
-    aProfiles: Map<String, AIcdModustroCredentialProfile>,
-    aPackageName: String,
-    aVersion: String,
-    aFormat: String,
-    aGroupId: String?
-): Int {
-    val locBaseUrl = aEndpoint.url().toString().trimEnd('/')
-    val locExpectedSuffix = when (aFormat.lowercase()) {
-        "maven" -> "/api/mvn/artifacts/"
-        "python" -> "/api/pypi/packages/"
-        else -> throw GradleException(
-            "Repsy management adapter does not support package format '$aFormat' for endpoint '${aEndpoint.id()}'."
-        )
-    }
-    if (!locBaseUrl.contains(locExpectedSuffix)) {
-        throw GradleException(
-            "Repsy manage endpoint '${aEndpoint.id()}' URL '$locBaseUrl' must identify the configured repository using " +
-                "'$locExpectedSuffix<repoName>' for format '$aFormat'."
-        )
-    }
-    val locDeleteUrl = when (aFormat.lowercase()) {
-        "maven" -> {
-            val locGroupId = aGroupId?.takeIf { it.isNotBlank() }
-                ?: throw GradleException("Repsy Maven snapshot cleanup for '$aPackageName' requires an effective groupId.")
-            "$locBaseUrl/${AIcModustroUrlPathSegment(locGroupId)}/${AIcModustroUrlPathSegment(aPackageName)}/versions/${AIcModustroUrlPathSegment(aVersion)}"
-        }
-        "python" ->
-            "$locBaseUrl/${AIcModustroUrlPathSegment(aPackageName)}/releases/${AIcModustroUrlPathSegment(aVersion)}"
-        else -> error("unreachable")
-    }
-    val locHeaders = AIcModustroRepsyHeaders(aEndpoint, aProfiles)
-    val (locStatus, locBody) = AIcModustroHttpRequest("DELETE", locDeleteUrl, locHeaders)
-    return when {
-        locStatus in 200..299 -> 1
-        locStatus == 404 -> 0
-        else -> throw GradleException(
-            "Repsy package deletion failed for '$aPackageName/$aVersion' at endpoint '${aEndpoint.id()}' " +
-                "with HTTP $locStatus: $locBody"
-        )
-    }
-}
-
-@Suppress("UNCHECKED_CAST")
-fun AIcModustroDeleteCloudsmithSnapshot(
-    aEndpoint: AIcResourceEndpointDefinition,
-    aProfiles: Map<String, AIcdModustroCredentialProfile>,
-    aPackageName: String,
-    aVersionSelector: String,
-    aVersionPrefix: Boolean,
-    aFormat: String
-): Int {
-    val locBaseUrl = aEndpoint.url().toString().trimEnd('/') + "/"
-    val locHeaders = AIcModustroCloudsmithHeaders(aEndpoint, aProfiles)
-    val locVersionQuery = if (aVersionPrefix) {
-        "version:^$aVersionSelector"
-    } else {
-        "version:^${aVersionSelector}\$"
-    }
-    val locQuery = "name:^${aPackageName}\$ AND $locVersionQuery AND format:$aFormat"
-    val locEncodedQuery = URLEncoder.encode(locQuery, StandardCharsets.UTF_8.toString())
-    val locMatches = mutableListOf<Map<*, *>>()
-    var locPage = 1
-    while (true) {
-        val locListUrl = "${locBaseUrl}?page_size=500&page=$locPage&query=$locEncodedQuery"
-        val (locStatus, locBody) = AIcModustroHttpRequest("GET", locListUrl, locHeaders)
-        if (locStatus !in 200..299) {
-            throw GradleException("Cloudsmith package lookup failed for endpoint '${aEndpoint.id()}' with HTTP $locStatus: $locBody")
-        }
-        val locParsed = JsonSlurper().parseText(locBody)
-        val locItems = when (locParsed) {
-            is List<*> -> locParsed
-            is Map<*, *> -> (locParsed["results"] as? List<*>) ?: (locParsed["data"] as? List<*>) ?: emptyList<Any?>()
-            else -> emptyList<Any?>()
-        }
-        locMatches += locItems.mapNotNull { it as? Map<*, *> }.filter { locItem ->
-            val locVersion = locItem["version"]?.toString() ?: return@filter false
-            locItem["name"]?.toString() == aPackageName &&
-                (if (aVersionPrefix) locVersion.startsWith(aVersionSelector) else locVersion == aVersionSelector) &&
-                locItem["format"]?.toString()?.equals(aFormat, ignoreCase = true) == true
-        }
-        if (locItems.size < 500) break
-        locPage++
-    }
-
-    var locDeleted = 0
-    locMatches.forEach { locItem ->
-        val locVersion = locItem["version"]?.toString() ?: aVersionSelector
-        val locIdentifier = locItem["slug_perm"]?.toString()?.takeIf { it.isNotBlank() }
-            ?: locItem["identifier_perm"]?.toString()?.takeIf { it.isNotBlank() }
-            ?: throw GradleException("Cloudsmith package '$aPackageName/$locVersion' did not expose a permanent identifier.")
-        val (locDeleteStatus, locDeleteBody) = AIcModustroHttpRequest("DELETE", "$locBaseUrl$locIdentifier/", locHeaders)
-        if (locDeleteStatus !in setOf(204, 404)) {
-            throw GradleException(
-                "Cloudsmith package deletion failed for '$aPackageName/$locVersion' at endpoint '${aEndpoint.id()}' " +
-                    "with HTTP $locDeleteStatus: $locDeleteBody"
-            )
-        }
-        if (locDeleteStatus == 204) locDeleted++
-    }
-    return locDeleted
-}
-
-@Suppress("UNCHECKED_CAST")
-val modustroResolvedRepositoryMetadata = rootProject.extra["modustroResolvedRepositoryMetadata"] as Map<String, Any?>
-
-@Suppress("UNCHECKED_CAST")
-val modustroResolvedArtifactDirectoriesByGradleProjectPath =
-    rootProject.extra["modustroResolvedArtifactDirectoriesByGradleProjectPath"] as Map<String, Map<String, Any?>>
-
-fun modustroResolvedArtifactDirectoryForProject(aProjectPath: String): Map<String, Any?>? {
-    return modustroResolvedArtifactDirectoriesByGradleProjectPath[aProjectPath]
-}
-
-@Suppress("UNCHECKED_CAST")
-fun modustroResolvedVersionValue(aArtifactDirectory: Map<String, Any?>?): String? {
-    val locVersion = aArtifactDirectory?.get("version") as? Map<String, Any?>
-    return locVersion?.get("resolvedValue")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-}
-
-
-@Suppress("UNCHECKED_CAST")
 fun AIcModustroDependencyDefinitions(aArtifactDirectory: Map<String, Any?>?, aPropertyName: String): List<Map<String, Any?>> =
     (aArtifactDirectory?.get(aPropertyName) as? List<Map<String, Any?>>).orEmpty()
 
@@ -1892,7 +1646,7 @@ if (modustroRequestedRepositoryVisibility != null && modustroRequestedRepository
     )
 }
 
-val modustroPublishingRepositoryVisibility = when (modustroSourceRepositoryVisibility) {
+val modustroPublicationRepositoryVisibility = when (modustroSourceRepositoryVisibility) {
     "pub" -> "public"
     "priv" -> "private"
     else -> throw GradleException("Unsupported Algites repository visibility '$modustroSourceRepositoryVisibility'.")
@@ -2069,7 +1823,7 @@ modustroBuild.configure {
     dependsOn(validateModustroPythonDistributionPaths)
 }
 
-val modustroPublishingBuildGate = tasks.register("modustroPublishingBuildGate") {
+val modustroPublicationBuildGate = tasks.register("modustroPublicationBuildGate") {
     group = "publishing"
     description = "Requires all effective or explicitly selected Algites TechnologyKinds to build successfully before any publication task may start."
     dependsOn(modustroBuild)
@@ -2078,7 +1832,7 @@ val modustroPublishingBuildGate = tasks.register("modustroPublishingBuildGate") 
 val modustroPublish = tasks.register("modustroPublish") {
     group = "publishing"
     description = "Publishes all effective or explicitly selected Algites TechnologyKinds after the common publication build gate succeeds."
-    dependsOn(modustroPublishingBuildGate)
+    dependsOn(modustroPublicationBuildGate)
 }
 
 val modustroValidateReleaseTechnologyKinds = tasks.register("validateModustroReleaseTechnologyKinds") {
@@ -2176,80 +1930,68 @@ abstract class AIcResolveModustroRequiredCredentialsTask : DefaultTask() {
 }
 
 /* Publishing invocation overrides must be available before publication tasks resolve effective plans. */
-val locModustroSourceRepositoryRootForPublishingOverrides = generateSequence(rootProject.projectDir.canonicalFile) { it.parentFile }
+val locModustroSourceRepositoryRootForPublicationOverrides = generateSequence(rootProject.projectDir.canonicalFile) { it.parentFile }
     .firstOrNull { locDirectory -> locDirectory.resolve("modustro-source-repository.yml").isFile }
     ?: throw GradleException(
         "Cannot locate modustro-source-repository.yml on the ancestor path of Gradle build root '${rootProject.projectDir.path}'."
     )
-val locModustroPublishingOverridesScript =
-    locModustroSourceRepositoryRootForPublishingOverrides.resolve("gradle/tool/repository/modustro-publishing-overrides.gradle.kts")
-if (!rootProject.extra.has("modustroEffectivePublishingPlan")) {
-    if (locModustroPublishingOverridesScript.isFile) {
-        apply(from = locModustroPublishingOverridesScript)
+val locModustroPublicationOverridesScript =
+    locModustroSourceRepositoryRootForPublicationOverrides.resolve("gradle/tool/repository/modustro-publication-overrides.gradle.kts")
+if (!rootProject.extra.has("modustroEffectivePublicationPlan")) {
+    if (locModustroPublicationOverridesScript.isFile) {
+        apply(from = locModustroPublicationOverridesScript)
     } else {
         apply(from = uri(
-            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/repository/modustro-publishing-overrides.gradle.kts"
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${System.getenv("MODUSTRO_PUBLIC_GOVERNANCE_REVISION") ?: "main"}/gradle/tool/repository/modustro-publication-overrides.gradle.kts"
         ))
     }
 }
 
 
 val locAlgitesRequiredCredentialsPlan = run {
-    val locRequestedResourceKinds = (
-        modustroGradleOrEnvironmentValue("algites.credential.resourceKinds")
-            ?: System.getenv("ALGITES_CREDENTIAL_RESOURCE_KINDS")
-            ?: "native_product_sources,native_product_binaries,native_product_documentation,native_develop_sources,native_develop_binaries,native_develop_documentation"
+    val locRequestedOutputKinds = (
+        modustroGradleOrEnvironmentValue("algites.credential.outputKinds")
+            ?: System.getenv("ALGITES_CREDENTIAL_OUTPUT_KINDS")
+            ?: "native_product_sources,native_product_binaries,native_product_documentation,native_develop_sources,native_develop_binaries,native_develop_documentation,modustro_docs_site,schema_site"
         ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
     val locRequestedUsages = (
         modustroGradleOrEnvironmentValue("algites.credential.usages")
             ?: System.getenv("ALGITES_CREDENTIAL_USAGES")
-            ?: "download"
+            ?: "subscription"
         ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
-    val locDownloadStabilities = (
-        modustroGradleOrEnvironmentValue("algites.credential.download.stabilities")
-            ?: System.getenv("ALGITES_CREDENTIAL_DOWNLOAD_STABILITIES")
+    val locSubscriptionStabilities = (
+        modustroGradleOrEnvironmentValue("algites.credential.subscription.stabilities")
+            ?: System.getenv("ALGITES_CREDENTIAL_SUBSCRIPTION_STABILITIES")
             ?: "release,snapshot"
         ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
-    val locUploadStabilities = (
-        modustroGradleOrEnvironmentValue("algites.credential.upload.stabilities")
-            ?: System.getenv("ALGITES_CREDENTIAL_UPLOAD_STABILITIES")
-            ?: "release,snapshot"
-        ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
-    val locManageStabilities = (
-        modustroGradleOrEnvironmentValue("algites.credential.manage.stabilities")
-            ?: System.getenv("ALGITES_CREDENTIAL_MANAGE_STABILITIES")
+    val locPublicationStabilities = (
+        modustroGradleOrEnvironmentValue("algites.credential.publication.stabilities")
+            ?: System.getenv("ALGITES_CREDENTIAL_PUBLICATION_STABILITIES")
             ?: "release,snapshot"
         ).split(',').map { it.trim().lowercase() }.filter { it.isNotBlank() }.toSet()
 
-    val locSupportedResourceKinds = setOf(
-        "native_product_binaries",
-        "native_product_sources",
-        "native_product_documentation", "native_develop_sources", "native_develop_binaries", "native_develop_documentation",
-        "modustro_docs_site",
-        "schema_site"
+    val locSupportedOutputKinds = setOf(
+        "native_product_binaries", "native_product_sources", "native_product_documentation",
+        "native_develop_sources", "native_develop_binaries", "native_develop_documentation",
+        "modustro_docs_site", "schema_site"
     )
-    val locSupportedUsages = setOf("download", "upload", "manage")
+    val locSupportedUsages = setOf("subscription", "publication")
     val locSupportedStabilities = setOf("release", "snapshot")
-    if (!locSupportedResourceKinds.containsAll(locRequestedResourceKinds)) {
-        throw GradleException(
-            "Unsupported credential ResourceKind. Supported values: " +
-                locSupportedResourceKinds.sorted().joinToString(", ") + "."
-        )
+    if (!locSupportedOutputKinds.containsAll(locRequestedOutputKinds)) {
+        throw GradleException("Unsupported credential output kind. Supported values: ${locSupportedOutputKinds.sorted().joinToString(", ")}.")
     }
     if (!locSupportedUsages.containsAll(locRequestedUsages)) {
-        throw GradleException("Unsupported credential usage. Supported values: download, upload, manage.")
+        throw GradleException("Unsupported credential usage. Supported values: subscription, publication.")
     }
-    if (!locSupportedStabilities.containsAll(locDownloadStabilities + locUploadStabilities + locManageStabilities)) {
+    if (!locSupportedStabilities.containsAll(locSubscriptionStabilities + locPublicationStabilities)) {
         throw GradleException("Unsupported credential stability. Supported values: release, snapshot.")
     }
 
-    val locDownloadVisibilities = when (modustroSourceRepositoryVisibility) {
+    val locAllowedSubscriptionVisibilities = when (modustroSourceRepositoryVisibility) {
         "pub" -> setOf("public")
         "priv" -> setOf("public", "private")
         else -> throw GradleException("Unsupported Algites repository visibility '$modustroSourceRepositoryVisibility'.")
     }
-    val locUploadVisibilities = setOf(modustroPublishingRepositoryVisibility)
-    val locManageVisibilities = setOf(modustroPublishingRepositoryVisibility)
     val locDeclaredOperationTechnologyKinds = modustroResolvedArtifactDirectoriesByGradleProjectPath.values
         .flatMap { locMetadata -> AIcModustroStringList(locMetadata["technologyKinds"]) }
         .toSet()
@@ -2258,88 +2000,71 @@ val locAlgitesRequiredCredentialsPlan = run {
     } else {
         locDeclaredOperationTechnologyKinds
     }
-    val locResourceEndpoints = linkedMapOf<String, Map<String, String?>>()
+    val locSubscriptions = linkedMapOf<String, Map<String, Any?>>()
+    val locPublicationEndpoints = linkedMapOf<String, Map<String, Any?>>()
     val locCredentials = linkedMapOf<String, Map<String, String>>()
 
     fun AIcCollect(aMetadata: Map<String, Any?>, aScope: String) {
+        val locProfiles = AIcModustroCredentialProfiles(aMetadata["credentialProfiles"])
+        fun collectProfile(aId: String?) {
+            if (aId.isNullOrBlank()) return
+            val locProfile = locProfiles[aId]
+                ?: throw GradleException("Effective configuration in '$aScope' references undefined credential profile '$aId'.")
+            locCredentials["${locProfile.id}|${locProfile.type}"] = linkedMapOf("profileId" to locProfile.id, "type" to locProfile.type)
+        }
+
         val locScopeTechnologyKinds = AIcModustroStringList(aMetadata["technologyKinds"]).toSet()
-        val locPublicationProfiles = AIcModustroCredentialProfiles(aMetadata["credentialProfiles"])
-        fun collectProfile(id: String?) {
-            if (id.isNullOrBlank()) return
-            val profile = locPublicationProfiles[id] ?: throw GradleException("Publication in '$aScope' references undefined credential profile '$id'.")
-            locCredentials["${profile.id}|${profile.type}"] = linkedMapOf("profileId" to profile.id, "type" to profile.type)
-        }
-        fun extensions(items: List<*>) {
-            items.forEach { item ->
-                val value = item as? Map<*, *> ?: return@forEach
-                if (value["PublishingEnabled"] == false || value["Enabled"] == false) return@forEach
-                collectProfile(value["PublishingCredentialProfile"]?.toString())
-                extensions((value["ExtendedPublications"] as? List<*>).orEmpty())
-            }
-        }
-        if ("upload" in locRequestedUsages) {
-            @Suppress("UNCHECKED_CAST")
-            val resolver = rootProject.extra["modustroEffectivePublishingPlan"] as (Map<String, Any?>, String, String) -> Map<String, Any?>
-            locRequestedResourceKinds.forEach { kind -> locUploadStabilities.forEach { lane ->
-                val technologies = if (kind.startsWith("native_")) locScopeTechnologyKinds.ifEmpty { locOperationTechnologyKinds } else setOf("modustro")
-                technologies.forEach { technology ->
-                    val plan = resolver(aMetadata + ("publishingTechnologyKind" to technology), kind, lane)
-                    if (plan["publishingEnabled"] == true) (plan["endpointPublications"] as? List<*>).orEmpty().forEach { raw ->
-                        val endpoint = raw as? Map<*, *> ?: return@forEach
-                        if (endpoint["enabled"] == false) return@forEach
-                        collectProfile(endpoint["publishingCredentialProfile"]?.toString())
-                        (endpoint["publications"] as? List<*>).orEmpty().forEach { form ->
-                            val value = form as? Map<*, *> ?: return@forEach
-                            if (value["Enabled"] != false) extensions((value["ExtendedPublications"] as? List<*>).orEmpty())
-                        }
+        val locTechnologyKinds = if (locScopeTechnologyKinds.isEmpty()) locOperationTechnologyKinds
+            else locScopeTechnologyKinds.intersect(locOperationTechnologyKinds.ifEmpty { locScopeTechnologyKinds })
+
+        if ("subscription" in locRequestedUsages) {
+            locTechnologyKinds.sorted().forEach { locTechnology ->
+                locRequestedOutputKinds.filter { it.startsWith("native_") }.sorted().forEach { locSelector ->
+                    AIcModustroInputSubscriptions(
+                        aMetadata["inputSubscriptions"], locTechnology, locSelector,
+                        locAllowedSubscriptionVisibilities, locSubscriptionStabilities
+                    ).forEach { locSubscription ->
+                        collectProfile(locSubscription.subscriptionCredentialProfile)
+                        locSubscriptions["$aScope|$locTechnology|$locSelector|${locSubscription.id}"] = linkedMapOf(
+                            "scope" to aScope,
+                            "technologyKind" to locTechnology,
+                            "inputSelector" to locSelector,
+                            "id" to locSubscription.id,
+                            "subscriptionUri" to locSubscription.subscriptionUri,
+                            "subscriptionAdapter" to locSubscription.subscriptionAdapter,
+                            "stability" to locSubscription.stability
+                        )
                     }
                 }
-            } }
+            }
         }
-        val locResourceEndpointMap = aMetadata["resourceEndpoints"] as? Map<*, *> ?: return
-        val locProfiles = AIcModustroCredentialProfiles(aMetadata["credentialProfiles"])
 
-        locResourceEndpointMap.keys.mapNotNull { it?.toString() }.sorted().forEach resourceEndpointCellLoop@ { locCell ->
-            val locSegments = locCell.split('.')
-            if (locSegments.size != 4) return@resourceEndpointCellLoop
-            val (locTechnology, locResourceKind, locVisibility, locAction) = locSegments
-            if (locResourceKind !in locRequestedResourceKinds) return@resourceEndpointCellLoop
-            if (locAction !in locRequestedUsages) return@resourceEndpointCellLoop
-            if (locAction == "download" && locVisibility !in locDownloadVisibilities) return@resourceEndpointCellLoop
-            if (locAction == "upload" && locVisibility !in locUploadVisibilities) return@resourceEndpointCellLoop
-            if (locAction == "manage" && locVisibility !in locManageVisibilities) return@resourceEndpointCellLoop
-            if (locAction == "manage" && aScope == "repository") return@resourceEndpointCellLoop
-            if (locAction == "manage" && aMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() == false) return@resourceEndpointCellLoop
-            if (locTechnology != "modustro" && locTechnology !in locOperationTechnologyKinds) return@resourceEndpointCellLoop
-            if (locTechnology != "modustro" && locScopeTechnologyKinds.isNotEmpty() && locTechnology !in locScopeTechnologyKinds) return@resourceEndpointCellLoop
-
-            AIcModustroResourceEndpoints(aMetadata["resourceEndpoints"], locCell).forEach resourceEndpointLoop@ { locEndpoint ->
-                val locStability = locEndpoint.stability()?.wireValue()
-                if (locStability != null) {
-                    if (locAction == "download" && locStability !in locDownloadStabilities) return@resourceEndpointLoop
-                    if (locAction == "upload" && locStability !in locUploadStabilities) return@resourceEndpointLoop
-                    if (locAction == "manage" && locStability !in locManageStabilities) return@resourceEndpointLoop
-                }
-                val locProfileId = locEndpoint.credentialProfile()
-                val locProfile = if (locProfileId.isNullOrBlank()) null else locProfiles[locProfileId]
-                    ?: throw GradleException(
-                        "ResourceEndpoint '${locEndpoint.id()}' references undefined credential profile '$locProfileId'."
-                    )
-                val locEndpointKey = "$aScope|$locCell|${locStability.orEmpty()}|${locEndpoint.id()}"
-                locResourceEndpoints[locEndpointKey] = linkedMapOf(
-                    "scope" to aScope,
-                    "cell" to locCell,
-                    "stability" to locStability,
-                    "id" to locEndpoint.id(),
-                    "credentialProfile" to locProfileId,
-                    "credentialType" to locProfile?.type
-                )
-                if (locProfile != null) {
-                    val locCredentialKey = "${locProfile.id}|${locProfile.type}"
-                    locCredentials[locCredentialKey] = linkedMapOf(
-                        "profileId" to locProfile.id,
-                        "type" to locProfile.type
-                    )
+        if ("publication" in locRequestedUsages) {
+            @Suppress("UNCHECKED_CAST")
+            val locResolver = rootProject.extra["modustroEffectivePublicationPlan"] as (Map<String, Any?>, String, String) -> Map<String, Any?>
+            locRequestedOutputKinds.sorted().forEach { locOutputKind ->
+                val locTechnologies = if (locOutputKind.startsWith("native_")) locTechnologyKinds else setOf("modustro")
+                locTechnologies.forEach { locTechnology ->
+                    locPublicationStabilities.sorted().forEach { locLane ->
+                        val locPlan = locResolver(aMetadata + ("publicationTechnologyKind" to locTechnology), locOutputKind, locLane)
+                        if (locPlan["publicationEnabled"] != true) return@forEach
+                        val locRegistry = (locPlan["publicationEndpointRegistry"] as? List<*>).orEmpty()
+                        locRegistry.forEach { locRaw ->
+                            val locEndpoint = locRaw as? Map<*, *> ?: return@forEach
+                            if (locEndpoint["enabled"] == false) return@forEach
+                            val locId = locEndpoint["id"]?.toString()?.takeIf { it.isNotBlank() } ?: return@forEach
+                            collectProfile(locEndpoint["publicationCredentialProfile"]?.toString())
+                            locPublicationEndpoints["$aScope|$locTechnology|$locOutputKind|$locLane|$locId"] = linkedMapOf(
+                                "scope" to aScope,
+                                "technologyKind" to locTechnology,
+                                "outputKind" to locOutputKind,
+                                "stability" to locLane,
+                                "id" to locId,
+                                "publicationUri" to locEndpoint["publicationUri"],
+                                "publicationAdapter" to locEndpoint["publicationAdapter"]
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -2351,7 +2076,8 @@ val locAlgitesRequiredCredentialsPlan = run {
     }
 
     val locPlan = linkedMapOf<String, Any>(
-        "resourceEndpoints" to locResourceEndpoints.values.toList(),
+        "inputSubscriptions" to locSubscriptions.values.toList(),
+        "publicationEndpoints" to locPublicationEndpoints.values.toList(),
         "credentials" to locCredentials.values.toList()
     )
     Triple(JsonOutput.toJson(locPlan), locCredentials.size, locOperationTechnologyKinds.sorted())
@@ -2359,20 +2085,15 @@ val locAlgitesRequiredCredentialsPlan = run {
 
 val modustroResolveRequiredCredentials = tasks.register<AIcResolveModustroRequiredCredentialsTask>("resolveModustroRequiredCredentials") {
     group = "modustro"
-    description = "Resolves enabled ResourceEndpoints and the credential profiles required by the selected operation context."
-
+    description = "Resolves enabled InputSubscriptions/OutputPublications and credential profiles required by the selected operation context."
     planJson.set(locAlgitesRequiredCredentialsPlan.first)
     credentialCount.set(locAlgitesRequiredCredentialsPlan.second)
     technologyKinds.set(locAlgitesRequiredCredentialsPlan.third)
-
     val locOutputPath = modustroGradleOrEnvironmentValue("algites.credential.output")
         ?: System.getenv("ALGITES_CREDENTIAL_OUTPUT")
-    if (!locOutputPath.isNullOrBlank()) {
-        outputFile.set(File(locOutputPath))
-    }
+    if (!locOutputPath.isNullOrBlank()) outputFile.set(File(locOutputPath))
 }
 
-/* Existing workflow copies may still invoke the former governance task name. */
 tasks.register("resolveAlgitesRequiredCredentials") {
     group = "modustro"
     description = "Delegates credential preflight to resolveModustroRequiredCredentials."
@@ -2380,7 +2101,7 @@ tasks.register("resolveAlgitesRequiredCredentials") {
 }
 
 @Suppress("UNCHECKED_CAST")
-val modustroPublishingService = rootProject.extra["modustroPublishingService"] as Provider<AIcModustroPublishingService>
+val modustroPublicationService = rootProject.extra["modustroPublicationService"] as Provider<AIcModustroPublicationService>
 
 val locModustroSchemaSiteScript = rootProject.file("gradle/tool/publication/modustro-schema-site.gradle.kts")
 if (locModustroSchemaSiteScript.isFile) {
@@ -2397,13 +2118,13 @@ listOf("publishModustroDocsSite", "publishModustroSchemaSite").forEach { locTask
     }
 }
 
-val modustroAwaitBackgroundPublishing = tasks.register<AIcModustroAwaitPublishingTask>("modustroAwaitBackgroundPublishing") {
+val modustroAwaitBackgroundPublications = tasks.register<AIcModustroAwaitPublicationsTask>("modustroAwaitBackgroundPublications") {
     group = "publishing"
-    description = "Waits for best-effort publishing attempts that may outlive required publishing barriers."
-    publishingService.set(modustroPublishingService)
-    usesService(modustroPublishingService)
+    description = "Waits for best-effort publication attempts that may outlive required publishing barriers."
+    publicationService.set(modustroPublicationService)
+    usesService(modustroPublicationService)
 }
-modustroPublish.configure { finalizedBy(modustroAwaitBackgroundPublishing) }
+modustroPublish.configure { finalizedBy(modustroAwaitBackgroundPublications) }
 
 subprojects {
     val locAlgitesRunDirectoryRelativePath = AIcModustroRunDirectoryRelativePath(project.projectDir)
@@ -2525,7 +2246,7 @@ subprojects {
             description = "Discovers canonical product definitions and generates native source types for the artifact TechnologyKinds."
             artifactDirectory.set(project.layout.projectDirectory)
             /* Referenced canonical schemas may be owned by another artifact in the same source repository. */
-            sourceFiles.from(rootProject.fileTree(locModustroSourceRepositoryRootForPublishingOverrides) {
+            sourceFiles.from(rootProject.fileTree(locModustroSourceRepositoryRootForPublicationOverrides) {
                 include("**/src/product/yamldefs/**/*.yamldef.schema.json", "**/src/product/jsondefs/**/*.jsondef.schema.json")
                 exclude("**/.gradle/**", "**/.git/**", "**/.run/**", "**/build/**")
             })
@@ -2581,33 +2302,34 @@ subprojects {
     val locAlgitesVariantId = locAlgitesArtifactDirectory?.get("variantId")?.toString()?.takeIf { it.isNotBlank() && it != "null" }
     val locAlgitesEffectiveArtifactId = AIcAlgitesEffectiveArtifactId(locAlgitesCanonicalArtifactId, locAlgitesVariantId)
     val locAlgitesProjectVersion = project.version.toString()
-    val locModustroPublishingStability = if (locAlgitesProjectVersion.endsWith("SNAPSHOT", ignoreCase = true)) "snapshot" else "release"
+    val locModustroPublicationStability = if (locAlgitesProjectVersion.endsWith("SNAPSHOT", ignoreCase = true)) "snapshot" else "release"
 
     @Suppress("UNCHECKED_CAST")
-    fun locModustroPublishingEnabled(aOutputKind: String): Boolean {
-        val locResolver = rootProject.extra["modustroEffectivePublishingPlan"]
+    fun locModustroPublicationEnabled(aOutputKind: String, aTechnologyKind: String): Boolean {
+        val locResolver = rootProject.extra["modustroEffectivePublicationPlan"]
             as (Map<String, Any?>, String, String) -> Map<String, Any?>
-        val locMetadata = locAlgitesArtifactDirectory ?: emptyMap()
-        val locPlan = locResolver(locMetadata, aOutputKind, locModustroPublishingStability)
-        return locPlan["publishingEnabled"] as? Boolean ?: false
+        val locMetadata = (locAlgitesArtifactDirectory ?: emptyMap()) + ("publicationTechnologyKind" to aTechnologyKind)
+        val locPlan = locResolver(locMetadata, aOutputKind, locModustroPublicationStability)
+        return locPlan["publicationEnabled"] as? Boolean ?: false
     }
 
-    val locAnyNativePublishingEnabled = listOf(
-        "native_product_binaries",
-        "native_product_sources",
-        "native_product_documentation", "native_develop_sources", "native_develop_binaries", "native_develop_documentation"
-    ).any(::locModustroPublishingEnabled)
+    val locAnyNativePublicationEnabled = locEffectiveTechnologyKinds.any { locTechnologyKind ->
+        listOf(
+            "native_product_binaries", "native_product_sources", "native_product_documentation",
+            "native_develop_sources", "native_develop_binaries", "native_develop_documentation"
+        ).any { locOutputKind -> locModustroPublicationEnabled(locOutputKind, locTechnologyKind) }
+    }
 
-    val locEffectiveResourceEndpoints = locAlgitesArtifactDirectory?.get("resourceEndpoints")
+    val locEffectiveInputSubscriptions = locAlgitesArtifactDirectory?.get("inputSubscriptions")
     val locEffectiveCredentialProfiles = AIcModustroCredentialProfiles(locAlgitesArtifactDirectory?.get("credentialProfiles"))
 
     @Suppress("UNCHECKED_CAST")
-    fun locModustroPublishingPlanJson(aOutputKind: String, aTechnologyKind: String): String {
-        val locResolver = rootProject.extra["modustroEffectivePublishingPlan"]
+    fun locModustroPublicationPlanJson(aOutputKind: String, aTechnologyKind: String): String {
+        val locResolver = rootProject.extra["modustroEffectivePublicationPlan"]
             as (Map<String, Any?>, String, String) -> Map<String, Any?>
-        return JsonOutput.toJson(locResolver((locAlgitesArtifactDirectory ?: emptyMap()) + ("publishingTechnologyKind" to aTechnologyKind), aOutputKind, locModustroPublishingStability))
+        return JsonOutput.toJson(locResolver((locAlgitesArtifactDirectory ?: emptyMap()) + ("publicationTechnologyKind" to aTechnologyKind), aOutputKind, locModustroPublicationStability))
     }
-    val locPublishingCredentialProfilesJson = JsonOutput.toJson(locAlgitesArtifactDirectory?.get("credentialProfiles") ?: emptyMap<String, Any>())
+    val locPublicationCredentialProfilesJson = JsonOutput.toJson(locAlgitesArtifactDirectory?.get("credentialProfiles") ?: emptyMap<String, Any>())
 
     val locAlgitesArtifactDirectoryPath = locAlgitesArtifactDirectory?.get("path")?.toString()?.takeIf { it.isNotBlank() } ?: "."
     val locAlgitesProductLicenses = locAlgitesLicensesForPathAndContentKind(locAlgitesArtifactDirectoryPath, "product")
@@ -2750,7 +2472,7 @@ subprojects {
             }
         }
 
-        if ("java" in locEffectiveTechnologyKinds && locAnyNativePublishingEnabled) {
+        if ("java" in locEffectiveTechnologyKinds && locAnyNativePublicationEnabled) {
             plugins.withId("maven-publish") {
                 listOf(
                     Triple(AInBuildOutputProductionKind.JAVA_CLASSES_JAR, "publishModustroJavaNativeBinary", "jar"),
@@ -2764,26 +2486,26 @@ subprojects {
                     }
                     val locArchive = tasks.named<Jar>(locArchiveTaskName).flatMap { it.archiveFile }
                     val locPom = layout.buildDirectory.file("publications/mavenJava/pom-default.xml")
-                    val locPlanJson = locModustroPublishingPlanJson(locOutputKind, "java")
+                    val locPlanJson = locModustroPublicationPlanJson(locOutputKind, "java")
                     val locPublish = tasks.register<AIcModustroPublishFilesTask>(locTaskName) {
                         group = "publishing"
-                        description = "Publishes the Java native output through the Modustro publishing scheduler."
-                        dependsOn(modustroPublishingBuildGate)
+                        description = "Publishes the Java native output through the Modustro publication scheduler."
+                        dependsOn(modustroPublicationBuildGate)
                         payloadFiles.from(locArchive)
                         if (locArchiveTaskName == "jar") {
                             dependsOn("generatePomFileForMavenJavaPublication")
                             payloadFiles.from(locPom)
                             publishedFileNames.put("pom-default.xml", "$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion.pom")
                         }
-                        publishingPlanJson.set(locPlanJson)
-                        credentialProfilesJson.set(locPublishingCredentialProfilesJson)
+                        publicationPlanJson.set(locPlanJson)
+                        credentialProfilesJson.set(locPublicationCredentialProfilesJson)
                         outputKind.set(locOutputKind.uppercase())
-                        stability.set(locModustroPublishingStability)
+                        stability.set(locModustroPublicationStability)
                         artifactIdentity.set(listOfNotNull(locAlgitesResolvedProjectGroup, locAlgitesEffectiveArtifactId).joinToString(":"))
                         publicationVersion.set(locAlgitesProjectVersion)
                         coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId, "version" to locAlgitesProjectVersion, "technologyKind" to "java", "classifier" to (if (locArchiveTaskName == "sourcesJar") "sources" else if (locArchiveTaskName == "javadocJar") "javadoc" else ""), "extension" to "jar"))
-                        publishingService.set(modustroPublishingService)
-                        usesService(modustroPublishingService)
+                        publicationService.set(modustroPublicationService)
+                        usesService(modustroPublicationService)
                     }
                     modustroPublish.configure { dependsOn(locPublish) }
                 }
@@ -2800,8 +2522,8 @@ subprojects {
                 Triple("native_develop_sources", "test-sources", "publishModustroJavaDevelopSources"),
                 Triple("native_develop_documentation", "test-javadoc", "publishModustroJavaDevelopDocumentation")
             ).forEach { (kind, classifier, publishName) ->
-                val plan = locModustroPublishingPlanJson(kind, "java")
-                if ((JsonSlurper().parseText(plan) as Map<*, *>)["publishingEnabled"] == true) {
+                val plan = locModustroPublicationPlanJson(kind, "java")
+                if ((JsonSlurper().parseText(plan) as Map<*, *>)["publicationEnabled"] == true) {
                     val docs = if (kind == "native_develop_documentation") tasks.register<org.gradle.api.tasks.javadoc.Javadoc>("modustroDevelopJavadoc") {
                         source(locDevelop.allJava)
                         classpath = locDevelop.compileClasspath
@@ -2817,15 +2539,15 @@ subprojects {
                     }
                     val publish = tasks.register<AIcModustroPublishFilesTask>(publishName) {
                         group = "publishing"
-                        dependsOn(modustroPublishingBuildGate, archive)
-                        publishingPlanJson.set(plan)
-                        credentialProfilesJson.set(locPublishingCredentialProfilesJson)
-                        outputKind.set(kind.uppercase()); stability.set(locModustroPublishingStability)
+                        dependsOn(modustroPublicationBuildGate, archive)
+                        publicationPlanJson.set(plan)
+                        credentialProfilesJson.set(locPublicationCredentialProfilesJson)
+                        outputKind.set(kind.uppercase()); stability.set(locModustroPublicationStability)
                         artifactIdentity.set("${locAlgitesResolvedProjectGroup}:$locAlgitesEffectiveArtifactId")
                         publicationVersion.set(locAlgitesProjectVersion)
                         coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId, "version" to locAlgitesProjectVersion, "technologyKind" to "java", "classifier" to classifier, "extension" to "jar"))
                         payloadFiles.from(archive.flatMap { it.archiveFile })
-                        publishingService.set(modustroPublishingService); usesService(modustroPublishingService)
+                        publicationService.set(modustroPublicationService); usesService(modustroPublicationService)
                     }
                     modustroPublish.configure { dependsOn(publish) }
                 }
@@ -2927,14 +2649,15 @@ subprojects {
                 ?.takeIf { it.isNotBlank() }
         }
 
-        val locPythonDownloadEndpoints = listOf(
-            "python.native_product_binaries.public.download",
-            "python.native_product_binaries.private.download"
-        ).flatMap { locCell -> AIcModustroResourceEndpoints(locEffectiveResourceEndpoints, locCell) }
-        val locPythonDownloadEndpointDefinitions = locPythonDownloadEndpoints.map { locEndpoint ->
-            val locProfileId = locEndpoint.credentialProfile().orEmpty()
+        val locPythonInputSubscriptions = AIcModustroInputSubscriptions(
+            locEffectiveInputSubscriptions, "python", "native_product_binaries",
+            if (modustroSourceRepositoryVisibility == "pub") setOf("public") else setOf("public", "private"),
+            setOf("release", "snapshot")
+        ).filter { it.subscriptionAdapter == "python-repository" }
+        val locPythonDownloadEndpointDefinitions = locPythonInputSubscriptions.map { locSubscription ->
+            val locProfileId = locSubscription.subscriptionCredentialProfile.orEmpty()
             val locProfileType = if (locProfileId.isBlank()) "" else locEffectiveCredentialProfiles[locProfileId]?.type.orEmpty()
-            listOf(locEndpoint.id(), locEndpoint.url().toString(), locProfileId, locProfileType).joinToString("\t")
+            listOf(locSubscription.id, locSubscription.subscriptionUri.orEmpty(), locProfileId, locProfileType).joinToString("\t")
         }
 
         val locResolvePythonDependencies = tasks.register<AIcResolvePythonDependenciesTask>("resolvePythonDependencies") {
@@ -3213,17 +2936,17 @@ subprojects {
             Triple(AInBuildOutputProductionKind.PYTHON_SDIST, "publishModustroPythonNativeSources", "*.tar.gz")
         ).filter { it.first in locPythonProductionKinds }.forEach { (_, locTaskName, locPattern) ->
             val locOutputKind = if (locPattern == "*.whl") "native_product_binaries" else "native_product_sources"
-            val locPlanJson = locModustroPublishingPlanJson(locOutputKind, "python")
+            val locPlanJson = locModustroPublicationPlanJson(locOutputKind, "python")
             val locDistributionFiles = fileTree(locPythonDistDirectory) { include(locPattern) }
             val locPythonExecutable = modustroGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3"
             val locPublish = tasks.register<AIcModustroPublishFilesTask>(locTaskName) {
                 group = "publishing"
-                description = "Publishes the Python distribution through the Modustro publishing scheduler."
-                dependsOn(modustroPublishingBuildGate, locBuildPython)
-                publishingPlanJson.set(locPlanJson)
-                credentialProfilesJson.set(locPublishingCredentialProfilesJson)
+                description = "Publishes the Python distribution through the Modustro publication scheduler."
+                dependsOn(modustroPublicationBuildGate, locBuildPython)
+                publicationPlanJson.set(locPlanJson)
+                credentialProfilesJson.set(locPublicationCredentialProfilesJson)
                 outputKind.set(locOutputKind.uppercase())
-                stability.set(locModustroPublishingStability)
+                stability.set(locModustroPublicationStability)
                 artifactIdentity.set(listOfNotNull(locAlgitesResolvedProjectGroup, locAlgitesEffectiveArtifactId).joinToString(":"))
                 publicationVersion.set(locPythonProjectVersion)
                 coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId,
@@ -3231,18 +2954,18 @@ subprojects {
                 requiresSnapshotInstance.set(true)
                 snapshotInstanceId.set(algitesSnapshotInstanceId ?: "")
                 payloadFiles.from(locDistributionFiles)
-                publishingService.set(modustroPublishingService)
-                usesService(modustroPublishingService)
+                publicationService.set(modustroPublicationService)
+                usesService(modustroPublicationService)
             }
-            if ("python" in locEffectiveTechnologyKinds && locAnyNativePublishingEnabled) {
+            if ("python" in locEffectiveTechnologyKinds && locAnyNativePublicationEnabled) {
                 modustroPublish.configure { dependsOn(locPublish) }
             }
         }
 
         if ("python" in locEffectiveTechnologyKinds) {
             val locDevelopKinds = listOf("native_develop_binaries", "native_develop_sources")
-            val locDevelopPlans = locDevelopKinds.associateWith { locModustroPublishingPlanJson(it, "python") }
-            if (locDevelopPlans.values.any { (JsonSlurper().parseText(it) as Map<*, *>)["publishingEnabled"] == true }) {
+            val locDevelopPlans = locDevelopKinds.associateWith { locModustroPublicationPlanJson(it, "python") }
+            if (locDevelopPlans.values.any { (JsonSlurper().parseText(it) as Map<*, *>)["publicationEnabled"] == true }) {
                 val locDevelopRoot = locAlgitesProjectRunDirectory.dir("bld/python/develop-project")
                 val locDevelopDist = locAlgitesProjectRunDirectory.dir("bld/python/develop-dist")
                 val locDevelopMetadata = locAlgitesProjectRunDirectory.file("bld/python/develop-pyproject.toml")
@@ -3290,9 +3013,9 @@ subprojects {
                     val plan = locDevelopPlans.getValue(kind)
                     val pattern = if (kind == "native_develop_binaries") "*.whl" else "*.tar.gz"
                     val publish = tasks.register<AIcModustroPublishFilesTask>(if (kind == "native_develop_binaries") "publishModustroPythonDevelopBinaries" else "publishModustroPythonDevelopSources") {
-                        group = "publishing"; dependsOn(modustroPublishingBuildGate, locDevelopBuild)
-                        publishingPlanJson.set(plan); credentialProfilesJson.set(locPublishingCredentialProfilesJson)
-                        outputKind.set(kind.uppercase()); stability.set(locModustroPublishingStability)
+                        group = "publishing"; dependsOn(modustroPublicationBuildGate, locDevelopBuild)
+                        publicationPlanJson.set(plan); credentialProfilesJson.set(locPublicationCredentialProfilesJson)
+                        outputKind.set(kind.uppercase()); stability.set(locModustroPublicationStability)
                         artifactIdentity.set("${locAlgitesResolvedProjectGroup}:$locAlgitesEffectiveArtifactId:develop")
                         publicationVersion.set(locPythonProjectVersion)
                         coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId,
@@ -3300,7 +3023,7 @@ subprojects {
                             "pythonExecutable" to (modustroGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3")))
                         requiresSnapshotInstance.set(true); snapshotInstanceId.set(algitesSnapshotInstanceId ?: "")
                         payloadFiles.from(fileTree(locDevelopDist) { include(pattern) })
-                        publishingService.set(modustroPublishingService); usesService(modustroPublishingService)
+                        publicationService.set(modustroPublicationService); usesService(modustroPublicationService)
                     }
                     modustroPublish.configure { dependsOn(publish) }
                 }
@@ -3319,128 +3042,25 @@ subprojects {
 }
 
 
-val modustroDeleteReleasedSnapshots = tasks.register("modustroDeleteReleasedSnapshots") {
-    group = "publishing"
-    description = "Deletes snapshot packages corresponding to a successfully published release according to effective Algites lifecycle policy."
-
-    doLast {
-        var locConfiguredTargets = 0
-        var locDeletedPackages = 0
-        modustroResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locProjectPath, locMetadata) ->
-            val locDeclaredTechnologyKinds = AIcModustroStringList(locMetadata["technologyKinds"]).toSet()
-            val locTechnologyKinds = if (modustroRequestedTechnologyKinds.isEmpty()) {
-                locDeclaredTechnologyKinds
-            } else {
-                locDeclaredTechnologyKinds.intersect(modustroRequestedTechnologyKinds)
-            }
-            if (locTechnologyKinds.isEmpty()) return@forEach
-            val locDeleteEnabled = locMetadata["deleteSnapshotWhenReleased"]?.toString()?.toBooleanStrictOrNull() ?: true
-            if (!locDeleteEnabled) {
-                logger.lifecycle("Skipping released-snapshot cleanup for '$locProjectPath': deleteSnapshotWhenReleased=false.")
-                return@forEach
-            }
-            val locProject = rootProject.findProject(locProjectPath)
-                ?: throw GradleException("Resolved Algites artifact project '$locProjectPath' is not present in the Gradle build.")
-            val locReleaseVersion = modustroGradleOrEnvironmentValue("algites.cleanup.releaseVersion")
-                ?: System.getenv("ALGITES_CLEANUP_RELEASE_VERSION")
-                ?: locProject.version.toString()
-            if (locReleaseVersion.endsWith("SNAPSHOT", ignoreCase = true)) {
-                throw GradleException("Released-snapshot cleanup requires a release version, but '$locProjectPath' resolved '$locReleaseVersion'.")
-            }
-            val locResourceEndpoints = locMetadata["resourceEndpoints"]
-            val locProfiles = AIcModustroCredentialProfiles(locMetadata["credentialProfiles"])
-            val locGroupId = locMetadata["groupId"]?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" }
-            val locArtifactBaseId = AIcAlgitesCanonicalArtifactId(locProjectPath)
-            val locVariantId = locMetadata["variantId"]?.toString()?.takeIf { it.isNotBlank() && it != "null" }
-            val locArtifactId = AIcAlgitesEffectiveArtifactId(locArtifactBaseId, locVariantId)
-
-            locTechnologyKinds.sorted().forEach { locTechnology ->
-                val locCell = "$locTechnology.native_product_binaries.$modustroPublishingRepositoryVisibility.manage"
-                val locEndpoints = AIcModustroResourceEndpoints(locResourceEndpoints, locCell, "snapshot")
-                if (locEndpoints.isEmpty()) {
-                    logger.lifecycle("No enabled $locTechnology snapshot manage endpoint is configured for '$locProjectPath'; cleanup is skipped for this TechnologyKind.")
-                    return@forEach
-                }
-                val locSnapshotVersion = AIcAlgitesSnapshotVersionForTechnology(locReleaseVersion, locTechnology)
-                val locSnapshotVersionIsPrefix = locTechnology == "python"
-                val locPackageName = when (locTechnology) {
-                    "java" -> locArtifactId
-                    "python" -> AIcAlgitesPythonDistributionName(locGroupId, locArtifactId)
-                    else -> throw GradleException(
-                        "Released-snapshot cleanup for TechnologyKind '$locTechnology' has no management package-coordinate adapter yet."
-                    )
-                }
-                val locFormat = when (locTechnology) {
-                    "java" -> "maven"
-                    "python" -> "python"
-                    else -> locTechnology
-                }
-
-                locEndpoints.forEach { locEndpoint ->
-                    locConfiguredTargets++
-                    val locDeleted = when (locEndpoint.resourceEndpointProviderAdapter()) {
-                        "cloudsmith" -> AIcModustroDeleteCloudsmithSnapshot(
-                            locEndpoint,
-                            locProfiles,
-                            locPackageName,
-                            locSnapshotVersion,
-                            locSnapshotVersionIsPrefix,
-                            locFormat
-                        )
-                        "repsy" -> {
-                            if (locSnapshotVersionIsPrefix) {
-                                logger.warn(
-                                    "Repsy released-snapshot cleanup currently supports exact versions only; " +
-                                        "timestamped Python snapshot series '$locSnapshotVersion*' for '$locProjectPath' must be cleaned manually " +
-                                        "until the Repsy adapter has a confirmed release-list API endpoint."
-                                )
-                                0
-                            } else {
-                                AIcModustroDeleteRepsySnapshot(
-                                    locEndpoint,
-                                    locProfiles,
-                                    locPackageName,
-                                    locSnapshotVersion,
-                                    locFormat,
-                                    locGroupId
-                                )
-                            }
-                        }
-                        null -> throw GradleException("Manage endpoint '${locEndpoint.id()}' has no ResourceEndpointProviderAdapter.")
-                        else -> throw GradleException(
-                            "Manage endpoint '${locEndpoint.id()}' uses unsupported ResourceEndpointProviderAdapter '${locEndpoint.resourceEndpointProviderAdapter()}'."
-                        )
-                    }
-                    locDeletedPackages += locDeleted
-                    logger.lifecycle(
-                        "Released-snapshot cleanup endpoint '${locEndpoint.id()}': package=$locPackageName " +
-                            "versionSelector=${locSnapshotVersion}${if (locSnapshotVersionIsPrefix) "*" else ""} deleted=$locDeleted"
-                    )
-                }
-            }
-        }
-        logger.lifecycle(
-            "Algites released-snapshot cleanup completed: configuredTargets=$locConfiguredTargets deletedPackages=$locDeletedPackages"
-        )
-    }
-}
-
-tasks.register("printModustroPublishingPlan") {
+tasks.register("printModustroPublicationPlan") {
     group = "modustro"
-    description = "Prints the effective Modustro Builder publishing/deployment configuration."
+    description = "Prints the effective Modustro Builder input-subscription and output-publication configuration."
 
     doLast {
-        println("Modustro Builder publishing/deployment plan for ${rootProject.name}:")
+        println("Modustro Builder input/publication plan for ${rootProject.name}:")
         println(" - repository visibility: $modustroSourceRepositoryVisibility")
         println(" - requested technology kinds: ${if (modustroRequestedTechnologyKinds.isEmpty()) "all effective technology kinds" else modustroRequestedTechnologyKinds.joinToString(",")}")
         println(" - docs pages branch: $modustroDocsPagesBranch")
-
         modustroResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { locEntry ->
             val locMetadata = locEntry.value
             println(" - ${locEntry.key}: technologyKinds=${AIcModustroStringList(locMetadata["technologyKinds"])}")
-            val locResourceEndpoints = locMetadata["resourceEndpoints"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
-            locResourceEndpoints.toSortedMap(compareBy { it.toString() }).forEach { (locCell, locEndpoints) ->
-                println("     $locCell=$locEndpoints")
+            val locInputSubscriptions = locMetadata["inputSubscriptions"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+            locInputSubscriptions.toSortedMap(compareBy { it.toString() }).forEach { (locKey, locSubscriptions) ->
+                println("     InputSubscriptions[$locKey]=$locSubscriptions")
+            }
+            val locOutputPublications = locMetadata["outputPublications"] as? Map<*, *> ?: emptyMap<Any?, Any?>()
+            locOutputPublications.toSortedMap(compareBy { it.toString() }).forEach { (locKey, locPublications) ->
+                println("     OutputPublications[$locKey]=$locPublications")
             }
         }
     }

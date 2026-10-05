@@ -22,13 +22,12 @@ val locModustroArtifactMetadata = locModustroResolvedArtifactDirectories.map { l
         "relativePath" to locArtifactDirectory["path"],
         "hasGradleBuild" to locArtifactDirectory["hasGradleBuild"],
         "projectPath" to locArtifactDirectory["gradleProjectPath"],
-        "resourceEndpoints" to locArtifactDirectory["resourceEndpoints"],
+        "inputSubscriptions" to locArtifactDirectory["inputSubscriptions"],
         "dependencies" to locArtifactDirectory["dependencies"],
         "dependencyConstraints" to locArtifactDirectory["dependencyConstraints"],
         "environmentRequirements" to locArtifactDirectory["environmentRequirements"],
-        "deleteSnapshotWhenReleased" to locArtifactDirectory["deleteSnapshotWhenReleased"],
         "nestedGradleSettingsBuildPolicy" to locArtifactDirectory["nestedGradleSettingsBuildPolicy"],
-        "outputPublishing" to locArtifactDirectory["outputPublishing"]
+        "outputPublications" to locArtifactDirectory["outputPublications"]
     )
 }
 

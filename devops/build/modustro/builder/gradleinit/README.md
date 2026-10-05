@@ -3,7 +3,7 @@
 `gradleinit` is the compiled Gradle integration edge. Builder `coreintf` and
 `coreimpl` remain independent of Gradle. The existing metadata orchestration is
 compiled here instead of being evaluated as Settings/Project script plugins;
-ResourceEndpoint declaration merge, defaulting and validation still call Core.
+Input-subscription and output-publication normalization still delegates portable semantics to Core.
 
 ## Consumer bootstrap
 
@@ -22,7 +22,7 @@ eu.algites.pltf.modustro.builder:pub.gov.Algites_devops.build.modustro.builder.g
 
 The Settings plugin owns one `AIcModustroGradleRuntime` per Gradle build domain.
 It discovers artifact projects and isolated builds, resolves descriptor metadata,
-registers download repositories and initializes credential providers. The Project
+registers repositories from effective InputSubscriptions and initializes credential providers. The Project
 plugin `eu.algites.pltf.modustro.builder.repository` reuses that runtime, exposes
 compatibility metadata properties and registers the existing metadata CLI tasks.
 Public defaults are bundled from the canonical governance defaults file during
@@ -80,13 +80,13 @@ documentation workflow uses this mode.
 ## Validation
 
 TestNG/Gradle TestKit integration tests exercise the actual top-level buildscript
-bootstrap, Settings/Project/applied-Project class identity, endpoint inheritance,
+bootstrap, Settings/Project/applied-Project class identity, subscription/publication inheritance,
 project discovery, metadata-only helper initialization and isolated-build inheritance with domain-local Gradle paths. Gradle plugin validation
 checks the compiled adapter. Core classes are not shaded or copied into the plugin.
 
 
 Native Java/Python, documentation and schema publication tasks now pass only
-serializable payload paths, coordinates, publishing plans and credential-profile
+serializable payload paths, coordinates, publication plans and credential-profile
 metadata to compiled task classes. A shared invocation-scoped BuildService owns
 the Core scheduler and resolves credentials at execution, keeping secrets and
 live Project/script objects out of configuration cache. It preserves required

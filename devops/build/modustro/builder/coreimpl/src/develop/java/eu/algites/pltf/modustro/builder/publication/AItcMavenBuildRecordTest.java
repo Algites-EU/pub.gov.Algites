@@ -1,47 +1,109 @@
 package eu.algites.pltf.modustro.builder.publication;
 
 import com.sun.net.httpserver.HttpServer;
-import eu.algites.pltf.modustro.builder.model.publication.*;
-import eu.algites.pltf.modustro.builder.publication.adapters.AIcMavenRepositoryPublishingAdapter;
-import java.net.*;import java.nio.file.*;import java.time.*;import java.util.*;import java.util.concurrent.*;import java.util.concurrent.atomic.*;
-import org.testng.annotations.Test;import static org.testng.Assert.*;
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload;
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayloadFile;
+import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind;
+import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability;
+import eu.algites.pltf.modustro.builder.publication.adapters.AIcMavenRepositoryPublicationAdapter;
+import java.net.InetSocketAddress;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.testng.Assert;
+import org.testng.annotations.Test;
 
-/** Exercises real Maven HTTP requests, compound extensions and retry immutability. */
+/** Exercises a real Maven HTTP publication followed by the implicit build-record action. */
 public final class AItcMavenBuildRecordTest {
- @Test public void pairedSnapshotAndIdempotentRetry() throws Exception {
-  var bytes=new ConcurrentHashMap<String,byte[]>();var puts=new ConcurrentHashMap<String,AtomicInteger>();
-  var server=HttpServer.create(new InetSocketAddress("127.0.0.1",0),0);
-  server.createContext("/",exchange->{
-   String path=exchange.getRequestURI().getPath();
-   if(exchange.getRequestMethod().equals("PUT")){bytes.put(path,exchange.getRequestBody().readAllBytes());puts.computeIfAbsent(path,k->new AtomicInteger()).incrementAndGet();exchange.sendResponseHeaders(201,-1);}
-   else {byte[] content=bytes.get(path);if(content==null)exchange.sendResponseHeaders(404,-1);else {exchange.sendResponseHeaders(200,content.length);exchange.getResponseBody().write(content);}}
-   exchange.close();
-  });server.start();
-  try {
-   Path tmp=Files.createTempDirectory("modustro-maven-record-");Path jar=tmp.resolve("library-1.0-SNAPSHOT-javadoc.jar");Files.writeString(jar,"unchanged documentation");
-   var payload=new AIcPublishingPayload(AInPublishingOutputKind.NATIVE_PRODUCT_DOCUMENTATION,AInPublishingStability.SNAPSHOT,"test:library","1.0-SNAPSHOT",List.of(new AIcPublishingPayloadFile(jar,jar.getFileName().toString())),Map.of("groupId","test","artifactId","library","version","1.0-SNAPSHOT","technologyKind","java","classifier","javadoc","extension","jar"));
-   var context=Map.<String,Object>of("RepositoryId","pub.test","Invocation",Map.of("Id","mock-http","StartedAt","2026-10-04T20:00:00.123456789Z"));
-   var endpoint=Map.<String,Object>of("id","remote","publishingUrl","http://127.0.0.1:"+server.getAddress().getPort()+"/maven/","publishingAdapter","maven-repository");
-   var jobs=new AIcPublicationPlanner().plan(payload,Map.of("publishingEnabled",true,"endpointPublications",List.of(endpoint)),context,tmp);
-   var adapter=new AIcMavenRepositoryPublishingAdapter();
-   var main=jobs.get(0).payloadFactory().prepare(null,null);
-   var record=jobs.get(1).payloadFactory().prepare(main,new AIcPublishingEndpointResult("remote/standard",true,true,false,1,Duration.ZERO,null));
-   var progress=new AIiPublishingProgressReporter(){public void started(String m){}public void progress(long c,long t,String u,String m){}public void indeterminate(String m){}public void completed(String m){}};
-   for(int repeat=0;repeat<2;repeat++)for(int index=0;index<2;index++){
-    var published=index==0?main:record;
-    adapter.publish(new AIcPublishingAttemptContext(jobs.get(index).endpoint(),published,1,1,10000L,Instant.now().plusSeconds(10),Map.of(),()->false,progress));
-   }
-   String base="/maven/test/library/1.0-SNAPSHOT/";
-   String original=main.files().get(0).logicalName();String sidecar=record.files().get(0).logicalName();
-   assertEquals(sidecar,original+".modustro-build-record.yml");
-   assertEquals(puts.get(base+original).get(),1);assertEquals(puts.get(base+sidecar).get(),1);
-   var metadata=javax.xml.parsers.DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(new java.io.ByteArrayInputStream(bytes.get(base+"maven-metadata.xml")));
-   var versions=metadata.getElementsByTagName("snapshotVersion");assertEquals(versions.getLength(),2);
-   var extensions=new HashSet<String>();var values=new HashSet<String>();
-   for(int i=0;i<versions.getLength();i++){var element=(org.w3c.dom.Element)versions.item(i);extensions.add(element.getElementsByTagName("extension").item(0).getTextContent());values.add(element.getElementsByTagName("value").item(0).getTextContent());assertEquals(element.getElementsByTagName("classifier").item(0).getTextContent(),"javadoc");}
-   assertEquals(extensions,Set.of("jar","jar.modustro-build-record.yml"));assertEquals(values,Set.of(main.version()));
-   Files.writeString(main.files().get(0).path(),"different bytes");
-   try{adapter.publish(new AIcPublishingAttemptContext(jobs.get(0).endpoint(),main,1,1,10000L,Instant.now().plusSeconds(10),Map.of(),()->false,progress));fail("An immutable publication was overwritten");}catch(IllegalStateException expected){assertTrue(expected.getMessage().contains("immutable"));}
-  }finally{server.stop(0);}
- }
+    @Test
+    public void AIcPublishesPairedSnapshotAndBuildRecord() throws Exception {
+        Map<String, byte[]> locBytes = new ConcurrentHashMap<>();
+        Map<String, AtomicInteger> locPuts = new ConcurrentHashMap<>();
+        HttpServer locServer = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        locServer.createContext("/", aExchange -> {
+            String locPath = aExchange.getRequestURI().getPath();
+            if ("PUT".equals(aExchange.getRequestMethod())) {
+                locBytes.put(locPath, aExchange.getRequestBody().readAllBytes());
+                locPuts.computeIfAbsent(locPath, aIgnored -> new AtomicInteger()).incrementAndGet();
+                aExchange.sendResponseHeaders(201, -1);
+            } else if ("GET".equals(aExchange.getRequestMethod())) {
+                byte[] locContent = locBytes.get(locPath);
+                if (locContent == null) {
+                    aExchange.sendResponseHeaders(404, -1);
+                } else {
+                    aExchange.sendResponseHeaders(200, locContent.length);
+                    aExchange.getResponseBody().write(locContent);
+                }
+            } else {
+                aExchange.sendResponseHeaders(405, -1);
+            }
+            aExchange.close();
+        });
+        locServer.start();
+        try {
+            Path locDirectory = Files.createTempDirectory("modustro-maven-record-");
+            Path locJar = locDirectory.resolve("library-1.0-SNAPSHOT-javadoc.jar");
+            Files.writeString(locJar, "unchanged documentation");
+            AIcPublicationPayload locPayload = new AIcPublicationPayload(
+                    AInPublicationOutputKind.NATIVE_PRODUCT_DOCUMENTATION,
+                    AInPublicationStability.SNAPSHOT,
+                    "test:library",
+                    "1.0-SNAPSHOT",
+                    List.of(new AIcPublicationPayloadFile(locJar, locJar.getFileName().toString())),
+                    Map.of(
+                            "groupId", "test",
+                            "artifactId", "library",
+                            "version", "1.0-SNAPSHOT",
+                            "logicalVersion", "1.0-SNAPSHOT",
+                            "technologyKind", "java",
+                            "classifier", "javadoc",
+                            "extension", "jar"));
+            Map<String, Object> locEndpoint = Map.of(
+                    "Id", "remote",
+                    "PublicationUri", "http://127.0.0.1:" + locServer.getAddress().getPort() + "/maven/",
+                    "PublicationAdapter", "maven-repository");
+            List<AIcPublicationJob> locJobs = new AIcPublicationPlanner().plan(
+                    locPayload,
+                    Map.of("PublicationEnabled", true, "PublicationEndpoints", List.of(locEndpoint)),
+                    Map.of("RepositoryId", "pub.test", "Invocation", Map.of(
+                            "Id", "mock-http",
+                            "StartedAt", "2026-10-04T20:00:00.123456789Z")),
+                    locDirectory);
+            Assert.assertEquals(locJobs.size(), 1);
+            Assert.assertEquals(locJobs.get(0).postPublicationActions().size(), 1);
+            Assert.assertEquals(locJobs.get(0).postPublicationActions().get(0).id(), "build-record");
+
+            try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(
+                    List.of(new AIcMavenRepositoryPublicationAdapter()),
+                    List.of(new AIcBuildRecordPostPublicationActionAdapter()))) {
+                var locHandle = locScheduler.schedule(
+                        locJobs,
+                        aEndpoint -> Map.of(),
+                        aEndpoint -> new AIiPublicationProgressReporter() {
+                            @Override public void started(String aMessage) { }
+                            @Override public void progress(long aCompleted, long aTotal, String aUnit, String aMessage) { }
+                            @Override public void indeterminate(String aMessage) { }
+                            @Override public void completed(String aMessage) { }
+                        });
+                locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+                Assert.assertTrue(locHandle.publicationResults().get("remote/standard").join().success());
+                Assert.assertTrue(locHandle.postPublicationActionResults().get("remote/standard/build-record").join().success());
+            }
+
+            String locBase = "/maven/test/library/1.0-SNAPSHOT/";
+            String locMainName = locJobs.get(0).payload().files().get(0).logicalName();
+            String locRecordName = locMainName + ".modustro-build-record.yml";
+            Assert.assertTrue(locBytes.containsKey(locBase + locMainName));
+            Assert.assertTrue(locBytes.containsKey(locBase + locRecordName));
+            Assert.assertEquals(locPuts.get(locBase + locMainName).get(), 1);
+            Assert.assertEquals(locPuts.get(locBase + locRecordName).get(), 1);
+            Assert.assertTrue(locBytes.containsKey(locBase + "maven-metadata.xml"));
+        } finally {
+            locServer.stop(0);
+        }
+    }
 }

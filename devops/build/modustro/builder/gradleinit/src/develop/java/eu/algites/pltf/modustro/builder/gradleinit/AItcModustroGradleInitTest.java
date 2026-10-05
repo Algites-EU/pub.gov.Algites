@@ -37,28 +37,28 @@ public final class AItcModustroGradleInitTest {
                   ReleaseLineVersion: "1"
                   Revision: 0
                   QualifierKind: snapshot
-                ResourceEndpoints:
-                  java:
-                    - OutputSelector: native_product_binaries
-                      public:
-                        download:
-                          - Id: algites-test-java-native-product-binaries-public-release-download
-                            Url: https://repo.example.test/releases/
-                            Stability: release
-                            Enabled: false
+                InputSubscriptions:
+                  - InputSelector: native_product_binaries
+                    TechnologyKind: java
+                    Subscriptions:
+                      - Id: algites-test-java-native-product-binaries-public-release-subscription
+                        Visibility: public
+                        SubscriptionUri: https://repo.example.test/releases/
+                        SubscriptionAdapter: maven-repository
+                        Stability: release
+                        Enabled: false
                 """);
         Path locChild = Files.createDirectories(locDirectory.resolve("child"));
         Files.writeString(locChild.resolve("modustro-artifact.yml"), """
                 Artifact:
                   Name: Gradle init child
                   TechnologyKinds: [java]
-                ResourceEndpoints:
-                  java:
-                    - OutputSelector: native_product_binaries
-                      public:
-                        download:
-                          - Id: algites-test-java-native-product-binaries-public-release-download
-                            Enabled: true
+                InputSubscriptions:
+                  - InputSelector: native_product_binaries
+                    TechnologyKind: java
+                    Subscriptions:
+                      - Id: algites-test-java-native-product-binaries-public-release-subscription
+                        Enabled: true
                 """);
 
         return locDirectory;
@@ -70,15 +70,15 @@ public final class AItcModustroGradleInitTest {
         Files.writeString(locFixture.resolve("settings.gradle.kts"), AIcBootstrap());
         Files.writeString(locFixture.resolve("applied.gradle.kts"), """
                 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroGradleRuntime
-                import eu.algites.pltf.modustro.builder.model.resource.AIcgdResourceEndpoint_1
+                import eu.algites.pltf.modustro.builder.model.subscription.AIcInputSubscription
                 val locRuntime = gradle.extra["modustroGradleRuntime"] as AIcModustroGradleRuntime
-                check(locRuntime.endpointDeclarationClass === AIcgdResourceEndpoint_1::class.java)
+                check(locRuntime.inputSubscriptionClass === AIcInputSubscription::class.java)
                 """);
         Files.writeString(locFixture.resolve("build.gradle.kts"), """
                 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroGradleRuntime
-                import eu.algites.pltf.modustro.builder.model.resource.AIcgdResourceEndpoint_1
+                import eu.algites.pltf.modustro.builder.model.subscription.AIcInputSubscription
                 val locRuntime = gradle.extra["modustroGradleRuntime"] as AIcModustroGradleRuntime
-                check(locRuntime.endpointDeclarationClass === AIcgdResourceEndpoint_1::class.java)
+                check(locRuntime.inputSubscriptionClass === AIcInputSubscription::class.java)
                 apply(from = "applied.gradle.kts")
                 apply(plugin = "eu.algites.pltf.modustro.builder.repository")
                 check(project(":child").projectDir == file("child"))
@@ -87,10 +87,11 @@ public final class AItcModustroGradleInitTest {
                 @Suppress("UNCHECKED_CAST")
                 val locArtifacts = locMetadata["artifactDirectories"] as List<Map<String, Any?>>
                 @Suppress("UNCHECKED_CAST")
-                val locEndpoints = locArtifacts.single { it["path"] == "child" }["resourceEndpoints"] as Map<String, List<Map<String, Any?>>>
-                val locEndpoint = locEndpoints["java.native_product_binaries.public.download"]!!.single { it["id"] == "algites-test-java-native-product-binaries-public-release-download" }
-                check(locEndpoint["enabled"] == true)
-                check(locEndpoint["url"] == "https://repo.example.test/releases/")
+                val locSubscriptions = locArtifacts.single { it["path"] == "child" }["inputSubscriptions"] as Map<String, List<Map<String, Any?>>>
+                val locSubscription = locSubscriptions["java.native_product_binaries"]!!.single { it["id"] == "algites-test-java-native-product-binaries-public-release-subscription" }
+                check(locSubscription["enabled"] == true)
+                check(locSubscription["subscriptionUri"] == "https://repo.example.test/releases/")
+                check(locSubscription["subscriptionAdapter"] == "maven-repository")
                 println("SETTINGS_PROJECT_IDENTITY_AND_INHERITANCE_OK")
                 """);
         BuildResult locResult = GradleRunner.create().withProjectDir(locFixture.toFile())
@@ -106,9 +107,9 @@ public final class AItcModustroGradleInitTest {
         Files.writeString(locFixture.resolve("gradle.properties"), "modustro.gradleinit.metadataOnly=true\n");
         Files.writeString(locFixture.resolve("build.gradle.kts"), """
                 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroGradleRuntime
-                import eu.algites.pltf.modustro.builder.model.resource.AIcgdResourceEndpoint_1
+                import eu.algites.pltf.modustro.builder.model.subscription.AIcInputSubscription
                 val locRuntime = gradle.extra["modustroGradleRuntime"] as AIcModustroGradleRuntime
-                check(locRuntime.endpointDeclarationClass === AIcgdResourceEndpoint_1::class.java)
+                check(locRuntime.inputSubscriptionClass === AIcInputSubscription::class.java)
                 check(extra.has("modustroResolveArtifactDirectoryMetadataMap"))
                 check(extra.has("modustroResolveCredentialValue"))
                 println("METADATA_HELPER_OK")
@@ -128,9 +129,9 @@ public final class AItcModustroGradleInitTest {
         Files.writeString(locFixture.resolve("child/settings.gradle.kts"), AIcBootstrap());
         Files.writeString(locFixture.resolve("child/build.gradle.kts"), """
                 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroGradleRuntime
-                import eu.algites.pltf.modustro.builder.model.resource.AIcgdResourceEndpoint_1
+                import eu.algites.pltf.modustro.builder.model.subscription.AIcInputSubscription
                 val locRuntime = gradle.extra["modustroGradleRuntime"] as AIcModustroGradleRuntime
-                check(locRuntime.endpointDeclarationClass === AIcgdResourceEndpoint_1::class.java)
+                check(locRuntime.inputSubscriptionClass === AIcInputSubscription::class.java)
                 apply(plugin = "eu.algites.pltf.modustro.builder.repository")
                 @Suppress("UNCHECKED_CAST")
                 val locByProject = extra["modustroResolvedArtifactDirectoriesByGradleProjectPath"] as Map<String, Map<String, Any?>>
@@ -147,7 +148,7 @@ public final class AItcModustroGradleInitTest {
 
     /** Publishes through a runtime BuildService twice and proves that configuration cache is reusable. */
     @Test
-    public void AIcPublishingReusesConfigurationCache() throws IOException {
+    public void AIcPublicationReusesConfigurationCache() throws IOException {
         Path locFixture = AIcFixture();
         Files.writeString(locFixture.resolve("settings.gradle.kts"), AIcBootstrap());
         Files.writeString(locFixture.resolve("gradle.properties"), "modustro.gradleinit.metadataOnly=true\n");
@@ -155,22 +156,22 @@ public final class AItcModustroGradleInitTest {
         Files.createDirectories(locFixture.resolve("published/nested"));
         Files.writeString(locFixture.resolve("published/nested/payload.txt"), "initial destination");
         Files.writeString(locFixture.resolve("build.gradle.kts"), """
-                import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishingService
+                import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublicationService
                 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
-                import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroAwaitPublishingTask
+                import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroAwaitPublicationsTask
                 import groovy.json.JsonOutput
-                val locService = gradle.sharedServices.registerIfAbsent("modustroPublishing", AIcModustroPublishingService::class.java) {
+                val locService = gradle.sharedServices.registerIfAbsent("modustroPublications", AIcModustroPublicationService::class.java) {
                     parameters.credentialBaseDirectory.set(layout.projectDirectory)
                 }
-                val locPlan = JsonOutput.toJson(mapOf("publishingEnabled" to true, "endpointPublications" to listOf(
-                    mapOf("id" to "local", "publishingAdapter" to "local-copy", "publishingUrl" to file("published").toURI().toString())
+                val locPlan = JsonOutput.toJson(mapOf("publicationEnabled" to true, "publicationEndpoints" to listOf(
+                    mapOf("id" to "local", "publicationAdapter" to "local-copy", "publicationUri" to file("published").toURI().toString())
                 )))
-                val locAwait = tasks.register<AIcModustroAwaitPublishingTask>("awaitPublishing") {
-                    publishingService.set(locService)
+                val locAwait = tasks.register<AIcModustroAwaitPublicationsTask>("awaitPublications") {
+                    publicationService.set(locService)
                     usesService(locService)
                 }
                 tasks.register<AIcModustroPublishFilesTask>("publishFixture") {
-                    publishingPlanJson.set(locPlan)
+                    publicationPlanJson.set(locPlan)
                     outputKind.set("NATIVE_PRODUCT_BINARIES")
                     stability.set("snapshot")
                     coordinates.set(mapOf("groupId" to "eu.algites.test", "artifactId" to "fixture", "technologyKind" to "java"))
@@ -178,7 +179,7 @@ public final class AItcModustroGradleInitTest {
                     publicationVersion.set("1.0-SNAPSHOT")
                     payloadFiles.from(layout.projectDirectory.file("payload.txt"))
                     publishedFileNames.put("payload.txt", "nested/payload.txt")
-                    publishingService.set(locService)
+                    publicationService.set(locService)
                     usesService(locService)
                     finalizedBy(locAwait)
                 }
