@@ -644,7 +644,7 @@ OutputPublications:
           PublicationAdapter: maven-repository
           PublicationCredentialProfile: algites-java-snapshot-publication
           ExecutionOrder: 0
-          PublicationFailurePolicy: fail_build_on_publication_failure
+          ExecutionFailurePolicy: fail_build_on_failure
           PublicationRetryCount: 2
           PublicationWaitForNextAttemptMillis: 1000
           PublicationAttemptTimeoutMillis: 60000
@@ -677,12 +677,12 @@ endpoint, publication form, or finalization action disables only that item. Disa
 disable the payload publication or sibling finalizers. Enabling an item does not bypass an enclosing disabled output
 or endpoint, or the finalization completion barriers.
 
-The scheduling policy names also differ by operation:
+Execution control uses the same `ExecutionOrder` and `ExecutionFailurePolicy` names for endpoints and finalization actions; retry, timeout, and progress-control names remain operation-specific:
 
 | Endpoint publication policy | Finalization-action policy |
 | --- | --- |
 | `ExecutionOrder` | `ExecutionOrder` |
-| `PublicationFailurePolicy` | `FailurePolicy` |
+| `ExecutionFailurePolicy` | `ExecutionFailurePolicy` |
 | `PublicationRetryCount` | `RetryCount` |
 | `PublicationWaitForNextAttemptMillis` | `WaitForNextAttemptMillis` |
 | `PublicationAttemptTimeoutMillis` | `AttemptTimeoutMillis` |
@@ -705,7 +705,7 @@ replaced; they are not schema aliases. `PublicationEnabled` remains valid only o
 | `PublicationAdapter` | required for enabled effective endpoint | Adapter that performs one publication attempt. |
 | `PublicationCredentialProfile` | no | Non-secret credential profile reference. |
 | `ExecutionOrder` | no | Root scheduling order, default `0`; negative values are allowed. |
-| `PublicationFailurePolicy` | no | Defaults to `fail_build_on_publication_failure`. |
+| `ExecutionFailurePolicy` | no | Defaults to `fail_build_on_failure`. |
 | `PublicationRetryCount` | no | Additional attempts after the first; defaults to `0`. |
 | `PublicationWaitForNextAttemptMillis` | no | Delay between attempts; defaults to `1000`. |
 | `PublicationAttemptTimeoutMillis` | no | Positive timeout for one attempt. |
@@ -790,7 +790,7 @@ The common action fields are:
 | `ExecutionEnabled` | Default `true`; `false` disables this inherited action without clearing its siblings. |
 | Adapter property | The level-specific property above; required for an enabled effective action. |
 | `ExecutionOrder` | Default `0`; negative values allowed; orders direct siblings of this list. |
-| `FailurePolicy` | `fail_build_on_failure` (default) or `ignore_failure`. |
+| `ExecutionFailurePolicy` | `fail_build_on_failure` (default), `propagate_failure`, or `ignore_failure`. |
 | `RetryCount` | Additional attempts after the first; default `0`. |
 | `WaitForNextAttemptMillis` | Default `1000`. |
 | `AttemptTimeoutMillis` | Optional positive timeout for one attempt. |
@@ -798,6 +798,34 @@ The common action fields are:
 | `Configuration` | Adapter-specific non-secret values. |
 | `TargetPublicationEndpointId` | Optional on recursive publication actions only; otherwise the root endpoint is inherited. |
 | `FinalizationActions` | Recursive children of a publication-level action only. |
+
+### 11.6.1 Build execution failure policy
+
+All executable publication endpoints and finalization actions use the same `ExecutionFailurePolicy` field. Its canonical
+schema type is `BuildExecutionFailurePolicy` from `eu.algites.pltf.modustro.builder.model.execution`. The three policy
+values have deliberately different propagation strength:
+
+- `fail_build_on_failure` creates a terminal build failure. Once created, no enclosing execution policy may absorb or downgrade it.
+- `propagate_failure` passes a non-terminal failure to the immediate enclosing execution boundary, whose own policy decides what happens next.
+- `ignore_failure` consumes a non-terminal failure at the current boundary. It cannot consume a terminal build failure.
+
+The scheduler therefore keeps the local execution result separate from the outgoing failure flow. A parent may complete
+its own work successfully while still forwarding a descendant failure. The transition at every execution boundary is:
+
+| Failure arriving at the boundary | `fail_build_on_failure` | `propagate_failure` | `ignore_failure` |
+| --- | --- | --- | --- |
+| No failure | `NONE` | `NONE` | `NONE` |
+| Local execution failure | `BUILD_FAILURE` | `PROPAGATED_FAILURE` | `NONE` |
+| Propagated descendant failure | `BUILD_FAILURE` | `PROPAGATED_FAILURE` | `NONE` |
+| Existing terminal `BUILD_FAILURE` from a descendant | `BUILD_FAILURE` | `BUILD_FAILURE` | `BUILD_FAILURE` |
+
+`BUILD_FAILURE` is terminal across the complete execution hierarchy. `PROPAGATED_FAILURE` remains non-terminal until an
+enclosing boundary converts it to `BUILD_FAILURE`, consumes it with `ignore_failure`, or propagates it again. If a
+`PROPAGATED_FAILURE` reaches the build root without an enclosing policy boundary, the build fails.
+
+`ExecutionOrder` remains a direct-sibling scheduling rule. A later sibling order group waits for the direct attempts in
+the preceding group, not for descendant trees spawned by those attempts; descendant failure flow is still drained and
+resolved before the complete publication result becomes terminal.
 
 This fragment illustrates placement of every level:
 
@@ -931,7 +959,7 @@ VersionScopePublicationFinalizationActions:
     - Id: remove-corresponding-snapshots
       VersionScopePublicationFinalizationActionAdapter: modustro-remove-corresponding-snapshots
       ExecutionOrder: 10
-      FailurePolicy: ignore_failure
+      ExecutionFailurePolicy: ignore_failure
     - Id: refresh-docs-site
       VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
       ExecutionOrder: 20

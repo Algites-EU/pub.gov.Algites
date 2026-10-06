@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.model.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import java.net.URI;
 import java.util.Map;
 import java.util.Objects;
@@ -12,7 +14,7 @@ public record AIcPublicationEndpoint(
         String publicationAdapter,
         String publicationCredentialProfile,
         int executionOrder,
-        AInPublicationFailurePolicy publicationFailurePolicy,
+        AIngBuildExecutionFailurePolicy_1 executionFailurePolicy,
         int publicationRetryCount,
         long publicationWaitForNextAttemptMillis,
         Long publicationAttemptTimeoutMillis,
@@ -22,7 +24,7 @@ public record AIcPublicationEndpoint(
     /** Validates endpoint invariants. */
     public AIcPublicationEndpoint {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(publicationFailurePolicy, "publicationFailurePolicy");
+        Objects.requireNonNull(executionFailurePolicy, "executionFailurePolicy");
         configuration = AIcPublicationValues.freeze(configuration);
         if (id.isBlank()) {
             throw new IllegalArgumentException("Publication endpoint id must not be blank.");
@@ -47,11 +49,11 @@ public record AIcPublicationEndpoint(
     /** Compatibility constructor for endpoint declarations without provider-specific configuration. */
     public AIcPublicationEndpoint(
             String aId, boolean aExecutionEnabled, URI aPublicationUri, String aPublicationAdapter,
-            String aPublicationCredentialProfile, int aExecutionOrder, AInPublicationFailurePolicy aPublicationFailurePolicy,
+            String aPublicationCredentialProfile, int aExecutionOrder, AIngBuildExecutionFailurePolicy_1 aExecutionFailurePolicy,
             int aPublicationRetryCount, long aPublicationWaitForNextAttemptMillis, Long aPublicationAttemptTimeoutMillis,
             boolean aShowPublicationProgressIfPossible) {
         this(aId, aExecutionEnabled, aPublicationUri, aPublicationAdapter, aPublicationCredentialProfile, aExecutionOrder,
-                aPublicationFailurePolicy, aPublicationRetryCount, aPublicationWaitForNextAttemptMillis,
+                aExecutionFailurePolicy, aPublicationRetryCount, aPublicationWaitForNextAttemptMillis,
                 aPublicationAttemptTimeoutMillis, aShowPublicationProgressIfPossible, Map.of());
     }
 }

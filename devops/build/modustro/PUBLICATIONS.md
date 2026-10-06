@@ -115,7 +115,7 @@ OutputPublications:
           PublicationAdapter: maven-repository
           PublicationCredentialProfile: java-public-snapshot-publication
           ExecutionOrder: 0
-          PublicationFailurePolicy: FAIL_BUILD_ON_PUBLICATION_FAILURE
+          ExecutionFailurePolicy: fail_build_on_failure
           PublicationRetryCount: 2
           PublicationWaitForNextAttemptMillis: 1000
           PublicationAttemptTimeoutMillis: 60000
@@ -148,12 +148,12 @@ endpoint, publication form, or finalization action disables only that item. Disa
 disable the payload publication or sibling finalizers. Enabling an item does not bypass an enclosing disabled output
 or endpoint, or the finalization completion barriers.
 
-The scheduling policy names also differ by operation:
+Execution control uses the same `ExecutionOrder` and `ExecutionFailurePolicy` names for endpoints and finalization actions; retry, timeout, and progress-control names remain operation-specific:
 
 | Endpoint publication policy | Finalization-action policy |
 | --- | --- |
 | `ExecutionOrder` | `ExecutionOrder` |
-| `PublicationFailurePolicy` | `FailurePolicy` |
+| `ExecutionFailurePolicy` | `ExecutionFailurePolicy` |
 | `PublicationRetryCount` | `RetryCount` |
 | `PublicationWaitForNextAttemptMillis` | `WaitForNextAttemptMillis` |
 | `PublicationAttemptTimeoutMillis` | `AttemptTimeoutMillis` |
@@ -179,7 +179,7 @@ Fields are:
 - `PublicationAdapter`
 - `PublicationCredentialProfile`
 - `ExecutionOrder` (default `0`, negative values allowed)
-- `PublicationFailurePolicy` (default `FAIL_BUILD_ON_PUBLICATION_FAILURE`)
+- `ExecutionFailurePolicy` (default `fail_build_on_failure`)
 - `PublicationRetryCount` (default `0`)
 - `PublicationWaitForNextAttemptMillis` (default `1000`)
 - `PublicationAttemptTimeoutMillis` (optional positive timeout)
@@ -291,7 +291,7 @@ A missing expected output is incomplete, not an empty successful publication.
 | Level-specific adapter property | Required for an enabled effective action; selects the typed catalog entry above. |
 | `ExecutionOrder` | `0`; negative values allowed; compares direct siblings within this list. |
 | `Configuration` | Adapter-specific non-secret values. |
-| `FailurePolicy` | `FAIL_BUILD_ON_FAILURE` or `IGNORE_FAILURE`; default `FAIL_BUILD_ON_FAILURE`. |
+| `ExecutionFailurePolicy` | `fail_build_on_failure`, `propagate_failure`, or `ignore_failure`; default `fail_build_on_failure`. |
 | `RetryCount` | Additional attempts after the first; default `0`. |
 | `WaitForNextAttemptMillis` | Default `1000`. |
 | `AttemptTimeoutMillis` | Optional positive per-attempt timeout. |
@@ -479,7 +479,7 @@ VersionScopePublicationFinalizationActions:
     - Id: remove-corresponding-snapshots
       VersionScopePublicationFinalizationActionAdapter: modustro-remove-corresponding-snapshots
       ExecutionOrder: 10
-      FailurePolicy: IGNORE_FAILURE
+      ExecutionFailurePolicy: ignore_failure
     - Id: refresh-docs-site
       VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
       ExecutionOrder: 20
@@ -500,7 +500,7 @@ supported. Cloudsmith uses `Workspace`/`Repository`, Repsy uses `Repository`, an
 management API root. Credentials resolve lazily inside the cleanup attempt, so resolution errors obey its retry/failure
 policy. Already-absent versions are successful no-ops. MPS has no configured cleanup contract.
 
-Cleanup is governance policy, not standard Maven release behavior. `IGNORE_FAILURE` records a cleanup failure without
+Cleanup is governance policy, not standard Maven release behavior. `ignore_failure` records a cleanup failure without
 invalidating the successful release boundary; required policy would fail that finalization instead.
 
 ### 11.2 Repository docs refresh
@@ -582,9 +582,21 @@ Secret values remain outside governance YAML.
 
 ## 13. Failure, retry, and completion semantics
 
-Root transport uses `PublicationFailurePolicy` (`FAIL_BUILD_ON_PUBLICATION_FAILURE` or
-`IGNORE_PUBLICATION_FAILURE`); finalization uses `FailurePolicy` (`FAIL_BUILD_ON_FAILURE` or `IGNORE_FAILURE`).
-Required failures fail required completion. Ignored failures remain visible in execution results.
+Publication endpoints and finalization actions use the same `ExecutionFailurePolicy`, whose canonical schema type is
+`BuildExecutionFailurePolicy`. The values are `fail_build_on_failure`, `propagate_failure`, and `ignore_failure`.
+The scheduler tracks local execution outcome separately from the failure flow leaving an execution boundary.
+
+| Failure arriving at the boundary | `fail_build_on_failure` | `propagate_failure` | `ignore_failure` |
+| --- | --- | --- | --- |
+| No failure | `NONE` | `NONE` | `NONE` |
+| Local execution failure | `BUILD_FAILURE` | `PROPAGATED_FAILURE` | `NONE` |
+| Propagated descendant failure | `BUILD_FAILURE` | `PROPAGATED_FAILURE` | `NONE` |
+| Existing terminal `BUILD_FAILURE` from a descendant | `BUILD_FAILURE` | `BUILD_FAILURE` | `BUILD_FAILURE` |
+
+`BUILD_FAILURE` is terminal and cannot be absorbed by any ancestor. `PROPAGATED_FAILURE` is offered to the immediate
+parent boundary, which may fail the build, propagate the failure again, or ignore it. An unhandled propagated failure
+that reaches the build root fails the build. Ignored and propagated failures remain visible in execution results even
+when a parent completes its own local work successfully.
 
 Retries belong only to the failing scheduler unit: retrying a build-record action does not republish its parent or
 rerun another successful root. Retry-capable adapters declare safety. Timeouts and cancellation are scheduler-owned;

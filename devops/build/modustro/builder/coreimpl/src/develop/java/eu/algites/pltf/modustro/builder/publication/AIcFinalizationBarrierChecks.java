@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog;
 import eu.algites.pltf.modustro.builder.catalog.AIcBuiltinAdapterCatalog;
 import eu.algites.pltf.modustro.builder.model.publication.*;
@@ -78,17 +80,17 @@ public final class AIcFinalizationBarrierChecks {
                         AIcAction("later", 1, 0, null, List.of())), Map.of("root", locEndpoint));
         try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(locCatalog)) {
             AIcOutputPublicationFinalizationAction locOutputAction = new AIcOutputPublicationFinalizationAction(
-                    "output", true, "output-probe", 0, AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
+                    "output", true, "output-probe", 0, AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
             var locHandle = locScheduler.schedule(locPayload, List.of(locJob), List.of(locOutputAction), Map.of(), aEndpoint -> Map.of(), AIcFinalizationBarrierChecks::AIcProgress);
             var locOutput = locHandle.outputExecutionResult().toCompletableFuture().get(5, TimeUnit.SECONDS);
             locHandle.requiredCompletion().toCompletableFuture().get(5, TimeUnit.SECONDS);
             AIcCheck(locOutput.success(), "Complete output must succeed.");
             var locArtifactBase = new AIcArtifactPublicationExecutionResult("test:artifact", "artifact", ".", "1.0", AInPublicationStability.RELEASE, List.of(locOutput), List.of());
             var locArtifactAction = new AIcArtifactPublicationFinalizationAction("artifact", true, "artifact-probe", 0,
-                    AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
+                    AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
             var locArtifact = locScheduler.finalizeArtifact(locArtifactBase, List.of(locArtifactAction), AIcFinalizationBarrierChecks::AIcProgress);
             var locScopeAction = new AIcVersionScopePublicationFinalizationAction("scope", true, "scope-probe", 0,
-                    AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
+                    AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
             var locScope = locScheduler.finalizeVersionScope(AIcScope(List.of(locArtifact)), List.of(locScopeAction), Map.of(), AIcFinalizationBarrierChecks::AIcProgress);
             AIcCheck(locScope.state() == AInVersionScopePublicationAttemptState.COMPLETE, "Successful scope must be COMPLETE.");
             int locCompletedEvents = locEvents.size();
@@ -166,7 +168,7 @@ public final class AIcFinalizationBarrierChecks {
         Map<String, Object> locConfiguration = new LinkedHashMap<>();
         locConfiguration.put("Nested", locNested);
         var locAction = new AIcPublicationFinalizationAction("frozen", false, null, null, 0,
-                AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, locConfiguration, List.of());
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, locConfiguration, List.of());
         locNested.add("changed");
         AIcCheck(((List<?>) locAction.configuration().get("Nested")).size() == 1, "Nested configuration must be snapshotted.");
         try { ((List<?>) locAction.configuration().get("Nested")).clear(); throw new AssertionError("Nested result values must be immutable."); }
@@ -196,10 +198,10 @@ public final class AIcFinalizationBarrierChecks {
                 }
             };
             var locEndpoint = new AIcPublicationEndpoint("root", true, URI.create("file:///virtual/"), "transport", null, 0,
-                    locOptionalPublication ? AInPublicationFailurePolicy.IGNORE_PUBLICATION_FAILURE : AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE,
+                    locOptionalPublication ? AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE : AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE,
                     0, 0L, null, false, Map.of());
             var locAction = new AIcPublicationFinalizationAction("optional", true, "probe", null, 0,
-                    AInFinalizationActionFailurePolicy.IGNORE_FAILURE, 0, 0L, null, false, Map.of(), List.of());
+                    AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE, 0, 0L, null, false, Map.of(), List.of());
             var locPayload = AIcPayload();
             var locJob = new AIcPublicationJob("root/standard", locEndpoint, locPayload, Map.of(),
                     locOptionalPublication ? List.of() : List.of(locAction), Map.of());
@@ -235,7 +237,7 @@ public final class AIcFinalizationBarrierChecks {
         var locPayload = AIcPayload();
         var locFirst = AIcEndpoint();
         var locLater = new AIcPublicationEndpoint("later", true, URI.create("file:///virtual/later/"), "transport", null, 1,
-                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 0L, null, false, Map.of());
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, Map.of());
         var locJobs = List.of(new AIcPublicationJob("first/standard", locFirst, locPayload, Map.of(), List.of(AIcAction("child", 0, 0, null, List.of())), Map.of()),
                 new AIcPublicationJob("later/standard", locLater, locPayload, Map.of(), List.of(), Map.of()));
         try (var locScheduler = new AIcPublicationScheduler(new AIcAdapterCatalog(List.of(), List.of(locTransport), List.of(locFinalizer), List.of(), List.of(), List.of()))) {
@@ -249,7 +251,7 @@ public final class AIcFinalizationBarrierChecks {
         return new AIcVersionScopePublicationExecutionResult(".", "1.0", AInPublicationStability.RELEASE, AInVersionScopePublicationAttemptState.PUBLISHING, aArtifacts, List.of());
     }
     private static AIcPublicationFinalizationAction AIcAction(String aId, int aOrder, int aRetries, Long aTimeout, List<AIcPublicationFinalizationAction> aChildren) {
-        return new AIcPublicationFinalizationAction(aId, true, "probe", null, aOrder, AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE,
+        return new AIcPublicationFinalizationAction(aId, true, "probe", null, aOrder, AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE,
                 aRetries, 0L, aTimeout, false, Map.of(), aChildren);
     }
     private static AIcPublicationFinalizationActionResult AIcSuccess(String aId) {
@@ -263,7 +265,7 @@ public final class AIcFinalizationBarrierChecks {
     }
     private static AIcPublicationEndpoint AIcEndpoint() {
         return new AIcPublicationEndpoint("root", true, URI.create("file:///virtual/"), "transport", null, 0,
-                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 0L, null, false, Map.of());
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, Map.of());
     }
     private static AIiPublicationAdapter AIcTransport() {
         return new AIiPublicationAdapter() {

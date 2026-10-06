@@ -7,26 +7,13 @@
     "NestedGradleSettingsBuildPolicy": {
       "type": "string",
       "enum": [
-        "IGNORE_NESTED_SETTINGS",
-        "USE_ISOLATED_BUILD_ON_NESTED_SETTINGS"
+        "ignore_nested_settings",
+        "use_isolated_build_on_nested_settings"
       ],
-      "default": "IGNORE_NESTED_SETTINGS"
+      "default": "ignore_nested_settings"
     },
-    "PublicationFailurePolicy": {
-      "type": "string",
-      "enum": [
-        "FAIL_BUILD_ON_PUBLICATION_FAILURE",
-        "IGNORE_PUBLICATION_FAILURE"
-      ],
-      "default": "FAIL_BUILD_ON_PUBLICATION_FAILURE"
-    },
-    "FailurePolicy": {
-      "type": "string",
-      "enum": [
-        "FAIL_BUILD_ON_FAILURE",
-        "IGNORE_FAILURE"
-      ],
-      "default": "FAIL_BUILD_ON_FAILURE"
+    "BuildExecutionFailurePolicy": {
+      "$ref": "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/model/execution/build-execution-failure-policy_1.yamldef.schema.json"
     },
     "FinalizationAction": {
       "type": "object",
@@ -48,9 +35,6 @@
         "Configuration": {
           "type": "object",
           "additionalProperties": true
-        },
-        "FailurePolicy": {
-          "$ref": "#/$defs/FailurePolicy"
         },
         "RetryCount": {
           "type": "integer",
@@ -83,6 +67,9 @@
           "items": {
             "$ref": "#/$defs/FinalizationAction"
           }
+        },
+        "ExecutionFailurePolicy": {
+          "$ref": "#/$defs/BuildExecutionFailurePolicy"
         }
       },
       "required": [
@@ -110,9 +97,6 @@
         "Configuration": {
           "type": "object",
           "additionalProperties": true
-        },
-        "FailurePolicy": {
-          "$ref": "#/$defs/FailurePolicy"
         },
         "RetryCount": {
           "type": "integer",
@@ -145,6 +129,9 @@
           "items": {
             "$ref": "#/$defs/FinalizationAction"
           }
+        },
+        "ExecutionFailurePolicy": {
+          "$ref": "#/$defs/BuildExecutionFailurePolicy"
         }
       },
       "required": [
@@ -173,9 +160,6 @@
           "type": "object",
           "additionalProperties": true
         },
-        "FailurePolicy": {
-          "$ref": "#/$defs/FailurePolicy"
-        },
         "RetryCount": {
           "type": "integer",
           "minimum": 0,
@@ -197,6 +181,9 @@
         "OutputPublicationFinalizationActionAdapter": {
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "ExecutionFailurePolicy": {
+          "$ref": "#/$defs/BuildExecutionFailurePolicy"
         }
       },
       "required": [
@@ -225,9 +212,6 @@
           "type": "object",
           "additionalProperties": true
         },
-        "FailurePolicy": {
-          "$ref": "#/$defs/FailurePolicy"
-        },
         "RetryCount": {
           "type": "integer",
           "minimum": 0,
@@ -249,6 +233,9 @@
         "ArtifactPublicationFinalizationActionAdapter": {
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "ExecutionFailurePolicy": {
+          "$ref": "#/$defs/BuildExecutionFailurePolicy"
         }
       },
       "required": [
@@ -277,9 +264,6 @@
           "type": "object",
           "additionalProperties": true
         },
-        "FailurePolicy": {
-          "$ref": "#/$defs/FailurePolicy"
-        },
         "RetryCount": {
           "type": "integer",
           "minimum": 0,
@@ -301,6 +285,9 @@
         "VersionScopePublicationFinalizationActionAdapter": {
           "type": "string",
           "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+        },
+        "ExecutionFailurePolicy": {
+          "$ref": "#/$defs/BuildExecutionFailurePolicy"
         }
       },
       "required": [
@@ -407,9 +394,6 @@
           "default": 0,
           "description": "Global order among direct root publication endpoint groups. Lower values run first; equal values may run concurrently."
         },
-        "PublicationFailurePolicy": {
-          "$ref": "#/$defs/PublicationFailurePolicy"
-        },
         "PublicationRetryCount": {
           "type": "integer",
           "minimum": 0,
@@ -437,6 +421,9 @@
           "items": {
             "$ref": "#/$defs/Publication"
           }
+        },
+        "ExecutionFailurePolicy": {
+          "$ref": "#/$defs/BuildExecutionFailurePolicy"
         }
       },
       "required": [

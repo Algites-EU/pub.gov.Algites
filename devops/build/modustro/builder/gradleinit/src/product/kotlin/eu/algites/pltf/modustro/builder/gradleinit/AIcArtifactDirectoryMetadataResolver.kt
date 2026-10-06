@@ -9,9 +9,13 @@ package eu.algites.pltf.modustro.builder.gradleinit
  * resolved as independent, symmetric input/output concerns.
  */
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1
 import java.io.File
 import java.net.URI
 import java.security.MessageDigest
+
+/** Canonical schema field name used by the bootstrap resolver before generated descriptor models are available. */
+private const val SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY = "ExecutionFailurePolicy"
 
 
 data class AIcdAlgitesVersion(
@@ -148,7 +152,7 @@ data class AIcdModustroPublicationEndpoint(
     val publicationAdapter: String? = null,
     val publicationCredentialProfile: String? = null,
     val executionOrder: Int? = null,
-    val publicationFailurePolicy: String? = null,
+    val executionFailurePolicy: String? = null,
     val publicationRetryCount: Int? = null,
     val publicationWaitForNextAttemptMillis: Long? = null,
     val publicationAttemptTimeoutMillis: Long? = null,
@@ -165,7 +169,7 @@ data class AIcdModustroPublicationEndpoint(
             publicationAdapter = aOther.publicationAdapter ?: publicationAdapter,
             publicationCredentialProfile = aOther.publicationCredentialProfile ?: publicationCredentialProfile,
             executionOrder = aOther.executionOrder ?: executionOrder,
-            publicationFailurePolicy = aOther.publicationFailurePolicy ?: publicationFailurePolicy,
+            executionFailurePolicy = aOther.executionFailurePolicy ?: executionFailurePolicy,
             publicationRetryCount = aOther.publicationRetryCount ?: publicationRetryCount,
             publicationWaitForNextAttemptMillis = aOther.publicationWaitForNextAttemptMillis ?: publicationWaitForNextAttemptMillis,
             publicationAttemptTimeoutMillis = aOther.publicationAttemptTimeoutMillis ?: publicationAttemptTimeoutMillis,
@@ -177,7 +181,7 @@ data class AIcdModustroPublicationEndpoint(
 
     fun AIcEffectiveExecutionEnabled(): Boolean = executionEnabled ?: true
     fun AIcEffectiveExecutionOrder(): Int = executionOrder ?: 0
-    fun AIcEffectivePublicationFailurePolicy(): String = publicationFailurePolicy ?: "fail_build_on_publication_failure"
+    fun AIcEffectiveExecutionFailurePolicy(): String = executionFailurePolicy ?: AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue()
     fun AIcEffectivePublicationRetryCount(): Int = publicationRetryCount ?: 0
     fun AIcEffectivePublicationWaitForNextAttemptMillis(): Long = publicationWaitForNextAttemptMillis ?: 1000L
     fun AIcEffectiveShowPublicationProgressIfPossible(): Boolean = showPublicationProgressIfPossible ?: true
@@ -484,9 +488,8 @@ val AIcModustroCredentialTypes = linkedSetOf("basic", "bearer", "api_key", "cert
 val AIcModustroPublicationOutputKinds = linkedSetOf(
     "native_product_binaries", "native_product_sources", "native_product_documentation", "native_develop_sources", "native_develop_binaries", "native_develop_documentation", "modustro_docs_site", "schema_site"
 )
-val AIcModustroPublicationFailurePolicies = linkedSetOf(
-    "fail_build_on_publication_failure", "ignore_publication_failure"
-)
+val AIcModustroBuildExecutionFailurePolicies = AIngBuildExecutionFailurePolicy_1.values()
+    .mapTo(linkedSetOf()) { it.wireValue() }
 val AIcModustroNestedGradleSettingsBuildPolicies = linkedSetOf(
     "ignore_nested_settings", "use_isolated_build_on_nested_settings"
 )
@@ -1147,7 +1150,7 @@ fun AIcOutputPublicationsFromConfig(
             data class AIcdBuilder(
                 var id: String? = null, var executionEnabled: Boolean? = null, var publicationUri: String? = null,
                 var publicationAdapter: String? = null, var publicationCredentialProfile: String? = null,
-                var executionOrder: Int? = null, var publicationFailurePolicy: String? = null,
+                var executionOrder: Int? = null, var executionFailurePolicy: String? = null,
                 var publicationRetryCount: Int? = null, var publicationWaitForNextAttemptMillis: Long? = null,
                 var publicationAttemptTimeoutMillis: Long? = null, var showPublicationProgressIfPossible: Boolean? = null,
                 val configuration: MutableMap<String, String> = linkedMapOf()
@@ -1172,7 +1175,7 @@ fun AIcOutputPublicationsFromConfig(
                     "PublicationAdapter" -> locBuilder.publicationAdapter = locValue.trim().takeIf { it.isNotBlank() }
                     "PublicationCredentialProfile" -> locBuilder.publicationCredentialProfile = locValue.trim().takeIf { it.isNotBlank() }
                     "ExecutionOrder" -> locBuilder.executionOrder = locValue.trim().toIntOrNull() ?: error("$locKey in '${aFile.path}' must be an integer.")
-                    "PublicationFailurePolicy" -> locBuilder.publicationFailurePolicy = locValue.trim().also { locPolicy -> if (locPolicy !in AIcModustroPublicationFailurePolicies) error("$locKey in '${aFile.path}' uses unsupported policy '$locPolicy'.") }
+                    SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY -> locBuilder.executionFailurePolicy = locValue.trim().also { locPolicy -> if (locPolicy !in AIcModustroBuildExecutionFailurePolicies) error("$locKey in '${aFile.path}' uses unsupported policy '$locPolicy'.") }
                     "PublicationRetryCount" -> locBuilder.publicationRetryCount = locValue.trim().toIntOrNull()?.also { if (it < 0) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
                     "PublicationWaitForNextAttemptMillis" -> locBuilder.publicationWaitForNextAttemptMillis = locValue.trim().toLongOrNull()?.also { if (it < 0L) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
                     "PublicationAttemptTimeoutMillis" -> locBuilder.publicationAttemptTimeoutMillis = locValue.trim().toLongOrNull()?.also { if (it <= 0L) error("$locKey in '${aFile.path}' must be positive.") } ?: error("$locKey in '${aFile.path}' must be a positive integer.")
@@ -1195,7 +1198,7 @@ fun AIcOutputPublicationsFromConfig(
                 locEndpoints[locId] = AIcdModustroPublicationEndpoint(
                     id=locId, executionEnabled=locBuilder.executionEnabled, publicationUri=locBuilder.publicationUri,
                     publicationAdapter=locBuilder.publicationAdapter, publicationCredentialProfile=locBuilder.publicationCredentialProfile,
-                    executionOrder=locBuilder.executionOrder, publicationFailurePolicy=locBuilder.publicationFailurePolicy,
+                    executionOrder=locBuilder.executionOrder, executionFailurePolicy=locBuilder.executionFailurePolicy,
                     publicationRetryCount=locBuilder.publicationRetryCount, publicationWaitForNextAttemptMillis=locBuilder.publicationWaitForNextAttemptMillis,
                     publicationAttemptTimeoutMillis=locBuilder.publicationAttemptTimeoutMillis,
                     showPublicationProgressIfPossible=locBuilder.showPublicationProgressIfPossible,
@@ -1799,7 +1802,7 @@ fun AIcPublicationEndpointMapForOutput(aEndpoint: AIcdModustroPublicationEndpoin
     "publicationAdapter" to aEndpoint.publicationAdapter,
     "publicationCredentialProfile" to aEndpoint.publicationCredentialProfile,
     "executionOrder" to aEndpoint.AIcEffectiveExecutionOrder(),
-    "publicationFailurePolicy" to aEndpoint.AIcEffectivePublicationFailurePolicy(),
+    "executionFailurePolicy" to aEndpoint.AIcEffectiveExecutionFailurePolicy(),
     "publicationRetryCount" to aEndpoint.AIcEffectivePublicationRetryCount(),
     "publicationWaitForNextAttemptMillis" to aEndpoint.AIcEffectivePublicationWaitForNextAttemptMillis(),
     "publicationAttemptTimeoutMillis" to aEndpoint.publicationAttemptTimeoutMillis,

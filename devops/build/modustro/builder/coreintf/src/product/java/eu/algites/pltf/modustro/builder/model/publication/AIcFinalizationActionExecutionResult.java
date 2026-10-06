@@ -9,9 +9,19 @@ public record AIcFinalizationActionExecutionResult(
         String scopeKind,
         AIcPublicationFinalizationActionResult result,
         Map<String, Object> configuration,
-        List<AIcFinalizationActionExecutionResult> finalizationActions) {
+        List<AIcFinalizationActionExecutionResult> finalizationActions,
+        boolean failureHandled) {
     public AIcFinalizationActionExecutionResult {
         configuration = AIcPublicationValues.freeze(configuration);
         finalizationActions = List.copyOf(finalizationActions == null ? List.of() : finalizationActions);
+    }
+
+    /** Compatibility constructor retaining the previous handled-failure semantics. */
+    public AIcFinalizationActionExecutionResult(
+            String aId, String aScopeKind, AIcPublicationFinalizationActionResult aResult,
+            Map<String, Object> aConfiguration, List<AIcFinalizationActionExecutionResult> aFinalizationActions) {
+        this(aId, aScopeKind, aResult, aConfiguration, aFinalizationActions,
+                aResult != null && (aResult.success() || aResult.ignoredFailure())
+                        && (aFinalizationActions == null || aFinalizationActions.stream().allMatch(AIcFinalizationActionExecutionResult::failureHandled)));
     }
 }

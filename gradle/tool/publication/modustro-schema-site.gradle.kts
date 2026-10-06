@@ -12,6 +12,7 @@ import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublicationService
 import org.gradle.api.provider.Provider
 import groovy.json.JsonOutput
 import eu.algites.pltf.modustro.builder.publication.AIcGlobalPublicationPathValidator
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayloadFile
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationStabilityConfiguration
@@ -246,7 +247,7 @@ val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite")
                     appendLine("endpoint.${locIndex}.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}")
                     appendLine("endpoint.${locIndex}.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}")
                     appendLine("endpoint.${locIndex}.executionOrder=${locEndpoint["executionOrder"] ?: 0}")
-                    appendLine("endpoint.${locIndex}.failurePolicy=${locEndpoint["publicationFailurePolicy"] ?: "fail_build_on_publication_failure"}")
+                    appendLine("endpoint.${locIndex}.executionFailurePolicy=${locEndpoint["executionFailurePolicy"] ?: AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue()}")
                 }
             },
             Charsets.UTF_8

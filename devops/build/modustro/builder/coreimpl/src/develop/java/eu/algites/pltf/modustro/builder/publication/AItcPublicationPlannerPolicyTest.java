@@ -1,74 +1,83 @@
 package eu.algites.pltf.modustro.builder.publication;
 
-import eu.algites.pltf.modustro.builder.model.publication.AInFinalizationActionFailurePolicy;
-import eu.algites.pltf.modustro.builder.model.publication.AInPublicationFailurePolicy;
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
 import java.util.List;
 import java.util.Map;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
-/** Tests the lower-snake-case descriptor representation of publication failure policies. */
+/** Tests the canonical descriptor representation of build execution failure policies. */
 public class AItcPublicationPlannerPolicyTest {
 
-    /** Verifies lower-snake-case endpoint policy conversion to the internal Java enum. */
+    /** Verifies lower-snake-case endpoint policy conversion to the generated Java enum. */
     @Test
-    public void testPublicationFailurePolicyWireValue() {
+    public void testExecutionFailurePolicyWireValue() {
         var locEndpoint = AIcPublicationPlanner.endpoint(Map.of(
                 "PublicationUri", "https://example.invalid/repository",
                 "PublicationAdapter", "maven-repository",
-                "PublicationFailurePolicy", "ignore_publication_failure"), "primary");
-        Assert.assertEquals(locEndpoint.publicationFailurePolicy(), AInPublicationFailurePolicy.IGNORE_PUBLICATION_FAILURE);
+                "ExecutionFailurePolicy", AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE.wireValue()), "primary");
+        Assert.assertEquals(locEndpoint.executionFailurePolicy(), AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE);
     }
 
-    /** Verifies that obsolete Java-enum spelling is not accepted as descriptor syntax. */
+    /** Verifies propagation policy conversion to the generated Java enum. */
+    @Test
+    public void testExecutionFailurePropagationPolicyWireValue() {
+        var locEndpoint = AIcPublicationPlanner.endpoint(Map.of(
+                "PublicationUri", "https://example.invalid/repository",
+                "PublicationAdapter", "maven-repository",
+                "ExecutionFailurePolicy", AIngBuildExecutionFailurePolicy_1.PROPAGATE_FAILURE.wireValue()), "primary");
+        Assert.assertEquals(locEndpoint.executionFailurePolicy(), AIngBuildExecutionFailurePolicy_1.PROPAGATE_FAILURE);
+    }
+
+    /** Verifies that Java-enum spelling is not accepted as descriptor syntax. */
     @Test(expectedExceptions = IllegalArgumentException.class)
-    public void testPublicationFailurePolicyRejectsUpperSnakeCaseWireValue() {
+    public void testExecutionFailurePolicyRejectsUpperSnakeCaseWireValue() {
         AIcPublicationPlanner.endpoint(Map.of(
                 "PublicationUri", "https://example.invalid/repository",
                 "PublicationAdapter", "maven-repository",
-                "PublicationFailurePolicy", "IGNORE_PUBLICATION_FAILURE"), "primary");
+                "ExecutionFailurePolicy", "IGNORE_FAILURE"), "primary");
     }
 
-    /** Verifies lower-snake-case finalization policy conversion to the internal Java enum. */
+    /** Verifies lower-snake-case finalization policy conversion to the generated Java enum. */
     @Test
-    public void testFinalizationFailurePolicyWireValue() {
+    public void testFinalizationExecutionFailurePolicyWireValue() {
         var locActions = AIcPublicationPlanner.outputPublicationFinalizationActions(Map.of(
                 "OutputPublicationFinalizationActions", List.of(Map.of(
                         "Id", "probe",
                         "OutputPublicationFinalizationActionAdapter", "probe",
-                        "FailurePolicy", "ignore_failure"))));
-        Assert.assertEquals(locActions.get(0).failurePolicy(), AInFinalizationActionFailurePolicy.IGNORE_FAILURE);
+                        "ExecutionFailurePolicy", AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE.wireValue()))));
+        Assert.assertEquals(locActions.get(0).executionFailurePolicy(), AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE);
     }
 
     /** Verifies the canonical-only value/default overload. */
     @Test
     public void testValueOrDefaultCanonicalFieldName() {
         Assert.assertEquals(
-                AIcPublicationPlanner.AIcValueOrDefault(Map.of("FailurePolicy", "ignore_failure"),
-                        "fail_build_on_failure", "FailurePolicy"),
-                "ignore_failure");
+                AIcPublicationPlanner.AIcValueOrDefault(Map.of("CanonicalField", "configured"),
+                        "default", "CanonicalField"),
+                "configured");
         Assert.assertEquals(
                 AIcPublicationPlanner.AIcValueOrDefault(Map.of(),
-                        "fail_build_on_failure", "FailurePolicy"),
-                "fail_build_on_failure");
+                        "default", "CanonicalField"),
+                "default");
     }
 
     /** Verifies the explicit alternative-field-name overload remains available where required. */
     @Test
     public void testValueOrDefaultAlternativeFieldName() {
         Assert.assertEquals(
-                AIcPublicationPlanner.AIcValueOrDefault(Map.of("failurePolicy", "ignore_failure"),
-                        "fail_build_on_failure", "FailurePolicy", "failurePolicy"),
-                "ignore_failure");
+                AIcPublicationPlanner.AIcValueOrDefault(Map.of("alternativeField", "configured"),
+                        "default", "CanonicalField", "alternativeField"),
+                "configured");
     }
 
-    /** Verifies that obsolete Java-enum spelling is not accepted for finalization actions. */
+    /** Verifies that Java-enum spelling is not accepted for finalization actions. */
     @Test(expectedExceptions = IllegalArgumentException.class)
-    public void testFinalizationFailurePolicyRejectsUpperSnakeCaseWireValue() {
+    public void testFinalizationExecutionFailurePolicyRejectsUpperSnakeCaseWireValue() {
         AIcPublicationPlanner.outputPublicationFinalizationActions(Map.of(
                 "OutputPublicationFinalizationActions", List.of(Map.of(
                         "Id", "probe",
                         "OutputPublicationFinalizationActionAdapter", "probe",
-                        "FailurePolicy", "IGNORE_FAILURE"))));
+                        "ExecutionFailurePolicy", "IGNORE_FAILURE"))));
     }
 }

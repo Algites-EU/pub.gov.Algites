@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "x-yamldefs-id": "eu.algites.pltf.modustro.builder.model.execution.build-execution-failure-policy",
+  "x-yamldefs-version": 1,
+  "x-yamldefs-name": "build-execution-failure-policy",
+  "type": "string",
+  "enum": [
+    "fail_build_on_failure",
+    "propagate_failure",
+    "ignore_failure"
+  ],
+  "oneOf": [
+    {
+      "const": "fail_build_on_failure",
+      "description": "Requires the entire build to fail when this execution or any non-ignored descendant execution fails. This terminal failure cannot be absorbed by an ancestor execution policy."
+    },
+    {
+      "const": "propagate_failure",
+      "description": "Propagates a non-terminal failure to the immediate parent execution, whose own BuildExecutionFailurePolicy decides whether to fail the build, continue propagation, or ignore the failure."
+    },
+    {
+      "const": "ignore_failure",
+      "description": "Consumes a non-terminal failure at this execution boundary so that it is not propagated to an ancestor execution. An already terminal fail-build failure cannot be ignored."
+    }
+  ],
+  "description": "Defines how an execution failure affects its parent execution hierarchy and the enclosing build."
+}

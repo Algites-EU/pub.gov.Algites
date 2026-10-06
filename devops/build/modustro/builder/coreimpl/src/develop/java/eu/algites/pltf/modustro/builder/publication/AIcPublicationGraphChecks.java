@@ -1,13 +1,13 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputTypeGroup;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationFinalizationAction;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationFinalizationActionResult;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationEndpoint;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayloadFile;
-import eu.algites.pltf.modustro.builder.model.publication.AInFinalizationActionFailurePolicy;
-import eu.algites.pltf.modustro.builder.model.publication.AInPublicationFailurePolicy;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability;
 import eu.algites.pltf.modustro.builder.model.subscription.AIcInputSubscription;
@@ -60,6 +60,7 @@ public final class AIcPublicationGraphChecks {
         AIcCheckInputSubscriptions();
         AIcCheckPlanningAndBuildRecord();
         AIcCheckActionLineageAndOrdering();
+        AIcCheckExecutionFailurePolicies();
         AIcCheckTargetPublicationEndpointResolution();
     }
 
@@ -208,7 +209,7 @@ public final class AIcPublicationGraphChecks {
                 Map.of("groupId", "test", "artifactId", "artifact", "version", "1", "technologyKind", "java"));
         AIcPublicationEndpoint locEndpoint = new AIcPublicationEndpoint(
                 "root", true, locDirectory.resolve("out").toUri(), "mock", null, 0,
-                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 0L, null, true, Map.of());
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
         List<String> locEvents = new CopyOnWriteArrayList<>();
         AIiPublicationAdapter locPublicationAdapter = new AIiPublicationAdapter() {
             @Override
@@ -271,6 +272,135 @@ public final class AIcPublicationGraphChecks {
                 "Every action must receive the complete ancestor lineage.");
     }
 
+    private static void AIcCheckExecutionFailurePolicies() throws Exception {
+        Path locDirectory = Files.createTempDirectory("modustro-execution-failure-policy-");
+        Path locFile = locDirectory.resolve("artifact.bin");
+        Files.writeString(locFile, "data");
+        AIcPublicationPayload locPayload = new AIcPublicationPayload(
+                AInPublicationOutputKind.NATIVE_PRODUCT_BINARIES,
+                AInPublicationStability.RELEASE,
+                "test:failure-policy",
+                "1",
+                List.of(new AIcPublicationPayloadFile(locFile, locFile.getFileName().toString())),
+                Map.of("groupId", "test", "artifactId", "failure-policy", "version", "1", "technologyKind", "java"));
+        AIiPublicationAdapter locPublicationAdapter = new AIiPublicationAdapter() {
+            @Override
+            public String adapterId() {
+                return "policy-publication";
+            }
+
+            @Override
+            public boolean isRetrySafe(AIcPublicationPayload aPayload, AIcPublicationEndpoint aEndpoint) {
+                return true;
+            }
+
+            @Override
+            public void publish(AIcPublicationAttemptContext aContext) {
+            }
+        };
+        AIiPublicationFinalizationActionAdapter locActionAdapter = new AIiPublicationFinalizationActionAdapter() {
+            @Override
+            public String adapterId() {
+                return "policy-action";
+            }
+
+            @Override
+            public AIcPublicationFinalizationActionResult execute(AIcPublicationFinalizationActionAttemptContext aContext) {
+                if ("failing-child".equals(aContext.action().id())) {
+                    return new AIcPublicationFinalizationActionResult(
+                            aContext.action().id(), true, false, false, 1, Duration.ZERO, null, Map.of(),
+                            new IllegalStateException("intentional nested failure"));
+                }
+                return new AIcPublicationFinalizationActionResult(
+                        aContext.action().id(), true, true, false, 1, Duration.ZERO, null, Map.of(), null);
+            }
+        };
+        eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog locCatalog =
+                new eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog(
+                        List.of(), List.of(locPublicationAdapter), List.of(locActionAdapter), List.of(), List.of(), List.of());
+
+        AIcPublicationFinalizationAction locPropagatingChild = new AIcPublicationFinalizationAction(
+                "failing-child", true, "policy-action", null, 0,
+                AIngBuildExecutionFailurePolicy_1.PROPAGATE_FAILURE, 0, 0L, null, false, Map.of(), List.of());
+        AIcPublicationFinalizationAction locIgnoringParent = new AIcPublicationFinalizationAction(
+                "ignoring-parent", true, "policy-action", null, 0,
+                AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE, 0, 0L, null, false, Map.of(), List.of(locPropagatingChild));
+        AIcPublicationEndpoint locStrictEndpoint = new AIcPublicationEndpoint(
+                "root", true, locDirectory.resolve("ignore-out").toUri(), "policy-publication", null, 0,
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, Map.of());
+        AIcPublicationJob locIgnoredJob = new AIcPublicationJob(
+                "root/ignored", locStrictEndpoint, locPayload, Map.of(), List.of(locIgnoringParent), Map.of("root", locStrictEndpoint));
+        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(locCatalog)) {
+            AIcPublicationScheduleHandle locHandle = locScheduler.schedule(
+                    locPayload, List.of(locIgnoredJob), List.of(), Map.of(), aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress);
+            locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            var locOutput = locHandle.outputExecutionResult().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            AIcCheck(locOutput.success(), "A propagated child failure absorbed by an IGNORE_FAILURE parent must not fail the output.");
+            var locParentResult = locHandle.publicationFinalizationActionResults().get("root/ignored/ignoring-parent")
+                    .toCompletableFuture().get(10, TimeUnit.SECONDS);
+            var locChildResult = locHandle.publicationFinalizationActionResults().get("root/ignored/ignoring-parent/failing-child")
+                    .toCompletableFuture().get(10, TimeUnit.SECONDS);
+            AIcCheck(locParentResult.failureHandled(), "The parent boundary must record that it consumed the propagated child failure.");
+            AIcCheck(!locChildResult.failureHandled(), "The child boundary must retain that its failure was propagated outward.");
+        }
+
+        AIcPublicationFinalizationAction locRepropagatingParent = new AIcPublicationFinalizationAction(
+                "propagating-parent", true, "policy-action", null, 0,
+                AIngBuildExecutionFailurePolicy_1.PROPAGATE_FAILURE, 0, 0L, null, false, Map.of(), List.of(locPropagatingChild));
+        AIcPublicationEndpoint locIgnoringEndpoint = new AIcPublicationEndpoint(
+                "root", true, locDirectory.resolve("endpoint-ignore-out").toUri(), "policy-publication", null, 0,
+                AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE, 0, 0L, null, false, Map.of());
+        AIcPublicationJob locEndpointIgnoredJob = new AIcPublicationJob(
+                "root/endpoint-ignored", locIgnoringEndpoint, locPayload, Map.of(), List.of(locRepropagatingParent), Map.of("root", locIgnoringEndpoint));
+        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(locCatalog)) {
+            AIcPublicationScheduleHandle locHandle = locScheduler.schedule(
+                    locPayload, List.of(locEndpointIgnoredJob), List.of(), Map.of(), aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress);
+            locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            AIcCheck(locHandle.outputExecutionResult().toCompletableFuture().get(10, TimeUnit.SECONDS).success(),
+                    "An endpoint IGNORE_FAILURE policy must be able to consume a failure propagated through its action hierarchy.");
+        }
+
+        AIcPublicationFinalizationAction locFatalChild = new AIcPublicationFinalizationAction(
+                "failing-child", true, "policy-action", null, 0,
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, Map.of(), List.of());
+        AIcPublicationFinalizationAction locCannotIgnoreFatalParent = new AIcPublicationFinalizationAction(
+                "ignoring-parent", true, "policy-action", null, 0,
+                AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE, 0, 0L, null, false, Map.of(), List.of(locFatalChild));
+        AIcPublicationJob locFatalJob = new AIcPublicationJob(
+                "root/fatal", locStrictEndpoint, locPayload, Map.of(), List.of(locCannotIgnoreFatalParent), Map.of("root", locStrictEndpoint));
+        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(locCatalog)) {
+            AIcPublicationScheduleHandle locHandle = locScheduler.schedule(
+                    locPayload, List.of(locFatalJob), List.of(), Map.of(), aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress);
+            boolean locFailed = false;
+            try {
+                locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            } catch (Exception locExpected) {
+                locFailed = true;
+            }
+            AIcCheck(locFailed, "FAIL_BUILD_ON_FAILURE must remain terminal even below an IGNORE_FAILURE parent.");
+        }
+
+        AIcPublicationFinalizationAction locRootPropagatingAction = new AIcPublicationFinalizationAction(
+                "failing-child", true, "policy-action", null, 0,
+                AIngBuildExecutionFailurePolicy_1.PROPAGATE_FAILURE, 0, 0L, null, false, Map.of(), List.of());
+        AIcPublicationEndpoint locPropagatingEndpoint = new AIcPublicationEndpoint(
+                "root", true, locDirectory.resolve("root-propagate-out").toUri(), "policy-publication", null, 0,
+                AIngBuildExecutionFailurePolicy_1.PROPAGATE_FAILURE, 0, 0L, null, false, Map.of());
+        AIcPublicationJob locRootPropagatingJob = new AIcPublicationJob(
+                "root/propagated", locPropagatingEndpoint, locPayload, Map.of(), List.of(locRootPropagatingAction), Map.of("root", locPropagatingEndpoint));
+        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(locCatalog)) {
+            AIcPublicationScheduleHandle locHandle = locScheduler.schedule(
+                    locPayload, List.of(locRootPropagatingJob), List.of(), Map.of(), aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress);
+            boolean locFailed = false;
+            try {
+                locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+            } catch (Exception locExpected) {
+                locFailed = true;
+            }
+            AIcCheck(locFailed, "A propagated failure reaching the build root must fail the build.");
+        }
+    }
+
     private static void AIcCheckTargetPublicationEndpointResolution() throws Exception {
         Path locDirectory = Files.createTempDirectory("modustro-action-target-");
         Path locFile = locDirectory.resolve("artifact.jar");
@@ -285,14 +415,14 @@ public final class AIcPublicationGraphChecks {
                         "logicalVersion", "1.0", "technologyKind", "java"));
         AIcPublicationEndpoint locRelease = new AIcPublicationEndpoint(
                 "release", true, URI.create("https://release.invalid/"), "root-probe", null, 0,
-                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 0L, null, true, Map.of());
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of());
         AIcPublicationEndpoint locSnapshot = new AIcPublicationEndpoint(
                 "snapshot", true, URI.create("https://snapshot.invalid/"), "snapshot-probe", "snapshot-credentials", 0,
-                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 0L, null, true,
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true,
                 Map.of("Provider", "repsy", "Repository", "snapshots"));
         AIcPublicationFinalizationAction locCleanup = new AIcPublicationFinalizationAction(
                 "cleanup", true, "target-probe", "snapshot", 0,
-                AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of(), List.of());
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of(), List.of());
         AIiPublicationAdapter locRootAdapter = new AIiPublicationAdapter() {
             @Override
             public String adapterId() {
@@ -344,7 +474,7 @@ public final class AIcPublicationGraphChecks {
             String aId, int aOrder, List<AIcPublicationFinalizationAction> aChildren) {
         return new AIcPublicationFinalizationAction(
                 aId, true, "probe", null, aOrder,
-                AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE,
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE,
                 0, 0L, null, true, Map.of(), aChildren);
     }
 

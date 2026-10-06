@@ -38,6 +38,6 @@ public record AIcOutputPublicationExecutionResult(
                 && outputPublicationFinalizationActions.stream().allMatch(AIcOutputPublicationExecutionResult::AIcFinalizationSuccess);
     }
     private static boolean AIcFinalizationSuccess(AIcFinalizationActionExecutionResult aNode) {
-        return aNode.result() != null && (aNode.result().success() || aNode.result().ignoredFailure());
+        return aNode.failureHandled();
     }
 }

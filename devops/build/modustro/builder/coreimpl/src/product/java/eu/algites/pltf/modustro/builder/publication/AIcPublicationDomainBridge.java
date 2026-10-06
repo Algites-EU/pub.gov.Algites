@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import eu.algites.pltf.modustro.builder.model.publication.*;
 import java.net.URI;
 import java.time.Duration;
@@ -144,12 +146,14 @@ public final class AIcPublicationDomainBridge {
         return AIcMap("PublicationId", aPublication.publicationId(), "Endpoint", AIcEndpointMap(aPublication.endpoint()),
                 "Payload", AIcPayloadMap(aPublication.payload()), "Configuration", aPublication.configuration(),
                 "Result", aPublication.result() == null ? null : AIcResultMap(aPublication.result()),
-                "PublicationFinalizationActions", AIcNodes(aPublication.publicationFinalizationActions()));
+                "PublicationFinalizationActions", AIcNodes(aPublication.publicationFinalizationActions()),
+                "FailureHandled", aPublication.failureHandled());
     }
     private static AIcPublicationExecutionResult AIcPublication(Map<String, Object> aValue) {
         return new AIcPublicationExecutionResult(AIcString(aValue, "PublicationId"), AIcEndpoint(AIcObject(aValue.get("Endpoint"))),
                 AIcPayload(AIcObject(aValue.get("Payload"))), AIcObject(aValue.get("Configuration")),
-                aValue.get("Result") == null ? null : AIcResult(AIcObject(aValue.get("Result"))), AIcNodes(aValue, "PublicationFinalizationActions"));
+                aValue.get("Result") == null ? null : AIcResult(AIcObject(aValue.get("Result"))), AIcNodes(aValue, "PublicationFinalizationActions"),
+                AIcBoolean(aValue, "FailureHandled"));
     }
     private static Map<String, Object> AIcPayloadMap(AIcPublicationPayload aPayload) {
         return AIcMap("OutputKind", aPayload.outputKind().name(), "Stability", aPayload.stability().name(),
@@ -163,10 +167,16 @@ public final class AIcPublicationDomainBridge {
                 AInPublicationStability.valueOf(AIcString(aValue, "Stability")), AIcString(aValue, "ArtifactIdentity"), AIcString(aValue, "Version"),
                 AIcList(aValue, "Files").stream().map(aFile -> new AIcPublicationPayloadFile(URI.create(AIcString(aFile, "ContentUri")), AIcString(aFile, "LogicalName"))).toList(), locCoordinates);
     }
+    private static AIngBuildExecutionFailurePolicy_1 AIcExecutionFailurePolicy(String aValue) {
+        return Arrays.stream(AIngBuildExecutionFailurePolicy_1.values())
+                .filter(aPolicy -> aPolicy.wireValue().equals(aValue))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Unsupported ExecutionFailurePolicy '" + aValue + "'."));
+    }
     private static Map<String, Object> AIcEndpointMap(AIcPublicationEndpoint aEndpoint) {
         return AIcMap("Id", aEndpoint.id(), "ExecutionEnabled", aEndpoint.executionEnabled(), "PublicationUri", AIcUri(aEndpoint.publicationUri()),
                 "PublicationAdapter", aEndpoint.publicationAdapter(), "PublicationCredentialProfile", aEndpoint.publicationCredentialProfile(),
-                "ExecutionOrder", aEndpoint.executionOrder(), "PublicationFailurePolicy", aEndpoint.publicationFailurePolicy().name(),
+                "ExecutionOrder", aEndpoint.executionOrder(), "ExecutionFailurePolicy", aEndpoint.executionFailurePolicy().wireValue(),
                 "PublicationRetryCount", aEndpoint.publicationRetryCount(), "PublicationWaitForNextAttemptMillis", aEndpoint.publicationWaitForNextAttemptMillis(),
                 "PublicationAttemptTimeoutMillis", aEndpoint.publicationAttemptTimeoutMillis(), "ShowPublicationProgressIfPossible", aEndpoint.showPublicationProgressIfPossible(),
                 "Configuration", aEndpoint.configuration());
@@ -174,7 +184,7 @@ public final class AIcPublicationDomainBridge {
     private static AIcPublicationEndpoint AIcEndpoint(Map<String, Object> aValue) {
         return new AIcPublicationEndpoint(AIcString(aValue, "Id"), AIcBoolean(aValue, "ExecutionEnabled"), AIcUri(aValue.get("PublicationUri")),
                 (String)aValue.get("PublicationAdapter"), (String)aValue.get("PublicationCredentialProfile"), AIcInt(aValue, "ExecutionOrder"),
-                AInPublicationFailurePolicy.valueOf(AIcString(aValue, "PublicationFailurePolicy")), AIcInt(aValue, "PublicationRetryCount"),
+                AIcExecutionFailurePolicy(AIcString(aValue, "ExecutionFailurePolicy")), AIcInt(aValue, "PublicationRetryCount"),
                 AIcLong(aValue, "PublicationWaitForNextAttemptMillis"), aValue.get("PublicationAttemptTimeoutMillis") == null ? null : AIcLong(aValue, "PublicationAttemptTimeoutMillis"),
                 AIcBoolean(aValue, "ShowPublicationProgressIfPossible"), AIcObject(aValue.get("Configuration")));
     }
@@ -212,7 +222,7 @@ public final class AIcPublicationDomainBridge {
             return AIcMap("Id", aNode.id(), "ScopeKind", aNode.scopeKind(), "Configuration", aNode.configuration(),
                     "Result", locResult == null ? null : AIcAttemptMap(locResult.actionId(), locResult.started(), locResult.success(),
                             locResult.ignoredFailure(), locResult.attempts(), locResult.duration(), locResult.outputUri(), locResult.metadata(), locResult.failure()),
-                    "FinalizationActions", AIcNodes(aNode.finalizationActions()));
+                    "FinalizationActions", AIcNodes(aNode.finalizationActions()), "FailureHandled", aNode.failureHandled());
         }).toList();
     }
     private static List<AIcFinalizationActionExecutionResult> AIcNodes(Map<String, Object> aValue, String aKey) {
@@ -223,7 +233,8 @@ public final class AIcPublicationDomainBridge {
                     AIcInt(locAttempt, "Attempts"), Duration.parse(AIcString(locAttempt, "Duration")), AIcUri(locAttempt.get("OutputUri")),
                     AIcObject(locAttempt.get("Metadata")), AIcFailure(locAttempt.get("Failure"), 0));
             return new AIcFinalizationActionExecutionResult(AIcString(aNode, "Id"), AIcString(aNode, "ScopeKind"), locResult,
-                    AIcObject(aNode.get("Configuration")), AIcNodes(aNode, "FinalizationActions"));
+                    AIcObject(aNode.get("Configuration")), AIcNodes(aNode, "FinalizationActions"),
+                    AIcBoolean(aNode, "FailureHandled"));
         }).toList();
     }
     private static Map<String, Object> AIcFailureMap(Throwable aFailure, int aDepth) {

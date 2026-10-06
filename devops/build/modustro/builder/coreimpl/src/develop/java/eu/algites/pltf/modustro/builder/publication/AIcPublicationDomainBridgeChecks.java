@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog;
 import eu.algites.pltf.modustro.builder.model.publication.*;
 import java.net.URI;
@@ -65,7 +67,7 @@ public final class AIcPublicationDomainBridgeChecks {
         };
         try (var locScheduler = new AIcPublicationScheduler(new AIcAdapterCatalog(List.of(), List.of(), List.of(), List.of(), List.of(), List.of(locAdapter)))) {
             var locAction = new AIcVersionScopePublicationFinalizationAction("probe", true, "scope-probe", 0,
-                    AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, Map.of());
+                    AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 0L, null, false, Map.of());
             var locComplete = locScheduler.finalizeVersionScope(locCombined.execution(), List.of(locAction), Map.of(), aEndpoint -> AIcNoProgress());
             AIcPublicationCheckAssertions.assertEquals(locComplete.state(), AInVersionScopePublicationAttemptState.COMPLETE);
             locScheduler.finalizeVersionScope(locComplete, List.of(locAction), Map.of(), aEndpoint -> AIcNoProgress());
@@ -129,9 +131,9 @@ public final class AIcPublicationDomainBridgeChecks {
     }
     private static AIcPublicationDomainContribution AIcDomain(String aInvocation, String aDomain, String aArtifact, boolean aCompleted) {
         var locEndpoint = new AIcPublicationEndpoint("release", true, URI.create("https://output.example.test/releases/"), "maven-repository", null,
-                0, AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 1000L, 5000L, true, Map.of("Provider", "test"));
+                0, AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 1000L, 5000L, true, Map.of("Provider", "test"));
         var locSnapshot = new AIcPublicationEndpoint("snapshot", true, URI.create("https://output.example.test/snapshots/"), "maven-repository", "snapshot-profile",
-                1, AInPublicationFailurePolicy.IGNORE_PUBLICATION_FAILURE, 1, 100L, null, false, Map.of("nested", List.of(Map.of("key", "value"))));
+                1, AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE, 1, 100L, null, false, Map.of("nested", List.of(Map.of("key", "value"))));
         String locOutputIdentity = aArtifact + ":java";
         var locPayload = new AIcPublicationPayload(AInPublicationOutputKind.NATIVE_PRODUCT_BINARIES, AInPublicationStability.RELEASE, locOutputIdentity, "1.0",
                 List.of(new AIcPublicationPayloadFile(URI.create("https://input.example.test/" + aArtifact + ".jar"), "payload.jar")), Map.of("groupId", "test", "artifactId", aArtifact));

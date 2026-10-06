@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import eu.algites.pltf.modustro.builder.model.publication.*;
 import java.net.URI;
 import java.nio.file.Files;
@@ -11,6 +13,9 @@ import java.util.*;
 
 /** Converts one effective output-publication plan into publication jobs and finalization actions. */
 public final class AIcPublicationPlanner {
+    /** Canonical schema field name until the publication descriptor itself is consumed as a generated model. */
+    private static final String SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY = "ExecutionFailurePolicy";
+
     public List<AIcPublicationJob> plan(AIcPublicationPayload aRoot, Map<String, Object> aConfiguration,
             Map<String, Object> aContext, Path aDirectory) throws Exception {
         if (!Boolean.TRUE.equals(AIcValue(aConfiguration, "PublicationEnabled", "publicationEnabled"))) return List.of();
@@ -45,7 +50,7 @@ public final class AIcPublicationPlanner {
                 if (locActions.stream().noneMatch(locAction -> "build-record".equals(locAction.id()))) {
                     ArrayList<AIcPublicationFinalizationAction> locWithDefault = new ArrayList<>(locActions);
                     locWithDefault.add(new AIcPublicationFinalizationAction("build-record", true, "modustro-build-record", null, 0,
-                            AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, true, Map.of(), List.of()));
+                            AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, true, Map.of(), List.of()));
                     locActions = List.copyOf(locWithDefault);
                 }
                 locJobs.add(new AIcPublicationJob(locId, AIcWithId(locEndpoint, locId), locPayload, aContext, locActions, locRegistry));
@@ -84,8 +89,8 @@ public final class AIcPublicationPlanner {
                     !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ExecutionEnabled", "executionEnabled")),
                     Objects.toString(AIcValue(locItem, "OutputPublicationFinalizationActionAdapter", "outputPublicationFinalizationActionAdapter"), null),
                     AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
-                    AIcFinalizationActionFailurePolicy(AIcValueOrDefault(locItem,
-                            "fail_build_on_failure", "FailurePolicy", "failurePolicy")),
+                    AIcBuildExecutionFailurePolicy(AIcValueOrDefault(locItem,
+                            AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue(), SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY)),
                     AIcInt(locItem, 0, "RetryCount", "retryCount"),
                     AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
                     AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
@@ -105,8 +110,8 @@ public final class AIcPublicationPlanner {
                     !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ExecutionEnabled", "executionEnabled")),
                     Objects.toString(AIcValue(locItem, "ArtifactPublicationFinalizationActionAdapter", "artifactPublicationFinalizationActionAdapter"), null),
                     AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
-                    AIcFinalizationActionFailurePolicy(AIcValueOrDefault(locItem,
-                            "fail_build_on_failure", "FailurePolicy", "failurePolicy")),
+                    AIcBuildExecutionFailurePolicy(AIcValueOrDefault(locItem,
+                            AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue(), SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY)),
                     AIcInt(locItem, 0, "RetryCount", "retryCount"),
                     AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
                     AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
@@ -126,8 +131,8 @@ public final class AIcPublicationPlanner {
                     !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ExecutionEnabled", "executionEnabled")),
                     Objects.toString(AIcValue(locItem, "VersionScopePublicationFinalizationActionAdapter", "versionScopePublicationFinalizationActionAdapter"), null),
                     AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
-                    AIcFinalizationActionFailurePolicy(AIcValueOrDefault(locItem,
-                            "fail_build_on_failure", "FailurePolicy", "failurePolicy")),
+                    AIcBuildExecutionFailurePolicy(AIcValueOrDefault(locItem,
+                            AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue(), SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY)),
                     AIcInt(locItem, 0, "RetryCount", "retryCount"),
                     AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
                     AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
@@ -148,8 +153,8 @@ public final class AIcPublicationPlanner {
                 locAdapter,
                 Objects.toString(AIcValue(aItem, "PublicationCredentialProfile", "publicationCredentialProfile"), null),
                 AIcInt(aItem, 0, "ExecutionOrder", "executionOrder"),
-                AIcPublicationFailurePolicy(AIcValueOrDefault(aItem,
-                        "fail_build_on_publication_failure", "PublicationFailurePolicy", "publicationFailurePolicy")),
+                AIcBuildExecutionFailurePolicy(AIcValueOrDefault(aItem,
+                        AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue(), SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY)),
                 AIcInt(aItem, 0, "PublicationRetryCount", "publicationRetryCount"),
                 AIcLong(aItem, 1000L, "PublicationWaitForNextAttemptMillis", "publicationWaitForNextAttemptMillis"),
                 AIcNullableLong(aItem, "PublicationAttemptTimeoutMillis", "publicationAttemptTimeoutMillis"),
@@ -173,8 +178,8 @@ public final class AIcPublicationPlanner {
                     locAdapter,
                     Objects.toString(AIcValue(locItem, "TargetPublicationEndpointId", "targetPublicationEndpointId"), null),
                     AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
-                    AIcFinalizationActionFailurePolicy(AIcValueOrDefault(locItem,
-                            "fail_build_on_failure", "FailurePolicy", "failurePolicy")),
+                    AIcBuildExecutionFailurePolicy(AIcValueOrDefault(locItem,
+                            AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue(), SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY)),
                     AIcInt(locItem, 0, "RetryCount", "retryCount"),
                     AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
                     AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
@@ -185,22 +190,13 @@ public final class AIcPublicationPlanner {
         return List.copyOf(locResult);
     }
 
-    private static AInPublicationFailurePolicy AIcPublicationFailurePolicy(Object aValue) {
+    private static AIngBuildExecutionFailurePolicy_1 AIcBuildExecutionFailurePolicy(Object aValue) {
         String locValue = Objects.toString(aValue, "");
-        return switch (locValue) {
-            case "fail_build_on_publication_failure" -> AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE;
-            case "ignore_publication_failure" -> AInPublicationFailurePolicy.IGNORE_PUBLICATION_FAILURE;
-            default -> throw new IllegalArgumentException("Unsupported PublicationFailurePolicy '" + locValue + "'.");
-        };
-    }
-
-    private static AInFinalizationActionFailurePolicy AIcFinalizationActionFailurePolicy(Object aValue) {
-        String locValue = Objects.toString(aValue, "");
-        return switch (locValue) {
-            case "fail_build_on_failure" -> AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE;
-            case "ignore_failure" -> AInFinalizationActionFailurePolicy.IGNORE_FAILURE;
-            default -> throw new IllegalArgumentException("Unsupported FailurePolicy '" + locValue + "'.");
-        };
+        return Arrays.stream(AIngBuildExecutionFailurePolicy_1.values())
+                .filter(aPolicy -> aPolicy.wireValue().equals(locValue))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Unsupported ExecutionFailurePolicy '" + locValue + "'."));
     }
 
     private static String AIcActionId(Map<String, Object> aItem, String aCollectionName) {
@@ -279,7 +275,7 @@ public final class AIcPublicationPlanner {
 
     private static AIcPublicationEndpoint AIcWithId(AIcPublicationEndpoint aEndpoint, String aId) {
         return new AIcPublicationEndpoint(aId, aEndpoint.executionEnabled(), aEndpoint.publicationUri(), aEndpoint.publicationAdapter(),
-                aEndpoint.publicationCredentialProfile(), aEndpoint.executionOrder(), aEndpoint.publicationFailurePolicy(),
+                aEndpoint.publicationCredentialProfile(), aEndpoint.executionOrder(), aEndpoint.executionFailurePolicy(),
                 aEndpoint.publicationRetryCount(), aEndpoint.publicationWaitForNextAttemptMillis(), aEndpoint.publicationAttemptTimeoutMillis(),
                 aEndpoint.showPublicationProgressIfPossible(), aEndpoint.configuration());
     }
@@ -289,7 +285,8 @@ public final class AIcPublicationPlanner {
         return null;
     }
     static Object AIcValueOrDefault(Map<String, Object> aMap, Object aDefault, String aFieldName) {
-        return AIcValueOrDefault(aMap, aDefault, aFieldName, aFieldName);
+        Object locValue = AIcValue(aMap, aFieldName);
+        return locValue == null ? aDefault : locValue;
     }
 
     static Object AIcValueOrDefault(

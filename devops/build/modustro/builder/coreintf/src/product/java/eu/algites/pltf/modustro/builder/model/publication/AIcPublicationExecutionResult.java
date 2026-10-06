@@ -10,16 +10,22 @@ public record AIcPublicationExecutionResult(
         AIcPublicationPayload payload,
         Map<String, Object> configuration,
         AIcPublicationResult result,
-        List<AIcFinalizationActionExecutionResult> publicationFinalizationActions) {
+        List<AIcFinalizationActionExecutionResult> publicationFinalizationActions,
+        boolean failureHandled) {
     public AIcPublicationExecutionResult {
         configuration = AIcPublicationValues.freeze(configuration);
         publicationFinalizationActions = List.copyOf(publicationFinalizationActions == null ? List.of() : publicationFinalizationActions);
     }
-    public boolean success() {
-        return result != null && result.success() && publicationFinalizationActions.stream().allMatch(AIcPublicationExecutionResult::AIcFinalizationSuccess);
+    /** Compatibility constructor retaining the previous handled-failure semantics. */
+    public AIcPublicationExecutionResult(
+            String aPublicationId, AIcPublicationEndpoint aEndpoint, AIcPublicationPayload aPayload,
+            Map<String, Object> aConfiguration, AIcPublicationResult aResult,
+            List<AIcFinalizationActionExecutionResult> aPublicationFinalizationActions) {
+        this(aPublicationId, aEndpoint, aPayload, aConfiguration, aResult, aPublicationFinalizationActions,
+                aPublicationFinalizationActions == null || aPublicationFinalizationActions.stream().allMatch(AIcFinalizationActionExecutionResult::failureHandled));
     }
-    private static boolean AIcFinalizationSuccess(AIcFinalizationActionExecutionResult aNode) {
-        return aNode.result() != null && (aNode.result().success() || aNode.result().ignoredFailure())
-                && aNode.finalizationActions().stream().allMatch(AIcPublicationExecutionResult::AIcFinalizationSuccess);
+
+    public boolean success() {
+        return result != null && result.success() && failureHandled;
     }
 }

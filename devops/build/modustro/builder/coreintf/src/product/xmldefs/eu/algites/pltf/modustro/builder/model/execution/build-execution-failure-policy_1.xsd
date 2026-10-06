@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="eu.algites.pltf.modustro.builder.model.execution.build-execution-failure-policy" version="1">
+  <xs:annotation>
+    <xs:documentation>Defines how an execution failure affects its parent execution hierarchy and the enclosing build.</xs:documentation>
+  </xs:annotation>
+  <xs:simpleType name="build-execution-failure-policy">
+    <xs:annotation>
+      <xs:documentation>Defines how an execution failure affects its parent execution hierarchy and the enclosing build.</xs:documentation>
+    </xs:annotation>
+    <xs:restriction base="xs:string">
+      <xs:enumeration value="fail_build_on_failure">
+        <xs:annotation><xs:documentation>Requires the entire build to fail when this execution or any non-ignored descendant execution fails. This terminal failure cannot be absorbed by an ancestor execution policy.</xs:documentation></xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="propagate_failure">
+        <xs:annotation><xs:documentation>Propagates a non-terminal failure to the immediate parent execution, whose own BuildExecutionFailurePolicy decides whether to fail the build, continue propagation, or ignore the failure.</xs:documentation></xs:annotation>
+      </xs:enumeration>
+      <xs:enumeration value="ignore_failure">
+        <xs:annotation><xs:documentation>Consumes a non-terminal failure at this execution boundary so that it is not propagated to an ancestor execution. An already terminal fail-build failure cannot be ignored.</xs:documentation></xs:annotation>
+      </xs:enumeration>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>

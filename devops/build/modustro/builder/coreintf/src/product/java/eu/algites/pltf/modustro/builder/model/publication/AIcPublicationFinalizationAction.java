@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.model.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,7 +13,7 @@ public record AIcPublicationFinalizationAction(
         String finalizationActionAdapter,
         String targetPublicationEndpointId,
         int executionOrder,
-        AInFinalizationActionFailurePolicy failurePolicy,
+        AIngBuildExecutionFailurePolicy_1 executionFailurePolicy,
         int retryCount,
         long waitForNextAttemptMillis,
         Long attemptTimeoutMillis,
@@ -20,7 +22,7 @@ public record AIcPublicationFinalizationAction(
         List<AIcPublicationFinalizationAction> finalizationActions) {
     public AIcPublicationFinalizationAction {
         Objects.requireNonNull(id, "id");
-        Objects.requireNonNull(failurePolicy, "failurePolicy");
+        Objects.requireNonNull(executionFailurePolicy, "executionFailurePolicy");
         if (id.isBlank()) throw new IllegalArgumentException("Publication finalization action id must not be blank.");
         if (executionEnabled && (finalizationActionAdapter == null || finalizationActionAdapter.isBlank())) {
             throw new IllegalArgumentException("ExecutionEnabled publication finalization action requires an adapter.");

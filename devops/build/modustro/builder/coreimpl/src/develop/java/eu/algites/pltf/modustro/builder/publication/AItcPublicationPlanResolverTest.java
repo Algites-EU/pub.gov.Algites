@@ -1,8 +1,9 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationEndpoint;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationStabilityConfiguration;
-import eu.algites.pltf.modustro.builder.model.publication.AInPublicationFailurePolicy;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationInvocationOverride;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability;
 import java.net.URI;
@@ -21,7 +22,7 @@ public class AItcPublicationPlanResolverTest {
             "maven-repository",
             null,
             0,
-            AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE,
+            AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE,
             0,
             1000L,
             30000L,

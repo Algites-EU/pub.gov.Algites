@@ -17,6 +17,6 @@ public record AIcArtifactPublicationExecutionResult(
     }
     public boolean success() {
         return outputs.stream().allMatch(AIcOutputPublicationExecutionResult::success)
-                && artifactPublicationFinalizationActions.stream().allMatch(loc -> loc.result() != null && (loc.result().success() || loc.result().ignoredFailure()));
+                && artifactPublicationFinalizationActions.stream().allMatch(loc -> loc.failureHandled());
     }
 }

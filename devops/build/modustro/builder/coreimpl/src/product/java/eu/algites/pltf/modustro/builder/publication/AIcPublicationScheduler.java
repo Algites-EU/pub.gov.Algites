@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog;
 import eu.algites.pltf.modustro.builder.model.publication.*;
 import java.net.URI;
@@ -71,10 +73,12 @@ public final class AIcPublicationScheduler implements AutoCloseable {
         LinkedHashMap<String, CompletableFuture<Void>> locRequiredSteps = new LinkedHashMap<>();
         for (AIcPublicationJob locJob : aJobs) {
             if (!locJob.endpoint().executionEnabled()) continue;
-            if (locJob.endpoint().publicationFailurePolicy() == AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE) {
+            if (locJob.endpoint().executionFailurePolicy() != AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE) {
                 locRequiredSteps.put(locJob.id(), new CompletableFuture<>());
             }
-            AIcRegisterRequiredActions(locJob.publicationFinalizationActions(), locJob.id(), locRequiredSteps);
+            AIcRegisterRequiredActions(
+                    locJob.publicationFinalizationActions(), locJob.id(),
+                    List.of(locJob.endpoint().executionFailurePolicy()), locRequiredSteps);
         }
         CompletableFuture<AIcOutputRun> locRun = CompletableFuture.supplyAsync(() -> AIcRunOutput(
                 aRootPayload, aJobs, aOutputFinalizationActions, aSnapshotPublicationEndpoints,
@@ -92,11 +96,14 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             });
         });
         CompletableFuture<AIcOutputPublicationExecutionResult> locOutput = locTerminatedRun.thenApply(AIcOutputRun::result);
-        CompletableFuture<Void> locRequired = CompletableFuture.allOf(locRequiredSteps.values().toArray(CompletableFuture[]::new));
+        CompletableFuture<Void> locRequired = CompletableFuture.allOf(
+                locRequiredSteps.values().toArray(CompletableFuture[]::new));
         if (aOutputFinalizationActions.stream().anyMatch(aAction -> aAction.executionEnabled()
-                && aAction.failurePolicy() == AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE)) {
+                && aAction.executionFailurePolicy() != AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE)) {
             locRequired = CompletableFuture.allOf(locRequired, locTerminatedRun.thenAccept(aCompleted -> {
-                if (aCompleted.requiredFailure() != null) throw new CompletionException(aCompleted.requiredFailure());
+                if (!aCompleted.failureFlow().AIcIsNone()) {
+                    throw new CompletionException(aCompleted.failureFlow().AIcAsThrowable());
+                }
             }));
         }
         return new AIcPublicationScheduleHandle(locRequired, locOutput, locPublicationResults, locActionResults);
@@ -168,7 +175,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             AIiPublicationCredentialResolver aCredentialResolver,
             AIiPublicationProgressReporterFactory aProgressReporterFactory) {
         List<AIcPublicationExecutionResult> locExecutions = new ArrayList<>();
-        Throwable locRequiredFailure = null;
+        AIcExecutionFailureFlow locFailureFlow = AIcExecutionFailureFlow.AIcNone();
         TreeMap<Integer, List<AIcPublicationJob>> locGroups = new TreeMap<>();
         for (AIcPublicationJob locJob : aJobs) {
             if (locJob.endpoint().executionEnabled()) locGroups.computeIfAbsent(locJob.endpoint().executionOrder(), ignored -> new ArrayList<>()).add(locJob);
@@ -199,7 +206,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
         for (CompletableFuture<AIcPublicationRun> locTree : locTrees) {
             AIcPublicationRun locRun = locTree.join();
             locExecutions.add(locRun.result());
-            if (locRequiredFailure == null && locRun.requiredFailure() != null) locRequiredFailure = locRun.requiredFailure();
+            locFailureFlow = locFailureFlow.AIcMerge(locRun.failureFlow());
         }
 
         Map<String, AIcPublicationEndpoint> locRegistry = new LinkedHashMap<>();
@@ -211,16 +218,16 @@ public final class AIcPublicationScheduler implements AutoCloseable {
                 locRegistry, aSnapshotPublicationEndpoints, locExecutions, List.of());
 
         List<AIcFinalizationActionExecutionResult> locOutputFinalizers = List.of();
-        if (locRequiredFailure == null && locBase.publications().stream().allMatch(AIcPublicationExecutionResult::success)) {
+        if (locFailureFlow.AIcIsNone() && locBase.publications().stream().allMatch(AIcPublicationExecutionResult::success)) {
             locOutputFinalizers = AIcRunOutputFinalizationActions(locBase, aOutputFinalizationActions, aProgressReporterFactory);
             AIcFinalizationActionExecutionResult locFailed = locOutputFinalizers.stream()
                     .filter(locResult -> !AIcRequiredFinalizationSuccess(locResult)).findFirst().orElse(null);
-            if (locFailed != null) locRequiredFailure = locFailed.result().failure();
+            if (locFailed != null) locFailureFlow = locFailureFlow.AIcMerge(AIcExecutionFailureFlow.AIcPropagated(locFailed.result().failure()));
         }
         AIcOutputPublicationExecutionResult locResult = new AIcOutputPublicationExecutionResult(
                 locBase.artifactIdentity(), locBase.technologyKind(), locBase.outputKind(), locBase.stability(), locBase.version(),
                 locBase.publicationEndpointRegistry(), locBase.snapshotPublicationEndpoints(), locBase.publications(), locOutputFinalizers);
-        return new AIcOutputRun(locResult, locRequiredFailure);
+        return new AIcOutputRun(locResult, locFailureFlow);
     }
 
     private AIcPublicationRun AIcRunPublicationTree(
@@ -231,31 +238,32 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             AIiPublicationCredentialResolver aCredentialResolver,
             AIiPublicationProgressReporterFactory aProgressReporterFactory) {
         AIcPublicationResult locPublication = aPublicationResult;
-        Throwable locRequiredFailure = null;
+        AIcExecutionFailureFlow locFailureFlow = AIcExecutionFailureFlow.AIcNone();
         List<AIcFinalizationActionExecutionResult> locActions = List.of();
         if (!locPublication.success()) {
-            if (aJob.endpoint().publicationFailurePolicy() == AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE) {
-                locRequiredFailure = locPublication.failure();
-            }
+            locFailureFlow = AIcApplyFailurePolicy(
+                    aJob.endpoint().executionFailurePolicy(), AIcExecutionFailureFlow.AIcPropagated(locPublication.failure()));
         } else {
             URI locInputUri = AIcPublicationContent.inputUri(aJob.payload());
             AIcPublicationExecutionStep locRootStep = new AIcPublicationExecutionStep(
                     aJob.id(), "publication", locInputUri, locPublication.outputUri(), aJob.configuration(), locPublication.metadata());
             AIcPublicationExecutionLineage locLineage = new AIcPublicationExecutionLineage(List.of(locRootStep));
             AIcFinalizationTreeRun locTree = AIcRunPublicationFinalizationGroups(
-                    aJob, aJob.publicationFinalizationActions(), locLineage,
+                    aJob, aJob.publicationFinalizationActions(), aJob.endpoint().executionFailurePolicy(), locLineage,
                     locPublication.outputUri() == null ? locInputUri : locPublication.outputUri(), aActionResults,
                     aRequiredSteps, aCredentialResolver, aProgressReporterFactory);
             locActions = locTree.results();
-            locRequiredFailure = locTree.requiredFailure();
+            locFailureFlow = locTree.failureFlow();
         }
         return new AIcPublicationRun(new AIcPublicationExecutionResult(
-                aJob.id(), aJob.endpoint(), aJob.payload(), aJob.configuration(), locPublication, locActions), locRequiredFailure);
+                aJob.id(), aJob.endpoint(), aJob.payload(), aJob.configuration(), locPublication, locActions,
+                locFailureFlow.AIcIsNone()), locFailureFlow);
     }
 
     private AIcFinalizationTreeRun AIcRunPublicationFinalizationGroups(
             AIcPublicationJob aJob,
             List<AIcPublicationFinalizationAction> aActions,
+            AIngBuildExecutionFailurePolicy_1 aParentFailurePolicy,
             AIcPublicationExecutionLineage aLineage,
             URI aInputUri,
             Map<String, CompletableFuture<AIcFinalizationActionExecutionResult>> aObservableResults,
@@ -268,6 +276,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             locGroups.computeIfAbsent(locAction.executionOrder(), ignored -> new ArrayList<>()).add(locAction);
         }
         for (List<AIcPublicationFinalizationAction> locGroup : locGroups.values()) {
+            List<AIcPublicationFinalizationAction> locScheduledActions = new ArrayList<>();
             List<CompletableFuture<AIcPublicationFinalizationActionResult>> locAttempts = new ArrayList<>();
             for (AIcPublicationFinalizationAction locAction : locGroup) {
                 CompletableFuture<AIcPublicationFinalizationActionResult> locAttempt = CompletableFuture.supplyAsync(
@@ -279,26 +288,34 @@ public final class AIcPublicationScheduler implements AutoCloseable {
                             if (!aResult.success()) AIcSkipRequiredActions(locAction.finalizationActions(), locPath, aRequiredSteps);
                             return aResult;
                         });
+                locScheduledActions.add(locAction);
                 locAttempts.add(locAttempt);
                 locTrees.add(locAttempt.thenApplyAsync(aResult -> AIcRunPublicationFinalizationAction(
                         aJob, locAction, aResult, aLineage, aInputUri, aObservableResults,
                         aRequiredSteps, aCredentialResolver, aProgressReporterFactory), orchestrationExecutor));
             }
-            boolean locFailed = false;
-            for (CompletableFuture<AIcPublicationFinalizationActionResult> locAttempt : locAttempts) {
-                AIcPublicationFinalizationActionResult locResult = locAttempt.join();
-                if (!locResult.success() && !locResult.ignoredFailure()) locFailed = true;
+            AIcExecutionFailureFlow locImmediateGroupFlow = AIcExecutionFailureFlow.AIcNone();
+            for (int locIndex = 0; locIndex < locAttempts.size(); locIndex++) {
+                AIcPublicationFinalizationActionResult locResult = locAttempts.get(locIndex).join();
+                if (!locResult.success()) {
+                    AIcPublicationFinalizationAction locAction = locScheduledActions.get(locIndex);
+                    AIcExecutionFailureFlow locActionFlow = AIcApplyFailurePolicy(
+                            locAction.executionFailurePolicy(), AIcExecutionFailureFlow.AIcPropagated(locResult.failure()));
+                    locImmediateGroupFlow = locImmediateGroupFlow.AIcMerge(locActionFlow);
+                }
             }
-            if (locFailed) break;
+            AIcExecutionFailureFlow locImmediateParentFlow = AIcApplyFailurePolicy(aParentFailurePolicy, locImmediateGroupFlow);
+            if (!locImmediateParentFlow.AIcIsNone()) break;
         }
         List<AIcFinalizationActionExecutionResult> locResults = new ArrayList<>();
-        Throwable locRequiredFailure = null;
+        AIcExecutionFailureFlow locTreeFlow = AIcExecutionFailureFlow.AIcNone();
         for (CompletableFuture<AIcFinalizationTreeRun> locTree : locTrees) {
             AIcFinalizationTreeRun locRun = locTree.join();
             locResults.addAll(locRun.results());
-            if (locRequiredFailure == null && locRun.requiredFailure() != null) locRequiredFailure = locRun.requiredFailure();
+            locTreeFlow = locTreeFlow.AIcMerge(locRun.failureFlow());
         }
-        return new AIcFinalizationTreeRun(List.copyOf(locResults), locRequiredFailure);
+        return new AIcFinalizationTreeRun(
+                List.copyOf(locResults), AIcApplyFailurePolicy(aParentFailurePolicy, locTreeFlow));
     }
 
     private AIcFinalizationTreeRun AIcRunPublicationFinalizationAction(
@@ -313,26 +330,28 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             AIiPublicationProgressReporterFactory aProgressReporterFactory) {
         AIcPublicationFinalizationActionResult locActionResult = aActionResult;
         List<AIcFinalizationActionExecutionResult> locChildren = List.of();
-        Throwable locRequiredFailure = null;
+        AIcExecutionFailureFlow locFailureFlow;
         if (locActionResult.success()) {
             URI locChildInput = locActionResult.outputUri() == null ? aInputUri : locActionResult.outputUri();
             AIcPublicationExecutionStep locStep = new AIcPublicationExecutionStep(
                     aAction.id(), "publication-finalization-action", aInputUri, locActionResult.outputUri(),
                     aAction.configuration(), locActionResult.metadata());
             AIcFinalizationTreeRun locChildRun = AIcRunPublicationFinalizationGroups(
-                    aJob, aAction.finalizationActions(), aLineage.append(locStep), locChildInput,
-                    aObservableResults, aRequiredSteps, aCredentialResolver, aProgressReporterFactory);
+                    aJob, aAction.finalizationActions(), aAction.executionFailurePolicy(),
+                    aLineage.append(locStep), locChildInput, aObservableResults, aRequiredSteps,
+                    aCredentialResolver, aProgressReporterFactory);
             locChildren = locChildRun.results();
-            locRequiredFailure = locChildRun.requiredFailure();
-        } else if (!locActionResult.ignoredFailure()) {
-            locRequiredFailure = locActionResult.failure();
+            locFailureFlow = locChildRun.failureFlow();
+        } else {
+            locFailureFlow = AIcApplyFailurePolicy(
+                    aAction.executionFailurePolicy(), AIcExecutionFailureFlow.AIcPropagated(locActionResult.failure()));
         }
         AIcFinalizationActionExecutionResult locNode = new AIcFinalizationActionExecutionResult(
-                aAction.id(), "publication", locActionResult, aAction.configuration(), locChildren);
+                aAction.id(), "publication", locActionResult, aAction.configuration(), locChildren, locFailureFlow.AIcIsNone());
         String locPath = AIcActionPath(aJob.id(), aLineage, aAction.id());
         CompletableFuture<AIcFinalizationActionExecutionResult> locObservable = aObservableResults.get(locPath);
         if (locObservable != null) locObservable.complete(locNode);
-        return new AIcFinalizationTreeRun(List.of(locNode), locRequiredFailure);
+        return new AIcFinalizationTreeRun(List.of(locNode), locFailureFlow);
     }
 
     private AIcPublicationFinalizationActionResult AIcRunPublicationFinalizationAttempt(
@@ -346,12 +365,12 @@ public final class AIcPublicationScheduler implements AutoCloseable {
         try {
             locAdapter = adapterCatalog.requirePublicationFinalizationActionAdapter(aAction.finalizationActionAdapter());
         } catch (Throwable locFailure) {
-            return AIcFinalizationFailure(aAction.id(), aAction.failurePolicy(), false, 0, Duration.ZERO, locFailure);
+            return AIcFinalizationFailure(aAction.id(), aAction.executionFailurePolicy(), false, 0, Duration.ZERO, locFailure);
         }
         AIcPublicationEndpoint locTarget = aAction.targetPublicationEndpointId() == null
                 ? aJob.endpoint() : aJob.publicationEndpointRegistry().get(aAction.targetPublicationEndpointId());
         if (aAction.targetPublicationEndpointId() != null && locTarget == null) {
-            return AIcFinalizationFailure(aAction.id(), aAction.failurePolicy(), false, 0, Duration.ZERO,
+            return AIcFinalizationFailure(aAction.id(), aAction.executionFailurePolicy(), false, 0, Duration.ZERO,
                     new IllegalArgumentException("Unknown TargetPublicationEndpointId '" + aAction.targetPublicationEndpointId() + "'."));
         }
         int locMaximumAttempts = aAction.retryCount() + 1;
@@ -385,7 +404,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
                 if (locAttempt < locMaximumAttempts) AIcSleep(aAction.waitForNextAttemptMillis());
             }
         }
-        return AIcFinalizationFailure(aAction.id(), aAction.failurePolicy(), true, locMaximumAttempts,
+        return AIcFinalizationFailure(aAction.id(), aAction.executionFailurePolicy(), true, locMaximumAttempts,
                 Duration.between(locStarted, Instant.now()), locFailure);
     }
 
@@ -416,11 +435,11 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             locAdapter = adapterCatalog.requireOutputPublicationFinalizationActionAdapter(aAction.outputPublicationFinalizationActionAdapter());
         } catch (Throwable locFailure) {
             return new AIcFinalizationActionExecutionResult(aAction.id(), "output",
-                    AIcFinalizationFailure(aAction.id(), aAction.failurePolicy(), false, 0, Duration.ZERO, locFailure),
+                    AIcFinalizationFailure(aAction.id(), aAction.executionFailurePolicy(), false, 0, Duration.ZERO, locFailure),
                     aAction.configuration(), List.of());
         }
         AIcPublicationFinalizationActionResult locResult = AIcRunFlatFinalization(
-                aAction.id(), aAction.failurePolicy(), aAction.retryCount(), aAction.waitForNextAttemptMillis(), aAction.attemptTimeoutMillis(),
+                aAction.id(), aAction.executionFailurePolicy(), aAction.retryCount(), aAction.waitForNextAttemptMillis(), aAction.attemptTimeoutMillis(),
                 (locAttempt, locMaximum, locDeadline, locCancelled) -> {
                     AIcOutputPublicationFinalizationActionAttemptContext locContext = new AIcOutputPublicationFinalizationActionAttemptContext(
                             aAction, aBase, locAttempt, locMaximum, aAction.attemptTimeoutMillis(), locDeadline,
@@ -460,11 +479,11 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             locAdapter = adapterCatalog.requireArtifactPublicationFinalizationActionAdapter(aAction.artifactPublicationFinalizationActionAdapter());
         } catch (Throwable locFailure) {
             return new AIcFinalizationActionExecutionResult(aAction.id(), "artifact",
-                    AIcFinalizationFailure(aAction.id(), aAction.failurePolicy(), false, 0, Duration.ZERO, locFailure),
+                    AIcFinalizationFailure(aAction.id(), aAction.executionFailurePolicy(), false, 0, Duration.ZERO, locFailure),
                     aAction.configuration(), List.of());
         }
         AIcPublicationFinalizationActionResult locResult = AIcRunFlatFinalization(
-                aAction.id(), aAction.failurePolicy(), aAction.retryCount(), aAction.waitForNextAttemptMillis(), aAction.attemptTimeoutMillis(),
+                aAction.id(), aAction.executionFailurePolicy(), aAction.retryCount(), aAction.waitForNextAttemptMillis(), aAction.attemptTimeoutMillis(),
                 (locAttempt, locMaximum, locDeadline, locCancelled) -> {
                     AIcArtifactPublicationFinalizationActionAttemptContext locContext = new AIcArtifactPublicationFinalizationActionAttemptContext(
                             aAction, aBase, locAttempt, locMaximum, aAction.attemptTimeoutMillis(), locDeadline,
@@ -507,11 +526,11 @@ public final class AIcPublicationScheduler implements AutoCloseable {
             locAdapter = adapterCatalog.requireVersionScopePublicationFinalizationActionAdapter(aAction.versionScopePublicationFinalizationActionAdapter());
         } catch (Throwable locFailure) {
             return new AIcFinalizationActionExecutionResult(aAction.id(), "version-scope",
-                    AIcFinalizationFailure(aAction.id(), aAction.failurePolicy(), false, 0, Duration.ZERO, locFailure),
+                    AIcFinalizationFailure(aAction.id(), aAction.executionFailurePolicy(), false, 0, Duration.ZERO, locFailure),
                     aAction.configuration(), List.of());
         }
         AIcPublicationFinalizationActionResult locResult = AIcRunFlatFinalization(
-                aAction.id(), aAction.failurePolicy(), aAction.retryCount(), aAction.waitForNextAttemptMillis(), aAction.attemptTimeoutMillis(),
+                aAction.id(), aAction.executionFailurePolicy(), aAction.retryCount(), aAction.waitForNextAttemptMillis(), aAction.attemptTimeoutMillis(),
                 (locAttempt, locMaximum, locDeadline, locCancelled) -> {
                     AIcVersionScopePublicationFinalizationActionAttemptContext locContext = new AIcVersionScopePublicationFinalizationActionAttemptContext(
                             aAction, aBase, locAttempt, locMaximum, aAction.attemptTimeoutMillis(), locDeadline,
@@ -526,7 +545,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
     }
 
     private AIcPublicationFinalizationActionResult AIcRunFlatFinalization(
-            String aId, AInFinalizationActionFailurePolicy aFailurePolicy, int aRetryCount,
+            String aId, AIngBuildExecutionFailurePolicy_1 aFailurePolicy, int aRetryCount,
             long aWaitMillis, Long aTimeoutMillis, AIiFlatFinalizationAttempt aAttempt) {
         int locMaximumAttempts = aRetryCount + 1;
         Instant locStarted = Instant.now();
@@ -567,7 +586,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
                 throw new IllegalArgumentException("Publication adapter '" + aEndpoint.publicationAdapter() + "' does not permit automatic retries.");
             }
         } catch (Throwable locAdapterFailure) {
-            boolean locIgnored = aEndpoint.publicationFailurePolicy() == AInPublicationFailurePolicy.IGNORE_PUBLICATION_FAILURE;
+            boolean locIgnored = aEndpoint.executionFailurePolicy() == AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE;
             return new AIcPublicationResult(aEndpoint.id(), false, false, locIgnored, 0, Duration.ZERO, null, Map.of(), AIcCause(locAdapterFailure));
         }
         for (int locAttempt = 1; locAttempt <= locMaximumAttempts; locAttempt++) {
@@ -594,7 +613,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
                 if (locAttempt < locMaximumAttempts) AIcSleep(aEndpoint.publicationWaitForNextAttemptMillis());
             }
         }
-        boolean locIgnored = aEndpoint.publicationFailurePolicy() == AInPublicationFailurePolicy.IGNORE_PUBLICATION_FAILURE;
+        boolean locIgnored = aEndpoint.executionFailurePolicy() == AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE;
         return new AIcPublicationResult(
                 aEndpoint.id(), true, false, locIgnored, locMaximumAttempts, Duration.between(locStarted, Instant.now()),
                 null, Map.of("PublicationAdapter", aEndpoint.publicationAdapter(), "PublicationEndpointId", aEndpoint.id()), locFailure);
@@ -610,10 +629,10 @@ public final class AIcPublicationScheduler implements AutoCloseable {
     }
 
     private static AIcPublicationFinalizationActionResult AIcFinalizationFailure(
-            String aId, AInFinalizationActionFailurePolicy aFailurePolicy, boolean aStarted, int aAttempts,
+            String aId, AIngBuildExecutionFailurePolicy_1 aFailurePolicy, boolean aStarted, int aAttempts,
             Duration aDuration, Throwable aFailure) {
         return new AIcPublicationFinalizationActionResult(
-                aId, aStarted, false, aFailurePolicy == AInFinalizationActionFailurePolicy.IGNORE_FAILURE,
+                aId, aStarted, false, aFailurePolicy == AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE,
                 aAttempts, aDuration, null, Map.of(), aFailure);
     }
 
@@ -628,9 +647,7 @@ public final class AIcPublicationScheduler implements AutoCloseable {
     }
 
     private static boolean AIcRequiredFinalizationSuccess(AIcFinalizationActionExecutionResult aResult) {
-        if (aResult.result() == null) return false;
-        if (!aResult.result().success() && !aResult.result().ignoredFailure()) return false;
-        return aResult.finalizationActions().stream().allMatch(AIcPublicationScheduler::AIcRequiredFinalizationSuccess);
+        return aResult.failureHandled();
     }
 
     private static AIiPublicationProgressReporter AIcProgress(
@@ -669,13 +686,34 @@ public final class AIcPublicationScheduler implements AutoCloseable {
     }
 
     private static void AIcRegisterRequiredActions(
-            List<AIcPublicationFinalizationAction> aActions, String aPrefix, Map<String, CompletableFuture<Void>> aRequiredSteps) {
+            List<AIcPublicationFinalizationAction> aActions,
+            String aPrefix,
+            List<AIngBuildExecutionFailurePolicy_1> aAncestorPolicies,
+            Map<String, CompletableFuture<Void>> aRequiredSteps) {
         for (AIcPublicationFinalizationAction locAction : aActions) {
             if (!locAction.executionEnabled()) continue;
             String locPath = aPrefix + "/" + locAction.id();
-            if (locAction.failurePolicy() == AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE) aRequiredSteps.put(locPath, new CompletableFuture<>());
-            AIcRegisterRequiredActions(locAction.finalizationActions(), locPath, aRequiredSteps);
+            if (AIcFailureCanReachBuild(locAction.executionFailurePolicy(), aAncestorPolicies)) {
+                aRequiredSteps.put(locPath, new CompletableFuture<>());
+            }
+            ArrayList<AIngBuildExecutionFailurePolicy_1> locChildAncestors = new ArrayList<>();
+            locChildAncestors.add(locAction.executionFailurePolicy());
+            locChildAncestors.addAll(aAncestorPolicies);
+            AIcRegisterRequiredActions(
+                    locAction.finalizationActions(), locPath, List.copyOf(locChildAncestors), aRequiredSteps);
         }
+    }
+
+    private static boolean AIcFailureCanReachBuild(
+            AIngBuildExecutionFailurePolicy_1 aPolicy,
+            List<AIngBuildExecutionFailurePolicy_1> aAncestorPolicies) {
+        if (aPolicy == AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE) return true;
+        if (aPolicy == AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE) return false;
+        for (AIngBuildExecutionFailurePolicy_1 locPolicy : aAncestorPolicies) {
+            if (locPolicy == AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE) return true;
+            if (locPolicy == AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE) return false;
+        }
+        return true;
     }
 
     private static void AIcCompleteRequiredStep(Map<String, CompletableFuture<Void>> aRequiredSteps, String aPath, Throwable aFailure) {
@@ -785,7 +823,61 @@ public final class AIcPublicationScheduler implements AutoCloseable {
         AIcPublicationFinalizationActionResult execute(int aAttempt, int aMaximumAttempts, Instant aDeadline, AtomicBoolean aCancelled) throws Exception;
     }
 
-    private record AIcPublicationRun(AIcPublicationExecutionResult result, Throwable requiredFailure) { }
-    private record AIcFinalizationTreeRun(List<AIcFinalizationActionExecutionResult> results, Throwable requiredFailure) { }
-    private record AIcOutputRun(AIcOutputPublicationExecutionResult result, Throwable requiredFailure) { }
+    private enum AInExecutionFailureFlowState { NONE, PROPAGATED_FAILURE, BUILD_FAILURE }
+
+    private record AIcExecutionFailureFlow(AInExecutionFailureFlowState state, List<Throwable> failures) {
+        private AIcExecutionFailureFlow {
+            Objects.requireNonNull(state, "state");
+            failures = List.copyOf(failures == null ? List.of() : failures);
+        }
+
+        static AIcExecutionFailureFlow AIcNone() {
+            return new AIcExecutionFailureFlow(AInExecutionFailureFlowState.NONE, List.of());
+        }
+
+        static AIcExecutionFailureFlow AIcPropagated(Throwable aFailure) {
+            return aFailure == null ? AIcNone()
+                    : new AIcExecutionFailureFlow(AInExecutionFailureFlowState.PROPAGATED_FAILURE, List.of(aFailure));
+        }
+
+        boolean AIcIsNone() {
+            return state == AInExecutionFailureFlowState.NONE;
+        }
+
+        AIcExecutionFailureFlow AIcMerge(AIcExecutionFailureFlow aOther) {
+            if (aOther == null || aOther.AIcIsNone()) return this;
+            if (AIcIsNone()) return aOther;
+            ArrayList<Throwable> locFailures = new ArrayList<>(failures);
+            locFailures.addAll(aOther.failures);
+            AInExecutionFailureFlowState locState = state == AInExecutionFailureFlowState.BUILD_FAILURE
+                    || aOther.state == AInExecutionFailureFlowState.BUILD_FAILURE
+                    ? AInExecutionFailureFlowState.BUILD_FAILURE : AInExecutionFailureFlowState.PROPAGATED_FAILURE;
+            return new AIcExecutionFailureFlow(locState, locFailures);
+        }
+
+        Throwable AIcAsThrowable() {
+            if (failures.isEmpty()) return new IllegalStateException("Build execution failed without a recorded cause.");
+            if (failures.size() == 1) return failures.get(0);
+            IllegalStateException locCombined = new IllegalStateException("Multiple build execution failures occurred.");
+            failures.forEach(locCombined::addSuppressed);
+            return locCombined;
+        }
+    }
+
+    private static AIcExecutionFailureFlow AIcApplyFailurePolicy(
+            AIngBuildExecutionFailurePolicy_1 aPolicy, AIcExecutionFailureFlow aFailureFlow) {
+        Objects.requireNonNull(aPolicy, "policy");
+        if (aFailureFlow == null || aFailureFlow.AIcIsNone()) return AIcExecutionFailureFlow.AIcNone();
+        if (aFailureFlow.state() == AInExecutionFailureFlowState.BUILD_FAILURE) return aFailureFlow;
+        return switch (aPolicy) {
+            case FAIL_BUILD_ON_FAILURE -> new AIcExecutionFailureFlow(
+                    AInExecutionFailureFlowState.BUILD_FAILURE, aFailureFlow.failures());
+            case PROPAGATE_FAILURE -> aFailureFlow;
+            case IGNORE_FAILURE -> AIcExecutionFailureFlow.AIcNone();
+        };
+    }
+
+    private record AIcPublicationRun(AIcPublicationExecutionResult result, AIcExecutionFailureFlow failureFlow) { }
+    private record AIcFinalizationTreeRun(List<AIcFinalizationActionExecutionResult> results, AIcExecutionFailureFlow failureFlow) { }
+    private record AIcOutputRun(AIcOutputPublicationExecutionResult result, AIcExecutionFailureFlow failureFlow) { }
 }

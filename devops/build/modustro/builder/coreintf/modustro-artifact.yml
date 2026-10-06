@@ -12,3 +12,9 @@ Artifact:
           Items:
             - BuildOutputType: java_classes_jar
             - BuildOutputType: java_sources_jar
+
+      - TechnologyKind: python
+        BuildOutputTypes:
+          Items:
+            - BuildOutputType: python_wheel
+            - BuildOutputType: python_sdist

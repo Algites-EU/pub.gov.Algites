@@ -588,18 +588,21 @@ jobs:
 
       - name: Set up Python documentation toolchain
         if: ${{ contains(format(',{0},', steps.algites-artifact-metadata.outputs.documentation-technology-kinds), ',python,') }}
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ steps.request.outputs.python-version }}
 
-      - name: Install Python documentation tooling
+      - name: Install Python documentation and packaging tooling
         if: ${{ contains(format(',{0},', steps.algites-artifact-metadata.outputs.documentation-technology-kinds), ',python,') }}
         shell: bash
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check \
+            "build==1.6.1" \
             "Sphinx==9.1.0" \
             "sphinx-autoapi==3.8.0"
+          locPythonExecutable="$(python -c 'import sys; print(sys.executable)')"
+          echo "ALGITES_PYTHON_EXECUTABLE=${locPythonExecutable}" >> "${GITHUB_ENV}"
 
       - name: Generate documentation site into persistent documentation branch workspace
         working-directory: source

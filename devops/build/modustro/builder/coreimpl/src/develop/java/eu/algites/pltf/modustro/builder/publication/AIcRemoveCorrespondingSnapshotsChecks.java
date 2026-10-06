@@ -1,5 +1,7 @@
 package eu.algites.pltf.modustro.builder.publication;
 
+import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1;
+
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import eu.algites.pltf.modustro.builder.model.publication.*;
@@ -9,7 +11,6 @@ import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationExecutio
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayloadFile;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationResult;
-import eu.algites.pltf.modustro.builder.model.publication.AInPublicationFailurePolicy;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability;
 import java.net.InetSocketAddress;
@@ -189,7 +190,7 @@ public final class AIcRemoveCorrespondingSnapshotsChecks {
             AIcPublicationPayload aPayload, AIcPublicationEndpoint aTarget, Map<String, String> aCredentials) {
         var locAction = new AIcVersionScopePublicationFinalizationAction("remove-corresponding-snapshots", true,
                 AIcRemoveCorrespondingSnapshotsVersionScopePublicationFinalizationActionAdapter.ADAPTER_ID, 0,
-                AInFinalizationActionFailurePolicy.IGNORE_FAILURE, 0, 0L, null, true, Map.of());
+                AIngBuildExecutionFailurePolicy_1.IGNORE_FAILURE, 0, 0L, null, true, Map.of());
         var locPublication = new AIcPublicationExecutionResult("release/standard", aTarget, aPayload, Map.of(),
                 new AIcPublicationResult("release", true, true, false, 1, Duration.ZERO, URI.create("https://release.invalid/artifact"), Map.of(), null), List.of());
         var locOutput = new AIcOutputPublicationExecutionResult(aPayload.artifactIdentity(), aPayload.coordinates().get("technologyKind"),
@@ -233,7 +234,7 @@ public final class AIcRemoveCorrespondingSnapshotsChecks {
                 "mock-publication",
                 "credentials",
                 0,
-                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE,
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE,
                 0,
                 0L,
                 null,

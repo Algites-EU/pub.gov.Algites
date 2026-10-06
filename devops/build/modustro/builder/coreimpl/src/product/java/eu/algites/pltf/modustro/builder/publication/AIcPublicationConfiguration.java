@@ -24,10 +24,10 @@ public final class AIcPublicationConfiguration {
             "Id", "OutputSelector", "TechnologyKind", "ExecutionEnabled", "PublicationEnabled", "Classifier", "Extension",
             "PublicationFinalizationActionAdapter", "FinalizationActionAdapter",
             "OutputPublicationFinalizationActionAdapter", "ArtifactPublicationFinalizationActionAdapter",
-            "VersionScopePublicationFinalizationActionAdapter", "TargetPublicationEndpointId", "ExecutionOrder", "FailurePolicy",
+            "VersionScopePublicationFinalizationActionAdapter", "TargetPublicationEndpointId", "ExecutionOrder", "ExecutionFailurePolicy",
             "RetryCount", "WaitForNextAttemptMillis", "AttemptTimeoutMillis", "ShowProgressIfPossible",
             "PublicationUri", "PublicationAdapter", "PublicationCredentialProfile",
-            "PublicationFailurePolicy", "PublicationRetryCount", "PublicationWaitForNextAttemptMillis",
+            "PublicationRetryCount", "PublicationWaitForNextAttemptMillis",
             "PublicationAttemptTimeoutMillis", "ShowPublicationProgressIfPossible");
     private static final Set<String> CHILD_LIST_PROPERTIES = Set.of(
             "Publications", "PublicationFinalizationActions", "FinalizationActions",
