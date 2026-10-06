@@ -1,56 +1,66 @@
+# yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
+# $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
 $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/modustro-source-repository_1.yamldef.schema.json
+
 SourceRepository:
   Id: pub.gov.Algites
   Name: Algites public governance repository
+
 GroupId: eu.algites.gov.pub
+
 Version:
   ReleaseLineVersion: '1'
   Revision: 0
   QualifierKind: snapshot
-modustro_docs_site:
-  Snapshot:
-    PublicationEnabled: true
-  Release:
-    PublicationEnabled: true
-schema_site:
-  Snapshot:
-    PublicationEnabled: true
-  Release:
-    PublicationEnabled: true
+
+# Default publication policy preserves the normal repository publication behavior.
+# Snapshot invocation overrides may force individual output kinds on/off without affecting build/test/package.
 OutputPublications:
 - OutputSelector: native_product_outputs
-  Snapshot:
-    PublicationEnabled: true
-  Release:
-    PublicationEnabled: true
   TechnologyKind: java
-- OutputSelector: native_product_outputs
   Snapshot:
     PublicationEnabled: true
   Release:
     PublicationEnabled: true
+- OutputSelector: native_product_outputs
   TechnologyKind: python
+  Snapshot:
+    PublicationEnabled: true
+  Release:
+    PublicationEnabled: true
 - OutputSelector: native_product_outputs
-  Snapshot:
-    PublicationEnabled: true
-  Release:
-    PublicationEnabled: true
   TechnologyKind: mps
-- OutputSelector: native_develop_outputs
   Snapshot:
-    PublicationEnabled: false
+    PublicationEnabled: true
   Release:
-    PublicationEnabled: false
+    PublicationEnabled: true
+- OutputSelector: native_develop_outputs
   TechnologyKind: java
-- OutputSelector: native_develop_outputs
   Snapshot:
     PublicationEnabled: false
   Release:
     PublicationEnabled: false
+- OutputSelector: native_develop_outputs
   TechnologyKind: python
-- OutputSelector: native_develop_outputs
   Snapshot:
     PublicationEnabled: false
   Release:
     PublicationEnabled: false
+- OutputSelector: native_develop_outputs
   TechnologyKind: mps
+  Snapshot:
+    PublicationEnabled: false
+  Release:
+    PublicationEnabled: false
+- OutputSelector: modustro_docs_site
+  TechnologyKind: modustro
+  Snapshot:
+    PublicationEnabled: true
+  Release:
+    PublicationEnabled: true
+- OutputSelector: schema_site
+  TechnologyKind: modustro
+  Snapshot:
+    PublicationEnabled: true
+  Release:
+    PublicationEnabled: true

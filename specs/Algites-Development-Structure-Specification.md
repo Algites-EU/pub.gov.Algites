@@ -1283,28 +1283,40 @@ OutputPublications:
           PublicationAdapter: maven-repository
           Publications:
             - Id: standard
-              PostPublicationActions:
+              PublicationFinalizationActions:
                 - Id: build-record
-                  PostPublicationActionAdapter: modustro-build-record
+                  PublicationFinalizationActionAdapter: modustro-build-record
 ```
 
 Selectors may be concrete native output kinds or governed virtual groups. Group expansion establishes defaults; more specific declarations override broader declarations. Effective declarations always identify exactly one technology.
 
-Subscriptions, publication endpoints, root publications, and recursive post-actions each merge by stable `Id` in their own parent scope. Sparse descendant declarations amend inherited objects; explicit empty collections clear the inherited collection at that level.
+Subscriptions, publication endpoints, root publications, and recursive publication finalization actions each merge by stable `Id` in their own parent scope. Sparse descendant declarations amend inherited objects; explicit empty collections clear the inherited collection at that level.
 
 Public source repositories may consume only public subscriptions and may publish only through public-authorized publication configuration. Private source repositories may additionally consume and publish through authorized private governance overlays.
 
 Publication destination, adapter, credentials, retry/failure/timeout/progress policy, and root ordering belong only to `PublicationEndpoint`. There is no separate upload endpoint model.
 
-#### 3.9.6 Post-publication lifecycle
+#### 3.9.6 Publication finalization
 
-`PostPublicationActions` is a recursive dependency tree. A child action becomes eligible only after its immediate parent succeeds. Each action receives the complete ancestor lineage, including each step's effective configuration, one canonical input URI, optional canonical output URI, and result metadata. Sibling execution state is not exposed.
+`PublicationFinalizationActions` selects root `PublicationFinalizationActionAdapter` instances. Its child lists use
+`FinalizationActions` and `FinalizationActionAdapter`. Children wait for successful immediate parents and receive
+ordered ancestor lineage: configuration, canonical input URI, optional output URI, and metadata. Sibling state is excluded.
 
-Root `PublicationOrder` applies only among direct root publications. Action `Order` applies only among direct siblings of one parent. Lower values run first, equal values may run concurrently, and negative values are allowed. Ordering is not a substitute for dependency: if B consumes A's result, B must be a child of A.
+Root `ExecutionOrder` and action `ExecutionOrder` wait for direct attempts in the preceding group, without waiting for their
+descendants. Equal orders may run concurrently. Nesting expresses dependency/data flow.
 
-Every enabled root publication receives one implicit direct `build-record` action unless that Id is explicitly supplied. Its output is exactly `<published-filename>.modustro-build-record.yml`. No implicit build record is added recursively to post-actions.
+`OutputPublicationFinalizationActions`, `ArtifactPublicationFinalizationActions`, and
+`VersionScopePublicationFinalizationActions` are flat lists. Higher finalizers await complete lower trees and receive
+immutable boundary results. Artifact and Version Scope lists have independent Snapshot/Release branches and inherit by Id.
+Missing enabled expected outputs keep the scope FAILED; COMPLETE invocation records are immutable.
 
-Provider-specific lifecycle operations use the same action mechanism. For example, removal of a snapshot corresponding to a successful release is an explicit post-action and may reference the configured snapshot destination through `TargetPublicationEndpointId`. The former generic management endpoint category and `DeleteSnapshotWhenReleased` flag do not exist in the active model.
+Each root publication receives an implicit build-record action unless configured by Id. The output is exactly
+`<published-filename>.modustro-build-record.yml`; nested actions get no implicit build record.
+
+Corresponding-snapshot cleanup belongs to Version Scope finalization after all native release publications succeed.
+`modustro-remove-corresponding-snapshots` deduplicates snapshot targets from the complete context. The docs-refresh
+finalizer requests repository-only site publication, deduplicated across scopes/versions. There is no generic management
+endpoint or `DeleteSnapshotWhenReleased` flag. See the Builder PUBLICATIONS reference for current integration limits.
 
 #### 3.9.7 Credential profiles
 

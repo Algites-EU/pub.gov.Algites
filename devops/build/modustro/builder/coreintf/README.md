@@ -30,9 +30,11 @@ canonical yamldefs/jsondefs/xmldefs definition
 ```
 
 `InputSubscriptions` is the input-side contract. `OutputPublications` is the output-side contract. Publication execution
-adds portable `PublicationAdapter` and `PostPublicationActionAdapter` APIs, immutable publication payload/endpoint
-models, scheduler results, and execution-lineage types. The lineage records all ancestors visible to a post-action and
-keeps exactly one canonical input URI and one optional output URI per execution step.
+adds portable transport and four typed finalization adapter APIs, immutable payload/endpoint models, complete boundary
+results, and execution-lineage types. Publication-level finalization is recursive; higher output/artifact/Version Scope
+lists are flat. Publication action lineage retains ancestors and exactly one canonical input URI and optional output URI
+per step. Higher finalizers receive complete lower execution trees. Nested configuration/metadata maps and collections
+are copied into unmodifiable snapshots, and output results distinguish completed from missing planned work.
 
 ## Structured-data loading
 

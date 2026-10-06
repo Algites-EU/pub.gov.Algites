@@ -99,11 +99,23 @@ fun AIcModustroEffectivePublicationPlan(
         }
     }
 
+    val locSnapshotBranch = locOutput["snapshot"] as? Map<String, Any?> ?: emptyMap()
+    val locSnapshotEndpoints = (locSnapshotBranch["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+        .filter { locEndpoint -> locEndpoint["executionEnabled"] != false }
+    val locArtifactFinalizationByStability = aMetadata["artifactPublicationFinalizationActions"] as? Map<String, Any?> ?: emptyMap()
+    val locVersionScopeFinalizationByStability = aMetadata["versionScopePublicationFinalizationActions"] as? Map<String, Any?> ?: emptyMap()
+
     return linkedMapOf(
         "publicationEnabled" to AIcModustroEffectivePublicationEnabled(
             aOutputKind, locStabilityKey, locConfiguredEnabled),
         "publicationEndpoints" to locEndpoints,
-        "publicationEndpointRegistry" to locRegistryById.values.toList()
+        "publicationEndpointRegistry" to locRegistryById.values.toList(),
+        "snapshotPublicationEndpoints" to locSnapshotEndpoints,
+        "outputPublicationFinalizationActions" to ((locBranch["outputPublicationFinalizationActions"] as? List<*>) ?: emptyList<Any>()),
+        "artifactPath" to (aMetadata["path"]?.toString() ?: "."),
+        "versionScopePath" to (aMetadata["versionScopePath"]?.toString() ?: "."),
+        "artifactPublicationFinalizationActions" to ((locArtifactFinalizationByStability[locStabilityKey] as? List<*>) ?: emptyList<Any>()),
+        "versionScopePublicationFinalizationActions" to ((locVersionScopeFinalizationByStability[locStabilityKey] as? List<*>) ?: emptyList<Any>())
     )
 }
 

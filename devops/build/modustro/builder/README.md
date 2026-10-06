@@ -23,16 +23,19 @@ by builds; `OutputPublications` describes outputs published by builds. Every dec
 `TechnologyKind`. The former generalized endpoint action matrix is removed.
 
 Subscriptions merge by stable `Id` inside an expanded `TechnologyKind + InputSelector` scope. Publication branches
-merge by `TechnologyKind + OutputSelector`, then recursively by stable `PublicationEndpoint`, `Publication`, and
-`PostPublicationAction` ids. Virtual selectors are expanded before effective configuration is consumed.
+merge by `TechnologyKind + OutputSelector`, then by stable endpoint/publication ids and recursive publication
+finalization ids. Virtual selectors are expanded before effective configuration is consumed.
 
-Publication execution is a scheduler-owned tree. Root `PublicationOrder` orders direct root publications. Each
-`PostPublicationActions` sibling set has its own local `Order`; the parent is always a hard completion barrier, while a
-later sibling group need not wait for descendants of an earlier sibling. Post-action contexts expose the complete
-ordered ancestor lineage with one input URI and one optional output URI per step.
+Publication execution has four finalization boundaries. `PublicationFinalizationActions` is recursive, with child
+`FinalizationActions`; output, artifact and Version Scope finalization lists are flat. Root `ExecutionOrder` and local
+`ExecutionOrder` wait for direct attempts in the previous group, while higher boundaries await complete lower result trees.
+Publication action contexts expose ancestor lineage with one input URI and one optional output URI per step.
+Higher contexts expose immutable results for their whole boundary.
 
-The default `build-record` behavior is implemented as an implicit root `PostPublicationAction`, not as a special second
-publication type. Provider operations such as released-snapshot cleanup use the same action contract.
+The implicit root `build-record` action uses `PublicationFinalizationActionAdapter`. Corresponding-snapshot cleanup
+runs once at Version Scope finalization. Docs refresh is requested there and deduplicated at repository publication.
+The unified adapter catalog covers subscriptions, transports and all four finalization levels.
+See [PUBLICATIONS.md](../PUBLICATIONS.md) for configuration, failure semantics and current integration limits.
 
 ## Phase 5.1 definition-driven generated sources
 
@@ -43,7 +46,7 @@ and TechnologyKinds rather than enumerated in artifact metadata. Generated sourc
 source roots and are reproducible build state rather than handwritten source.
 
 Structured-data loading remains separate from effective-model construction. The metadata resolver normalizes canonical
-`InputSubscriptions` and `OutputPublications`, while Builder Core owns publication planning, recursive post-action
+`InputSubscriptions` and `OutputPublications`, while Builder Core owns publication planning, finalization
 execution, scheduling, retry/failure policy, URI/lineage semantics, and adapter contracts. Settings-level Java repository
 registration is a bootstrap adapter over normalized input subscriptions.
 

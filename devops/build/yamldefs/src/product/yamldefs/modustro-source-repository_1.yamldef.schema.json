@@ -58,6 +58,12 @@
         },
         "OutputPublications": {
           "$ref": "modustro-builder-publications_1.yamldef.schema.json#/$defs/OutputPublications"
+        },
+        "ArtifactPublicationFinalizationActions": {
+          "$ref": "modustro-builder-publications_1.yamldef.schema.json#/$defs/ArtifactPublicationFinalizationActions"
+        },
+        "VersionScopePublicationFinalizationActions": {
+          "$ref": "modustro-builder-publications_1.yamldef.schema.json#/$defs/VersionScopePublicationFinalizationActions"
         }
       },
       "required": [

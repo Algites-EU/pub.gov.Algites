@@ -15,6 +15,12 @@
         },
         "InputSubscriptions": {
           "$ref": "algites-input-subscriptions_1.yamldef.schema.json#/$defs/InputSubscriptions"
+        },
+        "ArtifactPublicationFinalizationActions": {
+          "$ref": "modustro-builder-publications_1.yamldef.schema.json#/$defs/ArtifactPublicationFinalizationActions"
+        },
+        "VersionScopePublicationFinalizationActions": {
+          "$ref": "modustro-builder-publications_1.yamldef.schema.json#/$defs/VersionScopePublicationFinalizationActions"
         }
       }
     },

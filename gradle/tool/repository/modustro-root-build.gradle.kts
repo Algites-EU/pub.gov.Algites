@@ -849,6 +849,20 @@ apply(plugin = "base")
 
 apply(plugin = "eu.algites.pltf.modustro.builder.repository")
 
+/* Typed script views reuse the compiled repository plugin's normalized metadata. */
+@Suppress("UNCHECKED_CAST")
+val modustroResolvedRepositoryMetadata = rootProject.extra["modustroResolvedRepositoryMetadata"] as Map<String, Any?>
+
+@Suppress("UNCHECKED_CAST")
+val modustroResolvedArtifactDirectoriesByGradleProjectPath = rootProject.extra["modustroResolvedArtifactDirectoriesByGradleProjectPath"] as Map<String, Map<String, Any?>>
+
+fun modustroResolvedArtifactDirectoryForProject(aProjectPath: String): Map<String, Any?>? =
+    modustroResolvedArtifactDirectoriesByGradleProjectPath[aProjectPath]
+
+fun modustroResolvedVersionValue(aMetadata: Map<String, Any?>?): String? =
+    (aMetadata?.get("version") as? Map<*, *>)?.get("resolvedValue")?.toString()
+        ?.takeIf { it.isNotBlank() && it != "null" }
+
 val locAlgitesLicensingScript = rootProject.file("gradle/tool/licensing/algites-licensing.gradle.kts")
 if (locAlgitesLicensingScript.isFile) {
     apply(from = locAlgitesLicensingScript)
@@ -2051,7 +2065,7 @@ val locAlgitesRequiredCredentialsPlan = run {
                         val locRegistry = (locPlan["publicationEndpointRegistry"] as? List<*>).orEmpty()
                         locRegistry.forEach { locRaw ->
                             val locEndpoint = locRaw as? Map<*, *> ?: return@forEach
-                            if (locEndpoint["enabled"] == false) return@forEach
+                            if (locEndpoint["executionEnabled"] == false) return@forEach
                             val locId = locEndpoint["id"]?.toString()?.takeIf { it.isNotBlank() } ?: return@forEach
                             collectProfile(locEndpoint["publicationCredentialProfile"]?.toString())
                             locPublicationEndpoints["$aScope|$locTechnology|$locOutputKind|$locLane|$locId"] = linkedMapOf(
@@ -2112,7 +2126,7 @@ if (locModustroSchemaSiteScript.isFile) {
     ))
 }
 
-listOf("publishModustroDocsSite", "publishModustroSchemaSite").forEach { locTaskName ->
+listOf("publishModustroSchemaSite").forEach { locTaskName ->
     tasks.findByName(locTaskName)?.let { locPublishingTask ->
         modustroPublish.configure { dependsOn(locPublishingTask) }
     }
@@ -2125,6 +2139,14 @@ val modustroAwaitBackgroundPublications = tasks.register<AIcModustroAwaitPublica
     usesService(modustroPublicationService)
 }
 modustroPublish.configure { finalizedBy(modustroAwaitBackgroundPublications) }
+tasks.findByName("refreshModustroDocsSite")?.let { locRefresh ->
+    modustroAwaitBackgroundPublications.configure { finalizedBy(locRefresh) }
+    locRefresh.mustRunAfter(modustroAwaitBackgroundPublications)
+    tasks.matching { it.name in setOf("generateModustroDocsRootIndex", "generateModustroDocsArtifactPublishingIndexes",
+        "generateModustroDocsPublishingGroupIndexes", "generateModustroDocsGeneratedIndex", "generateModustroDocsSite") }
+        .configureEach { mustRunAfter(modustroAwaitBackgroundPublications) }
+}
+
 
 subprojects {
     val locAlgitesRunDirectoryRelativePath = AIcModustroRunDirectoryRelativePath(project.projectDir)

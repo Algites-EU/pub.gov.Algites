@@ -36,7 +36,7 @@ public final class AItcModustroGovernanceScriptsTest {
             ? "gradle/tool/repository/modustro-root-build.gradle.kts"
             : "gradle/tool/publication/modustro-publication.gradle.kts"));
         if (aRootBuild) {
-            locEntry = locEntry.substring(locEntry.indexOf("/* Publication invocation overrides must be available"),
+            locEntry = locEntry.substring(locEntry.indexOf("/* Publishing invocation overrides must be available"),
                 locEntry.indexOf("val locAlgitesRequiredCredentialsPlan = run"));
         }
         AtomicInteger locDownloads = new AtomicInteger();
@@ -62,18 +62,33 @@ public final class AItcModustroGovernanceScriptsTest {
             locEntry = locEntry.replace("${System.getenv(\"MODUSTRO_PUBLIC_GOVERNANCE_REVISION\") ?: \"main\"}", "main");
             String locTestUrl = "http://127.0.0.1:" + locServer.getAddress().getPort() + "/overrides.gradle.kts";
             Files.writeString(locBuild.resolve("bridge.gradle.kts"), locEntry.replace(OVERRIDES_URL, locTestUrl));
-            Files.writeString(locBuild.resolve("build.gradle.kts"), """
+            String locBuildScript = """
                 extra["modustroResolvedArtifactDirectoryMetadata"] = emptyList<Map<String, Any?>>()
                 apply(from = "bridge.gradle.kts")
                 apply(from = "bridge.gradle.kts")
                 @Suppress("UNCHECKED_CAST")
                 val locResolve = extra["modustroEffectivePublicationPlan"] as (Map<String, Any?>, String, String) -> Map<String, Any?>
-                val locMetadata = mapOf<String, Any?>("outputPublications" to mapOf(
-                    "native_product_binaries" to mapOf("snapshot" to mapOf("publicationEnabled" to true))
+                val locMetadata = mapOf<String, Any?>("publicationTechnologyKind" to "java", "outputPublications" to mapOf(
+                    "java.native_product_binaries" to mapOf("snapshot" to mapOf("publicationEnabled" to true))
                 ))
                 check(locResolve(locMetadata, "native_product_binaries", "snapshot")["publicationEnabled"] == false)
                 println("PUBLICATION_FALLBACK_OK")
-                """);
+                """;
+            if (!aRootBuild) locBuildScript += """
+                @Suppress("UNCHECKED_CAST")
+                val locRepositoryResolver = extra["modustroResolvePublicationPlan"] as (Map<String, Any?>, String, String, List<String>) -> Map<String, Any?>
+                val locRepositoryMetadata = mapOf<String, Any?>("outputPublications" to listOf("modustro_docs_site", "schema_site").associate {
+                    "modustro.$it" to mapOf("snapshot" to mapOf("publicationEnabled" to true,
+                        "outputPublicationFinalizationActions" to listOf(mapOf("Id" to "retained-action"))))
+                })
+                listOf("modustro_docs_site", "schema_site").forEach {
+                    val locPlan = locRepositoryResolver(locRepositoryMetadata, it, "snapshot", emptyList())
+                    check(locPlan["publicationEnabled"] == true)
+                    check((locPlan["outputPublicationFinalizationActions"] as List<*>).size == 1)
+                    check(locPlan.containsKey("snapshotPublicationEndpoints"))
+                }
+                """;
+            Files.writeString(locBuild.resolve("build.gradle.kts"), locBuildScript);
             var locResult = GradleRunner.create().withProjectDir(locBuild.toFile())
                 .withArguments("printModustroPublicationOverrides", "-Pmodustro.publication.nativeProductBinaries=FORCE_OFF",
                     "--stacktrace").build();

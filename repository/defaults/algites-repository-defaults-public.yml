@@ -59,3 +59,17 @@ InputSubscriptions:
     SubscriptionAdapter: mps-repository
     Stability: snapshot
     Enabled: false
+
+VersionScopePublicationFinalizationActions:
+  Snapshot:
+  - Id: refresh-docs-site
+    VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
+    ExecutionOrder: 20
+  Release:
+  - Id: remove-corresponding-snapshots
+    VersionScopePublicationFinalizationActionAdapter: modustro-remove-corresponding-snapshots
+    ExecutionOrder: 10
+    FailurePolicy: IGNORE_FAILURE
+  - Id: refresh-docs-site
+    VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
+    ExecutionOrder: 20

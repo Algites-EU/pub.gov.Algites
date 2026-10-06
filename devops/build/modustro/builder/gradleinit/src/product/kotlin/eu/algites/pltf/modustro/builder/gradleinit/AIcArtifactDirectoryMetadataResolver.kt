@@ -143,11 +143,11 @@ data class AIcdModustroInputSubscriptionsConfiguration(
 
 data class AIcdModustroPublicationEndpoint(
     val id: String,
-    val enabled: Boolean? = null,
+    val executionEnabled: Boolean? = null,
     val publicationUri: String? = null,
     val publicationAdapter: String? = null,
     val publicationCredentialProfile: String? = null,
-    val publicationOrder: Int? = null,
+    val executionOrder: Int? = null,
     val publicationFailurePolicy: String? = null,
     val publicationRetryCount: Int? = null,
     val publicationWaitForNextAttemptMillis: Long? = null,
@@ -160,11 +160,11 @@ data class AIcdModustroPublicationEndpoint(
         require(id == aOther.id) { "Cannot merge publication endpoints with different ids '$id' and '${aOther.id}'." }
         return AIcdModustroPublicationEndpoint(
             id = id,
-            enabled = aOther.enabled ?: enabled,
+            executionEnabled = aOther.executionEnabled ?: executionEnabled,
             publicationUri = aOther.publicationUri ?: publicationUri,
             publicationAdapter = aOther.publicationAdapter ?: publicationAdapter,
             publicationCredentialProfile = aOther.publicationCredentialProfile ?: publicationCredentialProfile,
-            publicationOrder = aOther.publicationOrder ?: publicationOrder,
+            executionOrder = aOther.executionOrder ?: executionOrder,
             publicationFailurePolicy = aOther.publicationFailurePolicy ?: publicationFailurePolicy,
             publicationRetryCount = aOther.publicationRetryCount ?: publicationRetryCount,
             publicationWaitForNextAttemptMillis = aOther.publicationWaitForNextAttemptMillis ?: publicationWaitForNextAttemptMillis,
@@ -175,8 +175,8 @@ data class AIcdModustroPublicationEndpoint(
         )
     }
 
-    fun AIcEffectiveEnabled(): Boolean = enabled ?: true
-    fun AIcEffectivePublicationOrder(): Int = publicationOrder ?: 0
+    fun AIcEffectiveExecutionEnabled(): Boolean = executionEnabled ?: true
+    fun AIcEffectiveExecutionOrder(): Int = executionOrder ?: 0
     fun AIcEffectivePublicationFailurePolicy(): String = publicationFailurePolicy ?: "FAIL_BUILD_ON_PUBLICATION_FAILURE"
     fun AIcEffectivePublicationRetryCount(): Int = publicationRetryCount ?: 0
     fun AIcEffectivePublicationWaitForNextAttemptMillis(): Long = publicationWaitForNextAttemptMillis ?: 1000L
@@ -186,7 +186,8 @@ data class AIcdModustroPublicationEndpoint(
 data class AIcdModustroPublicationStabilityConfiguration(
     val publicationEnabled: Boolean? = null,
     val publicationEndpoints: Map<String, AIcdModustroPublicationEndpoint> = emptyMap(),
-    val clearPublicationEndpoints: Boolean = false
+    val clearPublicationEndpoints: Boolean = false,
+    val outputPublicationFinalizationActions: List<Map<String, Any?>>? = null
 ) {
     fun AIcEffectivePublicationEnabled(): Boolean = publicationEnabled ?: false
 
@@ -199,7 +200,9 @@ data class AIcdModustroPublicationStabilityConfiguration(
         return AIcdModustroPublicationStabilityConfiguration(
             publicationEnabled = aOther.publicationEnabled ?: publicationEnabled,
             publicationEndpoints = locEndpoints,
-            clearPublicationEndpoints = aOther.clearPublicationEndpoints || clearPublicationEndpoints
+            clearPublicationEndpoints = aOther.clearPublicationEndpoints || clearPublicationEndpoints,
+            outputPublicationFinalizationActions = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.merge(
+                outputPublicationFinalizationActions, aOther.outputPublicationFinalizationActions)
         )
     }
 }
@@ -212,6 +215,18 @@ data class AIcdModustroOutputPublicationsConfiguration(
         AIcdModustroOutputPublicationsConfiguration(
             snapshot = snapshot.AIcMerge(aOther.snapshot),
             release = release.AIcMerge(aOther.release)
+        )
+}
+
+
+data class AIcdModustroPublicationFinalizationActionsByStability(
+    val snapshot: List<Map<String, Any?>>? = null,
+    val release: List<Map<String, Any?>>? = null
+) {
+    fun AIcMerge(aOther: AIcdModustroPublicationFinalizationActionsByStability): AIcdModustroPublicationFinalizationActionsByStability =
+        AIcdModustroPublicationFinalizationActionsByStability(
+            snapshot = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.merge(snapshot, aOther.snapshot),
+            release = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.merge(release, aOther.release)
         )
 }
 
@@ -336,6 +351,9 @@ data class AIcdModustroResolvedState(
     val inputSubscriptions: Map<String, AIcdModustroInputSubscriptionsConfiguration> = emptyMap(),
     val credentialProfiles: Map<String, AIcdModustroCredentialProfileDefinition> = emptyMap(),
     val version: AIcdAlgitesVersion = AIcdAlgitesVersion(),
+    val versionScopePath: String? = null,
+    val artifactPublicationFinalizationActions: AIcdModustroPublicationFinalizationActionsByStability = AIcdModustroPublicationFinalizationActionsByStability(),
+    val versionScopePublicationFinalizationActions: AIcdModustroPublicationFinalizationActionsByStability = AIcdModustroPublicationFinalizationActionsByStability(),
     val dependencies: List<AIcdModustroDependencyDefinition> = emptyList(),
     val dependencyItemsInheritancePoliciesByKind: Map<String, AInModustroItemsInheritancePolicy> = emptyMap(),
     val dependencyConstraints: List<AIcdModustroDependencyDefinition> = emptyList(),
@@ -373,6 +391,9 @@ data class AIcdModustroResolvedState(
             inputSubscriptions = locInputSubscriptions,
             credentialProfiles = locProfiles,
             version = version.AIcMerge(aOther.version),
+            versionScopePath = aOther.versionScopePath ?: versionScopePath,
+            artifactPublicationFinalizationActions = artifactPublicationFinalizationActions.AIcMerge(aOther.artifactPublicationFinalizationActions),
+            versionScopePublicationFinalizationActions = versionScopePublicationFinalizationActions.AIcMerge(aOther.versionScopePublicationFinalizationActions),
             dependencies = AIcMergeDependencyDefinitions(
                 dependencies,
                 aOther.dependencies,
@@ -419,6 +440,9 @@ data class AIcdModustroArtifactDirectoryMetadata(
     val hasGradleBuild: Boolean,
     val gradleProjectPath: String,
     val version: AIcdAlgitesVersion,
+    val versionScopePath: String,
+    val artifactPublicationFinalizationActions: AIcdModustroPublicationFinalizationActionsByStability,
+    val versionScopePublicationFinalizationActions: AIcdModustroPublicationFinalizationActionsByStability,
     val dependencies: List<AIcdModustroDependencyDefinition>,
     val dependencyConstraints: List<AIcdModustroDependencyDefinition>,
     val environmentRequirements: Map<String, AIcdAlgitesVersionRequirement>,
@@ -432,6 +456,10 @@ data class AIcdModustroRepositoryMetadata(
     val name: String,
     val visibility: String,
     val groupId: String?,
+    val version: AIcdAlgitesVersion = AIcdAlgitesVersion(),
+    val versionScopePath: String = ".",
+    val artifactPublicationFinalizationActions: AIcdModustroPublicationFinalizationActionsByStability = AIcdModustroPublicationFinalizationActionsByStability(),
+    val versionScopePublicationFinalizationActions: AIcdModustroPublicationFinalizationActionsByStability = AIcdModustroPublicationFinalizationActionsByStability(),
     val inputSubscriptions: Map<String, AIcdModustroInputSubscriptionsConfiguration>,
     val credentialProfiles: Map<String, AIcdModustroCredentialProfileDefinition>,
     val dependencies: List<AIcdModustroDependencyDefinition>,
@@ -525,7 +553,7 @@ fun AIcResolveModustroArtifactDirectoryMetadata(
     val locRepositoryBase = AIcResolveRepositoryMetadataBase(aRepositoryRoot, aRepositoryNameOverride, aRepositoryVisibilityOverride)
     val locInitialState = AIcModustroBuiltInState().AIcMerge(AIcAlgitesExternalDefaultsState())
     val locRootConfig = AIcFindModustroMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.takeIf { it.structureKind == "repository" }
-    val locRootState = if (locRootConfig == null) locInitialState else locInitialState.AIcMerge(AIcResolvedStateFromConfig(locRootConfig))
+    val locRootState = if (locRootConfig == null) locInitialState else locInitialState.AIcMerge(AIcResolvedStateFromConfig(locRootConfig, aRepositoryRoot))
     AIcValidateEffectiveState(locRootState, "repository '${locRepositoryBase.id}'")
 
     val locRepository = AIcdModustroRepositoryMetadata(
@@ -533,11 +561,15 @@ fun AIcResolveModustroArtifactDirectoryMetadata(
         name = locRepositoryBase.name,
         visibility = locRepositoryBase.visibility,
         groupId = locRootState.groupId ?: locRepositoryBase.groupId,
+        version = locRootState.version,
+        versionScopePath = locRootState.versionScopePath ?: ".",
+        artifactPublicationFinalizationActions = locRootState.artifactPublicationFinalizationActions,
+        versionScopePublicationFinalizationActions = locRootState.versionScopePublicationFinalizationActions,
         inputSubscriptions = locRootState.inputSubscriptions,
         credentialProfiles = locRootState.credentialProfiles,
         dependencies = locRootState.dependencies,
         dependencyConstraints = locRootState.dependencyConstraints,
-                nestedGradleSettingsBuildPolicy = locRootState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
+        nestedGradleSettingsBuildPolicy = locRootState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
         outputPublications = locRootState.outputPublications
     )
 
@@ -624,8 +656,16 @@ fun AIcResolveRepositoryMetadataBase(
         ?: AIcInferVisibilityFromRepositoryName(locRepositoryId)
     val locGroupId = locRootConfig?.values?.let { AIcFirstValue(it, "GroupId") }?.takeIf { it.isNotBlank() }
     return AIcdModustroRepositoryMetadata(
-        locRepositoryId, locRepositoryName, locVisibility, locGroupId, emptyList(), emptyMap(),
-        emptyList(), emptyList(), true, "IGNORE_NESTED_SETTINGS", emptyMap()
+        id = locRepositoryId,
+        name = locRepositoryName,
+        visibility = locVisibility,
+        groupId = locGroupId,
+        inputSubscriptions = emptyMap(),
+        credentialProfiles = emptyMap(),
+        dependencies = emptyList(),
+        dependencyConstraints = emptyList(),
+        nestedGradleSettingsBuildPolicy = "IGNORE_NESTED_SETTINGS",
+        outputPublications = emptyMap()
     )
 }
 
@@ -650,7 +690,7 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
         val locConfig = AIcFindModustroMetadataConfig(aDirectory, aRepositoryRoot)
         var locState = aInheritedState
         if (locConfig != null) {
-            locState = locState.AIcMerge(AIcResolvedStateFromConfig(locConfig))
+            locState = locState.AIcMerge(AIcResolvedStateFromConfig(locConfig, aRepositoryRoot))
             AIcValidateEffectiveState(locState, "${locConfig.structureKind} '${AIcRelativePath(aRepositoryRoot, aDirectory)}'")
         }
 
@@ -694,11 +734,11 @@ fun AIcResolveInheritedStateBeforeDirectory(
     if (locSegments.isEmpty()) return aInitialState
     var locDirectory = aRepositoryRoot
     var locState = aInitialState
-    AIcFindModustroMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it)) }
+    AIcFindModustroMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it, aRepositoryRoot)) }
     locSegments.dropLast(1).forEach { locSegment ->
         locDirectory = locDirectory.resolve(locSegment)
         if (!locDirectory.isDirectory) error("Artifact directory parent path '${locDirectory.path}' does not exist.")
-        AIcFindModustroMetadataConfig(locDirectory, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it)) }
+        AIcFindModustroMetadataConfig(locDirectory, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it, aRepositoryRoot)) }
     }
     return locState
 }
@@ -710,11 +750,11 @@ fun AIcResolveSingleArtifactDirectory(
 ): AIcdModustroArtifactDirectoryMetadata {
     var locDirectory = aRepositoryRoot
     var locState = aInitialState
-    AIcFindModustroMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it)) }
+    AIcFindModustroMetadataConfig(aRepositoryRoot, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it, aRepositoryRoot)) }
     AIcPathSegments(aArtifactDirectoryPath).forEach { locSegment ->
         locDirectory = locDirectory.resolve(locSegment)
         if (!locDirectory.isDirectory) error("Artifact directory path '$aArtifactDirectoryPath' does not exist.")
-        AIcFindModustroMetadataConfig(locDirectory, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it)) }
+        AIcFindModustroMetadataConfig(locDirectory, aRepositoryRoot)?.let { locState = locState.AIcMerge(AIcResolvedStateFromConfig(it, aRepositoryRoot)) }
     }
     val locConfig = AIcFindModustroMetadataConfig(locDirectory, aRepositoryRoot)
         ?: error("Directory '$aArtifactDirectoryPath' does not contain an Algites metadata file.")
@@ -786,6 +826,9 @@ fun AIcArtifactDirectoryMetadataFromConfig(
         hasGradleBuild = AIcHasGradleBuild(aDirectory),
         gradleProjectPath = AIcGradleProjectPath(aRepositoryRoot, aDirectory),
         version = aState.version,
+        versionScopePath = aState.versionScopePath ?: ".",
+        artifactPublicationFinalizationActions = aState.artifactPublicationFinalizationActions,
+        versionScopePublicationFinalizationActions = aState.versionScopePublicationFinalizationActions,
         dependencies = aState.dependencies,
         dependencyConstraints = aState.dependencyConstraints,
         environmentRequirements = aState.environmentRequirements,
@@ -811,7 +854,7 @@ fun AIcFindModustroMetadataConfig(aDirectory: File, aRepositoryRoot: File): AIcd
     return AIcdModustroDirectoryConfig(locCandidate.first, locCandidate.second, AIcReadSimpleYamlScalars(locCandidate.first))
 }
 
-fun AIcResolvedStateFromConfig(aConfig: AIcdModustroDirectoryConfig): AIcdModustroResolvedState {
+fun AIcResolvedStateFromConfig(aConfig: AIcdModustroDirectoryConfig, aRepositoryRoot: File): AIcdModustroResolvedState {
     val locPrefix = AIcStructureKindPrefix(aConfig.structureKind)
     val locBase = AIcResolvedStateFromRawValues(aConfig.values, locPrefix, aConfig.file)
     val locTechnologyKinds = when (aConfig.structureKind) {
@@ -821,7 +864,13 @@ fun AIcResolvedStateFromConfig(aConfig: AIcdModustroDirectoryConfig): AIcdModust
         val locUnsupported = locConfig.AIcTechnologyKinds().filter { it !in AIcModustroSupportedTechnologyKinds }
         if (locUnsupported.isNotEmpty()) error("Unsupported Algites TechnologyKind(s) in '${aConfig.file.path}': ${locUnsupported.joinToString(", ")}.")
     }
-    return locBase.copy(technologyKinds = locTechnologyKinds)
+    val locVersionDeclared = aConfig.values.keys.any { locKey ->
+        locKey.startsWith("$locPrefix.Version.") || locKey.startsWith("Version.")
+    }
+    return locBase.copy(
+        technologyKinds = locTechnologyKinds,
+        versionScopePath = if (locVersionDeclared) AIcRelativePath(aRepositoryRoot, aConfig.file.parentFile) else null
+    )
 }
 
 fun AIcParseItemsInheritancePolicy(
@@ -1050,6 +1099,10 @@ fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String,
         inputSubscriptions = AIcInputSubscriptionsFromConfig(aValues, aFile),
         credentialProfiles = AIcCredentialProfilesFromConfig(aValues, aFile),
         version = locVersion,
+        artifactPublicationFinalizationActions = AIcFinalizationActionsByStabilityFromConfig(
+            aValues, "ArtifactPublicationFinalizationActions"),
+        versionScopePublicationFinalizationActions = AIcFinalizationActionsByStabilityFromConfig(
+            aValues, "VersionScopePublicationFinalizationActions"),
         dependencies = locDependencies.definitions,
         dependencyItemsInheritancePoliciesByKind = locDependencies.itemsInheritancePoliciesByDependencyKind,
         dependencyConstraints = locDependencyConstraints.definitions,
@@ -1066,6 +1119,21 @@ fun AIcResolvedStateFromRawValues(aValues: Map<String, String>, aPrefix: String,
     )
 }
 
+fun AIcFinalizationActionsByStabilityFromConfig(
+    aValues: Map<String, String>,
+    aPrefix: String
+): AIcdModustroPublicationFinalizationActionsByStability {
+    fun locLane(aLane: String): List<Map<String, Any?>>? {
+        val locPrefix = "$aPrefix.$aLane"
+        val locPresent = aValues.containsKey(locPrefix) || aValues.keys.any { locKey -> locKey.startsWith("$locPrefix.") }
+        return if (locPresent) eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.list(aValues, locPrefix) else null
+    }
+    return AIcdModustroPublicationFinalizationActionsByStability(
+        snapshot = locLane("Snapshot"),
+        release = locLane("Release")
+    )
+}
+
 fun AIcOutputPublicationsFromConfig(
     aRawValues: Map<String, String>,
     aFile: File
@@ -1077,9 +1145,9 @@ fun AIcOutputPublicationsFromConfig(
             val locPrefix = "$locOutputKind.$aStability"
             val locPublicationEnabled = aValues["$locPrefix.PublicationEnabled"]?.let { AIcParseBoolean(it, "$locPrefix.PublicationEnabled", aFile) }
             data class AIcdBuilder(
-                var id: String? = null, var enabled: Boolean? = null, var publicationUri: String? = null,
+                var id: String? = null, var executionEnabled: Boolean? = null, var publicationUri: String? = null,
                 var publicationAdapter: String? = null, var publicationCredentialProfile: String? = null,
-                var publicationOrder: Int? = null, var publicationFailurePolicy: String? = null,
+                var executionOrder: Int? = null, var publicationFailurePolicy: String? = null,
                 var publicationRetryCount: Int? = null, var publicationWaitForNextAttemptMillis: Long? = null,
                 var publicationAttemptTimeoutMillis: Long? = null, var showPublicationProgressIfPossible: Boolean? = null,
                 val configuration: MutableMap<String, String> = linkedMapOf()
@@ -1098,11 +1166,12 @@ fun AIcOutputPublicationsFromConfig(
                 }
                 when (locProperty) {
                     "Id" -> locBuilder.id = locValue.trim()
-                    "Enabled" -> locBuilder.enabled = AIcParseBoolean(locValue, locKey, aFile)
+                    "Enabled", "Order", "PublicationOrder" -> error("$locKey in '${aFile.path}' uses an obsolete publication endpoint field; use ExecutionEnabled or ExecutionOrder.")
+                    "ExecutionEnabled" -> locBuilder.executionEnabled = AIcParseBoolean(locValue, locKey, aFile)
                     "PublicationUri" -> locBuilder.publicationUri = locValue.trim().takeIf { it.isNotBlank() }
                     "PublicationAdapter" -> locBuilder.publicationAdapter = locValue.trim().takeIf { it.isNotBlank() }
                     "PublicationCredentialProfile" -> locBuilder.publicationCredentialProfile = locValue.trim().takeIf { it.isNotBlank() }
-                    "PublicationOrder" -> locBuilder.publicationOrder = locValue.trim().toIntOrNull() ?: error("$locKey in '${aFile.path}' must be an integer.")
+                    "ExecutionOrder" -> locBuilder.executionOrder = locValue.trim().toIntOrNull() ?: error("$locKey in '${aFile.path}' must be an integer.")
                     "PublicationFailurePolicy" -> locBuilder.publicationFailurePolicy = locValue.trim().also { locPolicy -> if (locPolicy !in AIcModustroPublicationFailurePolicies) error("$locKey in '${aFile.path}' uses unsupported policy '$locPolicy'.") }
                     "PublicationRetryCount" -> locBuilder.publicationRetryCount = locValue.trim().toIntOrNull()?.also { if (it < 0) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
                     "PublicationWaitForNextAttemptMillis" -> locBuilder.publicationWaitForNextAttemptMillis = locValue.trim().toLongOrNull()?.also { if (it < 0L) error("$locKey in '${aFile.path}' must be non-negative.") } ?: error("$locKey in '${aFile.path}' must be a non-negative integer.")
@@ -1124,9 +1193,9 @@ fun AIcOutputPublicationsFromConfig(
                     }
                 }
                 locEndpoints[locId] = AIcdModustroPublicationEndpoint(
-                    id=locId, enabled=locBuilder.enabled, publicationUri=locBuilder.publicationUri,
+                    id=locId, executionEnabled=locBuilder.executionEnabled, publicationUri=locBuilder.publicationUri,
                     publicationAdapter=locBuilder.publicationAdapter, publicationCredentialProfile=locBuilder.publicationCredentialProfile,
-                    publicationOrder=locBuilder.publicationOrder, publicationFailurePolicy=locBuilder.publicationFailurePolicy,
+                    executionOrder=locBuilder.executionOrder, publicationFailurePolicy=locBuilder.publicationFailurePolicy,
                     publicationRetryCount=locBuilder.publicationRetryCount, publicationWaitForNextAttemptMillis=locBuilder.publicationWaitForNextAttemptMillis,
                     publicationAttemptTimeoutMillis=locBuilder.publicationAttemptTimeoutMillis,
                     showPublicationProgressIfPossible=locBuilder.showPublicationProgressIfPossible,
@@ -1134,10 +1203,17 @@ fun AIcOutputPublicationsFromConfig(
                     publications = eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.list(aValues, "$locPrefix.PublicationEndpoints." + locBuilders.entries.first { it.value === locBuilder }.key + ".Publications").takeIf { aValues.keys.any { key -> key.startsWith("$locPrefix.PublicationEndpoints." + locBuilders.entries.first { it.value === locBuilder }.key + ".Publications") } }
                 )
             }
-            return AIcdModustroPublicationStabilityConfiguration(locPublicationEnabled, locEndpoints, aValues["$locPrefix.PublicationEndpoints"] == "[]")
+            val locOutputFinalizationPrefix = "$locPrefix.OutputPublicationFinalizationActions"
+            val locOutputFinalizationPresent = aValues.containsKey(locOutputFinalizationPrefix) ||
+                aValues.keys.any { locKey -> locKey.startsWith("$locOutputFinalizationPrefix.") }
+            val locOutputFinalizationActions = if (locOutputFinalizationPresent)
+                eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.list(aValues, locOutputFinalizationPrefix) else null
+            return AIcdModustroPublicationStabilityConfiguration(
+                locPublicationEnabled, locEndpoints, aValues["$locPrefix.PublicationEndpoints"] == "[]", locOutputFinalizationActions)
         }
         val locSnapshot=locStability("Snapshot"); val locRelease=locStability("Release")
-        if (locSnapshot.publicationEnabled != null || locSnapshot.publicationEndpoints.isNotEmpty() || locSnapshot.clearPublicationEndpoints || locRelease.publicationEnabled != null || locRelease.publicationEndpoints.isNotEmpty() || locRelease.clearPublicationEndpoints) {
+        if (locSnapshot.publicationEnabled != null || locSnapshot.publicationEndpoints.isNotEmpty() || locSnapshot.clearPublicationEndpoints || locSnapshot.outputPublicationFinalizationActions != null ||
+            locRelease.publicationEnabled != null || locRelease.publicationEndpoints.isNotEmpty() || locRelease.clearPublicationEndpoints || locRelease.outputPublicationFinalizationActions != null) {
             locResult[locOutputKind]=AIcdModustroOutputPublicationsConfiguration(locSnapshot,locRelease)
         }
     }
@@ -1440,7 +1516,7 @@ fun AIcValidateEffectiveState(aState: AIcdModustroResolvedState, aContext: Strin
     aState.outputPublications.forEach { (locOutputKind, locConfiguration) ->
         listOf("Snapshot" to locConfiguration.snapshot, "Release" to locConfiguration.release).forEach { (locStability, locPublishing) ->
             locPublishing.publicationEndpoints.values.forEach { locEndpoint ->
-                if (locEndpoint.AIcEffectiveEnabled() && locPublishing.publicationEnabled == true) {
+                if (locEndpoint.AIcEffectiveExecutionEnabled() && locPublishing.publicationEnabled == true) {
                     if (locEndpoint.publicationUri.isNullOrBlank()) error("Enabled publication endpoint '${locEndpoint.id}' in $aContext $locOutputKind.$locStability has no PublicationUri after inheritance.")
                     if (locEndpoint.publicationAdapter.isNullOrBlank()) error("Enabled publication endpoint '${locEndpoint.id}' in $aContext $locOutputKind.$locStability has no PublicationAdapter after inheritance.")
                 }
@@ -1718,11 +1794,11 @@ fun AIcDependencyMapForOutput(aDependency: AIcdModustroDependencyDefinition): Ma
 
 fun AIcPublicationEndpointMapForOutput(aEndpoint: AIcdModustroPublicationEndpoint): Map<String, Any?> = linkedMapOf(
     "id" to aEndpoint.id,
-    "enabled" to aEndpoint.AIcEffectiveEnabled(),
+    "executionEnabled" to aEndpoint.AIcEffectiveExecutionEnabled(),
     "publicationUri" to aEndpoint.publicationUri,
     "publicationAdapter" to aEndpoint.publicationAdapter,
     "publicationCredentialProfile" to aEndpoint.publicationCredentialProfile,
-    "publicationOrder" to aEndpoint.AIcEffectivePublicationOrder(),
+    "executionOrder" to aEndpoint.AIcEffectiveExecutionOrder(),
     "publicationFailurePolicy" to aEndpoint.AIcEffectivePublicationFailurePolicy(),
     "publicationRetryCount" to aEndpoint.AIcEffectivePublicationRetryCount(),
     "publicationWaitForNextAttemptMillis" to aEndpoint.AIcEffectivePublicationWaitForNextAttemptMillis(),
@@ -1737,14 +1813,22 @@ fun AIcOutputPublicationsMapForOutput(aPublishing: Map<String, AIcdModustroOutpu
         linkedMapOf(
             "snapshot" to linkedMapOf(
                 "publicationEnabled" to locConfiguration.snapshot.AIcEffectivePublicationEnabled(),
-                "publicationEndpoints" to locConfiguration.snapshot.publicationEndpoints.values.map(::AIcPublicationEndpointMapForOutput)
+                "publicationEndpoints" to locConfiguration.snapshot.publicationEndpoints.values.map(::AIcPublicationEndpointMapForOutput),
+                "outputPublicationFinalizationActions" to (locConfiguration.snapshot.outputPublicationFinalizationActions ?: emptyList())
             ),
             "release" to linkedMapOf(
                 "publicationEnabled" to locConfiguration.release.AIcEffectivePublicationEnabled(),
-                "publicationEndpoints" to locConfiguration.release.publicationEndpoints.values.map(::AIcPublicationEndpointMapForOutput)
+                "publicationEndpoints" to locConfiguration.release.publicationEndpoints.values.map(::AIcPublicationEndpointMapForOutput),
+                "outputPublicationFinalizationActions" to (locConfiguration.release.outputPublicationFinalizationActions ?: emptyList())
             )
         )
     }
+
+
+fun AIcFinalizationActionsByStabilityMapForOutput(aActions: AIcdModustroPublicationFinalizationActionsByStability): Map<String, Any?> = linkedMapOf(
+    "snapshot" to (aActions.snapshot ?: emptyList()),
+    "release" to (aActions.release ?: emptyList())
+)
 
 fun AIcEnvironmentRequirementsMapForOutput(aRequirements: Map<String, AIcdAlgitesVersionRequirement>): Map<String, Any?> =
     aRequirements.toSortedMap().mapValues { (_, locRequirement) -> AIcVersionRequirementMapForOutput(locRequirement) }
@@ -1756,6 +1840,15 @@ fun AIcToMap(aResult: AIcdModustroResolutionResult): Map<String, Any?> = linkedM
         "name" to aResult.repository.name,
         "visibility" to aResult.repository.visibility,
         "groupId" to aResult.repository.groupId,
+        "version" to linkedMapOf(
+            "releaseLineVersion" to aResult.repository.version.releaseLineVersion,
+            "revision" to aResult.repository.version.revision,
+            "qualifierKind" to aResult.repository.version.qualifierKind,
+            "resolvedValue" to aResult.repository.version.AIcResolvedValue()
+        ),
+        "versionScopePath" to aResult.repository.versionScopePath,
+        "artifactPublicationFinalizationActions" to AIcFinalizationActionsByStabilityMapForOutput(aResult.repository.artifactPublicationFinalizationActions),
+        "versionScopePublicationFinalizationActions" to AIcFinalizationActionsByStabilityMapForOutput(aResult.repository.versionScopePublicationFinalizationActions),
         "inputSubscriptions" to AIcInputSubscriptionsMapForOutput(aResult.repository.inputSubscriptions),
         "credentialProfiles" to AIcCredentialProfilesMapForOutput(aResult.repository.credentialProfiles),
         "dependencies" to aResult.repository.dependencies.map(::AIcDependencyMapForOutput),
@@ -1773,6 +1866,9 @@ fun AIcToMap(aResult: AIcdModustroResolutionResult): Map<String, Any?> = linkedM
             "description" to locDirectory.description,
             "groupId" to locDirectory.groupId,
             "variantId" to locDirectory.variantId,
+            "versionScopePath" to locDirectory.versionScopePath,
+            "artifactPublicationFinalizationActions" to AIcFinalizationActionsByStabilityMapForOutput(locDirectory.artifactPublicationFinalizationActions),
+            "versionScopePublicationFinalizationActions" to AIcFinalizationActionsByStabilityMapForOutput(locDirectory.versionScopePublicationFinalizationActions),
             "inputSubscriptions" to AIcInputSubscriptionsMapForOutput(locDirectory.inputSubscriptions),
             "credentialProfiles" to AIcCredentialProfilesMapForOutput(locDirectory.credentialProfiles),
             "dependencies" to locDirectory.dependencies.map(::AIcDependencyMapForOutput),
@@ -1874,4 +1970,3 @@ fun AIcFormatOutput(aResult: AIcdModustroResolutionResult, aOutputKind: String):
     "dotted-properties" -> AIcFlattenDottedProperties(AIcToMap(aResult)).entries.joinToString("\n", postfix = "\n") { "${it.key}=${it.value}" }
     else -> error("Unsupported Modustro artifact directory output kind '$aOutputKind'. Supported values are: yml, yaml, dotted-properties.")
 }
-

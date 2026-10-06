@@ -33,12 +33,24 @@ Phase 5 adds the effective external-I/O pipeline:
 
 - `AIcInputSubscriptionResolver` merges inherited subscriptions by technology, selector and stable `Id`;
 - `AIcPublicationConfiguration` expands output selectors and recursively merge-composes publication endpoints, concrete
-  publications and post-publication actions;
+  publications and recursive publication finalization actions, plus flat higher finalization lists;
 - `AIcPublicationPlanner` creates independent root publication jobs, injects the implicit root build-record action and
   resolves the cross-lane endpoint registry used by target actions;
-- `AIcPublicationScheduler` owns root and local-sibling order barriers, retries, timeouts, cancellation, failure policy,
-  progress and required-completion propagation;
-- publication and post-action adapters execute one attempt and remain independent of Gradle.
+- `AIcPublicationScheduler` owns root/local order, complete output/artifact/Version Scope barriers, retries, timeouts,
+  cancellation, failure policy, progress and required-completion propagation;
+- transport and finalization adapters execute one attempt and remain independent of Gradle;
+- `AIcBuiltinAdapterCatalog` registers all six adapter categories, including Version Scope snapshot cleanup and
+  repository docs-refresh requests.
+
+Portable regression entry points cover recursive scheduling, all four barriers, retry/timeout and credential failures,
+missing outputs, immutable snapshots, Maven build-record transport and Cloudsmith/Repsy snapshot cleanup. TestNG wrappers
+call the same check classes. The portable domain bridge additionally round-trips complete immutable result trees,
+validates missing/stale/duplicate domain results, and checks immutable atomic handoff storage. Gradle orchestration
+has separate TestKit coverage in `gradleinit`.
+
+Run `bash devops/build/modustro/builder/coreimpl/verify-publication-core.sh` from the repository root with JDK 17 or newer.
+This checks the publication/subscription/catalog packages and all core interfaces without external dependencies;
+it does not replace the full CoreImpl, Gradleinit, TestNG or generated-definition bootstrap checks.
 
 The optional `builder/structureddata/jackson` artifact supplies YAML/JSON/XML representation mapping without putting Jackson on the core/bootstrap dependency path.
 

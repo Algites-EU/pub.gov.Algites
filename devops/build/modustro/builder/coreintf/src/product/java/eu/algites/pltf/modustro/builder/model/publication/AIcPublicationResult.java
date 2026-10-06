@@ -16,7 +16,7 @@ public record AIcPublicationResult(
         Map<String, Object> metadata,
         Throwable failure) {
     public AIcPublicationResult {
-        metadata = Map.copyOf(metadata == null ? Map.of() : metadata);
+        metadata = AIcPublicationValues.freeze(metadata);
     }
 
     /** Compatibility constructor for callers that do not yet provide URI/result metadata. */

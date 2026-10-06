@@ -15,7 +15,7 @@ public record AIcPublicationExecutionStep(
     public AIcPublicationExecutionStep {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(kind, "kind");
-        configuration = Map.copyOf(configuration == null ? Map.of() : configuration);
+        configuration = AIcPublicationValues.freeze(configuration);
         resultMetadata = Map.copyOf(resultMetadata == null ? Map.of() : resultMetadata);
     }
 }

@@ -9,7 +9,9 @@ This directory contains public non-secret defaults consumed by the Modustro Buil
 
 Every declaration has an explicit `TechnologyKind`. Subscriptions identify `SubscriptionUri`, `SubscriptionAdapter`,
 visibility/stability, optional credential profile, and adapter-specific `Configuration`. Output publication branches
-identify `PublicationEndpoints`, root `Publications`, and recursive `PostPublicationActions`.
+identify `PublicationEndpoints`, root `Publications`, and recursive `PublicationFinalizationActions` with child
+`FinalizationActions`. Output, artifact and Version Scope finalization lists are flat. Version Scope defaults provide
+release snapshot cleanup followed by a repository docs-refresh request; Snapshot defaults request docs refresh.
 
 The file contains no secret credential values. A `SubscriptionCredentialProfile` or
 `PublicationCredentialProfile` is only a reference to a governed profile whose value is resolved separately.

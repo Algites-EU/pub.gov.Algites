@@ -1,19 +1,30 @@
 package eu.algites.pltf.modustro.builder.gradleinit
 
 import java.io.File
+import groovy.json.JsonSlurper
 import org.gradle.api.initialization.Settings
 import org.gradle.api.plugins.ExtraPropertiesExtension
 
 /* One instance per Settings domain; Project adapters reuse the same typed API. */
 class AIcModustroGradleRuntime(aSettings: Settings) {
+    private val locProviders = aSettings.providers
     internal val credentials = AIcCredentialValues(aSettings.providers)
     internal var repositoryRoot: File? = null
     internal var buildRootRelativePath: String = "."
     internal var resolvedMetadata: Map<String, Any?>? = null
 
     val inputSubscriptionClass: Class<*> = eu.algites.pltf.modustro.builder.model.subscription.AIcInputSubscription::class.java
-    val resolveMap = fun(aRoot: File, aPath: String?, aKind: String?, aName: String?, aVisibility: String?): Map<String, Any?> =
-        AIcToMap(AIcResolveModustroArtifactDirectoryMetadata(aRoot, aPath, aKind, aName, aVisibility))
+    val resolveMap = fun(aRoot: File, aPath: String?, aKind: String?, aName: String?, aVisibility: String?): Map<String, Any?> {
+        val locJson = locProviders.of(AIcModustroMetadataValueSource::class.java) {
+            parameters.repositoryDirectory.set(aRoot)
+            parameters.artifactDirectoryPath.set(aPath ?: "")
+            parameters.resolutionKind.set(aKind ?: "current-with-subdirs")
+            parameters.repositoryName.set(aName ?: "")
+            parameters.repositoryVisibility.set(aVisibility ?: "")
+        }.get()
+        @Suppress("UNCHECKED_CAST")
+        return JsonSlurper().parseText(locJson) as Map<String, Any?>
+    }
     val resolveText = fun(aRoot: File, aPath: String?, aKind: String?, aName: String?, aVisibility: String?, aOutput: String?): String =
         AIcFormatOutput(AIcResolveModustroArtifactDirectoryMetadata(aRoot, aPath, aKind, aName, aVisibility), aOutput?.takeIf { it.isNotBlank() } ?: "yaml")
 

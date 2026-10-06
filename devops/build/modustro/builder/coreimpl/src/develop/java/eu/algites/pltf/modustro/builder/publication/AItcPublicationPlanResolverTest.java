@@ -13,10 +13,10 @@ import org.testng.annotations.Test;
 /** Tests snapshot publication invocation overrides and release reproducibility rules. */
 public class AItcPublicationPlanResolverTest {
 
-    private static AIcPublicationEndpoint endpoint(boolean aEnabled) {
+    private static AIcPublicationEndpoint endpoint(boolean aExecutionEnabled) {
         return new AIcPublicationEndpoint(
             "primary",
-            aEnabled,
+            aExecutionEnabled,
             URI.create("https://example.invalid/repository"),
             "maven-repository",
             null,
@@ -40,7 +40,7 @@ public class AItcPublicationPlanResolverTest {
             AInPublicationInvocationOverride.FORCE_ON
         );
         Assert.assertTrue(locResolved.publicationEnabled());
-        Assert.assertFalse(locResolved.publicationEndpoints().get(0).enabled());
+        Assert.assertFalse(locResolved.publicationEndpoints().get(0).executionEnabled());
     }
 
     /** Verifies that snapshot FORCE_OFF disables publishing without modifying endpoint configuration. */
@@ -54,7 +54,7 @@ public class AItcPublicationPlanResolverTest {
             AInPublicationInvocationOverride.FORCE_OFF
         );
         Assert.assertFalse(locResolved.publicationEnabled());
-        Assert.assertTrue(locResolved.publicationEndpoints().get(0).enabled());
+        Assert.assertTrue(locResolved.publicationEndpoints().get(0).executionEnabled());
     }
 
     /** Verifies that release publishing rejects invocation-time publishing overrides. */

@@ -384,19 +384,21 @@ Algites public-governance defaults
 
 Input declarations are selected by `InputSelector`, expanded through the governed native-output selector groups, and merge `Subscriptions` by stable `Id`. A subscription defines one canonical `SubscriptionUri`, adapter, optional credential profile, visibility/stability, order, and adapter-specific non-secret configuration.
 
-Output declarations are selected by `OutputSelector` and contain independent Snapshot/Release lanes. `PublicationEndpoints` merge by stable `Id`; root `Publications` and recursive `PostPublicationActions` also merge by stable Id within their immediate parent scope.
+Output declarations are selected by `OutputSelector` and contain independent Snapshot/Release lanes. `PublicationEndpoints` merge by stable `Id`; root `Publications` and recursive `PublicationFinalizationActions` also merge by stable Id within their immediate parent scope.
 
-Post-publication actions execute only after their parent succeeds. They receive the complete ancestor lineage with one canonical input URI and optional output URI per step. `PublicationOrder` schedules direct root publications; action `Order` schedules only direct siblings. Tree nesting is the hard dependency/data-flow relation.
+Post-publication actions execute only after their parent succeeds. They receive the complete ancestor lineage with one canonical input URI and optional output URI per step. `ExecutionOrder` schedules direct root publications; action `ExecutionOrder` schedules only direct siblings. Tree nesting is the hard dependency/data-flow relation.
 
 The implicit root build-record action produces `<published-filename>.modustro-build-record.yml` unless explicitly overridden or disabled. Package indexes that cannot store arbitrary sidecars must disable it or target a separate metadata-capable publication endpoint.
 
-Credential profiles remain independent inherited metadata and contain no secret values in governance files. GitHub Actions preflight uses the two canonical usages `subscription` and `publication`; it selects only the profile/type pairs needed by the effective plan, including target endpoints referenced by enabled post-actions, and the trusted bridge materializes only those credentials before the build.
+Credential profiles remain independent inherited metadata and contain no secret values in governance files. GitHub Actions preflight uses the two canonical usages `subscription` and `publication`; it selects only the profile/type pairs needed by the effective plan, including target endpoints referenced by enabled publication finalization actions, and the trusted bridge materializes only those credentials before the build.
 
 Public repositories may consume only public subscriptions and publish only through public-authorized publication configuration. Private repositories may add authorized private subscriptions and publication overlays.
 
 Python snapshots continue to use immutable PEP 440 development releases (`1.0.dev<snapshotInstanceId>`) while the logical Algites version remains `1.0-SNAPSHOT`.
 
-Released-snapshot cleanup, where desired, is an explicit provider-specific `PostPublicationAction` attached to the successful release. It is not a generic management endpoint, top-level flag, or independent post-release task. The action may reference an existing snapshot `PublicationEndpoint` by Id and receives the successful release lineage plus the resolved target endpoint and credentials.
+Released-snapshot cleanup is a Version Scope finalizer after all native artifact/output publications in that release boundary succeed. It receives complete immutable artifact/output/publication trees and deduplicates configured snapshot targets. Output and artifact finalization are flat intermediate barriers; publication-level finalization alone is recursive, with child `FinalizationActions` and `FinalizationActionAdapter`.
+
+Expected enabled outputs without execution keep the scope FAILED and suppress higher cleanup/refresh. COMPLETE invocation records are protected from mutation. A scope finalizer can request repository docs refresh; the repository aggregates requests across scopes and versions before publishing once. The current integration rejects shared scopes across isolated Gradle domains until its serialized result bridge is implemented and verified.
 
 The GitHub private-governance licensing bootstrap uses an authenticated sparse partial clone. Because `--filter=blob:none` may lazy-fetch blobs during the later `git sparse-checkout set` operation, the workflow installs the `gh` credential helper with `gh auth setup-git` before cloning; authentication must therefore cover both the initial clone and subsequent promisor-remote fetches.
 

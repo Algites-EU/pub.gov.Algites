@@ -38,6 +38,10 @@ never handed across included-build boundaries.
 
 **Publish this artifact before activating the new root Settings in CI.** Its
 first build must not load the consumer Settings that already require gradleinit.
+Publish CoreIntf and CoreImpl from the same checkpoint first: this integration
+uses their current publication-domain API. The accompanying bootstrap archive
+contains freshly rebuilt Maven artifacts and their matching POM/module metadata;
+older Core JARs cannot supply the new bridge contracts.
 The bootstrap script creates temporary independent Settings and builds this
 module against the already-published `modustrobuild` bundle. It does not rewrite
 the repository Settings and does not apply repository conventions to itself.
@@ -92,3 +96,35 @@ the Core scheduler and resolves credentials at execution, keeping secrets and
 live Project/script objects out of configuration cache. It preserves required
 completion barriers and awaits best-effort attempts before teardown. A TestKit
 regression publishes a local payload on two invocations with cache reuse.
+
+Publication tasks depend on a preparation task that declares all expected native
+outputs through serializable providers. The service includes missing declared
+outputs in failed scope records, drains complete output trees, and then finalizes
+artifacts and Version Scopes. Successful scope finalizers can request one
+repository docs-site refresh. Native publication records retain the full lower
+execution tree and protect COMPLETE records within one invocation.
+
+For isolated domains, `modustroExportPublicationResults` commits complete local
+artifact trees. `modustroFinalizePublicationScopes` waits for included-domain
+receipts and finalizes each shared Version Scope at its owning domain. Plain JSON
+packets reconstruct immutable Core values without sharing live Gradle objects.
+Missing producers and stale or contradictory packets prevent COMPLETE. Resolved
+credential values are excluded; finalizer credentials are resolved at execution
+against the originating domain's directory.
+
+The phase controller supplies a shared `MODUSTRO_BUILD_INVOCATION_ID` across its
+child and parent builds. Direct composite publication needs a fresh common ID
+through that environment variable or `-Pmodustro.build.invocationId=<fresh-id>`.
+Native publication fails before upload if it is missing. Committed packets and
+COMPLETE records cannot be replaced within one invocation; a new native attempt
+requires a new ID. The repository-root domain alone publishes the aggregate docs
+site after successful scope finalization.
+
+Effective metadata is obtained through a Gradle ValueSource. Generated output
+directories do not invalidate configuration cache when their appearance leaves
+the effective metadata unchanged; descriptor changes remain observable.
+
+TestKit checks include a real root/included-build publication, mixed Java/Python
+output identities, a missing included producer, a missing shared invocation ID,
+and configuration-cache reuse. Consult the checkpoint validation report for the
+executed checks and any remaining bootstrap limitations.

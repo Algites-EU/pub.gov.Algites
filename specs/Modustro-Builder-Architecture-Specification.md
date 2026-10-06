@@ -277,7 +277,7 @@ Phase 5 uses two explicit and symmetric external-I/O models. The former generali
 - `InputSubscriptions` describes external resources consumed by a build.
 - `OutputPublications` describes produced outputs, publication destinations, concrete publication forms, and dependent post-publication work.
 
-There is no structural `download` / `upload` / `manage` action dimension. Download semantics belong to subscriptions, publication semantics belong to output publications, and provider-specific lifecycle operations are modeled as `PostPublicationActions` attached to successful publications.
+There is no structural `download` / `upload` / `manage` action dimension. Download semantics belong to subscriptions, publication semantics belong to output publications, and provider-specific lifecycle operations are modeled as `PublicationFinalizationActions` attached to successful publications.
 
 ### 9.1 InputSubscriptions
 
@@ -305,45 +305,56 @@ Public source repositories may consume only public subscriptions. Private source
 
 Each output-publication declaration has exactly one effective `TechnologyKind` and one `OutputSelector`. Its `Snapshot` and `Release` branches are independent and contain `PublicationEnabled` plus `PublicationEndpoints`.
 
-A publication endpoint owns destination and attempt policy: `PublicationUri`, `PublicationAdapter`, optional `PublicationCredentialProfile`, `PublicationOrder`, failure policy, retry count/delay, attempt timeout, progress policy, adapter-specific `Configuration`, and a list of root `Publications`. Endpoints merge by stable `Id`.
+An output Snapshot/Release branch retains `PublicationEnabled` as its publication gate. Each endpoint, root publication form, and finalization action uses `ExecutionEnabled` (default `true`) to enable that item. Endpoints and finalization actions use `ExecutionOrder` (default `0`, negative values allowed) within their respective scheduling groups. These names are identical across repository defaults and structural descriptors.
+
+A publication endpoint owns destination and attempt policy: `PublicationUri`, `PublicationAdapter`, optional `PublicationCredentialProfile`, `ExecutionOrder`, failure policy, retry count/delay, attempt timeout, progress policy, adapter-specific `Configuration`, and a list of root `Publications`. Endpoints merge by stable `Id`.
 
 A root `Publication` is an independently scheduled and retried publication form. If no list is declared, one implicit `Id: standard` publication is used. Maven-compatible forms may override classifier and extension.
 
-Every enabled root publication receives one implicit direct `PostPublicationAction` with `Id: build-record`, unless the same Id is explicitly configured. The sidecar is named exactly `<published-filename>.modustro-build-record.yml`. The implicit action is never recursively added to child actions.
+Every enabled root publication receives one implicit direct `PublicationFinalizationAction` with `Id: build-record`, unless the same Id is explicitly configured. The sidecar is named exactly `<published-filename>.modustro-build-record.yml`. The implicit action is never recursively added to child actions.
 
-### 9.3 PostPublicationActions and execution lineage
+### 9.3 Four finalization boundaries
 
-`PostPublicationActions` is the only descendant execution mechanism. It replaces the old special-case extended-publication concept and also represents lifecycle side effects such as provider promotion or removal of a corresponding snapshot after release.
+`PublicationFinalizationActions` under a root publication is the recursive lowest level. It selects a
+`PublicationFinalizationActionAdapter`. Descendants are declared through `FinalizationActions` and select a
+`FinalizationActionAdapter`. Only this level is recursive: `OutputPublicationFinalizationActions`,
+`ArtifactPublicationFinalizationActions`, and `VersionScopePublicationFinalizationActions` are flat ordered lists,
+with corresponding typed adapter properties and contracts.
 
-A child action is never eligible before its immediate parent has completed successfully. Each action receives the complete ordered ancestor lineage from the root publication to its parent. Each lineage step has exactly one canonical `InputUri`, at most one canonical `OutputUri`, effective configuration, and result metadata. Sibling state is intentionally not exposed.
+A publication-level child waits for its immediate parent to succeed. Its ordered ancestor lineage retains one
+canonical input URI, optional output URI, configuration and result metadata per step. Sibling state is excluded.
+The adapter owns URI dereferencing; no shared open stream crosses this boundary. It retains the frozen root payload
+and can reference an effective endpoint through `TargetPublicationEndpointId`.
 
-The context does not pass an open stream. URI dereferencing belongs to the adapter and therefore supports local, mounted, and remote content uniformly. The frozen root publication payload remains available for identity and metadata.
-
-A post-action may reference another effective destination by `TargetPublicationEndpointId`; the planner therefore carries a registry of resolved publication endpoints across both Snapshot and Release lanes for the selected output. This permits, for example, a release cleanup action to target an already configured snapshot endpoint without duplicating URI or credentials.
+Each higher finalizer waits for complete lower execution trees and receives immutable results for its whole boundary.
+Enabled expected outputs that were not produced/published remain incomplete, preventing higher finalization.
+The Version Scope owns the shared version consistency boundary. A partial attempt is FAILED and repairable; COMPLETE
+records are protected from mutation within the invocation. Repository docs sites may aggregate multiple scopes and
+versions: scope finalizers request refresh, and repository publication deduplicates those requests.
 
 ### 9.4 Scheduler semantics
 
 Ordering is hierarchical rather than one global total order.
 
-- `PublicationOrder` orders only direct root publications in the same publication scheduler scope.
-- `Order` on `PostPublicationAction` orders only direct sibling actions of one parent.
+- `ExecutionOrder` orders only direct root publications in the same publication scheduler scope.
+- `ExecutionOrder` on `PublicationFinalizationAction` orders only direct sibling actions of one parent.
 - lower numbers run first, equal values may run concurrently, default is `0`, and negative values are allowed;
 - a later order group waits for the direct executions in the previous group, not for their descendants;
 - tree nesting, not order, expresses a hard data dependency.
 
 The overall required-completion handle still waits for all required descendant trees and propagates required failures.
 
-Retry, timeout, failure handling, cancellation, and progress policy are scheduler-owned. A `PublicationAdapter` or `PostPublicationActionAdapter` executes exactly one attempt.
+Retry, timeout, failure handling, cancellation, and progress policy are scheduler-owned. Each transport or typed finalization adapter executes exactly one attempt. The unified adapter catalog covers subscription, transport, and all four finalization levels. The current bootstrap uses explicit registration. Isolated domains exchange complete immutable results through an invocation-scoped JSON bridge; the scope owner finalizes only after all expected contributions are complete. Gradle/TestKit regressions exercise the bridge and its completion guards.
 
 ### 9.5 Publication consistency and cleanup
 
 For timestamped Maven snapshots, all forms derived from one payload use one reserved snapshot instance, including sidecars, so coordinates remain internally consistent.
 
-Released-snapshot cleanup is not a special `manage` endpoint or a global `DeleteSnapshotWhenReleased` flag. Where governance requires cleanup, it is an explicit provider-specific `PostPublicationAction` attached to a successful release and may reference the configured snapshot publication endpoint. This is governance policy rather than implicit Maven release behavior.
+Released-snapshot cleanup is a Version Scope finalizer using `modustro-remove-corresponding-snapshots`. It runs after all native artifact/output publications in the release boundary succeed and uses their configured snapshot endpoints. Cleanup is explicit governance policy, independent of Maven release behavior. Docs refresh is requested by `modustro-refresh-docs-site` at this boundary and performed once at repository level.
 
 ### 9.6 Credential preflight
 
-Credential preflight is aligned with the two external-I/O directions. The canonical usage values are `subscription` and `publication`; publication preflight also includes credentials required by referenced target endpoints of enabled post-actions. The preflight plan never reads secret values. The trusted bridge materializes only selected profile/type pairs before ordinary build execution.
+Credential preflight is aligned with the two external-I/O directions. The canonical usage values are `subscription` and `publication`; publication preflight also includes credentials required by referenced target endpoints of enabled publication finalization actions. The preflight plan never reads secret values. The trusted bridge materializes only selected profile/type pairs before ordinary build execution.
 
 The detailed normative field-level behavior, selector expansion, merge rules, URI semantics, adapter contracts, and examples are defined in `devops/build/modustro/PUBLICATIONS.md` and the Artifact Developer Reference.
 

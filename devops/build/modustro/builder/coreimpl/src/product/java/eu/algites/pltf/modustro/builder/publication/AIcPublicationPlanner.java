@@ -9,7 +9,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
-/** Converts effective OutputPublications endpoint/forms into root publication jobs with recursive action trees. */
+/** Converts one effective output-publication plan into publication jobs and finalization actions. */
 public final class AIcPublicationPlanner {
     public List<AIcPublicationJob> plan(AIcPublicationPayload aRoot, Map<String, Object> aConfiguration,
             Map<String, Object> aContext, Path aDirectory) throws Exception {
@@ -21,23 +21,17 @@ public final class AIcPublicationPlanner {
         Set<String> locIds = new HashSet<>();
         Set<String> locTargets = new HashSet<>();
         AIcPublicationPayload locFrozen = AIcFreeze(aRoot, aDirectory);
-        Map<String, AIcPublicationEndpoint> locRegistry = new LinkedHashMap<>();
-        Object locRegistryValue = AIcValue(aConfiguration, "PublicationEndpointRegistry", "publicationEndpointRegistry");
-        for (Map<String, Object> locRegistryDeclaration : AIcMaps(locRegistryValue)) {
-            String locRegistryId = Objects.toString(AIcValue(locRegistryDeclaration, "Id", "id"), "");
-            AIcPublicationEndpoint locRegistryEndpoint = endpoint(locRegistryDeclaration, locRegistryId);
-            locRegistry.put(locRegistryId, locRegistryEndpoint);
-        }
+        Map<String, AIcPublicationEndpoint> locRegistry = publicationEndpointRegistry(aConfiguration);
         Object locEndpointsValue = AIcValue(aConfiguration, "PublicationEndpoints", "publicationEndpoints");
         for (Map<String, Object> locDeclaration : AIcMaps(locEndpointsValue)) {
             AIcPublicationEndpoint locEndpoint = endpoint(locDeclaration, Objects.toString(AIcValue(locDeclaration, "Id", "id"), ""));
             locRegistry.putIfAbsent(locEndpoint.id(), locEndpoint);
-            if (!locEndpoint.enabled()) continue;
+            if (!locEndpoint.executionEnabled()) continue;
             Object locFormsValue = AIcValue(locDeclaration, "Publications", "publications");
             List<Map<String, Object>> locForms = locFormsValue == null ? List.of(Map.of("Id", "standard")) : AIcMaps(locFormsValue);
             int locIndex = 0;
             for (Map<String, Object> locForm : locForms) {
-                if (Boolean.FALSE.equals(AIcValue(locForm, "Enabled", "enabled"))) continue;
+                if (Boolean.FALSE.equals(AIcValue(locForm, "ExecutionEnabled", "executionEnabled"))) continue;
                 String locLocalId = Objects.toString(AIcValue(locForm, "Id", "id"), "standard");
                 String locId = locEndpoint.id() + "/" + locLocalId;
                 if (!locIds.add(locId)) throw new IllegalArgumentException("Duplicate publication path " + locId);
@@ -46,11 +40,12 @@ public final class AIcPublicationPlanner {
                     String locTarget = locEndpoint.publicationUri() + "|" + locFile.logicalName();
                     if (!locTargets.add(locTarget)) throw new IllegalArgumentException("Duplicate publication target " + locFile.logicalName());
                 }
-                List<AIcPostPublicationAction> locActions = AIcActions(AIcValue(locForm, "PostPublicationActions", "postPublicationActions"), 0);
+                List<AIcPublicationFinalizationAction> locActions = publicationFinalizationActions(
+                        AIcValue(locForm, "PublicationFinalizationActions", "publicationFinalizationActions"), 0);
                 if (locActions.stream().noneMatch(locAction -> "build-record".equals(locAction.id()))) {
-                    ArrayList<AIcPostPublicationAction> locWithDefault = new ArrayList<>(locActions);
-                    locWithDefault.add(new AIcPostPublicationAction("build-record", true, "modustro-build-record", null, 0,
-                            AInPostPublicationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, true, Map.of(), List.of()));
+                    ArrayList<AIcPublicationFinalizationAction> locWithDefault = new ArrayList<>(locActions);
+                    locWithDefault.add(new AIcPublicationFinalizationAction("build-record", true, "modustro-build-record", null, 0,
+                            AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, true, Map.of(), List.of()));
                     locActions = List.copyOf(locWithDefault);
                 }
                 locJobs.add(new AIcPublicationJob(locId, AIcWithId(locEndpoint, locId), locPayload, aContext, locActions, locRegistry));
@@ -59,16 +54,100 @@ public final class AIcPublicationPlanner {
         return List.copyOf(locJobs);
     }
 
+    public static Map<String, AIcPublicationEndpoint> publicationEndpointRegistry(Map<String, Object> aConfiguration) {
+        LinkedHashMap<String, AIcPublicationEndpoint> locRegistry = new LinkedHashMap<>();
+        Object locRegistryValue = AIcValue(aConfiguration, "PublicationEndpointRegistry", "publicationEndpointRegistry");
+        for (Map<String, Object> locDeclaration : AIcMaps(locRegistryValue)) {
+            String locId = Objects.toString(AIcValue(locDeclaration, "Id", "id"), "");
+            if (!locId.isBlank()) locRegistry.put(locId, endpoint(locDeclaration, locId));
+        }
+        return locRegistry;
+    }
+
+    public static Map<String, AIcPublicationEndpoint> snapshotPublicationEndpoints(Map<String, Object> aConfiguration) {
+        LinkedHashMap<String, AIcPublicationEndpoint> locResult = new LinkedHashMap<>();
+        Object locValue = AIcValue(aConfiguration, "SnapshotPublicationEndpoints", "snapshotPublicationEndpoints");
+        for (Map<String, Object> locDeclaration : AIcMaps(locValue)) {
+            String locId = Objects.toString(AIcValue(locDeclaration, "Id", "id"), "");
+            if (!locId.isBlank()) locResult.put(locId, endpoint(locDeclaration, locId));
+        }
+        return Map.copyOf(locResult);
+    }
+
+    public static List<AIcOutputPublicationFinalizationAction> outputPublicationFinalizationActions(Map<String, Object> aConfiguration) {
+        List<AIcOutputPublicationFinalizationAction> locResult = new ArrayList<>();
+        for (Map<String, Object> locItem : AIcMaps(AIcValue(aConfiguration,
+                "OutputPublicationFinalizationActions", "outputPublicationFinalizationActions"))) {
+            String locId = AIcActionId(locItem, "OutputPublicationFinalizationActions");
+            locResult.add(new AIcOutputPublicationFinalizationAction(
+                    locId,
+                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ExecutionEnabled", "executionEnabled")),
+                    Objects.toString(AIcValue(locItem, "OutputPublicationFinalizationActionAdapter", "outputPublicationFinalizationActionAdapter"), null),
+                    AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
+                    AInFinalizationActionFailurePolicy.valueOf(Objects.toString(AIcValueOrDefault(locItem,
+                            "FAIL_BUILD_ON_FAILURE", "FailurePolicy", "failurePolicy"))),
+                    AIcInt(locItem, 0, "RetryCount", "retryCount"),
+                    AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
+                    AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
+                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ShowProgressIfPossible", "showProgressIfPossible")),
+                    AIcObjectMap(AIcValue(locItem, "Configuration", "configuration"))));
+        }
+        AIcRequireUniqueActionIds(locResult.stream().map(AIcOutputPublicationFinalizationAction::id).toList(), "OutputPublicationFinalizationActions");
+        return List.copyOf(locResult);
+    }
+
+    public static List<AIcArtifactPublicationFinalizationAction> artifactPublicationFinalizationActions(Object aValue) {
+        List<AIcArtifactPublicationFinalizationAction> locResult = new ArrayList<>();
+        for (Map<String, Object> locItem : AIcMaps(aValue)) {
+            String locId = AIcActionId(locItem, "ArtifactPublicationFinalizationActions");
+            locResult.add(new AIcArtifactPublicationFinalizationAction(
+                    locId,
+                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ExecutionEnabled", "executionEnabled")),
+                    Objects.toString(AIcValue(locItem, "ArtifactPublicationFinalizationActionAdapter", "artifactPublicationFinalizationActionAdapter"), null),
+                    AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
+                    AInFinalizationActionFailurePolicy.valueOf(Objects.toString(AIcValueOrDefault(locItem,
+                            "FAIL_BUILD_ON_FAILURE", "FailurePolicy", "failurePolicy"))),
+                    AIcInt(locItem, 0, "RetryCount", "retryCount"),
+                    AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
+                    AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
+                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ShowProgressIfPossible", "showProgressIfPossible")),
+                    AIcObjectMap(AIcValue(locItem, "Configuration", "configuration"))));
+        }
+        AIcRequireUniqueActionIds(locResult.stream().map(AIcArtifactPublicationFinalizationAction::id).toList(), "ArtifactPublicationFinalizationActions");
+        return List.copyOf(locResult);
+    }
+
+    public static List<AIcVersionScopePublicationFinalizationAction> versionScopePublicationFinalizationActions(Object aValue) {
+        List<AIcVersionScopePublicationFinalizationAction> locResult = new ArrayList<>();
+        for (Map<String, Object> locItem : AIcMaps(aValue)) {
+            String locId = AIcActionId(locItem, "VersionScopePublicationFinalizationActions");
+            locResult.add(new AIcVersionScopePublicationFinalizationAction(
+                    locId,
+                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ExecutionEnabled", "executionEnabled")),
+                    Objects.toString(AIcValue(locItem, "VersionScopePublicationFinalizationActionAdapter", "versionScopePublicationFinalizationActionAdapter"), null),
+                    AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
+                    AInFinalizationActionFailurePolicy.valueOf(Objects.toString(AIcValueOrDefault(locItem,
+                            "FAIL_BUILD_ON_FAILURE", "FailurePolicy", "failurePolicy"))),
+                    AIcInt(locItem, 0, "RetryCount", "retryCount"),
+                    AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
+                    AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
+                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ShowProgressIfPossible", "showProgressIfPossible")),
+                    AIcObjectMap(AIcValue(locItem, "Configuration", "configuration"))));
+        }
+        AIcRequireUniqueActionIds(locResult.stream().map(AIcVersionScopePublicationFinalizationAction::id).toList(), "VersionScopePublicationFinalizationActions");
+        return List.copyOf(locResult);
+    }
+
     public static AIcPublicationEndpoint endpoint(Map<String, Object> aItem, String aId) {
         String locUri = Objects.toString(AIcValue(aItem, "PublicationUri", "publicationUri"), null);
         String locAdapter = Objects.toString(AIcValue(aItem, "PublicationAdapter", "publicationAdapter"), null);
         return new AIcPublicationEndpoint(
                 aId,
-                !Boolean.FALSE.equals(AIcValueOrDefault(aItem, true, "Enabled", "enabled")),
+                !Boolean.FALSE.equals(AIcValueOrDefault(aItem, true, "ExecutionEnabled", "executionEnabled")),
                 locUri == null ? null : URI.create(locUri),
                 locAdapter,
                 Objects.toString(AIcValue(aItem, "PublicationCredentialProfile", "publicationCredentialProfile"), null),
-                AIcInt(aItem, 0, "PublicationOrder", "publicationOrder"),
+                AIcInt(aItem, 0, "ExecutionOrder", "executionOrder"),
                 AInPublicationFailurePolicy.valueOf(Objects.toString(AIcValueOrDefault(aItem,
                         "FAIL_BUILD_ON_PUBLICATION_FAILURE", "PublicationFailurePolicy", "publicationFailurePolicy"))),
                 AIcInt(aItem, 0, "PublicationRetryCount", "publicationRetryCount"),
@@ -78,31 +157,44 @@ public final class AIcPublicationPlanner {
                 AIcObjectMap(AIcValue(aItem, "Configuration", "configuration")));
     }
 
-    private static List<AIcPostPublicationAction> AIcActions(Object aValue, int aDepth) {
-        if (aDepth > 64) throw new IllegalArgumentException("PostPublicationActions nesting exceeds 64.");
-        List<AIcPostPublicationAction> locResult = new ArrayList<>();
+    private static List<AIcPublicationFinalizationAction> publicationFinalizationActions(Object aValue, int aDepth) {
+        if (aDepth > 64) throw new IllegalArgumentException("FinalizationActions nesting exceeds 64.");
+        List<AIcPublicationFinalizationAction> locResult = new ArrayList<>();
         Set<String> locIds = new HashSet<>();
         for (Map<String, Object> locItem : AIcMaps(aValue)) {
-            String locId = Objects.toString(AIcValue(locItem, "Id", "id"), "");
-            if (!locId.matches("[a-z0-9]+(?:-[a-z0-9]+)*") || !locIds.add(locId)) {
-                throw new IllegalArgumentException("Post-publication action Id must be unique among siblings.");
-            }
-            locResult.add(new AIcPostPublicationAction(
+            String locId = AIcActionId(locItem, aDepth == 0 ? "PublicationFinalizationActions" : "FinalizationActions");
+            if (!locIds.add(locId)) throw new IllegalArgumentException("Finalization action Id must be unique among siblings.");
+            String locAdapter = Objects.toString(AIcValue(locItem,
+                    aDepth == 0 ? "PublicationFinalizationActionAdapter" : "FinalizationActionAdapter",
+                    aDepth == 0 ? "publicationFinalizationActionAdapter" : "finalizationActionAdapter"), null);
+            locResult.add(new AIcPublicationFinalizationAction(
                     locId,
-                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "Enabled", "enabled")),
-                    Objects.toString(AIcValue(locItem, "PostPublicationActionAdapter", "postPublicationActionAdapter"), null),
+                    !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ExecutionEnabled", "executionEnabled")),
+                    locAdapter,
                     Objects.toString(AIcValue(locItem, "TargetPublicationEndpointId", "targetPublicationEndpointId"), null),
-                    AIcInt(locItem, 0, "Order", "order"),
-                    AInPostPublicationActionFailurePolicy.valueOf(Objects.toString(AIcValueOrDefault(locItem,
+                    AIcInt(locItem, 0, "ExecutionOrder", "executionOrder"),
+                    AInFinalizationActionFailurePolicy.valueOf(Objects.toString(AIcValueOrDefault(locItem,
                             "FAIL_BUILD_ON_FAILURE", "FailurePolicy", "failurePolicy"))),
                     AIcInt(locItem, 0, "RetryCount", "retryCount"),
                     AIcLong(locItem, 1000L, "WaitForNextAttemptMillis", "waitForNextAttemptMillis"),
                     AIcNullableLong(locItem, "AttemptTimeoutMillis", "attemptTimeoutMillis"),
                     !Boolean.FALSE.equals(AIcValueOrDefault(locItem, true, "ShowProgressIfPossible", "showProgressIfPossible")),
                     AIcObjectMap(AIcValue(locItem, "Configuration", "configuration")),
-                    AIcActions(AIcValue(locItem, "PostPublicationActions", "postPublicationActions"), aDepth + 1)));
+                    publicationFinalizationActions(AIcValue(locItem, "FinalizationActions", "finalizationActions"), aDepth + 1)));
         }
         return List.copyOf(locResult);
+    }
+
+    private static String AIcActionId(Map<String, Object> aItem, String aCollectionName) {
+        String locId = Objects.toString(AIcValue(aItem, "Id", "id"), "");
+        if (!locId.matches("[a-z0-9]+(?:-[a-z0-9]+)*")) {
+            throw new IllegalArgumentException(aCollectionName + " action Id must be lowercase dash-separated.");
+        }
+        return locId;
+    }
+
+    private static void AIcRequireUniqueActionIds(List<String> aIds, String aCollectionName) {
+        if (new HashSet<>(aIds).size() != aIds.size()) throw new IllegalArgumentException(aCollectionName + " requires unique action Id values.");
     }
 
     private static AIcPublicationPayload AIcFreeze(AIcPublicationPayload aRoot, Path aDirectory) throws Exception {
@@ -168,34 +260,34 @@ public final class AIcPublicationPlanner {
     }
 
     private static AIcPublicationEndpoint AIcWithId(AIcPublicationEndpoint aEndpoint, String aId) {
-        return new AIcPublicationEndpoint(aId, aEndpoint.enabled(), aEndpoint.publicationUri(), aEndpoint.publicationAdapter(),
-                aEndpoint.publicationCredentialProfile(), aEndpoint.publicationOrder(), aEndpoint.publicationFailurePolicy(),
+        return new AIcPublicationEndpoint(aId, aEndpoint.executionEnabled(), aEndpoint.publicationUri(), aEndpoint.publicationAdapter(),
+                aEndpoint.publicationCredentialProfile(), aEndpoint.executionOrder(), aEndpoint.publicationFailurePolicy(),
                 aEndpoint.publicationRetryCount(), aEndpoint.publicationWaitForNextAttemptMillis(), aEndpoint.publicationAttemptTimeoutMillis(),
                 aEndpoint.showPublicationProgressIfPossible(), aEndpoint.configuration());
     }
 
-    private static Object AIcValue(Map<String, Object> aMap, String... aKeys) {
+    static Object AIcValue(Map<String, Object> aMap, String... aKeys) {
         for (String locKey : aKeys) if (aMap.containsKey(locKey)) return aMap.get(locKey);
         return null;
     }
-    private static Object AIcValueOrDefault(Map<String, Object> aMap, Object aDefault, String... aKeys) {
+    static Object AIcValueOrDefault(Map<String, Object> aMap, Object aDefault, String... aKeys) {
         Object locValue = AIcValue(aMap, aKeys); return locValue == null ? aDefault : locValue;
     }
-    private static int AIcInt(Map<String, Object> aMap, int aDefault, String... aKeys) {
+    static int AIcInt(Map<String, Object> aMap, int aDefault, String... aKeys) {
         Object locValue = AIcValue(aMap, aKeys); return locValue == null ? aDefault : ((Number) locValue).intValue();
     }
-    private static long AIcLong(Map<String, Object> aMap, long aDefault, String... aKeys) {
+    static long AIcLong(Map<String, Object> aMap, long aDefault, String... aKeys) {
         Object locValue = AIcValue(aMap, aKeys); return locValue == null ? aDefault : ((Number) locValue).longValue();
     }
-    private static Long AIcNullableLong(Map<String, Object> aMap, String... aKeys) {
+    static Long AIcNullableLong(Map<String, Object> aMap, String... aKeys) {
         Object locValue = AIcValue(aMap, aKeys); return locValue == null ? null : ((Number) locValue).longValue();
     }
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> AIcObjectMap(Object aValue) {
+    static Map<String, Object> AIcObjectMap(Object aValue) {
         return aValue instanceof Map<?, ?> ? Map.copyOf((Map<String, Object>) aValue) : Map.of();
     }
     @SuppressWarnings("unchecked")
-    private static List<Map<String, Object>> AIcMaps(Object aValue) {
+    static List<Map<String, Object>> AIcMaps(Object aValue) {
         if (aValue == null) return List.of();
         if (!(aValue instanceof List<?> locList)) throw new IllegalArgumentException("Expected a list.");
         return locList.stream().map(locItem -> {

@@ -369,7 +369,7 @@ if (tasks.findByName("writeModustroDocsPublishingSelection") == null) {
                 locLines += "endpoint.$locIndex.url=${locEndpoint["publicationUri"]?.toString().orEmpty()}"
                 locLines += "endpoint.$locIndex.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}"
                 locLines += "endpoint.$locIndex.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}"
-                locLines += "endpoint.$locIndex.order=${locEndpoint["publicationOrder"] ?: 0}"
+                locLines += "endpoint.$locIndex.executionOrder=${locEndpoint["executionOrder"] ?: 0}"
                 locLines += "endpoint.$locIndex.failurePolicy=${locEndpoint["publicationFailurePolicy"] ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"}"
             }
             locOutput.writeText(locLines.joinToString(System.lineSeparator()) + System.lineSeparator(), Charsets.UTF_8)
@@ -1647,7 +1647,7 @@ if (tasks.findByName("publishModustroDocsSite") == null) {
     val locPublicationService = rootProject.extra["modustroPublicationService"] as Provider<AIcModustroPublicationService>
     val locPublishingBranch = providers.gradleProperty("modustro.docs.publishingBranch").orNull?.trim()?.takeIf(String::isNotBlank) ?: "documentation"
     val locFiles = fileTree(locDocsSiteRoot) { exclude(".git/**", ".modustro-publishing/**", "**/*.modustro-build-record.yml") }
-    tasks.register<AIcModustroPublishFilesTask>("publishModustroDocsSite") {
+    val locConfigureDocsSitePublication: AIcModustroPublishFilesTask.() -> Unit = {
         group = "publishing"
         description = "Publishes the generated Modustro documentation site through the common publication scheduler."
         if (locDocsHasPublicationEndpoints) {
@@ -1669,6 +1669,12 @@ if (tasks.findByName("publishModustroDocsSite") == null) {
             "commitMessage" to "Publish documentation for $locAlgitesDocsEffectivePublicationKind/$locAlgitesDocsEffectivePublicationId"))
         publicationService.set(locPublicationService)
         usesService(locPublicationService)
+    }
+    tasks.register<AIcModustroPublishFilesTask>("publishModustroDocsSite") { locConfigureDocsSitePublication(this) }
+    tasks.register<AIcModustroPublishFilesTask>("refreshModustroDocsSite") {
+        locConfigureDocsSitePublication(this)
+        description = "Refreshes the repository documentation site once after completed Version Scopes request it."
+        requiresRepositoryRefreshRequest.set(true)
     }
 }
 

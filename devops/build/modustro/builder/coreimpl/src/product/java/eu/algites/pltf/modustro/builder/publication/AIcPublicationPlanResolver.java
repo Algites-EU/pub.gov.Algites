@@ -8,7 +8,7 @@ import java.util.Objects;
 
 /** Applies invocation-time policy to an already inherited publication stability configuration. */
 public final class AIcPublicationPlanResolver {
-    /** Resolves output-level publication enablement while leaving endpoint Enabled values untouched. */
+    /** Resolves output-level publication enablement while leaving endpoint ExecutionEnabled values untouched. */
     public AIcPublicationStabilityConfiguration resolve(
             AIcPublicationStabilityConfiguration aConfigured,
             AInPublicationStability aStability,

@@ -1,6 +1,6 @@
 # Algites Artifact Developer Reference
 
-> The next-generation Gradle-independent build model is defined in `Modustro-Builder-Architecture-Specification.md`. The Phase-1 contracts coexist with the current operational metadata model until later migration phases explicitly connect them.
+> The Gradle-independent build model is defined in `Modustro-Builder-Architecture-Specification.md`. The current Gradle and Python publication adapters use its publication and finalization contracts; section 11 describes their operational metadata, state records, and cross-domain coordination.
 
 ## 1. Purpose and scope
 
@@ -467,7 +467,9 @@ Different properties use different merge semantics. Do not assume every field fo
 
 `InputSubscriptions` merge by `TechnologyKind`, expanded concrete selector, and stable subscription `Id`.
 `OutputPublications` merge by `TechnologyKind` and expanded concrete selector; `PublicationEndpoints`, `Publications`,
-and recursively nested `PostPublicationActions` merge by stable `Id`. A descendant can modify or disable an inherited
+root `PublicationFinalizationActions`, and recursive child `FinalizationActions` merge by stable sibling `Id`.
+Output, artifact, and Version Scope finalizer lists also merge by Id in their independent Snapshot/Release branches.
+A repeated Id at the same merge location yields one effective action. A descendant can modify or disable an inherited
 item without repeating unrelated properties.
 
 ```yaml
@@ -561,8 +563,9 @@ OutputPublications  -> build outputs published to external destinations
 
 The former `ResourceEndpoints` matrix and its `download`, `upload`, and `manage` action dimension are not part of the
 active descriptor contract. Download/resource resolution became `InputSubscriptions`; publishing became
-`OutputPublications`; work that is causally dependent on a successful publication is modeled as recursive
-`PostPublicationActions`.
+`OutputPublications`. Finalization distinguishes concrete publication, output, logical artifact, and Version Scope.
+Recursive `PublicationFinalizationActions` and child `FinalizationActions` express dependencies within one publication;
+flat higher finalizers receive complete results for their larger consistency boundary.
 
 Every declaration has an explicit `TechnologyKind`. Omission never means "all technologies". Effective configuration
 must identify exactly one of `java`, `python`, `mps`, or `modustro` for each declaration.
@@ -640,7 +643,7 @@ OutputPublications:
           PublicationUri: https://maven.example.invalid/snapshots/
           PublicationAdapter: maven-repository
           PublicationCredentialProfile: algites-java-snapshot-publication
-          PublicationOrder: 0
+          ExecutionOrder: 0
           PublicationFailurePolicy: FAIL_BUILD_ON_PUBLICATION_FAILURE
           PublicationRetryCount: 2
           PublicationWaitForNextAttemptMillis: 1000
@@ -657,16 +660,51 @@ not disable source processing, compilation, verification, packaging, or output p
 The same selector expansion rules apply as for `InputSubscriptions`, but each declaration is always scoped to one
 explicit `TechnologyKind`.
 
+### 11.2.1 Enablement and scheduling names by location
+
+`PublicationEnabled` is the output-level publication gate; `ExecutionEnabled` is the item-level execution gate. YAML property names are
+case-sensitive; the spelling is exactly `PublicationEnabled`. Their location determines their meaning:
+
+| Configuration location | Enablement field / default | Scheduling field / default |
+| --- | --- | --- |
+| `OutputPublications` item, `Snapshot` or `Release` branch | `PublicationEnabled: false` | No order property on this branch. |
+| `PublicationEndpoints` item | `ExecutionEnabled: true` | `ExecutionOrder: 0`; schedules direct root publication groups. |
+| `Publications` item | `ExecutionEnabled: true` | No separate order property; uses its endpoint's publication policy. |
+| Any publication/output/artifact/Version Scope finalization action, including nested `FinalizationActions` | `ExecutionEnabled: true` | `ExecutionOrder: 0`; schedules direct sibling actions in that list. |
+
+`PublicationEnabled: false` disables publication of that output in that stability branch. `ExecutionEnabled: false` on an
+endpoint, publication form, or finalization action disables only that item. Disabling a finalization action does not
+disable the payload publication or sibling finalizers. Enabling an item does not bypass an enclosing disabled output
+or endpoint, or the finalization completion barriers.
+
+The scheduling policy names also differ by operation:
+
+| Endpoint publication policy | Finalization-action policy |
+| --- | --- |
+| `ExecutionOrder` | `ExecutionOrder` |
+| `PublicationFailurePolicy` | `FailurePolicy` |
+| `PublicationRetryCount` | `RetryCount` |
+| `PublicationWaitForNextAttemptMillis` | `WaitForNextAttemptMillis` |
+| `PublicationAttemptTimeoutMillis` | `AttemptTimeoutMillis` |
+| `ShowPublicationProgressIfPossible` | `ShowProgressIfPossible` |
+
+These names are shared by defaults and structural descriptors. `algites-repository-defaults_1`,
+`modustro-source-repository_1`, `modustro-artifact-set_1`, and `modustro-artifact_1` all reference the same definitions in
+`modustro-builder-publications_1.yamldef.schema.json` for output publications and artifact/Version Scope finalization.
+There is no defaults-specific renaming. Endpoints and finalization actions use `ExecutionEnabled` and
+`ExecutionOrder` in every layer. The former item fields `Enabled`, `Order`, and endpoint `PublicationOrder` have been
+replaced; they are not schema aliases. `PublicationEnabled` remains valid only on the output Snapshot/Release branch.
+
 ### 11.3 PublicationEndpoint fields
 
 | Field | Required | Meaning |
 | --- | ---: | --- |
 | `Id` | yes | Stable endpoint identity and optional action target identity. |
-| `Enabled` | no | Defaults to `true`. |
+| `ExecutionEnabled` | no | Defaults to `true`. |
 | `PublicationUri` | required for enabled effective endpoint | Canonical destination URI. |
 | `PublicationAdapter` | required for enabled effective endpoint | Adapter that performs one publication attempt. |
 | `PublicationCredentialProfile` | no | Non-secret credential profile reference. |
-| `PublicationOrder` | no | Root scheduling order, default `0`; negative values are allowed. |
+| `ExecutionOrder` | no | Root scheduling order, default `0`; negative values are allowed. |
 | `PublicationFailurePolicy` | no | Defaults to `FAIL_BUILD_ON_PUBLICATION_FAILURE`. |
 | `PublicationRetryCount` | no | Additional attempts after the first; defaults to `0`. |
 | `PublicationWaitForNextAttemptMillis` | no | Delay between attempts; defaults to `1000`. |
@@ -701,14 +739,14 @@ unit. A retry of one publication never retries another publication that already 
 For Maven snapshots, all forms created from one root payload share one reserved timestamp/build-number instance so the
 main artifact and sidecars stay internally consistent.
 
-### 11.5 Implicit build-record post-action
+### 11.5 Implicit build-record publication finalization action
 
-Every enabled root `Publication` receives one implicit direct post-action:
+Every enabled root `Publication` receives one implicit direct publication finalization action:
 
 ```yaml
-PostPublicationActions:
+PublicationFinalizationActions:
   - Id: build-record
-    PostPublicationActionAdapter: modustro-build-record
+    PublicationFinalizationActionAdapter: modustro-build-record
 ```
 
 Its file is named exactly:
@@ -722,67 +760,126 @@ The complete published filename is preserved, including classifier and compound 
 Declare the same stable action id to customize or disable it:
 
 ```yaml
-PostPublicationActions:
+PublicationFinalizationActions:
   - Id: build-record
-    Enabled: false
+    ExecutionEnabled: false
 ```
 
 The implicit action is added only to root publications. Child actions never receive another implicit build record.
 Python package indexes and any other transport that cannot store arbitrary sidecars must disable the action or target a
 metadata-capable endpoint with `TargetPublicationEndpointId`.
 
-### 11.6 PostPublicationActions
+### 11.6 Publication finalization levels
 
-`PostPublicationActions` replaces the former specialized extended-publication concept and also absorbs former generic
-resource-management operations. Whether an action publishes another artifact or performs a provider side effect is an
-adapter concern, not a different configuration category.
+Four consistency boundaries are supported. Child `FinalizationActions` are recursion within the publication level,
+not a fifth consistency boundary:
 
-Examples include:
+| Declaration | Location | Adapter property | Recursive |
+| --- | --- | --- | --- |
+| `PublicationFinalizationActions` | Root publication | `PublicationFinalizationActionAdapter` | Yes, via child `FinalizationActions` |
+| `FinalizationActions` | Publication finalization action | `FinalizationActionAdapter` | Yes |
+| `OutputPublicationFinalizationActions` | Output Snapshot/Release branch | `OutputPublicationFinalizationActionAdapter` | No |
+| `ArtifactPublicationFinalizationActions` | Descriptor/default Snapshot/Release branch | `ArtifactPublicationFinalizationActionAdapter` | No |
+| `VersionScopePublicationFinalizationActions` | Descriptor/default Snapshot/Release branch | `VersionScopePublicationFinalizationActionAdapter` | No |
 
-- build-record generation and publication;
-- checksums, signatures, generated indexes, or derived metadata;
-- provider promotion operations;
-- cache invalidation;
-- removal of the snapshot corresponding to a successfully published release.
+The common action fields are:
 
-A post-action has these fields:
+| Field | Meaning / default |
+| --- | --- |
+| `Id` | Required stable lowercase dash-separated sibling identity; also the hierarchical merge key. |
+| `ExecutionEnabled` | Default `true`; `false` disables this inherited action without clearing its siblings. |
+| Adapter property | The level-specific property above; required for an enabled effective action. |
+| `ExecutionOrder` | Default `0`; negative values allowed; orders direct siblings of this list. |
+| `FailurePolicy` | `FAIL_BUILD_ON_FAILURE` (default) or `IGNORE_FAILURE`. |
+| `RetryCount` | Additional attempts after the first; default `0`. |
+| `WaitForNextAttemptMillis` | Default `1000`. |
+| `AttemptTimeoutMillis` | Optional positive timeout for one attempt. |
+| `ShowProgressIfPossible` | Default `true`. |
+| `Configuration` | Adapter-specific non-secret values. |
+| `TargetPublicationEndpointId` | Optional on recursive publication actions only; otherwise the root endpoint is inherited. |
+| `FinalizationActions` | Recursive children of a publication-level action only. |
 
-| Field | Required | Meaning |
-| --- | ---: | --- |
-| `Id` | yes | Stable sibling identity used for recursive merge. |
-| `Enabled` | no | Defaults to `true`. |
-| `PostPublicationActionAdapter` | required when enabled | Executes exactly one action attempt. |
-| `TargetPublicationEndpointId` | no | Resolves another effective endpoint by stable `Id`. |
-| `Order` | no | Local sibling order, default `0`; negative values are allowed. |
-| `FailurePolicy` | no | `FAIL_BUILD_ON_FAILURE` or `IGNORE_FAILURE`; fail-build is the default. |
-| `RetryCount` | no | Additional attempts; defaults to `0`. |
-| `WaitForNextAttemptMillis` | no | Delay between attempts; defaults to `1000`. |
-| `AttemptTimeoutMillis` | no | Positive timeout for one attempt. |
-| `ShowProgressIfPossible` | no | Defaults to `true`. |
-| `Configuration` | no | Adapter-specific, non-secret configuration. |
-| `PostPublicationActions` | no | Recursive child actions. |
+This fragment illustrates placement of every level:
 
-Actions merge recursively by stable sibling `Id`.
+```yaml
+OutputPublications:
+  - OutputSelector: native_product_binaries
+    TechnologyKind: java
+    Release:
+      PublicationEnabled: true
+      PublicationEndpoints:
+        - Id: java-release
+          ExecutionEnabled: true
+          PublicationUri: https://maven.example.invalid/releases/
+          PublicationAdapter: maven-repository
+          ExecutionOrder: 0
+          Publications:
+            - Id: standard
+              ExecutionEnabled: true
+              PublicationFinalizationActions:
+                - Id: create-index
+                  ExecutionEnabled: true
+                  PublicationFinalizationActionAdapter: example-create-index
+                  ExecutionOrder: 0
+                  FinalizationActions:
+                    - Id: sign-index
+                      FinalizationActionAdapter: example-sign-content
+      OutputPublicationFinalizationActions:
+        - Id: output-summary
+          OutputPublicationFinalizationActionAdapter: example-output-summary
 
-### 11.7 Dependency tree and local Order
+ArtifactPublicationFinalizationActions:
+  Release:
+    - Id: artifact-summary
+      ArtifactPublicationFinalizationActionAdapter: example-artifact-summary
+
+VersionScopePublicationFinalizationActions:
+  Release:
+    - Id: release-summary
+      VersionScopePublicationFinalizationActionAdapter: example-release-summary
+```
+
+`example-*` names are custom adapter extension points and must be registered; they are not built-in adapters.
+Implicit `modustro-build-record` remains active unless explicitly disabled.
+
+Output finalization waits for all publication trees of that output, including recursive descendants. Artifact finalization
+waits for all expected output results of one logical artifact. Version Scope finalization waits for all artifacts in the
+inherited version boundary. Each higher adapter receives complete immutable lower results, including ignored failures,
+endpoint registries, and nested publication action results. Expected work that never executes remains incomplete.
+Different Java/Python transport identities do not split one logical artifact into separate finalization boundaries.
+
+Lists merge by Id within their own stability/parent location. A sparse descendant can disable one inherited action
+with `ExecutionEnabled: false` (not `PublicationEnabled: false`):
+
+```yaml
+VersionScopePublicationFinalizationActions:
+  Release:
+    - Id: remove-corresponding-snapshots
+      ExecutionEnabled: false
+```
+
+`Release: []` clears the entire inherited release finalizer list, including docs refresh. Omitting the branch inherits
+it; clearing Snapshot leaves Release intact. Higher lists cannot contain recursive child actions.
+
+### 11.7 Dependency tree and local ExecutionOrder
 
 Tree nesting is a hard dependency and data-flow relationship. A child action cannot become eligible before its
 immediate parent succeeds.
 
-`Order` has a different purpose: it orders only direct siblings of one parent. Lower values run first and equal values
+`ExecutionOrder` has a different purpose: it orders only direct siblings of one parent. Lower values run first and equal values
 may run concurrently. A later sibling-order group waits for direct actions in the previous group, not for those
 actions' descendants.
 
-Likewise `PublicationOrder` applies only among direct root publications. A later root order does not wait for the
-post-action descendants of an earlier root. The complete required publication operation still waits for all required
+Likewise `ExecutionOrder` applies only among direct root publications. A later root order does not wait for the
+publication finalization action descendants of an earlier root. The complete required publication operation still waits for all required
 descendant trees before final completion.
 
-Therefore, if B needs data produced by A, model B as a child of A. Do not encode the dependency merely as `A.Order: 0`
-and `B.Order: 1`.
+Therefore, if B needs data produced by A, model B as a child of A. Do not encode the dependency merely as `A.ExecutionOrder: 0`
+and `B.ExecutionOrder: 1`.
 
 ### 11.8 Execution lineage
 
-Every `PostPublicationActionAdapter` receives the entire ordered ancestor lineage from the root publication through its
+Every `PublicationFinalizationActionAdapter` receives the entire ordered ancestor lineage from the root publication through its
 immediate parent. Every lineage step exposes:
 
 - step `Id` and kind;
@@ -804,13 +901,13 @@ publication payload remains available in the action context for root identity an
 
 ### 11.9 Targeting another publication endpoint
 
-By default a post-action uses the publication endpoint inherited from its root. A post-action that must operate on a
+By default a publication finalization action uses the publication endpoint inherited from its root. A publication finalization action that must operate on a
 different configured destination can reference it by stable Id:
 
 ```yaml
-PostPublicationActions:
+PublicationFinalizationActions:
   - Id: publish-build-record
-    PostPublicationActionAdapter: modustro-build-record
+    PublicationFinalizationActionAdapter: modustro-build-record
     TargetPublicationEndpointId: metadata-sidecars
 ```
 
@@ -818,46 +915,83 @@ The effective plan carries an endpoint registry covering both Snapshot and Relea
 release action can therefore target an already configured snapshot endpoint without duplicating destination URI,
 credentials, or provider configuration.
 
-### 11.10 Released-snapshot cleanup
+### 11.10 Released-snapshot cleanup and docs refresh
 
-Released-snapshot cleanup is no longer a top-level `manage` endpoint, `DeleteSnapshotWhenReleased` flag, or separate
-post-release Gradle task. It is a provider-specific post-publication action attached to the successful release whose
-result supplies the necessary artifact/version identity.
-
-Conceptual configuration:
+Released-snapshot cleanup runs once at Version Scope finalization after every native artifact/output publication in
+that release boundary succeeds. The built-in adapter deduplicates corresponding snapshot targets from the complete
+immutable context and resolves publication credentials inside the attempt.
 
 ```yaml
-Release:
-  PublicationEnabled: true
-  PublicationEndpoints:
-    - Id: java-release
-      PublicationUri: https://repository.example.invalid/releases/
-      PublicationAdapter: maven-repository
-      Publications:
-        - Id: standard
-          PostPublicationActions:
-            - Id: remove-corresponding-snapshot
-              PostPublicationActionAdapter: provider-remove-corresponding-snapshot
-              TargetPublicationEndpointId: java-snapshot
-              FailurePolicy: IGNORE_FAILURE
+VersionScopePublicationFinalizationActions:
+  Snapshot:
+    - Id: refresh-docs-site
+      VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
+      ExecutionOrder: 20
+  Release:
+    - Id: remove-corresponding-snapshots
+      VersionScopePublicationFinalizationActionAdapter: modustro-remove-corresponding-snapshots
+      ExecutionOrder: 10
+      FailurePolicy: IGNORE_FAILURE
+    - Id: refresh-docs-site
+      VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
+      ExecutionOrder: 20
 ```
 
-The provider action receives the successful release lineage plus the resolved snapshot endpoint and its credentials.
-The old `manage` category is unnecessary. Snapshot cleanup remains explicit governance policy; Maven release behavior
-does not itself imply deletion of the corresponding remote snapshot.
+Cleanup covers Cloudsmith/Repsy Java exact release-SNAPSHOT versions and Python release.dev* series. It is governance
+policy; a Maven release alone does not imply snapshot deletion. Already-absent versions are successful no-ops.
+`Configuration.Provider` can explicitly select `cloudsmith`/`repsy`; provider identity uses Cloudsmith
+`Workspace`/`Repository` or Repsy `Repository`, with optional `ManagementApiUri`. No MPS cleanup contract is configured.
+The inherited `IGNORE_FAILURE` records a cleanup failure without invalidating the release; it does not conceal the
+failure from the result context.
+
+Docs refresh is a request, deduplicated across COMPLETE scopes before repository-only `modustro_docs_site` publication.
+The site may aggregate multiple Version Scopes/versions and does not participate in native output/scope completion.
+`modustroPublish` finalizes native results before `refreshModustroDocsSite` generates aggregate indexes and publishes
+once when requested. Included builds contribute requests; only the repository-root domain refreshes the aggregate site.
+Explicit `publishModustroDocsSite` remains available.
+
+The common actions above are owned by the public defaults in
+`pub.gov.Algites/repository/defaults/algites-repository-defaults-public.yml`. The governed public overlay in
+`priv.gov.Algites/repository/defaults/algites-repository-governed-defaults-public.yml` supplies endpoints, profiles,
+and provider-specific configuration, with sparse action overrides only for intentional governed differences.
+Repeating identical action Ids in both layers would merge to one effective action, but can mask later public-policy
+changes; the common policy is therefore declared only in the public defaults.
+
+Partial attempts remain FAILED and suppress cleanup/docs refresh. A fresh invocation may repair publication.
+Scope/bridge behavior is described in 11.15–11.16. Portable and Gradle/TestKit regressions exercise these contracts;
+production provider credentials, remote uploads, and provider cleanup still require target-environment integration checks.
 
 ### 11.11 Publication and action adapters
 
-`PublicationAdapter` and `PostPublicationActionAdapter` are separate execution contracts. A module may implement either
-or both. Both execute exactly one attempt. Ordering, retry, timeout, failure policy, cancellation, and progress are
-scheduler-owned.
+The immutable `AIcAdapterCatalog` indexes six typed categories by adapter Id:
 
-A post-action attempt receives its action configuration, complete lineage, current input URI, frozen root publication
-payload, optional resolved target endpoint, credentials, cancellation/deadline, progress reporter, and a publication
-delegate for actions that produce and publish derived content.
+| Category | Portable interface | Current built-in responsibility |
+| --- | --- | --- |
+| Input subscription | `AIiSubscriptionAdapter` | Bootstrap subscription identities; resolution stays with technology/Gradle integration. |
+| Publication transport | `AIiPublicationAdapter` | Maven HTTP/local, Python package index, local-copy, HTTP directory, Git branch, S3-compatible storage. |
+| Recursive publication finalization | `AIiPublicationFinalizationActionAdapter` | `modustro-build-record`; covers root and nested publication actions. |
+| Output finalization | `AIiOutputPublicationFinalizationActionAdapter` | Extension point; no built-in action currently registered. |
+| Artifact finalization | `AIiArtifactPublicationFinalizationActionAdapter` | Extension point; no built-in action currently registered. |
+| Version Scope finalization | `AIiVersionScopePublicationFinalizationActionAdapter` | `modustro-remove-corresponding-snapshots`, `modustro-refresh-docs-site`. |
 
-Built-in publication adapters include Maven HTTP repository, Maven local repository, Python repository, local-copy,
-HTTP directory, Git branch, and S3-compatible object storage.
+Bootstrap uses explicit registration; automatic external plugin discovery is not implemented. Duplicate Ids within a
+category and unresolved adapter names are rejected. Root `PublicationFinalizationActionAdapter` and child
+`FinalizationActionAdapter` properties resolve in the same recursive category.
+
+Each transport/finalization adapter executes one attempt. ExecutionOrder, retry, timeout, failure policy, cancellation, and
+progress are scheduler-owned. A recursive action receives configuration, complete lineage, current input URI, frozen
+root payload, optional resolved target endpoint, credentials, attempt/deadline/cancellation data, progress reporter,
+and a publication delegate for derived content. Higher typed contexts receive complete immutable lower result trees;
+they do not invent a single input URI for a collection of unrelated outputs.
+
+Automatic retry requires declared retry safety. Credentials resolve inside the relevant finalizer attempt, so resolution
+errors obey its failure/retry policy. Cancellation cooperates with the adapter; it cannot reverse remote side effects.
+Progress may be determinate (completed/total/unit) or indeterminate (message).
+
+`requiredCompletion` waits for required work while unrelated ignored work may continue. Full output results, higher
+barriers, and scheduler shutdown drain the lower graph. Ignored transport failure can still prevent scope success because
+the payload was not published; ignored finalizer failure is retained without invalidating that boundary. Required
+failure stops later groups at that level, and unsuccessful parents cannot activate their children.
 
 ### 11.12 S3-compatible object storage
 
@@ -879,16 +1013,21 @@ appear in governance YAML.
 ### 11.13 Public governance resolution for local builds
 
 Normal local builds do not need a checkout-specific public-defaults path. When
-`ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` is not set, the resolver loads the published public defaults from
-`Algites-EU/pub.gov.Algites/main` and materializes them in the Gradle user-home cache.
+`ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` is absent, the resolver loads public defaults bundled inside the installed
+GradleInit JAR and materializes them below the Gradle user-home cache, keyed by content hash. This keeps defaults aligned
+with the plugin version and does not require a raw GitHub download.
 
-Precedence is:
+External default layers, applied in this order before structural descriptors, are:
 
-1. explicit `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE`;
-2. otherwise the published public GitHub defaults.
+| Input | Behavior |
+| --- | --- |
+| `ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` | Explicit public file overrides the bundled copy; otherwise bundled public defaults apply. |
+| `ALGITES_REPOSITORY_GOVERNED_PUBLIC_DEFAULTS_FILE` | Optional explicit governed public overlay. |
+| `ALGITES_REPOSITORY_PRIVATE_DEFAULTS_FILE` | Optional explicit private defaults. |
 
-Governed public publication overlays and private defaults are explicit inputs and are never fetched by the public
-fallback.
+Built-in defaults precede these layers; repository, artifact-set, and artifact descriptors follow them. An explicitly
+configured file must exist. Governed/private overlays are never fetched by the public fallback. CI may explicitly
+supply downloaded/pinned governance files; that is distinct from the local resolver fallback.
 
 ### 11.14 Credential preflight and invocation properties
 
@@ -914,15 +1053,63 @@ The plan reports `inputSubscriptions`, `publicationEndpoints`, and required cred
 
 Snapshot publication invocation overrides remain available per output kind through `modustro.publication.*` Gradle
 properties and corresponding `MODUSTRO_PUBLICATION_*` environment variables. They modify only effective
-`PublicationEnabled`; endpoint `Enabled` is not rewritten. Release publication does not permit non-default portable
+`PublicationEnabled`; endpoint `ExecutionEnabled` is not rewritten. Release publication does not permit non-default portable
 invocation overrides.
+
+### 11.15 Expected outputs, completion, and Version Scope records
+
+Before native publication tasks execute, an invocation-scoped BuildService receives serializable expected-output
+manifests. Descriptor-declared enabled outputs without registered producers/tasks become incomplete results;
+registered tasks whose effective publication policy is disabled are excluded. An expected-but-unexecuted output has
+`completed: false`, not empty-success semantics. Scopes with no attempted native publication are not finalized merely
+because their descriptors exist.
+
+The Version Scope state model is PUBLISHING, FINALIZING, COMPLETE, and FAILED. Partial attempts remain FAILED and do
+not trigger cleanup or docs refresh. A later invocation with a fresh identity may repair publication; automatic
+continuation of a partially committed invocation is not implemented.
+
+Human-readable records are written under
+`build/run/publication-records/<sanitized-invocation-and-fingerprint>/version-scopes/`, using collision-resistant names
+and atomic replacement where supported. COMPLETE records cannot be overwritten under one invocation identity; native
+publication after a finalized scope is refused. These guards protect local invocation state, not a provider-side
+transaction or release-immutability policy. Deleting local run files does not undo already published remote payloads.
+
+### 11.16 Version Scopes spanning isolated Gradle builds
+
+An inherited Version Scope can include multiple isolated builds. Each domain completes its output/artifact trees and
+commits an immutable `artifact-results` contribution. The scope-owner domain aggregates the expected domains/artifacts
+and included-domain finalization receipts before invoking the scope finalizers. Missing domains/producers, incomplete
+outputs, stale identities, duplicate contributions, and conflicting plans prevent COMPLETE.
+
+The versioned bridge reconstructs complete immutable Core results from JSON-compatible data, including recursive
+finalization trees, endpoint registries, content URIs, configuration, metadata, and exception diagnostics. It does not
+pass live Builder objects or Java serialization across classloaders. Credential-profile definitions/names cross the
+bridge; resolved secrets do not. Credentials resolve lazily against the originating domain's directory. Custom result
+metadata must be JSON-compatible rather than an arbitrary Java object.
+
+Coordination packets are below `build/run/publication-coordination/<invocation-fingerprint>/` in `artifact-results`
+and `scope-finalization` stages. Locked/atomic commits accept identical replayed bytes but reject replacement with
+conflicting results. This is filesystem coordination for one invocation, not a remote distributed transaction.
+
+Every participating domain needs the same fresh `MODUSTRO_BUILD_INVOCATION_ID` or
+`-Pmodustro.build.invocationId=<fresh-id>`. Direct composite publication without a common identity fails before native
+upload. The phase controller establishes a local identity and preserves a supplied CI identity across its phases/children:
+
+```bash
+bash gradle/tool/repository/modustro-phase-controller.sh --through package
+bash gradle/tool/repository/modustro-phase-controller.sh --through publish
+```
+
+These are separate invocations with fresh automatically generated identities when the variable was not already supplied.
+A native retry under a committed identity is rejected. An explicit later docs-only refresh may read existing receipts
+without native republishing or overwriting COMPLETE scope records.
 
 See [`../devops/build/modustro/PUBLICATIONS.md`](../devops/build/modustro/PUBLICATIONS.md) for the implementation-level
 scheduler and adapter reference.
 
 ## 12. Credential profiles vs credential values
 
-InputSubscription, PublicationEndpoint, and PostPublicationAction metadata never contains passwords, tokens, certificates, or other secret values.
+InputSubscription, PublicationEndpoint, and PublicationFinalizationAction metadata never contains passwords, tokens, certificates, or other secret values.
 
 A subscription or publication endpoint references a non-secret profile:
 

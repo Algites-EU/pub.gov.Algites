@@ -81,6 +81,9 @@ if [[ ! -x "$wrapper" ]]; then
 fi
 
 # Share one instance across all phases and isolated child builds in this invocation.
+if [[ -z "${MODUSTRO_BUILD_INVOCATION_ID:-}" ]]; then
+  export MODUSTRO_BUILD_INVOCATION_ID="local:$(cat /proc/sys/kernel/random/uuid 2>/dev/null || date -u +%Y%m%dT%H%M%S%N):$$"
+fi
 if [[ -z "${ALGITES_SNAPSHOT_INSTANCE_ID:-}" ]]; then
   export ALGITES_SNAPSHOT_INSTANCE_ID="$(date -u +%Y%m%d%H%M%S%3N)"
 fi

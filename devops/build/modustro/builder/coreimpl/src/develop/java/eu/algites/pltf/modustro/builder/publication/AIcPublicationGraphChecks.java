@@ -1,12 +1,12 @@
 package eu.algites.pltf.modustro.builder.publication;
 
 import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputTypeGroup;
-import eu.algites.pltf.modustro.builder.model.publication.AIcPostPublicationAction;
-import eu.algites.pltf.modustro.builder.model.publication.AIcPostPublicationActionResult;
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationFinalizationAction;
+import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationFinalizationActionResult;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationEndpoint;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload;
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayloadFile;
-import eu.algites.pltf.modustro.builder.model.publication.AInPostPublicationActionFailurePolicy;
+import eu.algites.pltf.modustro.builder.model.publication.AInFinalizationActionFailurePolicy;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationFailurePolicy;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability;
@@ -60,6 +60,7 @@ public final class AIcPublicationGraphChecks {
         AIcCheckInputSubscriptions();
         AIcCheckPlanningAndBuildRecord();
         AIcCheckActionLineageAndOrdering();
+        AIcCheckTargetPublicationEndpointResolution();
     }
 
     private static void AIcCheckPublicationConfiguration() throws Exception {
@@ -86,7 +87,7 @@ public final class AIcPublicationGraphChecks {
         AIcCheck("true".equals(locExpanded.get("java.native_develop_binaries.Snapshot.PublicationEnabled")),
                 "Concrete selector must override group selectors.");
         AIcCheck("false".equals(locExpanded.get("java.native_develop_sources.Snapshot.PublicationEnabled")),
-                "Overlapping non-global selectors must retain declaration order.");
+                "Overlapping non-global selectors must retain declaration executionOrder.");
         AIcCheck("true".equals(locExpanded.get("java.native_product_documentation.Snapshot.PublicationEnabled")),
                 "native_outputs must provide the lowest-precedence defaults.");
         AIcCheck("test-region".equals(locExpanded.get(
@@ -102,17 +103,17 @@ public final class AIcPublicationGraphChecks {
         List<Map<String, Object>> locBase = List.of(Map.of(
                 "Id", "standard",
                 "Classifier", "old",
-                "PostPublicationActions", List.of(Map.of("Id", "build-record", "RetryCount", 2L))));
+                "PublicationFinalizationActions", List.of(Map.of("Id", "build-record", "RetryCount", 2L))));
         List<Map<String, Object>> locMerged = AIcPublicationConfiguration.merge(locBase, List.of(Map.of(
                 "Id", "standard",
                 "Classifier", "custom",
-                "PostPublicationActions", List.of(Map.of("Id", "build-record", "WaitForNextAttemptMillis", 0L)))));
+                "PublicationFinalizationActions", List.of(Map.of("Id", "build-record", "WaitForNextAttemptMillis", 0L)))));
         AIcCheck(locMerged.size() == 1 && "custom".equals(locMerged.get(0).get("Classifier")),
                 "Publications must merge by stable Id.");
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> locActions = (List<Map<String, Object>>) locMerged.get(0).get("PostPublicationActions");
+        List<Map<String, Object>> locActions = (List<Map<String, Object>>) locMerged.get(0).get("PublicationFinalizationActions");
         AIcCheck(Long.valueOf(2L).equals(locActions.get(0).get("RetryCount")),
-                "Recursive post-action merge must preserve inherited properties.");
+                "Recursive finalization action merge must preserve inherited properties.");
         AIcCheck(AIcPublicationConfiguration.merge(locBase, List.of()).isEmpty(),
                 "An explicit empty list must clear an inherited list.");
     }
@@ -140,7 +141,7 @@ public final class AIcPublicationGraphChecks {
         Path locPublishedDirectory = Files.createDirectories(locDirectory.resolve("published"));
         Path locJar = locDirectory.resolve("library-1.0.jar");
         Files.writeString(locJar, "immutable binary contents");
-        String locBefore = AIcBuildRecordPostPublicationActionAdapter.hash(locJar);
+        String locBefore = AIcBuildRecordPublicationFinalizationActionAdapter.hash(locJar);
         AIcPublicationPayload locPayload = new AIcPublicationPayload(
                 AInPublicationOutputKind.NATIVE_PRODUCT_BINARIES,
                 AInPublicationStability.RELEASE,
@@ -165,37 +166,37 @@ public final class AIcPublicationGraphChecks {
                 Map.of("RepositoryId", "pub.test"),
                 locDirectory);
         AIcCheck(locPlan.size() == 1, "One root Publication must remain one scheduler root.");
-        AIcCheck(locPlan.get(0).postPublicationActions().stream().anyMatch(aAction -> "build-record".equals(aAction.id())),
+        AIcCheck(locPlan.get(0).publicationFinalizationActions().stream().anyMatch(aAction -> "build-record".equals(aAction.id())),
                 "A root Publication must receive one implicit build-record action.");
-        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(
-                List.of(new AIcLocalCopyPublicationAdapter()),
-                List.of(new AIcBuildRecordPostPublicationActionAdapter()))) {
+        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(new eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog(
+                List.of(), List.of(new AIcLocalCopyPublicationAdapter()),
+                List.of(new AIcBuildRecordPublicationFinalizationActionAdapter()), List.of(), List.of(), List.of()))) {
             AIcPublicationScheduleHandle locHandle = locScheduler.schedule(
-                    locPlan, aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress);
+                    locPayload, locPlan, List.of(), Map.of(), aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress);
             locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
         }
         Path locPublishedJar = locPublishedDirectory.resolve("library-1.0.jar");
         Path locRecord = locPublishedDirectory.resolve("library-1.0.jar.modustro-build-record.yml");
         AIcCheck(Files.isRegularFile(locPublishedJar), "Root publication must write its payload.");
         AIcCheck(Files.isRegularFile(locRecord), "Implicit build-record must use the exact published filename suffix.");
-        AIcCheck(locBefore.equals(AIcBuildRecordPostPublicationActionAdapter.hash(locJar)),
+        AIcCheck(locBefore.equals(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locJar)),
                 "Build-record generation must not modify the root artifact.");
 
         Map<String, Object> locDisabledRecordEndpoint = new LinkedHashMap<>(locEndpoint);
         locDisabledRecordEndpoint.put("Publications", List.of(Map.of(
                 "Id", "standard",
-                "PostPublicationActions", List.of(Map.of("Id", "build-record", "Enabled", false)))));
+                "PublicationFinalizationActions", List.of(Map.of("Id", "build-record", "ExecutionEnabled", false)))));
         List<AIcPublicationJob> locNoRecordPlan = new AIcPublicationPlanner().plan(
                 locPayload,
                 Map.of("PublicationEnabled", true, "PublicationEndpoints", List.of(locDisabledRecordEndpoint)),
                 Map.of(), locDirectory);
-        AIcCheck(locNoRecordPlan.get(0).postPublicationActions().size() == 1
-                        && !locNoRecordPlan.get(0).postPublicationActions().get(0).enabled(),
+        AIcCheck(locNoRecordPlan.get(0).publicationFinalizationActions().size() == 1
+                        && !locNoRecordPlan.get(0).publicationFinalizationActions().get(0).executionEnabled(),
                 "An explicit disabled build-record action must suppress the implicit action.");
     }
 
     private static void AIcCheckActionLineageAndOrdering() throws Exception {
-        Path locDirectory = Files.createTempDirectory("modustro-action-order-");
+        Path locDirectory = Files.createTempDirectory("modustro-action-executionOrder-");
         Path locFile = locDirectory.resolve("artifact.bin");
         Files.writeString(locFile, "data");
         AIcPublicationPayload locPayload = new AIcPublicationPayload(
@@ -225,14 +226,14 @@ public final class AIcPublicationGraphChecks {
                 locEvents.add("publication");
             }
         };
-        AIiPostPublicationActionAdapter locActionAdapter = new AIiPostPublicationActionAdapter() {
+        AIiPublicationFinalizationActionAdapter locActionAdapter = new AIiPublicationFinalizationActionAdapter() {
             @Override
             public String adapterId() {
                 return "probe";
             }
 
             @Override
-            public AIcPostPublicationActionResult execute(AIcPostPublicationActionAttemptContext aContext) throws Exception {
+            public AIcPublicationFinalizationActionResult execute(AIcPublicationFinalizationActionAttemptContext aContext) throws Exception {
                 List<String> locIds = aContext.lineage().steps().stream().map(aStep -> aStep.id()).toList();
                 locEvents.add("start:" + aContext.action().id() + ":" + String.join(">", locIds));
                 if ("child".equals(aContext.action().id())) {
@@ -240,19 +241,19 @@ public final class AIcPublicationGraphChecks {
                 }
                 URI locOutput = URI.create("file:///virtual/" + aContext.action().id());
                 locEvents.add("end:" + aContext.action().id());
-                return new AIcPostPublicationActionResult(
+                return new AIcPublicationFinalizationActionResult(
                         aContext.action().id(), true, true, false, 1, Duration.ZERO, locOutput,
                         Map.of("LineageSize", aContext.lineage().steps().size()), null);
             }
         };
-        AIcPostPublicationAction locChild = AIcAction("child", 0, List.of());
-        AIcPostPublicationAction locFirst = AIcAction("first", 0, List.of(locChild));
-        AIcPostPublicationAction locSecond = AIcAction("second", 1, List.of());
+        AIcPublicationFinalizationAction locChild = AIcAction("child", 0, List.of());
+        AIcPublicationFinalizationAction locFirst = AIcAction("first", 0, List.of(locChild));
+        AIcPublicationFinalizationAction locSecond = AIcAction("second", 1, List.of());
         AIcPublicationJob locJob = new AIcPublicationJob(
                 "root/standard", locEndpoint, locPayload, Map.of(), List.of(locFirst, locSecond), Map.of("root", locEndpoint));
-        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(
-                List.of(locPublicationAdapter), List.of(locActionAdapter))) {
-            locScheduler.schedule(List.of(locJob), aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress)
+        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(new eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog(
+                List.of(), List.of(locPublicationAdapter), List.of(locActionAdapter), List.of(), List.of(), List.of()))) {
+            locScheduler.schedule(locPayload, List.of(locJob), List.of(), Map.of(), aEndpoint -> Map.of(), AIcPublicationGraphChecks::AIcProgress)
                     .requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
         }
         int locFirstEnd = locEvents.indexOf("end:first");
@@ -260,21 +261,90 @@ public final class AIcPublicationGraphChecks {
         int locChildEnd = locEvents.indexOf("end:child");
         int locChildStart = AIcIndexPrefix(locEvents, "start:child:");
         AIcCheck(locFirstEnd >= 0 && locChildStart > locFirstEnd,
-                "A child post-action must never start before its parent completes.");
+                "A child finalization action must never start before its parent completes.");
         AIcCheck(locSecondStart > locFirstEnd,
-                "A later local Order group must wait for direct siblings in the previous group.");
+                "A later local ExecutionOrder group must wait for direct siblings in the previous group.");
         AIcCheck(locSecondStart < locChildEnd,
-                "A later sibling Order group must not wait for descendants of an earlier sibling.");
+                "A later sibling ExecutionOrder group must not wait for descendants of an earlier sibling.");
         String locChildEvent = locEvents.get(locChildStart);
         AIcCheck(locChildEvent.contains("root/standard>first"),
                 "Every action must receive the complete ancestor lineage.");
     }
 
-    private static AIcPostPublicationAction AIcAction(
-            String aId, int aOrder, List<AIcPostPublicationAction> aChildren) {
-        return new AIcPostPublicationAction(
+    private static void AIcCheckTargetPublicationEndpointResolution() throws Exception {
+        Path locDirectory = Files.createTempDirectory("modustro-action-target-");
+        Path locFile = locDirectory.resolve("artifact.jar");
+        Files.writeString(locFile, "data");
+        AIcPublicationPayload locPayload = new AIcPublicationPayload(
+                AInPublicationOutputKind.NATIVE_PRODUCT_BINARIES,
+                AInPublicationStability.RELEASE,
+                "test:artifact",
+                "1.0",
+                List.of(new AIcPublicationPayloadFile(locFile, locFile.getFileName().toString())),
+                Map.of("groupId", "test", "artifactId", "artifact", "version", "1.0",
+                        "logicalVersion", "1.0", "technologyKind", "java"));
+        AIcPublicationEndpoint locRelease = new AIcPublicationEndpoint(
+                "release", true, URI.create("https://release.invalid/"), "root-probe", null, 0,
+                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 0L, null, true, Map.of());
+        AIcPublicationEndpoint locSnapshot = new AIcPublicationEndpoint(
+                "snapshot", true, URI.create("https://snapshot.invalid/"), "snapshot-probe", "snapshot-credentials", 0,
+                AInPublicationFailurePolicy.FAIL_BUILD_ON_PUBLICATION_FAILURE, 0, 0L, null, true,
+                Map.of("Provider", "repsy", "Repository", "snapshots"));
+        AIcPublicationFinalizationAction locCleanup = new AIcPublicationFinalizationAction(
+                "cleanup", true, "target-probe", "snapshot", 0,
+                AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE, 0, 0L, null, true, Map.of(), List.of());
+        AIiPublicationAdapter locRootAdapter = new AIiPublicationAdapter() {
+            @Override
+            public String adapterId() {
+                return "root-probe";
+            }
+
+            @Override
+            public boolean isRetrySafe(AIcPublicationPayload aPayload, AIcPublicationEndpoint aEndpoint) {
+                return true;
+            }
+
+            @Override
+            public void publish(AIcPublicationAttemptContext aContext) {
+            }
+        };
+        AIiPublicationFinalizationActionAdapter locTargetProbe = new AIiPublicationFinalizationActionAdapter() {
+            @Override
+            public String adapterId() {
+                return "target-probe";
+            }
+
+            @Override
+            public AIcPublicationFinalizationActionResult execute(AIcPublicationFinalizationActionAttemptContext aContext) {
+                AIcCheck("snapshot".equals(aContext.targetPublicationEndpoint().id()),
+                        "TargetPublicationEndpointId must resolve from the publication endpoint registry.");
+                AIcCheck("repsy".equals(aContext.targetPublicationEndpoint().configuration().get("Provider")),
+                        "Target endpoint provider configuration must be available to the action.");
+                AIcCheck("secret".equals(aContext.credentials().get("password")),
+                        "Action credentials must be resolved from the target endpoint, not the release endpoint.");
+                return new AIcPublicationFinalizationActionResult(
+                        aContext.action().id(), true, true, false, 1, Duration.ZERO, null, Map.of(), null);
+            }
+        };
+        AIcPublicationJob locJob = new AIcPublicationJob(
+                "release/standard", locRelease, locPayload, Map.of(), List.of(locCleanup),
+                Map.of("release", locRelease, "snapshot", locSnapshot));
+        try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(new eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog(
+                List.of(), List.of(locRootAdapter), List.of(locTargetProbe), List.of(), List.of(), List.of()))) {
+            locScheduler.schedule(
+                    locPayload, List.of(locJob), List.of(), Map.of(),
+                    aEndpoint -> "snapshot".equals(aEndpoint.id())
+                            ? Map.of("username", "user", "password", "secret") : Map.of(),
+                    AIcPublicationGraphChecks::AIcProgress)
+                    .requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
+        }
+    }
+
+    private static AIcPublicationFinalizationAction AIcAction(
+            String aId, int aOrder, List<AIcPublicationFinalizationAction> aChildren) {
+        return new AIcPublicationFinalizationAction(
                 aId, true, "probe", null, aOrder,
-                AInPostPublicationActionFailurePolicy.FAIL_BUILD_ON_FAILURE,
+                AInFinalizationActionFailurePolicy.FAIL_BUILD_ON_FAILURE,
                 0, 0L, null, true, Map.of(), aChildren);
     }
 

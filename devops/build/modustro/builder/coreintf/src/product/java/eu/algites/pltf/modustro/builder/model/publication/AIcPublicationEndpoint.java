@@ -7,11 +7,11 @@ import java.util.Objects;
 /** Immutable effective configuration of one publication destination. */
 public record AIcPublicationEndpoint(
         String id,
-        boolean enabled,
+        boolean executionEnabled,
         URI publicationUri,
         String publicationAdapter,
         String publicationCredentialProfile,
-        int publicationOrder,
+        int executionOrder,
         AInPublicationFailurePolicy publicationFailurePolicy,
         int publicationRetryCount,
         long publicationWaitForNextAttemptMillis,
@@ -23,7 +23,7 @@ public record AIcPublicationEndpoint(
     public AIcPublicationEndpoint {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(publicationFailurePolicy, "publicationFailurePolicy");
-        configuration = Map.copyOf(configuration == null ? Map.of() : configuration);
+        configuration = AIcPublicationValues.freeze(configuration);
         if (id.isBlank()) {
             throw new IllegalArgumentException("Publication endpoint id must not be blank.");
         }
@@ -36,21 +36,21 @@ public record AIcPublicationEndpoint(
         if (publicationAttemptTimeoutMillis != null && publicationAttemptTimeoutMillis <= 0L) {
             throw new IllegalArgumentException("PublicationAttemptTimeoutMillis must be positive when specified.");
         }
-        if (enabled && publicationUri == null) {
-            throw new IllegalArgumentException("Enabled publication endpoint requires PublicationUri.");
+        if (executionEnabled && publicationUri == null) {
+            throw new IllegalArgumentException("ExecutionEnabled publication endpoint requires PublicationUri.");
         }
-        if (enabled && (publicationAdapter == null || publicationAdapter.isBlank())) {
-            throw new IllegalArgumentException("Enabled publication endpoint requires PublicationAdapter.");
+        if (executionEnabled && (publicationAdapter == null || publicationAdapter.isBlank())) {
+            throw new IllegalArgumentException("ExecutionEnabled publication endpoint requires PublicationAdapter.");
         }
     }
 
     /** Compatibility constructor for endpoint declarations without provider-specific configuration. */
     public AIcPublicationEndpoint(
-            String aId, boolean aEnabled, URI aPublicationUri, String aPublicationAdapter,
-            String aPublicationCredentialProfile, int aPublicationOrder, AInPublicationFailurePolicy aPublicationFailurePolicy,
+            String aId, boolean aExecutionEnabled, URI aPublicationUri, String aPublicationAdapter,
+            String aPublicationCredentialProfile, int aExecutionOrder, AInPublicationFailurePolicy aPublicationFailurePolicy,
             int aPublicationRetryCount, long aPublicationWaitForNextAttemptMillis, Long aPublicationAttemptTimeoutMillis,
             boolean aShowPublicationProgressIfPossible) {
-        this(aId, aEnabled, aPublicationUri, aPublicationAdapter, aPublicationCredentialProfile, aPublicationOrder,
+        this(aId, aExecutionEnabled, aPublicationUri, aPublicationAdapter, aPublicationCredentialProfile, aExecutionOrder,
                 aPublicationFailurePolicy, aPublicationRetryCount, aPublicationWaitForNextAttemptMillis,
                 aPublicationAttemptTimeoutMillis, aShowPublicationProgressIfPossible, Map.of());
     }

@@ -1,6 +1,7 @@
 package eu.algites.pltf.modustro.builder.gradleinit
 
 import java.io.File
+import groovy.json.JsonOutput
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.kotlin.dsl.*
@@ -14,6 +15,39 @@ class AIcModustroRepositoryPlugin : Plugin<Project> {
             parameters.credentialBaseDirectory.set(layout.projectDirectory)
         }
         extra["modustroPublicationService"] = locPublicationService
+        val locPreparePublications = tasks.register<AIcModustroPreparePublicationsTask>("modustroPreparePublications") {
+            group = "publishing"
+            description = "Establishes the complete expected output set for publication finalization."
+            publicationService.set(locPublicationService)
+            usesService(locPublicationService)
+        }
+        val locExportPublications = tasks.register<AIcModustroExportPublicationResultsTask>("modustroExportPublicationResults") {
+            group = "publishing"
+            description = "Commits complete local publication results for isolated-domain aggregation."
+            publicationService.set(locPublicationService)
+            usesService(locPublicationService)
+            dependsOn(locPreparePublications)
+        }
+        val locFinalizeScopes = tasks.register<AIcModustroFinalizePublicationScopesTask>("modustroFinalizePublicationScopes") {
+            group = "publishing"
+            description = "Finalizes owned Version Scopes after all participating isolated build domains."
+            publicationService.set(locPublicationService)
+            usesService(locPublicationService)
+            dependsOn(locExportPublications)
+        }
+        allprojects {
+            val locNativePublicationTasks = tasks.withType<AIcModustroPublishFilesTask>().matching {
+                it.outputKind.orNull !in setOf("MODUSTRO_DOCS_SITE", "SCHEMA_SITE")
+            }
+            locExportPublications.configure { mustRunAfter(locNativePublicationTasks) }
+            locFinalizeScopes.configure { mustRunAfter(locNativePublicationTasks) }
+            tasks.withType<AIcModustroPublishFilesTask>().all {
+                val locOutputId = path
+                val locInput = AIcExpectedPublicationInput()
+                dependsOn(locPreparePublications)
+                locPreparePublications.configure { expectedPublicationInputs.put(locOutputId, locInput) }
+            }
+        }
         val aRuntime = gradle.extra["modustroGradleRuntime"] as AIcModustroGradleRuntime
         aRuntime.install(extensions.extraProperties)
         @Suppress("UNCHECKED_CAST")
@@ -50,6 +84,74 @@ class AIcModustroRepositoryPlugin : Plugin<Project> {
         val locAlgitesResolvedRepository = locAlgitesResolvedMetadata["repository"] as Map<String, Any?>
         @Suppress("UNCHECKED_CAST")
         val locAlgitesResolvedArtifactDirectories = locAlgitesResolvedMetadata["artifactDirectories"] as List<Map<String, Any?>>
+
+        val locRepositoryDirectory = aRuntime.repositoryRoot ?: rootProject.projectDir
+        val locAllDomainMetadata = linkedMapOf<String, Map<String, Any?>>()
+        val locPendingDomains = java.util.ArrayDeque<String>()
+        locPendingDomains.add(".")
+        while (locPendingDomains.isNotEmpty()) {
+            val locDomain = locPendingDomains.removeFirst()
+            if (locDomain in locAllDomainMetadata) continue
+            val locMetadata = locAlgitesResolveMetadataMap(locRepositoryDirectory, locDomain, "current-with-subdirs",
+                providers.gradleProperty("repository.name").orNull, providers.gradleProperty("repository.visibility").orNull)
+            locAllDomainMetadata[locDomain] = AIcMetadataForBuildDomain(locMetadata, locDomain)
+            (locMetadata["isolatedBuildDirectories"] as? List<*>).orEmpty().mapNotNull { it?.toString() }.sorted().forEach(locPendingDomains::addLast)
+        }
+        val locScopeParticipants = linkedMapOf<String, MutableSet<String>>()
+        locAllDomainMetadata.forEach { (locDomain, locMetadata) ->
+            @Suppress("UNCHECKED_CAST")
+            val locDirectories = locMetadata["artifactDirectories"] as? List<Map<String, Any?>> ?: emptyList()
+            locDirectories.filter { it["structureKind"] == "artifact" }.forEach { locDirectory ->
+                locScopeParticipants.getOrPut(locDirectory["versionScopePath"]?.toString() ?: ".") { linkedSetOf() }.add(locDomain)
+            }
+        }
+        locScopeParticipants.forEach { (locScope, locDomains) ->
+            val locOwner = locAllDomainMetadata.keys.filter { it == "." || locScope == it || locScope.startsWith("$it/") }
+                .maxByOrNull { if (it == ".") -1 else it.length } ?: "."
+            locDomains.add(locOwner)
+        }
+        val locCrossDomainScopes = locScopeParticipants.filterValues { it.size > 1 }
+        locPreparePublications.configure {
+            crossDomainVersionScopes.set(locCrossDomainScopes.mapValues { (_, locDomains) -> locDomains.sorted().joinToString(", ") })
+            artifactMetadataJson.set(locAlgitesResolvedArtifactDirectories.filter { it["structureKind"] == "artifact" }
+                .associate { it["path"].toString() to JsonOutput.toJson(it) })
+            domainMetadataJson.set(JsonOutput.toJson(locAllDomainMetadata.toSortedMap()))
+            domainId.set(aRuntime.buildRootRelativePath)
+            repositoryDirectory.set(locRepositoryDirectory)
+        }
+        val locManagedDomainDirectories = locAllDomainMetadata.keys.map {
+            if (it == ".") locRepositoryDirectory.canonicalFile else locRepositoryDirectory.resolve(it).canonicalFile
+        }.toSet()
+        val locIncludedPublicationBuilds = gradle.includedBuilds.filter { locIncluded ->
+            locIncluded.projectDir.canonicalFile in locManagedDomainDirectories &&
+                locIncluded.projectDir.canonicalFile.toPath().startsWith(rootProject.projectDir.canonicalFile.toPath()) &&
+                locIncluded.projectDir.canonicalFile != rootProject.projectDir.canonicalFile
+        }
+        locFinalizeScopes.configure {
+            dependsOn(locIncludedPublicationBuilds.map { it.task(":modustroFinalizePublicationScopes") })
+        }
+        tasks.matching { it.name == "modustroPublish" }.configureEach {
+            dependsOn(locIncludedPublicationBuilds.map { it.task(":modustroPublish") })
+            finalizedBy(locFinalizeScopes)
+        }
+        tasks.matching { it.name == "modustroPublishPhase" }.configureEach { finalizedBy(locFinalizeScopes) }
+        tasks.matching { it.name in setOf("modustroPublish", "modustroPublishPhase") }.all {
+            val locPhase = this
+            locExportPublications.configure { mustRunAfter(locPhase) }
+            locFinalizeScopes.configure { mustRunAfter(locPhase) }
+        }
+        if (aRuntime.buildRootRelativePath == ".") {
+            tasks.matching { it.name == "refreshModustroDocsSite" }.all {
+                val locRefresh = this
+                mustRunAfter(locFinalizeScopes)
+                locFinalizeScopes.configure { finalizedBy(locRefresh) }
+            }
+            tasks.matching { it.name in setOf("generateModustroDocsRootIndex", "generateModustroDocsArtifactPublishingIndexes",
+                "generateModustroDocsPublishingGroupIndexes", "generateModustroDocsGeneratedIndex", "generateModustroDocsSite") }
+                .configureEach { mustRunAfter(locFinalizeScopes) }
+        } else {
+            tasks.matching { it.name in setOf("publishModustroDocsSite", "refreshModustroDocsSite") }.configureEach { enabled = false }
+        }
 
         rootProject.extra["modustroResolvedArtifactDirectoryMetadata"] = locAlgitesResolvedMetadata
         rootProject.extra["modustroResolvedArtifactDirectoryMetadataProperties"] = locAlgitesResolvedProperties

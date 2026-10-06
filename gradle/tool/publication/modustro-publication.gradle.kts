@@ -46,11 +46,14 @@ val locResolvePublicationPlan = fun(
     aStability: String,
     aPublicationDestinationIds: List<String>
 ): Map<String, Any?> {
-    val locPlan = locEffectivePublicationPlanResolver(aMetadata, aOutputKind, aStability)
+    val locTypedMetadata = if (aOutputKind in setOf("modustro_docs_site", "schema_site")) {
+        aMetadata + ("publicationTechnologyKind" to "modustro")
+    } else aMetadata
+    val locPlan = locEffectivePublicationPlanResolver(locTypedMetadata, aOutputKind, aStability)
     val locEnabled = locPlan["publicationEnabled"] as? Boolean ?: false
     val locAllEndpoints = (locPlan["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty()
     val locEnabledEndpoints = if (locEnabled) {
-        locAllEndpoints.filter { locEndpoint -> locEndpoint["enabled"] as? Boolean ?: true }
+        locAllEndpoints.filter { locEndpoint -> locEndpoint["executionEnabled"] as? Boolean ?: true }
     } else {
         emptyList()
     }
@@ -67,7 +70,7 @@ val locResolvePublicationPlan = fun(
         }
         aPublicationDestinationIds.map { locId -> locById.getValue(locId) }
     }
-    return linkedMapOf(
+    return locPlan + linkedMapOf(
         "publicationEnabled" to locEnabled,
         "publicationEndpoints" to locSelectedEndpoints,
         "publicationEndpointRegistry" to (locPlan["publicationEndpointRegistry"] ?: emptyList<Map<String, Any?>>())

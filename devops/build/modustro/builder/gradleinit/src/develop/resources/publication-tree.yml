@@ -7,7 +7,7 @@ OutputPublications:
     - Id: primary
       PublicationUri: file:///tmp/publication-upload
       PublicationAdapter: local-copy
-      PublicationOrder: -1
+      ExecutionOrder: -1
       PublicationRetryCount: 2
       PublicationWaitForNextAttemptMillis: 0
       PublicationAttemptTimeoutMillis: 10000
@@ -16,18 +16,18 @@ OutputPublications:
       - Id: standard
         Classifier: ''
         Extension: jar
-        PostPublicationActions:
+        PublicationFinalizationActions:
         - Id: build-record
-          PostPublicationActions:
+          PublicationFinalizationActionAdapter: modustro-build-record
+          FinalizationActions:
           - Id: record-of-record
-            PostPublicationActionAdapter: modustro-build-record
-          PostPublicationActionAdapter: modustro-build-record
+            FinalizationActionAdapter: modustro-build-record
       - Id: custom
         Classifier: tests.custom
         Extension: jar
-        PostPublicationActions:
+        PublicationFinalizationActions:
         - Id: build-record
-          PostPublicationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-build-record
   TechnologyKind: java
 - OutputSelector: native_outputs
   Snapshot:
@@ -36,7 +36,7 @@ OutputPublications:
     - Id: primary
       PublicationUri: file:///tmp/publication-upload
       PublicationAdapter: local-copy
-      PublicationOrder: -1
+      ExecutionOrder: -1
       PublicationRetryCount: 2
       PublicationWaitForNextAttemptMillis: 0
       PublicationAttemptTimeoutMillis: 10000
@@ -45,18 +45,18 @@ OutputPublications:
       - Id: standard
         Classifier: ''
         Extension: jar
-        PostPublicationActions:
+        PublicationFinalizationActions:
         - Id: build-record
-          PostPublicationActions:
+          PublicationFinalizationActionAdapter: modustro-build-record
+          FinalizationActions:
           - Id: record-of-record
-            PostPublicationActionAdapter: modustro-build-record
-          PostPublicationActionAdapter: modustro-build-record
+            FinalizationActionAdapter: modustro-build-record
       - Id: custom
         Classifier: tests.custom
         Extension: jar
-        PostPublicationActions:
+        PublicationFinalizationActions:
         - Id: build-record
-          PostPublicationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-build-record
   TechnologyKind: python
 - OutputSelector: native_outputs
   Snapshot:
@@ -65,7 +65,7 @@ OutputPublications:
     - Id: primary
       PublicationUri: file:///tmp/publication-upload
       PublicationAdapter: local-copy
-      PublicationOrder: -1
+      ExecutionOrder: -1
       PublicationRetryCount: 2
       PublicationWaitForNextAttemptMillis: 0
       PublicationAttemptTimeoutMillis: 10000
@@ -74,18 +74,18 @@ OutputPublications:
       - Id: standard
         Classifier: ''
         Extension: jar
-        PostPublicationActions:
+        PublicationFinalizationActions:
         - Id: build-record
-          PostPublicationActions:
+          PublicationFinalizationActionAdapter: modustro-build-record
+          FinalizationActions:
           - Id: record-of-record
-            PostPublicationActionAdapter: modustro-build-record
-          PostPublicationActionAdapter: modustro-build-record
+            FinalizationActionAdapter: modustro-build-record
       - Id: custom
         Classifier: tests.custom
         Extension: jar
-        PostPublicationActions:
+        PublicationFinalizationActions:
         - Id: build-record
-          PostPublicationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-build-record
   TechnologyKind: mps
 - OutputSelector: native_sources
   Snapshot:

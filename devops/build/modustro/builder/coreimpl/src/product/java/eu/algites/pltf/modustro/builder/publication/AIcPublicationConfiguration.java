@@ -1,96 +1,218 @@
 package eu.algites.pltf.modustro.builder.publication;
+
 import eu.algites.pltf.modustro.builder.model.output.AInBuildOutputTypeGroup;
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
 /** Core-owned sparse descriptor projection. Expand each hierarchy layer before merging layers. */
 public final class AIcPublicationConfiguration {
- private AIcPublicationConfiguration(){}
- public static List<String> outputs(String selector){
-  for(var g:AInBuildOutputTypeGroup.values())if(g.descriptorName().equals(selector))return g.outputs();
-  for(var k:AInPublicationOutputKind.values())if(k.descriptorName().equals(selector))return List.of(selector);
-  throw new IllegalArgumentException("Unknown OutputSelector '"+selector+"'.");
- }
- public static int rank(String selector){outputs(selector);return selector.equals("native_outputs")?0:outputs(selector).size()>1?1:2;}
- public static List<Map<String,Object>> list(Map<String,String> values,String prefix){
-  if(values.containsKey(prefix)){
-   if(values.get(prefix).equals("[]"))return List.of();
-   throw new IllegalArgumentException(prefix+" must be a list.");
-  }
-  TreeSet<Integer> indices=new TreeSet<>();
-  for(String key:values.keySet())if(key.startsWith(prefix+".")){
-   String first=key.substring(prefix.length()+1).split("\\.")[0];
-   try{indices.add(Integer.parseInt(first));}catch(NumberFormatException ignored){}
-  }
-  List<Map<String,Object>> result=new ArrayList<>();Set<String> ids=new HashSet<>();
-  for(int index:indices){Map<String,Object> item=new LinkedHashMap<>();String p=prefix+"."+index+".";
-   for(var entry:values.entrySet())if(entry.getKey().startsWith(p)){
-    String key=entry.getKey().substring(p.length());if(key.contains("."))continue;
-    if(key.equals("Publications")||key.equals("PostPublicationActions")||key.equals("Configuration"))continue;
-    if(!Set.of("Id","OutputSelector","TechnologyKind","Enabled","PublicationEnabled","Classifier","Extension","PostPublicationActionAdapter","TargetPublicationEndpointId","Order","FailurePolicy","RetryCount","WaitForNextAttemptMillis","AttemptTimeoutMillis","ShowProgressIfPossible","PublicationUri","PublicationAdapter","PublicationCredentialProfile","PublicationOrder","PublicationFailurePolicy","PublicationRetryCount","PublicationWaitForNextAttemptMillis","PublicationAttemptTimeoutMillis","ShowPublicationProgressIfPossible").contains(key))throw new IllegalArgumentException("Unknown publication property "+p+key);
-    String value=entry.getValue();Object typed=value;
-    if(Set.of("Enabled","PublicationEnabled","ShowPublicationProgressIfPossible","ShowProgressIfPossible").contains(key)){
-     if(!value.equals("true")&&!value.equals("false"))throw new IllegalArgumentException(p+key+" must be boolean.");typed=Boolean.valueOf(value);
-    } else if(Set.of("PublicationOrder","PublicationRetryCount","PublicationWaitForNextAttemptMillis","PublicationAttemptTimeoutMillis","Order","RetryCount","WaitForNextAttemptMillis","AttemptTimeoutMillis").contains(key)){
-     long n=Long.parseLong(value);if(!Set.of("PublicationOrder","Order").contains(key)&&(n<0||Set.of("PublicationAttemptTimeoutMillis","AttemptTimeoutMillis").contains(key)&&n==0))throw new IllegalArgumentException(p+key+" out of range.");typed=n;
-    }
-    item.put(key,typed);
-   }
-   String configurationPrefix=p+"Configuration.";
-   LinkedHashMap<String,Object> configuration=new LinkedHashMap<>();
-   for(var entry:values.entrySet())if(entry.getKey().startsWith(configurationPrefix)){
-    String configurationKey=entry.getKey().substring(configurationPrefix.length());
-    if(!configurationKey.isBlank())configuration.put(configurationKey,entry.getValue());
-   }
-   if(!configuration.isEmpty())item.put("Configuration",Collections.unmodifiableMap(configuration));
-   for(String child:List.of("Publications","PostPublicationActions"))if(values.containsKey(p+child)||values.keySet().stream().anyMatch(k->k.startsWith(p+child+".")))item.put(child,list(values,p+child));
-   if(!prefix.equals("OutputPublications")){
-    Object id=item.get("Id");if(id==null||!id.toString().matches("[a-z0-9]+(?:-[a-z0-9]+)*")||!ids.add(id.toString()))throw new IllegalArgumentException(prefix+" requires unique lowercase dash-separated Id values.");
-   }
-   result.add(Collections.unmodifiableMap(item));
-  }return List.copyOf(result);
- }
- public static List<Map<String,Object>> merge(List<Map<String,Object>> base,List<Map<String,Object>> override){
-  if(override==null)return base;if(override.isEmpty())return List.of();
-  LinkedHashMap<String,Map<String,Object>> items=new LinkedHashMap<>();if(base!=null)for(var i:base)items.put(i.get("Id").toString(),i);
-  for(var i:override){String id=i.get("Id").toString();Map<String,Object> value=new LinkedHashMap<>(items.getOrDefault(id,Map.of()));
-   for(var e:i.entrySet()){
-    if(Set.of("Publications","PostPublicationActions").contains(e.getKey()))value.put(e.getKey(),merge((List<Map<String,Object>>)value.get(e.getKey()),(List<Map<String,Object>>)e.getValue()));else value.put(e.getKey(),e.getValue());
-   }items.put(id,Collections.unmodifiableMap(value));
-  }return List.copyOf(items.values());
- }
+    private static final Set<String> BOOLEAN_PROPERTIES = Set.of(
+            "ExecutionEnabled", "PublicationEnabled", "ShowPublicationProgressIfPossible", "ShowProgressIfPossible");
+    private static final Set<String> INTEGER_PROPERTIES = Set.of(
+            "ExecutionOrder", "PublicationRetryCount", "PublicationWaitForNextAttemptMillis", "PublicationAttemptTimeoutMillis",
+            "RetryCount", "WaitForNextAttemptMillis", "AttemptTimeoutMillis");
+    private static final Set<String> DIRECT_PROPERTIES = Set.of(
+            "Id", "OutputSelector", "TechnologyKind", "ExecutionEnabled", "PublicationEnabled", "Classifier", "Extension",
+            "PublicationFinalizationActionAdapter", "FinalizationActionAdapter",
+            "OutputPublicationFinalizationActionAdapter", "ArtifactPublicationFinalizationActionAdapter",
+            "VersionScopePublicationFinalizationActionAdapter", "TargetPublicationEndpointId", "ExecutionOrder", "FailurePolicy",
+            "RetryCount", "WaitForNextAttemptMillis", "AttemptTimeoutMillis", "ShowProgressIfPossible",
+            "PublicationUri", "PublicationAdapter", "PublicationCredentialProfile",
+            "PublicationFailurePolicy", "PublicationRetryCount", "PublicationWaitForNextAttemptMillis",
+            "PublicationAttemptTimeoutMillis", "ShowPublicationProgressIfPossible");
+    private static final Set<String> CHILD_LIST_PROPERTIES = Set.of(
+            "Publications", "PublicationFinalizationActions", "FinalizationActions",
+            "OutputPublicationFinalizationActions", "ArtifactPublicationFinalizationActions",
+            "VersionScopePublicationFinalizationActions");
 
- public static Map<String,String> expand(Map<String,String> values){
-  LinkedHashMap<String,Map<String,Object>> policies=new LinkedHashMap<>();
-  TreeSet<Integer> indices=new TreeSet<>();for(String key:values.keySet())if(key.matches("OutputPublications\\.\\d+\\.OutputSelector"))indices.add(Integer.parseInt(key.split("\\.")[1]));
-  List<Integer> ordered=new ArrayList<>(indices);ordered.sort(Comparator.comparingInt(n->rank(values.get("OutputPublications."+n+".OutputSelector"))));
-  for(int n:ordered){String p="OutputPublications."+n;String technology=values.get(p+".TechnologyKind");
-   if(technology==null||technology.isBlank())throw new IllegalArgumentException(p+" requires TechnologyKind.");
-   if(!Set.of("java","python","mps","modustro").contains(technology))throw new IllegalArgumentException("Invalid TechnologyKind "+technology);
-   for(String output:outputs(values.get(p+".OutputSelector")))
-    apply(policies,technology+"."+output,branch(values,p+".Snapshot"),branch(values,p+".Release"));
-  }
-  
-  Map<String,String> result=new LinkedHashMap<>(values);for(var e:policies.entrySet())flatten(result,e.getKey(),e.getValue());return result;
- }
- private static Map<String,Object> branch(Map<String,String> values,String prefix){
-  Map<String,Object> b=new LinkedHashMap<>();String enabled=values.get(prefix+".PublicationEnabled");
-  if(enabled!=null){if(!enabled.equals("true")&&!enabled.equals("false"))throw new IllegalArgumentException(prefix+" PublicationEnabled must be boolean.");b.put("PublicationEnabled",Boolean.valueOf(enabled));}
-  String p=prefix+".PublicationEndpoints";
-  if(values.containsKey(p)||values.keySet().stream().anyMatch(k->k.startsWith(p+".")))b.put("PublicationEndpoints",list(values,p));return b;
- }
- private static void apply(Map<String,Map<String,Object>> policies,String output,Map<String,Object> snapshot,Map<String,Object> release){
-  if(snapshot.isEmpty()&&release.isEmpty())return;Map<String,Object> policy=policies.computeIfAbsent(output,k->new LinkedHashMap<>());
-  mergeBranch(policy,"Snapshot",snapshot);mergeBranch(policy,"Release",release);
- }
- private static void mergeBranch(Map<String,Object> policy,String key,Map<String,Object> change){
-  Map<String,Object> branch=new LinkedHashMap<>((Map<String,Object>)policy.getOrDefault(key,Map.of()));
-  if(change.containsKey("PublicationEnabled"))branch.put("PublicationEnabled",change.get("PublicationEnabled"));
-  if(change.containsKey("PublicationEndpoints"))branch.put("PublicationEndpoints",merge((List<Map<String,Object>>)branch.get("PublicationEndpoints"),(List<Map<String,Object>>)change.get("PublicationEndpoints")));
-  policy.put(key,branch);
- }
- private static void flatten(Map<String,String> values,String prefix,Object value){
-  if(value instanceof Map<?,?> m){for(var e:m.entrySet())flatten(values,prefix+"."+e.getKey(),e.getValue());}
-  else if(value instanceof List<?> list){values.keySet().removeIf(k->k.equals(prefix)||k.startsWith(prefix+"."));if(list.isEmpty())values.put(prefix,"[]");else for(int n=0;n<list.size();n++)flatten(values,prefix+"."+n,list.get(n));}
-  else values.put(prefix,Objects.toString(value,""));
- }
+    private AIcPublicationConfiguration() { }
+
+    public static List<String> outputs(String aSelector) {
+        for (AInBuildOutputTypeGroup locGroup : AInBuildOutputTypeGroup.values()) {
+            if (locGroup.descriptorName().equals(aSelector)) return locGroup.outputs();
+        }
+        for (AInPublicationOutputKind locKind : AInPublicationOutputKind.values()) {
+            if (locKind.descriptorName().equals(aSelector)) return List.of(aSelector);
+        }
+        throw new IllegalArgumentException("Unknown OutputSelector '" + aSelector + "'.");
+    }
+
+    public static int rank(String aSelector) {
+        List<String> locOutputs = outputs(aSelector);
+        return aSelector.equals("native_outputs") ? 0 : locOutputs.size() > 1 ? 1 : 2;
+    }
+
+    public static List<Map<String, Object>> list(Map<String, String> aValues, String aPrefix) {
+        if (aValues.containsKey(aPrefix)) {
+            if ("[]".equals(aValues.get(aPrefix))) return List.of();
+            throw new IllegalArgumentException(aPrefix + " must be a list.");
+        }
+        TreeSet<Integer> locIndices = new TreeSet<>();
+        for (String locKey : aValues.keySet()) {
+            if (!locKey.startsWith(aPrefix + ".")) continue;
+            String locFirst = locKey.substring(aPrefix.length() + 1).split("\\.")[0];
+            try { locIndices.add(Integer.parseInt(locFirst)); } catch (NumberFormatException ignored) { }
+        }
+        List<Map<String, Object>> locResult = new ArrayList<>();
+        Set<String> locIds = new HashSet<>();
+        for (int locIndex : locIndices) {
+            String locPrefix = aPrefix + "." + locIndex + ".";
+            Map<String, Object> locItem = new LinkedHashMap<>();
+            for (Map.Entry<String, String> locEntry : aValues.entrySet()) {
+                if (!locEntry.getKey().startsWith(locPrefix)) continue;
+                String locProperty = locEntry.getKey().substring(locPrefix.length());
+                if (locProperty.contains(".")) continue;
+                if (CHILD_LIST_PROPERTIES.contains(locProperty) || "Configuration".equals(locProperty)) continue;
+                if (!DIRECT_PROPERTIES.contains(locProperty)) throw new IllegalArgumentException("Unknown publication property " + locPrefix + locProperty);
+                Object locTyped = AIcTyped(locEntry.getValue(), locProperty, locPrefix);
+                locItem.put(locProperty, locTyped);
+            }
+            String locConfigurationPrefix = locPrefix + "Configuration.";
+            LinkedHashMap<String, Object> locConfiguration = new LinkedHashMap<>();
+            for (Map.Entry<String, String> locEntry : aValues.entrySet()) {
+                if (locEntry.getKey().startsWith(locConfigurationPrefix)) {
+                    String locKey = locEntry.getKey().substring(locConfigurationPrefix.length());
+                    if (!locKey.isBlank()) locConfiguration.put(locKey, locEntry.getValue());
+                }
+            }
+            if (!locConfiguration.isEmpty()) locItem.put("Configuration", Collections.unmodifiableMap(locConfiguration));
+            for (String locChild : CHILD_LIST_PROPERTIES) {
+                String locChildPrefix = locPrefix + locChild;
+                if (aValues.containsKey(locChildPrefix) || aValues.keySet().stream().anyMatch(locKey -> locKey.startsWith(locChildPrefix + "."))) {
+                    locItem.put(locChild, list(aValues, locChildPrefix));
+                }
+            }
+            if (!"OutputPublications".equals(aPrefix)) {
+                Object locId = locItem.get("Id");
+                if (locId == null || !locId.toString().matches("[a-z0-9]+(?:-[a-z0-9]+)*") || !locIds.add(locId.toString())) {
+                    throw new IllegalArgumentException(aPrefix + " requires unique lowercase dash-separated Id values.");
+                }
+            }
+            locResult.add(Collections.unmodifiableMap(locItem));
+        }
+        return List.copyOf(locResult);
+    }
+
+    @SuppressWarnings("unchecked")
+    public static List<Map<String, Object>> merge(List<Map<String, Object>> aBase, List<Map<String, Object>> aOverride) {
+        if (aOverride == null) return aBase;
+        if (aOverride.isEmpty()) return List.of();
+        LinkedHashMap<String, Map<String, Object>> locItems = new LinkedHashMap<>();
+        if (aBase != null) for (Map<String, Object> locItem : aBase) locItems.put(locItem.get("Id").toString(), locItem);
+        for (Map<String, Object> locItem : aOverride) {
+            String locId = locItem.get("Id").toString();
+            Map<String, Object> locValue = new LinkedHashMap<>(locItems.getOrDefault(locId, Map.of()));
+            for (Map.Entry<String, Object> locEntry : locItem.entrySet()) {
+                if (CHILD_LIST_PROPERTIES.contains(locEntry.getKey())) {
+                    locValue.put(locEntry.getKey(), merge(
+                            (List<Map<String, Object>>) locValue.get(locEntry.getKey()),
+                            (List<Map<String, Object>>) locEntry.getValue()));
+                } else {
+                    locValue.put(locEntry.getKey(), locEntry.getValue());
+                }
+            }
+            locItems.put(locId, Collections.unmodifiableMap(locValue));
+        }
+        return List.copyOf(locItems.values());
+    }
+
+    public static Map<String, String> expand(Map<String, String> aValues) {
+        LinkedHashMap<String, Map<String, Object>> locPolicies = new LinkedHashMap<>();
+        TreeSet<Integer> locIndices = new TreeSet<>();
+        for (String locKey : aValues.keySet()) {
+            if (locKey.matches("OutputPublications\\.\\d+\\.OutputSelector")) {
+                locIndices.add(Integer.parseInt(locKey.split("\\.")[1]));
+            }
+        }
+        List<Integer> locOrdered = new ArrayList<>(locIndices);
+        locOrdered.sort(Comparator.comparingInt(locIndex -> rank(aValues.get("OutputPublications." + locIndex + ".OutputSelector"))));
+        for (int locIndex : locOrdered) {
+            String locPrefix = "OutputPublications." + locIndex;
+            String locTechnology = aValues.get(locPrefix + ".TechnologyKind");
+            if (locTechnology == null || locTechnology.isBlank()) throw new IllegalArgumentException(locPrefix + " requires TechnologyKind.");
+            if (!Set.of("java", "python", "mps", "modustro").contains(locTechnology)) throw new IllegalArgumentException("Invalid TechnologyKind " + locTechnology);
+            for (String locOutput : outputs(aValues.get(locPrefix + ".OutputSelector"))) {
+                AIcApply(locPolicies, locTechnology + "." + locOutput,
+                        AIcBranch(aValues, locPrefix + ".Snapshot"), AIcBranch(aValues, locPrefix + ".Release"));
+            }
+        }
+        Map<String, String> locResult = new LinkedHashMap<>(aValues);
+        for (Map.Entry<String, Map<String, Object>> locEntry : locPolicies.entrySet()) {
+            AIcFlatten(locResult, locEntry.getKey(), locEntry.getValue());
+        }
+        return locResult;
+    }
+
+    private static Object AIcTyped(String aValue, String aProperty, String aPrefix) {
+        if (BOOLEAN_PROPERTIES.contains(aProperty)) {
+            if (!"true".equals(aValue) && !"false".equals(aValue)) throw new IllegalArgumentException(aPrefix + aProperty + " must be boolean.");
+            return Boolean.valueOf(aValue);
+        }
+        if (INTEGER_PROPERTIES.contains(aProperty)) {
+            long locNumber = Long.parseLong(aValue);
+            if (!Set.of("ExecutionOrder").contains(aProperty)
+                    && (locNumber < 0 || Set.of("PublicationAttemptTimeoutMillis", "AttemptTimeoutMillis").contains(aProperty) && locNumber == 0)) {
+                throw new IllegalArgumentException(aPrefix + aProperty + " out of range.");
+            }
+            return locNumber;
+        }
+        return aValue;
+    }
+
+    private static Map<String, Object> AIcBranch(Map<String, String> aValues, String aPrefix) {
+        Map<String, Object> locBranch = new LinkedHashMap<>();
+        String locEnabled = aValues.get(aPrefix + ".PublicationEnabled");
+        if (locEnabled != null) {
+            if (!"true".equals(locEnabled) && !"false".equals(locEnabled)) throw new IllegalArgumentException(aPrefix + " PublicationEnabled must be boolean.");
+            locBranch.put("PublicationEnabled", Boolean.valueOf(locEnabled));
+        }
+        for (String locChild : List.of("PublicationEndpoints", "OutputPublicationFinalizationActions")) {
+            String locPath = aPrefix + "." + locChild;
+            if (aValues.containsKey(locPath) || aValues.keySet().stream().anyMatch(locKey -> locKey.startsWith(locPath + "."))) {
+                locBranch.put(locChild, list(aValues, locPath));
+            }
+        }
+        return locBranch;
+    }
+
+    private static void AIcApply(Map<String, Map<String, Object>> aPolicies, String aOutput,
+            Map<String, Object> aSnapshot, Map<String, Object> aRelease) {
+        if (aSnapshot.isEmpty() && aRelease.isEmpty()) return;
+        Map<String, Object> locPolicy = aPolicies.computeIfAbsent(aOutput, aIgnored -> new LinkedHashMap<>());
+        AIcMergeBranch(locPolicy, "Snapshot", aSnapshot);
+        AIcMergeBranch(locPolicy, "Release", aRelease);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static void AIcMergeBranch(Map<String, Object> aPolicy, String aKey, Map<String, Object> aChange) {
+        Map<String, Object> locBranch = new LinkedHashMap<>((Map<String, Object>) aPolicy.getOrDefault(aKey, Map.of()));
+        if (aChange.containsKey("PublicationEnabled")) locBranch.put("PublicationEnabled", aChange.get("PublicationEnabled"));
+        for (String locChild : List.of("PublicationEndpoints", "OutputPublicationFinalizationActions")) {
+            if (aChange.containsKey(locChild)) {
+                locBranch.put(locChild, merge((List<Map<String, Object>>) locBranch.get(locChild), (List<Map<String, Object>>) aChange.get(locChild)));
+            }
+        }
+        aPolicy.put(aKey, locBranch);
+    }
+
+    private static void AIcFlatten(Map<String, String> aValues, String aPrefix, Object aValue) {
+        if (aValue instanceof Map<?, ?> locMap) {
+            for (Map.Entry<?, ?> locEntry : locMap.entrySet()) AIcFlatten(aValues, aPrefix + "." + locEntry.getKey(), locEntry.getValue());
+        } else if (aValue instanceof List<?> locList) {
+            aValues.keySet().removeIf(locKey -> locKey.equals(aPrefix) || locKey.startsWith(aPrefix + "."));
+            if (locList.isEmpty()) aValues.put(aPrefix, "[]");
+            else for (int locIndex = 0; locIndex < locList.size(); locIndex++) AIcFlatten(aValues, aPrefix + "." + locIndex, locList.get(locIndex));
+        } else {
+            aValues.put(aPrefix, Objects.toString(aValue, ""));
+        }
+    }
 }
