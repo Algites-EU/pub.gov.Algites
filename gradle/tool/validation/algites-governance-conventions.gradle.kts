@@ -194,6 +194,54 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
                 }
         }
 
+        /*
+         * Credential profile identifiers use the current external-I/O vocabulary.
+         * The obsolete action-family suffixes are rejected in active governance
+         * sources so that subscription/publication terminology cannot silently
+         * regress through examples, defaults, or workflow configuration.
+         */
+        val locObsoleteCredentialProfileIdPattern = Regex(
+            "\\balgites-[a-z0-9._-]+-(?:upload|download|manage)\\b"
+        )
+        val locCredentialConventionExtensions = setOf(
+            "json", "json5", "kts", "kt", "md", "properties", "py", "txt", "yaml", "yml"
+        )
+        val locObsoletePlaceholderIoUriPattern = Regex(
+            """https://dummy\.invalid/[^\s"']*/(?:upload|download|manage)/"""
+        )
+        locRepositoryDirectory.walkTopDown()
+            .onEnter { locDirectory ->
+                locDirectory == locRepositoryDirectory || locDirectory.name !in locIgnoredDirectoryNames
+            }
+            .filter { locFile ->
+                locFile.isFile && locFile.extension.lowercase() in locCredentialConventionExtensions
+            }
+            .forEach { locFile ->
+                val locText = locFile.readText(Charsets.UTF_8)
+                locObsoleteCredentialProfileIdPattern.findAll(locText).forEach { locMatch ->
+                    val locLine = locText.substring(0, locMatch.range.first).count { it == '\n' } + 1
+                    val locPath = locRepositoryDirectory.toPath()
+                        .relativize(locFile.toPath())
+                        .toString()
+                        .replace(File.separatorChar, '/')
+                    locProblems.add(
+                        "$locPath:$locLine obsolete credential profile id '${locMatch.value}' must use " +
+                            "the subscription/publication terminology."
+                    )
+                }
+                locObsoletePlaceholderIoUriPattern.findAll(locText).forEach { locMatch ->
+                    val locLine = locText.substring(0, locMatch.range.first).count { it == '\n' } + 1
+                    val locPath = locRepositoryDirectory.toPath()
+                        .relativize(locFile.toPath())
+                        .toString()
+                        .replace(File.separatorChar, '/')
+                    locProblems.add(
+                        "$locPath:$locLine obsolete dummy endpoint URI '${locMatch.value}' must use " +
+                            "the subscription/publication terminology."
+                    )
+                }
+            }
+
         val locTempDefinitionPattern = Regex(
             "(?m)(?:\\b(_TMP_ALGITES_([A-Z0-9_]+))\\s*=|^\\s*(_TMP_ALGITES_([A-Z0-9_]+))\\s*:)"
         )

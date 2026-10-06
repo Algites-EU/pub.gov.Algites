@@ -531,7 +531,7 @@ If the object is absent, the implicit level is `release`.
 
 Readiness does **not** remove an artifact from discovery and does **not** prevent compilation/testing. A local project dependency may still cause tasks of a `none` artifact to run when another local artifact needs it.
 
-Publication is different. Before `modustroPublish`, the framework validates the selected controlled publication closure. If a selected artifact depends on a local controlled artifact whose effective readiness is too low, publication stops before upload. Diagnostics include the blocking descriptor path and, when supplied, `Cause` and `Author`.
+Publication is different. Before `modustroPublish`, the framework validates the selected controlled publication closure. If a selected artifact depends on a local controlled artifact whose effective readiness is too low, publication stops before publication execution. Diagnostics include the blocking descriptor path and, when supplied, `Cause` and `Author`.
 
 ## 10. Version
 
@@ -644,7 +644,7 @@ OutputPublications:
           PublicationAdapter: maven-repository
           PublicationCredentialProfile: algites-java-snapshot-publication
           ExecutionOrder: 0
-          PublicationFailurePolicy: FAIL_BUILD_ON_PUBLICATION_FAILURE
+          PublicationFailurePolicy: fail_build_on_publication_failure
           PublicationRetryCount: 2
           PublicationWaitForNextAttemptMillis: 1000
           PublicationAttemptTimeoutMillis: 60000
@@ -705,7 +705,7 @@ replaced; they are not schema aliases. `PublicationEnabled` remains valid only o
 | `PublicationAdapter` | required for enabled effective endpoint | Adapter that performs one publication attempt. |
 | `PublicationCredentialProfile` | no | Non-secret credential profile reference. |
 | `ExecutionOrder` | no | Root scheduling order, default `0`; negative values are allowed. |
-| `PublicationFailurePolicy` | no | Defaults to `FAIL_BUILD_ON_PUBLICATION_FAILURE`. |
+| `PublicationFailurePolicy` | no | Defaults to `fail_build_on_publication_failure`. |
 | `PublicationRetryCount` | no | Additional attempts after the first; defaults to `0`. |
 | `PublicationWaitForNextAttemptMillis` | no | Delay between attempts; defaults to `1000`. |
 | `PublicationAttemptTimeoutMillis` | no | Positive timeout for one attempt. |
@@ -790,7 +790,7 @@ The common action fields are:
 | `ExecutionEnabled` | Default `true`; `false` disables this inherited action without clearing its siblings. |
 | Adapter property | The level-specific property above; required for an enabled effective action. |
 | `ExecutionOrder` | Default `0`; negative values allowed; orders direct siblings of this list. |
-| `FailurePolicy` | `FAIL_BUILD_ON_FAILURE` (default) or `IGNORE_FAILURE`. |
+| `FailurePolicy` | `fail_build_on_failure` (default) or `ignore_failure`. |
 | `RetryCount` | Additional attempts after the first; default `0`. |
 | `WaitForNextAttemptMillis` | Default `1000`. |
 | `AttemptTimeoutMillis` | Optional positive timeout for one attempt. |
@@ -931,7 +931,7 @@ VersionScopePublicationFinalizationActions:
     - Id: remove-corresponding-snapshots
       VersionScopePublicationFinalizationActionAdapter: modustro-remove-corresponding-snapshots
       ExecutionOrder: 10
-      FailurePolicy: IGNORE_FAILURE
+      FailurePolicy: ignore_failure
     - Id: refresh-docs-site
       VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
       ExecutionOrder: 20
@@ -941,7 +941,7 @@ Cleanup covers Cloudsmith/Repsy Java exact release-SNAPSHOT versions and Python 
 policy; a Maven release alone does not imply snapshot deletion. Already-absent versions are successful no-ops.
 `Configuration.Provider` can explicitly select `cloudsmith`/`repsy`; provider identity uses Cloudsmith
 `Workspace`/`Repository` or Repsy `Repository`, with optional `ManagementApiUri`. No MPS cleanup contract is configured.
-The inherited `IGNORE_FAILURE` records a cleanup failure without invalidating the release; it does not conceal the
+The inherited `ignore_failure` records a cleanup failure without invalidating the release; it does not conceal the
 failure from the result context.
 
 Docs refresh is a request, deduplicated across COMPLETE scopes before repository-only `modustro_docs_site` publication.
@@ -1048,8 +1048,7 @@ algites.credential.outputKinds
 algites.credential.output
 ```
 
-The plan reports `inputSubscriptions`, `publicationEndpoints`, and required credential profile/type pairs. There is no
-`manage` usage.
+The plan reports `inputSubscriptions`, `publicationEndpoints`, and required credential profile/type pairs. There is no third generic `manage` credential usage; maintenance belongs to explicit publication finalization actions.
 
 Snapshot publication invocation overrides remain available per output kind through `modustro.publication.*` Gradle
 properties and corresponding `MODUSTRO_PUBLICATION_*` environment variables. They modify only effective
@@ -1093,7 +1092,7 @@ conflicting results. This is filesystem coordination for one invocation, not a r
 
 Every participating domain needs the same fresh `MODUSTRO_BUILD_INVOCATION_ID` or
 `-Pmodustro.build.invocationId=<fresh-id>`. Direct composite publication without a common identity fails before native
-upload. The phase controller establishes a local identity and preserves a supplied CI identity across its phases/children:
+publication. The phase controller establishes a local identity and preserves a supplied CI identity across its phases/children:
 
 ```bash
 bash gradle/tool/repository/modustro-phase-controller.sh --through package
@@ -1115,7 +1114,7 @@ A subscription or publication endpoint references a non-secret profile:
 
 ```yaml
 CredentialProfiles:
-  example-download:
+  example-subscription:
     Type: basic
 
 InputSubscriptions:
@@ -1127,7 +1126,7 @@ InputSubscriptions:
         Stability: release
         SubscriptionUri: https://example.invalid/maven/
         SubscriptionAdapter: maven-repository
-        SubscriptionCredentialProfile: example-download
+        SubscriptionCredentialProfile: example-subscription
 ```
 
 Supported profile types are:
@@ -1268,7 +1267,7 @@ The manifest is deliberately **cache-stable with respect to unrelated build cont
 - Git commit IDs, branch names, tags, or dirty-working-tree state;
 - CI workflow/run/job IDs;
 - runner or workstation identity;
-- repository upload endpoint selection or credentials;
+- repository publication endpoint selection or credentials;
 - other data that can change while the relevant artifact sources and descriptor hierarchy remain unchanged.
 
 A change to a descriptor in the effective hierarchy changes its SHA-256 and therefore changes the manifest. A change only to unrelated CI/Git execution context does not.
@@ -1383,7 +1382,7 @@ Triggers:
 - every push;
 - manual `workflow_dispatch`.
 
-It delegates to the reusable public Algites CI wrapper. The common CI resolves branch/lifecycle mode, repository download defaults, TechnologyKinds, toolchains, credentials required for download, and the Gradle task appropriate to the mode.
+It delegates to the reusable public Algites CI wrapper. The common CI resolves branch/lifecycle mode, repository subscription defaults, TechnologyKinds, toolchains, credentials required for subscriptions, and the Gradle task appropriate to the mode.
 
 The shared CI implementation exposes optional task overrides for approval, verification, and construction modes, but a normal repository should use the standard wrapper unless it has an explicit reason to customize them.
 
@@ -1399,7 +1398,7 @@ This file is a deliberately stable per-repository automation bridge. It has exac
 
 The bridge does not declare publication, TechnologyKind, snapshot-instance, toolchain, or other operational fields individually. The request contract is owned by `pub.gov.Algites`; central automation may add request fields without requiring this file to be changed in every artifact repository. After a repository has adopted this generic bridge, normal documentation protocol evolution must not require bridge synchronization.
 
-The bridge verifies that the caller is Algites GitHub App automation and delegates the opaque request to `.github/workflows/algites-universal-docs-site.yml`. The reusable workflow interprets the fields it knows and ignores unknown request fields for forward compatibility. It checks out the selected source ref, loads public download/licensing governance, installs Java/Python documentation toolchains, updates the persistent documentation branch, and for public repositories can publish GitHub Pages.
+The bridge verifies that the caller is Algites GitHub App automation and delegates the opaque request to `.github/workflows/algites-universal-docs-site.yml`. The reusable workflow interprets the fields it knows and ignores unknown request fields for forward compatibility. It checks out the selected source ref, loads public subscription/licensing governance, installs Java/Python documentation toolchains, updates the persistent documentation branch, and for public repositories can publish GitHub Pages.
 
 Manual preview generation is intentionally separate in `.github/workflows/algites-docs-site-manual-preview.yml`; artifact developers therefore do not need to construct the automation JSON request manually.
 
@@ -1420,7 +1419,7 @@ The lifecycle creates the new lane branch(es) from the selected source lane and 
 
 ### 17.4 Snapshot and release publication
 
-Artifact authors normally do not embed upload/manage repository secrets or central publication logic in the source repository. Snapshot deployment and release publication are governed centrally. Public repositories may expose thin provider wrappers, but the private governance repository owns the operational upload/manage overlays and central workers.
+Artifact authors normally do not embed publication credentials or central publication/finalization logic in the source repository. Snapshot deployment and release publication are governed centrally. Public repositories may expose thin provider wrappers, but the private governance repository owns the operational publication overlays and central workers.
 
 ## 18. Practical recipes
 
@@ -1539,4 +1538,4 @@ Use this guide for day-to-day authoring, then consult the source of truth when n
 - shared Gradle implementation: `gradle/tool/`
 - reusable public workflows: `.github/workflows/`
 
-The private DevOps operator guide is maintained separately in `priv.gov.Algites` because it documents private upload/manage governance, centralized publication workers, repository service lists, and operational credentials.
+The private DevOps operator guide is maintained separately in `priv.gov.Algites` because it documents private publication governance, centralized publication workers, repository service lists, and operational credentials.

@@ -1376,7 +1376,7 @@ Example:
 
 ```json
 {
-  "algites-java-private-release-download": {
+  "algites-java-private-release-subscription": {
     "basic": {
       "Username": { "Source": "direct_value", "Value": "algites-user" },
       "Password": { "Source": "secret_content", "Value": "ALGITES_JAVA_PRIVATE_PASSWORD" }
@@ -1397,16 +1397,16 @@ Stable externally configurable build environment contracts currently include the
 
 The universal `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` document is also the canonical persistent local representation; complete profile/type credentials are not stored in a second format. A non-empty `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` environment variable overrides the persistent document for that process. Otherwise local Java resolution reads the document from the highest-priority available Algites operating-system secure store. Gradle Settings runs before the credential modules of the current checkout can be built, so its bootstrap adapter obtains the same stored document through an already installed `algites-credentials` helper; `ALGITES_CREDENTIAL_CLI` MAY specify a non-default helper path. OS backends are discovered through `ServiceLoader` and expose structured availability/remediation diagnostics. Linux desktop integration targets the Freedesktop Secret Service D-Bus API directly and does not require the `secret-tool` executable.
 
-A local build is not required to provision every credential known to governance. It needs only those profile/type pairs required by the enabled repositories and operations it actually performs. In particular, ordinary download-only development does not require publication credentials.
+A local build is not required to provision every credential known to governance. It needs only those profile/type pairs required by the enabled repositories and operations it actually performs. In particular, ordinary subscription-only development does not require publication credentials.
 
 Credential-type support in `coreintf` is distinct from authentication support in a concrete TechnologyKind repository adapter. Each repository client MUST explicitly define which types it can apply. Unsupported endpoint/type combinations MUST fail with a diagnostic that identifies the endpoint id, profile id, effective type, and supported alternatives. The current adapter status is:
 
 | Adapter operation | Supported credential types | Notes |
 |---|---|---|
-| Java/Maven download | `basic`, `bearer`, `api_key` | `api_key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
-| Java/Maven upload | `basic`, `bearer`, `api_key` | `api_key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
-| Python/Twine upload | `basic` | additional authentication types require explicit Python repository-adapter support |
-| Python download | not yet implemented | Python dependency repository consumption adapter remains to be defined |
+| Java/Maven subscription | `basic`, `bearer`, `api_key` | `api_key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
+| Java/Maven publication | `basic`, `bearer`, `api_key` | `api_key` requires `configuration.headerName`; certificate transport is not yet wired into the Gradle Maven adapter |
+| Python/Twine publication | `basic` | additional authentication types require explicit Python repository-adapter support |
+| Python subscription | not yet implemented | Python dependency repository consumption adapter remains to be defined |
 | MPS repository access | not yet implemented | declaration of `mps` alone does not provide a repository adapter |
 
 GitHub Actions performs credential selection in two phases. The Gradle task `resolveModustroRequiredCredentials` evaluates enabled subscriptions and publication endpoints for the requested technology/stability/usage context without requiring their secret values. The trusted bridge then filters `ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS` to the union of profile/type pairs returned by that plan and materializes all retained fields to `direct_value` before the actual Gradle processing starts.
@@ -1418,7 +1418,7 @@ The bridge is intentionally trusted with the complete GitHub secret context: its
 The effective repository/credential configuration follows the structural container hierarchy:
 
 ```text
-Algites public-governance download defaults
+Algites public-governance subscription defaults
         -> optional private-governance defaults overlays
         -> modustro-source-repository.yml
         -> ancestor modustro-artifact-set.yml / modustro-artifact.yml
@@ -1432,17 +1432,15 @@ Private-governance overlay files use `algites-repository-defaults_1.yamldef.sche
 - `InputSubscriptions` / `OutputPublications` — canonical inherited external-I/O overrides;
 - `CredentialProfiles` — non-secret profile definitions referenced by those endpoints.
 
-Actual credential values MUST NOT be stored in governance YAML. Upload credential values likewise MUST NOT be made available to ordinary target-repository builds. Provider implementations SHOULD keep publication workers in the private-governance execution context and pass only non-secret target identity/revision information from target repositories.
+Actual credential values MUST NOT be stored in governance YAML. Publication credential values likewise MUST NOT be made available to ordinary target-repository builds. Provider implementations SHOULD keep publication workers in the private-governance execution context and pass only non-secret target identity/revision information from target repositories.
 
-Concrete public download endpoints are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-defaults-public.yml`; they are not hard-coded in the resolver. The standard private-governance overlays are separated by purpose and visibility:
+Concrete public subscription endpoints are public-governance data in `pub.gov.Algites/repository/defaults/algites-repository-defaults-public.yml`; they are not hard-coded in the resolver. The standard private-governance overlays are separated by purpose and visibility:
 
-- private download defaults;
-- public upload defaults;
-- private upload defaults;
-- public management defaults;
-- private management defaults.
+- private subscription defaults;
+- governed public publication defaults;
+- private publication defaults.
 
-`ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` supplies the public-download defaults to the resolver. A normal public build requires that public defaults file but no private-governance overlay. A normal private build additionally requires only the private-download overlay. Governed publication receives the visibility-specific upload overlay. Post-release maintenance receives the visibility-specific management overlay and resolves only `manage` credentials; ordinary builds and the publication phase itself do not receive management credential values.
+`ALGITES_REPOSITORY_PUBLIC_DEFAULTS_FILE` supplies the public subscription defaults to the resolver. A normal public build requires that public defaults file but no private-governance overlay. A normal private build additionally requires the private subscription overlay. Governed publication receives the visibility-specific publication overlay. Post-release maintenance is modeled as publication finalization actions and resolves only the subscription/publication credentials required by the selected action closure; there is no independent `manage` overlay or `manage` credential usage.
 
 Resolution MUST be deterministic and diagnostics SHOULD identify the effective endpoint id, URL source, credential profile and profile type.
 

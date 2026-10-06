@@ -21,14 +21,39 @@ import org.gradle.api.Action
 import org.gradle.api.DefaultTask
 import org.gradle.api.Task
 import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.Exec
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.Internal
 import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.OutputFile
 import org.gradle.api.tasks.TaskAction
 import java.time.Instant
+
+abstract class AIcWriteModustroDocsPublishingSelectionTask : DefaultTask() {
+    @get:Input
+    abstract val selectionLines: ListProperty<String>
+
+    @get:Input
+    abstract val endpointIds: ListProperty<String>
+
+    @get:OutputFile
+    abstract val selectionFile: RegularFileProperty
+
+    @TaskAction
+    fun AIcWriteSelection() {
+        val locOutput = selectionFile.get().asFile
+        locOutput.parentFile.mkdirs()
+        locOutput.writeText(selectionLines.get().joinToString(System.lineSeparator()) + System.lineSeparator(), Charsets.UTF_8)
+        val locEndpoints = endpointIds.get()
+        logger.lifecycle(
+            "Algites modustro_docs_site publication endpoints: " +
+                if (locEndpoints.isEmpty()) "<none>" else locEndpoints.joinToString(", ")
+        )
+    }
+}
 
 abstract class AIcPrepareModustroDocsPublishingTask : DefaultTask() {
     @get:Input
@@ -349,37 +374,30 @@ val locDocsHasPublicationEndpoints =
     (locDocsPublicationPlan["publicationEnabled"] as? Boolean ?: false) && locDocsPublicationEndpoints.isNotEmpty()
 
 val locDocsPublicationSelectionFile = locDocsSiteRoot.file(".modustro-publishing/docs-site.properties")
+val locDocsPublicationSelectionLines = mutableListOf(
+    "outputKind=modustro_docs_site",
+    "stability=$locDocsPublicationStability",
+    "publicationEnabled=${locDocsPublicationPlan["publicationEnabled"]}",
+    "count=${locDocsPublicationEndpoints.size}"
+)
+locDocsPublicationEndpoints.forEachIndexed { locIndex, locEndpoint ->
+    locDocsPublicationSelectionLines += "endpoint.$locIndex.id=${locEndpoint["id"]?.toString().orEmpty()}"
+    locDocsPublicationSelectionLines += "endpoint.$locIndex.url=${locEndpoint["publicationUri"]?.toString().orEmpty()}"
+    locDocsPublicationSelectionLines += "endpoint.$locIndex.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}"
+    locDocsPublicationSelectionLines += "endpoint.$locIndex.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}"
+    locDocsPublicationSelectionLines += "endpoint.$locIndex.executionOrder=${locEndpoint["executionOrder"] ?: 0}"
+    locDocsPublicationSelectionLines += "endpoint.$locIndex.failurePolicy=${locEndpoint["publicationFailurePolicy"] ?: "fail_build_on_publication_failure"}"
+}
 if (tasks.findByName("writeModustroDocsPublishingSelection") == null) {
-    tasks.register("writeModustroDocsPublishingSelection") {
+    tasks.register<AIcWriteModustroDocsPublishingSelectionTask>("writeModustroDocsPublishingSelection") {
         group = "modustro"
         description = "Writes the effective modustro_docs_site PublicationEndpoint selection for the deployment adapter."
-        outputs.file(locDocsPublicationSelectionFile)
-        doLast {
-            val locOutput = locDocsPublicationSelectionFile.asFile
-            locOutput.parentFile.mkdirs()
-            val locEndpoints = locDocsPublicationEndpoints
-            val locLines = mutableListOf(
-                "outputKind=modustro_docs_site",
-                "stability=$locDocsPublicationStability",
-                "publicationEnabled=${locDocsPublicationPlan["publicationEnabled"]}",
-                "count=${locEndpoints.size}"
-            )
-            locEndpoints.forEachIndexed { locIndex, locEndpoint ->
-                locLines += "endpoint.$locIndex.id=${locEndpoint["id"]?.toString().orEmpty()}"
-                locLines += "endpoint.$locIndex.url=${locEndpoint["publicationUri"]?.toString().orEmpty()}"
-                locLines += "endpoint.$locIndex.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}"
-                locLines += "endpoint.$locIndex.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}"
-                locLines += "endpoint.$locIndex.executionOrder=${locEndpoint["executionOrder"] ?: 0}"
-                locLines += "endpoint.$locIndex.failurePolicy=${locEndpoint["publicationFailurePolicy"] ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"}"
-            }
-            locOutput.writeText(locLines.joinToString(System.lineSeparator()) + System.lineSeparator(), Charsets.UTF_8)
-            logger.lifecycle(
-                "Algites modustro_docs_site publication endpoints: " +
-                    if (locEndpoints.isEmpty()) "<none>" else locEndpoints.joinToString(", ") { it["id"].toString() }
-            )
-        }
+        selectionLines.set(locDocsPublicationSelectionLines)
+        endpointIds.set(locDocsPublicationEndpoints.map { locEndpoint -> locEndpoint["id"]?.toString().orEmpty() })
+        selectionFile.set(locDocsPublicationSelectionFile)
     }
 }
+
 
 if (tasks.findByName("prepareModustroDocsPublishing") == null) {
     tasks.register<AIcPrepareModustroDocsPublishingTask>("prepareModustroDocsPublishing") {

@@ -177,7 +177,7 @@ data class AIcdModustroPublicationEndpoint(
 
     fun AIcEffectiveExecutionEnabled(): Boolean = executionEnabled ?: true
     fun AIcEffectiveExecutionOrder(): Int = executionOrder ?: 0
-    fun AIcEffectivePublicationFailurePolicy(): String = publicationFailurePolicy ?: "FAIL_BUILD_ON_PUBLICATION_FAILURE"
+    fun AIcEffectivePublicationFailurePolicy(): String = publicationFailurePolicy ?: "fail_build_on_publication_failure"
     fun AIcEffectivePublicationRetryCount(): Int = publicationRetryCount ?: 0
     fun AIcEffectivePublicationWaitForNextAttemptMillis(): Long = publicationWaitForNextAttemptMillis ?: 1000L
     fun AIcEffectiveShowPublicationProgressIfPossible(): Boolean = showPublicationProgressIfPossible ?: true
@@ -485,10 +485,10 @@ val AIcModustroPublicationOutputKinds = linkedSetOf(
     "native_product_binaries", "native_product_sources", "native_product_documentation", "native_develop_sources", "native_develop_binaries", "native_develop_documentation", "modustro_docs_site", "schema_site"
 )
 val AIcModustroPublicationFailurePolicies = linkedSetOf(
-    "FAIL_BUILD_ON_PUBLICATION_FAILURE", "IGNORE_PUBLICATION_FAILURE"
+    "fail_build_on_publication_failure", "ignore_publication_failure"
 )
 val AIcModustroNestedGradleSettingsBuildPolicies = linkedSetOf(
-    "IGNORE_NESTED_SETTINGS", "USE_ISOLATED_BUILD_ON_NESTED_SETTINGS"
+    "ignore_nested_settings", "use_isolated_build_on_nested_settings"
 )
 
 val AIcModustroRootIgnoredDirectoryNames = setOf(
@@ -497,7 +497,7 @@ val AIcModustroRootIgnoredDirectoryNames = setOf(
 )
 
 fun AIcModustroBuiltInState(): AIcdModustroResolvedState = AIcdModustroResolvedState(
-    nestedGradleSettingsBuildPolicy = "IGNORE_NESTED_SETTINGS"
+    nestedGradleSettingsBuildPolicy = "ignore_nested_settings"
 )
 
 val AIcAlgitesExternalRepositoryDefaultsEnvironmentVariables = listOf(
@@ -569,7 +569,7 @@ fun AIcResolveModustroArtifactDirectoryMetadata(
         credentialProfiles = locRootState.credentialProfiles,
         dependencies = locRootState.dependencies,
         dependencyConstraints = locRootState.dependencyConstraints,
-        nestedGradleSettingsBuildPolicy = locRootState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
+        nestedGradleSettingsBuildPolicy = locRootState.nestedGradleSettingsBuildPolicy ?: "ignore_nested_settings",
         outputPublications = locRootState.outputPublications
     )
 
@@ -664,7 +664,7 @@ fun AIcResolveRepositoryMetadataBase(
         credentialProfiles = emptyMap(),
         dependencies = emptyList(),
         dependencyConstraints = emptyList(),
-        nestedGradleSettingsBuildPolicy = "IGNORE_NESTED_SETTINGS",
+        nestedGradleSettingsBuildPolicy = "ignore_nested_settings",
         outputPublications = emptyMap()
     )
 }
@@ -697,7 +697,7 @@ fun AIcResolveArtifactDirectoryAndSubdirectories(
         val locNestedSettingsBoundary =
             aDirectory.canonicalFile != locStartDirectory.canonicalFile &&
                 AIcHasGradleSettings(aDirectory) &&
-                locState.nestedGradleSettingsBuildPolicy == "USE_ISOLATED_BUILD_ON_NESTED_SETTINGS"
+                locState.nestedGradleSettingsBuildPolicy == "use_isolated_build_on_nested_settings"
         if (locNestedSettingsBoundary) {
             locIsolatedBuildDirectories.add(AIcRelativePath(aRepositoryRoot, aDirectory))
             return
@@ -832,7 +832,7 @@ fun AIcArtifactDirectoryMetadataFromConfig(
         dependencies = aState.dependencies,
         dependencyConstraints = aState.dependencyConstraints,
         environmentRequirements = aState.environmentRequirements,
-                nestedGradleSettingsBuildPolicy = aState.nestedGradleSettingsBuildPolicy ?: "IGNORE_NESTED_SETTINGS",
+        nestedGradleSettingsBuildPolicy = aState.nestedGradleSettingsBuildPolicy ?: "ignore_nested_settings",
         outputPublications = aState.outputPublications,
         descriptorHierarchy = AIcDescriptorHierarchy(aRepositoryRoot, aDirectory)
     )

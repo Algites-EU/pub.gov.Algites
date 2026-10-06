@@ -100,12 +100,12 @@
 
 	<distributionManagement>
 		<snapshotRepository>
-			<id>algites-public-releases-upload</id>
+			<id>algites-public-releases-publication</id>
 			<url>https://maven.cloudsmith.io/algites/maven-snapshots-pub/</url>
 		</snapshotRepository>
 		<repository>
 			<id>cloudsmith</id>
-<!--			<id>algites-public-snapshots-upload</id>-->
+<!--			<id>algites-public-snapshots-publication</id>-->
 			<url>https://dl.cloudsmith.io/algites/maven-snapshots-pub/</url>
 		</repository>
 	</distributionManagement>

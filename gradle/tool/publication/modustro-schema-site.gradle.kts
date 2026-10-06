@@ -246,7 +246,7 @@ val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite")
                     appendLine("endpoint.${locIndex}.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}")
                     appendLine("endpoint.${locIndex}.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}")
                     appendLine("endpoint.${locIndex}.executionOrder=${locEndpoint["executionOrder"] ?: 0}")
-                    appendLine("endpoint.${locIndex}.failurePolicy=${locEndpoint["publicationFailurePolicy"] ?: "FAIL_BUILD_ON_PUBLISHING_FAILURE"}")
+                    appendLine("endpoint.${locIndex}.failurePolicy=${locEndpoint["publicationFailurePolicy"] ?: "fail_build_on_publication_failure"}")
                 }
             },
             Charsets.UTF_8

@@ -49,13 +49,13 @@ InputSubscriptions:
   Subscriptions:
   - Id: algites-mps-native-product-binaries-public-release-subscription
     Visibility: public
-    SubscriptionUri: https://dummy.invalid/algites/mps/public/release/download/
+    SubscriptionUri: https://dummy.invalid/algites/mps/public/release/subscription/
     SubscriptionAdapter: mps-repository
     Stability: release
     Enabled: false
   - Id: algites-mps-native-product-binaries-public-snapshot-subscription
     Visibility: public
-    SubscriptionUri: https://dummy.invalid/algites/mps/public/snapshot/download/
+    SubscriptionUri: https://dummy.invalid/algites/mps/public/snapshot/subscription/
     SubscriptionAdapter: mps-repository
     Stability: snapshot
     Enabled: false
@@ -69,7 +69,7 @@ VersionScopePublicationFinalizationActions:
   - Id: remove-corresponding-snapshots
     VersionScopePublicationFinalizationActionAdapter: modustro-remove-corresponding-snapshots
     ExecutionOrder: 10
-    FailurePolicy: IGNORE_FAILURE
+    FailurePolicy: ignore_failure
   - Id: refresh-docs-site
     VersionScopePublicationFinalizationActionAdapter: modustro-refresh-docs-site
     ExecutionOrder: 20

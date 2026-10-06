@@ -380,11 +380,11 @@
 
 	<distributionManagement>
 		<repository>
-			<id>algites-public-releases-upload</id>
+			<id>algites-public-releases-publication</id>
 			<url>https://central.sonatype.com/service/local/staging/deploy/maven2/</url>
 		</repository>
 		<snapshotRepository>
-			<id>algites-public-snapshots-upload</id>
+			<id>algites-public-snapshots-publication</id>
 			<url>https://dl.cloudsmith.io/maven/algites/maven-snapshots-pub/maven/</url>
 <!--			<url>https://maven.cloudsmith.io/algites/maven-snapshots-pub/</url>-->
 		</snapshotRepository>

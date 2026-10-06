@@ -516,13 +516,13 @@ The release operation MUST:
 2. resolve and freeze the immutable release source revision,
 3. resolve the requested TechnologyKind set and reject an incomplete selection unless the explicit incomplete-release override is enabled,
 4. compute or validate the release identity/tag,
-5. obtain the governed private-download and visibility-specific upload repository-default overlays from private governance,
+5. obtain the governed private subscription and visibility-specific publication repository-default overlays from private governance,
 6. execute construction and verification required by each selected TechnologyKind adapter,
-7. publish only the selected TechnologyKinds to the effective upload cells matching the source repository visibility and release stability,
+7. publish only the selected TechnologyKinds to the effective publication endpoints matching the source repository visibility and release stability,
 8. record which TechnologyKind-specific publications actually exist for the logical version; when an incomplete release was explicitly allowed, omitted TechnologyKinds remain permanently absent from that release version,
-9. after all required release processing succeeds, perform best-effort cleanup only for snapshot packages corresponding to TechnologyKinds that were actually selected/released, through the visibility-specific `snapshot.manage` endpoints when the effective `deleteSnapshotWhenReleased` policy is `true`.
+9. after all required release processing succeeds, execute the selected version-scope publication finalization actions; released-snapshot cleanup is represented by the corresponding finalization action rather than by a third generic management endpoint family.
 
-Ordinary repository builds do not receive upload or management overlays. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. The release publication phase materializes only download/upload credentials; the final cleanup phase separately materializes only management credentials. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible for deterministic ResourceEndpoint resolution.
+Ordinary repository builds do not receive governed publication overlays unless the requested operation publishes. Snapshot and release publication are therefore centrally orchestrated operations rather than normal local project capabilities. Credential materialization resolves only the subscription/publication profile-type pairs required by the selected operation and its publication/finalization closure. There is no separate management overlay or management-credential phase. Provider-specific workflow code is responsible for obtaining the private overlay files and credentials; the Gradle resolver is responsible for deterministic InputSubscription/OutputPublication resolution.
 
 ##### 3.1.5.1 Release identity/tag naming
 
