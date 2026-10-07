@@ -11,6 +11,21 @@ import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublishFilesTask
 import eu.algites.pltf.modustro.builder.gradleinit.AIcModustroPublicationService
 import org.gradle.api.provider.Provider
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
+import org.gradle.api.DefaultTask
+import org.gradle.api.file.ConfigurableFileCollection
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.provider.ListProperty
+import org.gradle.api.provider.Property
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.InputFiles
+import org.gradle.api.tasks.Internal
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
+import org.gradle.api.tasks.TaskAction
 import eu.algites.pltf.modustro.builder.publication.AIcGlobalPublicationPathValidator
 import eu.algites.pltf.modustro.builder.model.execution.AIngBuildExecutionFailurePolicy_1
 import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationPayload
@@ -20,6 +35,201 @@ import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKi
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability
 import java.io.File
 import java.security.MessageDigest
+
+/** Stages schemas using declared inputs and a data-only publication plan. */
+abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
+    @get:Input abstract val publicationState: Property<String>
+    @get:Input abstract val sourceKinds: ListProperty<String>
+    @get:Input abstract val artifactPlansJson: Property<String>
+    @get:InputFiles
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val canonicalSources: ConfigurableFileCollection
+    @get:Internal abstract val repositoryDirectory: DirectoryProperty
+    @get:OutputDirectory abstract val siteRoot: DirectoryProperty
+
+    fun AIcSchemaSha256(aFile: File): String {
+        val locDigest = MessageDigest.getInstance("SHA-256")
+        aFile.inputStream().use { locInput ->
+            val locBuffer = ByteArray(64 * 1024)
+            while (true) {
+                val locRead = locInput.read(locBuffer)
+                if (locRead < 0) break
+                locDigest.update(locBuffer, 0, locRead)
+            }
+        }
+        return locDigest.digest().joinToString("") { locByte -> "%02x".format(locByte) }
+    }
+
+    fun AIcSchemaManifestValue(aValue: String): String = aValue
+        .replace("\\", "\\\\")
+        .replace("\t", "\\t")
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+
+    fun AIcSchemaReadGlobalPublicationPathId(aSidecar: File): String {
+        val locValues = aSidecar.readLines(Charsets.UTF_8).mapNotNull { locLine ->
+            val locTrimmed = locLine.trim()
+            if (locTrimmed.isBlank() || locTrimmed.startsWith("#") || !locTrimmed.startsWith("GlobalPublicationPathId:")) {
+                null
+            } else {
+                locTrimmed.substringAfter(':').trim().removeSurrounding("\"").removeSurrounding("'").takeIf(String::isNotBlank)
+            }
+        }
+        if (locValues.size != 1) {
+            throw GradleException(
+                "Global-publication user sidecar '$aSidecar' must define exactly one non-empty GlobalPublicationPathId."
+            )
+        }
+        return locValues.single()
+    }
+
+    @TaskAction
+    fun AIcGenerate() {
+        @Suppress("UNCHECKED_CAST")
+        val locArtifacts = JsonSlurper().parseText(artifactPlansJson.get()) as List<Map<String, Any?>>
+        val locOutputRoot = siteRoot.get().asFile
+        locOutputRoot.deleteRecursively()
+        locOutputRoot.mkdirs()
+        val locManifestRows = mutableListOf<String>()
+        val locPathValidator = AIcGlobalPublicationPathValidator()
+        val locSeenTargets = linkedMapOf<String, String>()
+        val locSeenEndpoints = linkedMapOf<String, Map<String, Any?>>()
+        var locExpectedEndpointIds: Set<String>? = null
+
+        locArtifacts
+            .forEach { locArtifact ->
+                val locArtifactPath = locArtifact["path"]?.toString().orEmpty()
+                val locArtifactDirectory = if (locArtifactPath.isBlank() || locArtifactPath == ".") {
+                    repositoryDirectory.get().asFile
+                } else {
+                    File(repositoryDirectory.get().asFile, locArtifactPath)
+                }
+                @Suppress("UNCHECKED_CAST")
+                val locPublicationPlan = locArtifact["publicationPlan"] as Map<String, Any?>
+                @Suppress("UNCHECKED_CAST")
+                val locPublicationEndpoints = (locPublicationPlan["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+                val locEndpointIds = locPublicationEndpoints.map { locEndpoint ->
+                    val locEndpointId = locEndpoint["id"]?.toString()
+                        ?: throw GradleException("schema_site PublicationEndpoint is missing Id.")
+                    val locPrevious = locSeenEndpoints.putIfAbsent(locEndpointId, locEndpoint)
+                    if (locPrevious != null && locPrevious != locEndpoint) {
+                        throw GradleException(
+                            "PublicationEndpoint id '$locEndpointId' resolves to inconsistent effective endpoint definitions across artifacts."
+                        )
+                    }
+                    locEndpointId
+                }
+
+                val locEndpointIdSet = locEndpointIds.toSet()
+                val locExpected = locExpectedEndpointIds
+                if (locExpected == null) {
+                    locExpectedEndpointIds = locEndpointIdSet
+                } else if (locExpected != locEndpointIdSet) {
+                    throw GradleException(
+                        "Global schema site requires one consistent schema_site PublicationEndpoint set across all artifacts; " +
+                            "expected ${locExpected.sorted()} but artifact '$locArtifactPath' resolves ${locEndpointIdSet.sorted()}."
+                    )
+                }
+
+                sourceKinds.get().sorted().forEach { locSourceKind ->
+                    val locSourceRoot = File(locArtifactDirectory, "src/product/$locSourceKind")
+                    if (!locSourceRoot.isDirectory) {
+                        return@forEach
+                    }
+                    locSourceRoot.walkTopDown()
+                        .filter { locFile -> locFile.isFile && !locFile.name.endsWith(".meta.yml") }
+                        .sortedBy { locFile -> locFile.relativeTo(locSourceRoot).invariantSeparatorsPath }
+                        .forEach { locDefinitionFile ->
+                            val locExpectedPathId = locDefinitionFile.relativeTo(locSourceRoot).invariantSeparatorsPath
+                            val locSidecar = File(locDefinitionFile.path + ".meta.yml")
+                            if (!locSidecar.isFile) {
+                                throw GradleException(
+                                    "Canonical definition '$locDefinitionFile' is missing required user sidecar '${locSidecar.name}'."
+                                )
+                            }
+                            val locPathId = locPathValidator.validate(AIcSchemaReadGlobalPublicationPathId(locSidecar))
+                            if (locPathId != locExpectedPathId) {
+                                throw GradleException(
+                                    "Canonical definition '$locDefinitionFile' declares GlobalPublicationPathId '$locPathId', " +
+                                        "but the canonical source-root-relative path is '$locExpectedPathId'."
+                                )
+                            }
+                            val locTargetKey = "$locSourceKind/$locPathId"
+                            val locPreviousSource = locSeenTargets.putIfAbsent(locTargetKey, locDefinitionFile.absolutePath)
+                            if (locPreviousSource != null) {
+                                throw GradleException(
+                                    "Duplicate global schema publication target '$locTargetKey': '$locPreviousSource' and '$locDefinitionFile'."
+                                )
+                            }
+
+                            val locTarget = File(locOutputRoot, "api/$locSourceKind/$locPathId")
+                            locTarget.parentFile.mkdirs()
+                            locDefinitionFile.copyTo(locTarget, overwrite = true)
+                            val locSha256 = AIcSchemaSha256(locDefinitionFile)
+                            locManifestRows += listOf(
+                                locSourceKind,
+                                locPathId,
+                                locTarget.relativeTo(locOutputRoot).invariantSeparatorsPath,
+                                locSha256,
+                                publicationState.get(),
+                                locArtifactPath,
+                                locEndpointIds.joinToString(",")
+                            ).joinToString("\t", transform = ::AIcSchemaManifestValue)
+                        }
+                }
+            }
+
+        val locManifest = File(locOutputRoot, ".modustro-publishing/schema-site.tsv")
+        locManifest.parentFile.mkdirs()
+        locManifest.writeText(
+            "SourceKind\tGlobalPublicationPathId\tStagedPath\tSha256\tPublicationState\tArtifactPath\tPublicationDestinations\n" +
+                locManifestRows.joinToString(System.lineSeparator()) +
+                if (locManifestRows.isEmpty()) "" else System.lineSeparator(),
+            Charsets.UTF_8
+        )
+
+        val locEndpointSelection = File(locOutputRoot, ".modustro-publishing/schema-endpoints.properties")
+        locEndpointSelection.parentFile.mkdirs()
+        locEndpointSelection.writeText(
+            buildString {
+                appendLine("count=${locSeenEndpoints.size}")
+                locSeenEndpoints.toSortedMap().values.forEachIndexed { locIndex, locEndpoint ->
+                    appendLine("endpoint.${locIndex}.id=${locEndpoint["id"]?.toString().orEmpty()}")
+                    appendLine("endpoint.${locIndex}.url=${locEndpoint["publicationUri"]?.toString().orEmpty()}")
+                    appendLine("endpoint.${locIndex}.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}")
+                    appendLine("endpoint.${locIndex}.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}")
+                    appendLine("endpoint.${locIndex}.executionOrder=${locEndpoint["executionOrder"] ?: 0}")
+                    appendLine("endpoint.${locIndex}.executionFailurePolicy=${locEndpoint["executionFailurePolicy"] ?: AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue()}")
+                }
+            },
+            Charsets.UTF_8
+        )
+        logger.lifecycle("Algites global schema site staged at: ${locOutputRoot.absolutePath}")
+        logger.lifecycle("Canonical definitions staged: ${locManifestRows.size}")
+    }
+}
+
+/** Validates the generated manifest without retaining the applied script. */
+abstract class AIcPrepareModustroSchemaPublishingTask : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val manifestFile: RegularFileProperty
+
+    @TaskAction
+    fun AIcPrepare() {
+        val locRows = manifestFile.get().asFile.readLines(Charsets.UTF_8).drop(1).filter(String::isNotBlank)
+        val locMissing = locRows.mapNotNull { locRow ->
+            val locParts = locRow.split('\t', limit = 7)
+            if (locParts.size == 7 && locParts[6].isBlank()) locParts[1] else null
+        }
+        if (locMissing.isNotEmpty()) {
+            throw GradleException(
+                "Global schema publication has no effective schema_site PublicationEndpoint for: " +
+                    locMissing.distinct().sorted().joinToString(", ")
+            )
+        }
+    }
+}
 
 val locPublicationBridgeScript = rootProject.file("gradle/tool/publication/modustro-publication.gradle.kts")
 if (locPublicationBridgeScript.isFile) {
@@ -84,197 +294,38 @@ val locSchemaHasPublicationEndpoints = locSchemaArtifactDirectories
         locEnabled && locEndpoints.isNotEmpty()
     }
 
-fun AIcSchemaSha256(aFile: File): String {
-    val locDigest = MessageDigest.getInstance("SHA-256")
-    aFile.inputStream().use { locInput ->
-        val locBuffer = ByteArray(64 * 1024)
-        while (true) {
-            val locRead = locInput.read(locBuffer)
-            if (locRead < 0) break
-            locDigest.update(locBuffer, 0, locRead)
-        }
-    }
-    return locDigest.digest().joinToString("") { locByte -> "%02x".format(locByte) }
-}
-
-fun AIcSchemaManifestValue(aValue: String): String = aValue
-    .replace("\\", "\\\\")
-    .replace("\t", "\\t")
-    .replace("\r", "\\r")
-    .replace("\n", "\\n")
-
-fun AIcSchemaReadGlobalPublicationPathId(aSidecar: File): String {
-    val locValues = aSidecar.readLines(Charsets.UTF_8).mapNotNull { locLine ->
-        val locTrimmed = locLine.trim()
-        if (locTrimmed.isBlank() || locTrimmed.startsWith("#") || !locTrimmed.startsWith("GlobalPublicationPathId:")) {
-            null
-        } else {
-            locTrimmed.substringAfter(':').trim().removeSurrounding("\"").removeSurrounding("'").takeIf(String::isNotBlank)
-        }
-    }
-    if (locValues.size != 1) {
-        throw GradleException(
-            "Global-publication user sidecar '$aSidecar' must define exactly one non-empty GlobalPublicationPathId."
+val locSchemaArtifactPlans = locSchemaArtifactDirectories
+    .filter { it["structureKind"]?.toString() == "artifact" }
+    .map { locArtifact ->
+        mapOf(
+            "path" to locArtifact["path"]?.toString().orEmpty(),
+            "publicationPlan" to locResolveSchemaPublicationPlan(
+                locArtifact, "schema_site", locSchemaPublicationStability, locSchemaPublicationDestinationIds
+            )
         )
     }
-    return locValues.single()
-}
-
-val locGenerateModustroSchemaSite = tasks.register("generateModustroSchemaSite") {
+val locSchemaCanonicalSources = files(locSchemaArtifactPlans.flatMap { locArtifact ->
+    val locPath = locArtifact["path"]?.toString().orEmpty()
+    val locDirectory = if (locPath.isBlank() || locPath == ".") rootProject.projectDir else File(rootProject.projectDir, locPath)
+    locSchemaSourceKinds.sorted().map { locKind -> File(locDirectory, "src/product/$locKind") }
+})
+val locGenerateModustroSchemaSite = tasks.register<AIcGenerateModustroSchemaSiteTask>("generateModustroSchemaSite") {
     group = "modustro"
     description = "Validates and stages canonical definitions for global schema-site publication."
-
-    inputs.property("publicationState", locSchemaPublicationState)
-    inputs.property("sourceKinds", locSchemaSourceKinds.sorted().joinToString(","))
-    inputs.property("publicationDestinations", locSchemaPublicationDestinationIds.joinToString(","))
-    outputs.dir(locSchemaSiteRoot)
-
-    doLast {
-        val locOutputRoot = locSchemaSiteRoot.asFile
-        locOutputRoot.deleteRecursively()
-        locOutputRoot.mkdirs()
-        val locManifestRows = mutableListOf<String>()
-        val locPathValidator = AIcGlobalPublicationPathValidator()
-        val locSeenTargets = linkedMapOf<String, String>()
-        val locSeenEndpoints = linkedMapOf<String, Map<String, Any?>>()
-        var locExpectedEndpointIds: Set<String>? = null
-
-        locSchemaArtifactDirectories
-            .filter { locArtifact -> locArtifact["structureKind"]?.toString() == "artifact" }
-            .forEach { locArtifact ->
-                val locArtifactPath = locArtifact["path"]?.toString().orEmpty()
-                val locArtifactDirectory = if (locArtifactPath.isBlank() || locArtifactPath == ".") {
-                    rootProject.projectDir
-                } else {
-                    File(rootProject.projectDir, locArtifactPath)
-                }
-                val locPublicationPlan = locResolveSchemaPublicationPlan(
-                    locArtifact,
-                    "schema_site",
-                    locSchemaPublicationStability,
-                    locSchemaPublicationDestinationIds
-                )
-                @Suppress("UNCHECKED_CAST")
-                val locPublicationEndpoints = (locPublicationPlan["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty()
-                val locEndpointIds = locPublicationEndpoints.map { locEndpoint ->
-                    val locEndpointId = locEndpoint["id"]?.toString()
-                        ?: throw GradleException("schema_site PublicationEndpoint is missing Id.")
-                    val locPrevious = locSeenEndpoints.putIfAbsent(locEndpointId, locEndpoint)
-                    if (locPrevious != null && locPrevious != locEndpoint) {
-                        throw GradleException(
-                            "PublicationEndpoint id '$locEndpointId' resolves to inconsistent effective endpoint definitions across artifacts."
-                        )
-                    }
-                    locEndpointId
-                }
-
-                val locEndpointIdSet = locEndpointIds.toSet()
-                val locExpected = locExpectedEndpointIds
-                if (locExpected == null) {
-                    locExpectedEndpointIds = locEndpointIdSet
-                } else if (locExpected != locEndpointIdSet) {
-                    throw GradleException(
-                        "Global schema site requires one consistent schema_site PublicationEndpoint set across all artifacts; " +
-                            "expected ${locExpected.sorted()} but artifact '$locArtifactPath' resolves ${locEndpointIdSet.sorted()}."
-                    )
-                }
-
-                locSchemaSourceKinds.sorted().forEach { locSourceKind ->
-                    val locSourceRoot = File(locArtifactDirectory, "src/product/$locSourceKind")
-                    if (!locSourceRoot.isDirectory) {
-                        return@forEach
-                    }
-                    locSourceRoot.walkTopDown()
-                        .filter { locFile -> locFile.isFile && !locFile.name.endsWith(".meta.yml") }
-                        .sortedBy { locFile -> locFile.relativeTo(locSourceRoot).invariantSeparatorsPath }
-                        .forEach { locDefinitionFile ->
-                            val locExpectedPathId = locDefinitionFile.relativeTo(locSourceRoot).invariantSeparatorsPath
-                            val locSidecar = File(locDefinitionFile.path + ".meta.yml")
-                            if (!locSidecar.isFile) {
-                                throw GradleException(
-                                    "Canonical definition '$locDefinitionFile' is missing required user sidecar '${locSidecar.name}'."
-                                )
-                            }
-                            val locPathId = locPathValidator.validate(AIcSchemaReadGlobalPublicationPathId(locSidecar))
-                            if (locPathId != locExpectedPathId) {
-                                throw GradleException(
-                                    "Canonical definition '$locDefinitionFile' declares GlobalPublicationPathId '$locPathId', " +
-                                        "but the canonical source-root-relative path is '$locExpectedPathId'."
-                                )
-                            }
-                            val locTargetKey = "$locSourceKind/$locPathId"
-                            val locPreviousSource = locSeenTargets.putIfAbsent(locTargetKey, locDefinitionFile.absolutePath)
-                            if (locPreviousSource != null) {
-                                throw GradleException(
-                                    "Duplicate global schema publication target '$locTargetKey': '$locPreviousSource' and '$locDefinitionFile'."
-                                )
-                            }
-
-                            val locTarget = File(locOutputRoot, "api/$locSourceKind/$locPathId")
-                            locTarget.parentFile.mkdirs()
-                            locDefinitionFile.copyTo(locTarget, overwrite = true)
-                            val locSha256 = AIcSchemaSha256(locDefinitionFile)
-                            locManifestRows += listOf(
-                                locSourceKind,
-                                locPathId,
-                                locTarget.relativeTo(locOutputRoot).invariantSeparatorsPath,
-                                locSha256,
-                                locSchemaPublicationState,
-                                locArtifactPath,
-                                locEndpointIds.joinToString(",")
-                            ).joinToString("\t", transform = ::AIcSchemaManifestValue)
-                        }
-                }
-            }
-
-        val locManifest = locSchemaManifestFile.asFile
-        locManifest.parentFile.mkdirs()
-        locManifest.writeText(
-            "SourceKind\tGlobalPublicationPathId\tStagedPath\tSha256\tPublicationState\tArtifactPath\tPublicationDestinations\n" +
-                locManifestRows.joinToString(System.lineSeparator()) +
-                if (locManifestRows.isEmpty()) "" else System.lineSeparator(),
-            Charsets.UTF_8
-        )
-
-        val locEndpointSelection = locSchemaEndpointSelectionFile.asFile
-        locEndpointSelection.parentFile.mkdirs()
-        locEndpointSelection.writeText(
-            buildString {
-                appendLine("count=${locSeenEndpoints.size}")
-                locSeenEndpoints.toSortedMap().values.forEachIndexed { locIndex, locEndpoint ->
-                    appendLine("endpoint.${locIndex}.id=${locEndpoint["id"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.url=${locEndpoint["publicationUri"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.credentialProfile=${locEndpoint["publicationCredentialProfile"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.adapter=${locEndpoint["publicationAdapter"]?.toString().orEmpty()}")
-                    appendLine("endpoint.${locIndex}.executionOrder=${locEndpoint["executionOrder"] ?: 0}")
-                    appendLine("endpoint.${locIndex}.executionFailurePolicy=${locEndpoint["executionFailurePolicy"] ?: AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE.wireValue()}")
-                }
-            },
-            Charsets.UTF_8
-        )
-        logger.lifecycle("Algites global schema site staged at: ${locOutputRoot.absolutePath}")
-        logger.lifecycle("Canonical definitions staged: ${locManifestRows.size}")
-    }
+    publicationState.set(locSchemaPublicationState)
+    sourceKinds.set(locSchemaSourceKinds.sorted())
+    artifactPlansJson.set(JsonOutput.toJson(locSchemaArtifactPlans))
+    canonicalSources.from(locSchemaCanonicalSources)
+    repositoryDirectory.set(rootProject.layout.projectDirectory)
+    siteRoot.set(locSchemaSiteRoot)
 }
 
 if (tasks.findByName("prepareModustroSchemaPublishing") == null) {
-    tasks.register("prepareModustroSchemaPublishing") {
+    tasks.register<AIcPrepareModustroSchemaPublishingTask>("prepareModustroSchemaPublishing") {
         group = "modustro"
-        description = "Prepares the validated global schema site and requires at least one enabled PublicationEndpoint for every published artifact."
+        description = "Requires an effective PublicationEndpoint for every staged canonical definition."
         dependsOn(locGenerateModustroSchemaSite)
-        doLast {
-            val locRows = locSchemaManifestFile.asFile.readLines(Charsets.UTF_8).drop(1).filter(String::isNotBlank)
-            val locMissing = locRows.mapNotNull { locRow ->
-                val locParts = locRow.split('\t', limit = 7)
-                if (locParts.size == 7 && locParts[6].isBlank()) locParts[1] else null
-            }
-            if (locMissing.isNotEmpty()) {
-                throw GradleException(
-                    "Global schema publication has no effective schema_site PublicationEndpoint for: " +
-                        locMissing.distinct().sorted().joinToString(", ")
-                )
-            }
-        }
+        manifestFile.set(locSchemaManifestFile)
     }
 }
 
