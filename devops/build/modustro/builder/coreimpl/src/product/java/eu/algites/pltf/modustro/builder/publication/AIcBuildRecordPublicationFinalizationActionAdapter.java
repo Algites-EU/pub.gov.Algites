@@ -34,8 +34,9 @@ public final class AIcBuildRecordPublicationFinalizationActionAdapter implements
             throw new IllegalArgumentException("Build record requires effective GroupId.");
         }
         String locFilename = AIcFilename(locInputUri);
-        long locSize = AIcSize(locInputUri);
-        String locSha256 = AIcHash(locInputUri);
+        URI locContentUri = AIcContentUri(aContext);
+        long locSize = AIcSize(locContentUri);
+        String locSha256 = AIcHash(locContentUri);
         Map<String, Object> locRecord = new LinkedHashMap<>();
         locRecord.put("BuildRecordVersion", 1);
         locRecord.put("Artifact", Map.of(
@@ -74,6 +75,17 @@ public final class AIcBuildRecordPublicationFinalizationActionAdapter implements
         }
         return new AIcPublicationFinalizationActionResult(aContext.action().id(), true, true, false, 1, Duration.ZERO,
                 locPublicationResult.outputUri(), Map.of("PublicationId", locPublicationResult.publicationId()), null);
+    }
+
+    /** A transport preserves the submitted bytes; nested actions may produce new content. */
+    private static URI AIcContentUri(AIcPublicationFinalizationActionAttemptContext aContext) {
+        if (!aContext.lineage().steps().isEmpty()) {
+            AIcPublicationExecutionStep locParent = aContext.lineage().parent();
+            if ("publication".equals(locParent.kind()) && locParent.inputUri() != null) {
+                return locParent.inputUri();
+            }
+        }
+        return aContext.inputUri();
     }
 
     private static String AIcFilename(URI aUri) {

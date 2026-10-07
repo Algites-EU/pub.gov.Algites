@@ -249,7 +249,8 @@ val locResolveSchemaPublicationPlan = rootProject.extra["modustroResolvePublicat
     String,
     List<String>
 ) -> Map<String, Any?>
-val locSchemaRepositoryVisibility = ((rootProject.extra["modustroResolvedRepositoryMetadata"] as Map<*, *>)["visibility"]?.toString())
+val locSchemaRepositoryMetadata = rootProject.extra["modustroResolvedRepositoryMetadata"] as Map<*, *>
+val locSchemaRepositoryVisibility = locSchemaRepositoryMetadata["visibility"]?.toString()
     ?: error("Algites repository visibility is unavailable for schema publication.")
 val locSchemaPublicationState = ((findProperty("modustro.schemas.publicationState") as String?) ?: "draft")
     .trim()
@@ -368,6 +369,13 @@ if (tasks.findByName("publishModustroSchemaSite") == null) {
         stability.set(locSchemaPublicationStability)
         artifactIdentity.set(rootProject.name)
         publicationVersion.set(locSchemaPublicationState)
+        coordinates.set(if (locSchemaHasPublicationEndpoints) mapOf(
+            "groupId" to (locSchemaRepositoryMetadata["groupId"]?.toString()?.takeIf(String::isNotBlank)
+                ?: error("Algites effective repository GroupId is unavailable for schema publication.")),
+            "artifactId" to rootProject.name,
+            "technologyKind" to "modustro",
+            "logicalVersion" to rootProject.version.toString()
+        ) else emptyMap())
         payloadRoot.set(locSchemaSiteRoot)
         publicationService.set(locPublicationService)
         usesService(locPublicationService)
