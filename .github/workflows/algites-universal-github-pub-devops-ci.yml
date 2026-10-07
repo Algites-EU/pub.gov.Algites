@@ -418,6 +418,18 @@ jobs:
           locPythonExecutable="$(python -c 'import sys; print(sys.executable)')"
           echo "ALGITES_PYTHON_EXECUTABLE=${locPythonExecutable}" >> "${GITHUB_ENV}"
 
+      - name: Install governed Gradle defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          locCommand="${RUNNER_TEMP}/modustro-gradle.sh"
+          curl -fsSL \
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${MODUSTRO_PUBLIC_GOVERNANCE_REVISION:-main}/gradle/tool/repository/modustro-gradle.sh" \
+            > "${locCommand}"
+          chmod +x "${locCommand}"
+          echo "ALGITES_GRADLE_COMMAND=${locCommand}" >> "${GITHUB_ENV}"
+          echo "MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME=gradle-diagnostic-reports-${GITHUB_JOB}-${GITHUB_RUN_ATTEMPT}-$(cat /proc/sys/kernel/random/uuid)" >> "${GITHUB_ENV}"
+
       - name: Resolve required Algites credentials
         id: algites-credential-plan
         if: ${{ steps.mode.outputs.mode != 'skip' }}
@@ -428,7 +440,7 @@ jobs:
           set -euo pipefail
           chmod +x "${GITHUB_WORKSPACE}/gradlew" || true
           locPlanFile="${RUNNER_TEMP}/algites-required-credentials.json"
-          "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q \
+          "${ALGITES_GRADLE_COMMAND}" --no-daemon -q \
             resolveModustroRequiredCredentials \
             -Palgites.credential.usages=subscription \
             -Palgites.credential.subscription.stabilities=release,snapshot \
@@ -531,7 +543,7 @@ jobs:
           }
           KTS
 
-          RESOLVED_METADATA="$(_TMP_ALGITES_METADATA_REPOSITORY_DIR="${GITHUB_WORKSPACE}" "${GITHUB_WORKSPACE}/gradlew" --no-daemon -q --project-dir "${LOC_RESOLVER_PROJECT_DIR}" algitesCiResolveMetadata)"
+          RESOLVED_METADATA="$(_TMP_ALGITES_METADATA_REPOSITORY_DIR="${GITHUB_WORKSPACE}" "${ALGITES_GRADLE_COMMAND}" --no-daemon -q --project-dir "${LOC_RESOLVER_PROJECT_DIR}" algitesCiResolveMetadata)"
           printf '%s\n' "$RESOLVED_METADATA"
 
           algites_ci_get_value() {
@@ -671,7 +683,7 @@ jobs:
               --build-root "${{ steps.modustro_phase_controller.outputs.build_root }}" \
               -- "${locArgs[@]}"
           else
-            "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
+            "${ALGITES_GRADLE_COMMAND}" --no-daemon $EXTRA ${{ inputs.gradle-construction-task }}
           fi
 
       # -------------------------
@@ -696,7 +708,7 @@ jobs:
               --build-root "${{ steps.modustro_phase_controller.outputs.build_root }}" \
               -- "${locArgs[@]}"
           else
-            "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
+            "${ALGITES_GRADLE_COMMAND}" --no-daemon $EXTRA ${{ inputs.gradle-verification-task }}
           fi
 
       # -------------------------
@@ -722,10 +734,23 @@ jobs:
               --build-root "${{ steps.modustro_phase_controller.outputs.build_root }}" \
               -- "${locArgs[@]}"
           else
-            "${GITHUB_WORKSPACE}/gradlew" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
+            "${ALGITES_GRADLE_COMMAND}" --no-daemon $EXTRA ${{ inputs.gradle-approval-task }}
           fi
 
       - name: Skip (non-matching branch)
         if: ${{ steps.mode.outputs.mode == 'skip' }}
         run: |
           echo "Mode=skip → no construction/verification/approval for this branch."
+      - name: Upload Gradle diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME || format('gradle-diagnostic-reports-{0}-{1}-{2}', github.job, github.run_attempt, strategy.job-index) }}
+          path: |
+            **/reports/configuration-cache/**
+            **/reports/problems/**
+            **/reports/tests/**
+            **/test-results/**
+          if-no-files-found: warn
+          retention-days: 7
+

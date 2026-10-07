@@ -181,6 +181,18 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
+      - name: Install governed Gradle defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          locCommand="${RUNNER_TEMP}/modustro-gradle.sh"
+          curl -fsSL \
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${MODUSTRO_PUBLIC_GOVERNANCE_REVISION:-main}/gradle/tool/repository/modustro-gradle.sh" \
+            > "${locCommand}"
+          chmod +x "${locCommand}"
+          echo "ALGITES_GRADLE_COMMAND=${locCommand}" >> "${GITHUB_ENV}"
+          echo "MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME=gradle-diagnostic-reports-${GITHUB_JOB}-${GITHUB_RUN_ATTEMPT}-$(cat /proc/sys/kernel/random/uuid)" >> "${GITHUB_ENV}"
+
       - name: Create new lane branches (per variant)
         shell: bash
         run: |
@@ -312,7 +324,7 @@ jobs:
           }
           KTS
 
-            _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" ./gradlew --no-daemon --quiet --project-dir "${LOC_RESOLVER_PROJECT_DIR}" writeAlgitesResolvedArtifactMetadataProperties
+            _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${LOC_RESOLVED_PROPERTIES_FILE}" "${ALGITES_GRADLE_COMMAND}" --no-daemon --quiet --project-dir "${LOC_RESOLVER_PROJECT_DIR}" writeAlgitesResolvedArtifactMetadataProperties
 
             LOC_RESOLVED_LANE="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
             LOC_RESOLVED_QUALIFIER_KIND="$(grep -m 1 '^artifactDirectories\.0\.version\.qualifierKind=' "${LOC_RESOLVED_PROPERTIES_FILE}" | cut -d= -f2- || true)"
@@ -332,3 +344,16 @@ jobs:
             git switch -
             git branch -D "$TMP" || true
           done
+      - name: Upload Gradle diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME || format('gradle-diagnostic-reports-{0}-{1}-{2}', github.job, github.run_attempt, strategy.job-index) }}
+          path: |
+            **/reports/configuration-cache/**
+            **/reports/problems/**
+            **/reports/tests/**
+            **/test-results/**
+          if-no-files-found: warn
+          retention-days: 7
+

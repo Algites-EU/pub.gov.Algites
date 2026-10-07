@@ -2508,6 +2508,7 @@ subprojects {
                     }
                     val locArchive = tasks.named<Jar>(locArchiveTaskName).flatMap { it.archiveFile }
                     val locPom = layout.buildDirectory.file("publications/mavenJava/pom-default.xml")
+                    val locModule = layout.buildDirectory.file("publications/mavenJava/module.json")
                     val locPlanJson = locModustroPublicationPlanJson(locOutputKind, "java")
                     val locPublish = tasks.register<AIcModustroPublishFilesTask>(locTaskName) {
                         group = "publishing"
@@ -2515,9 +2516,11 @@ subprojects {
                         dependsOn(modustroPublicationBuildGate)
                         payloadFiles.from(locArchive)
                         if (locArchiveTaskName == "jar") {
-                            dependsOn("generatePomFileForMavenJavaPublication")
+                            dependsOn("generatePomFileForMavenJavaPublication", "generateMetadataFileForMavenJavaPublication")
                             payloadFiles.from(locPom)
+                            payloadFiles.from(locModule)
                             publishedFileNames.put("pom-default.xml", "$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion.pom")
+                            publishedFileNames.put("module.json", "$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion.module")
                         }
                         publicationPlanJson.set(locPlanJson)
                         credentialProfilesJson.set(locPublicationCredentialProfilesJson)

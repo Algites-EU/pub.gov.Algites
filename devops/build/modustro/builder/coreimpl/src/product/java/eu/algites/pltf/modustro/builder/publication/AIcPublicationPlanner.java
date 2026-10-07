@@ -229,7 +229,7 @@ public final class AIcPublicationPlanner {
     }
 
     private static AIcPublicationPayload AIcForm(AIcPublicationPayload aRoot, Map<String, Object> aForm,
-            AIcPublicationEndpoint aEndpoint, boolean aIncludePom, Map<String, Object> aContext) {
+            AIcPublicationEndpoint aEndpoint, boolean aIncludePom, Map<String, Object> aContext) throws Exception {
         Map<String, String> locCoordinates = new LinkedHashMap<>(aRoot.coordinates());
         List<AIcPublicationPayloadFile> locFiles = new ArrayList<>();
         String locPublishedVersion = aRoot.version();
@@ -252,6 +252,34 @@ public final class AIcPublicationPlanner {
             locCoordinates.put("snapshotBuildNumber", locNumber);
         }
         for (AIcPublicationPayloadFile locFile : aRoot.files()) {
+            if (locJava && locFile.logicalName().endsWith(".module")) {
+                if (aIncludePom) {
+                    String locModuleName = locCoordinates.get("artifactId") + "-" + locPublishedVersion + ".module";
+                    URI locContent = locFile.contentUri();
+                    if (!Objects.equals(locPublishedVersion, aRoot.version())) {
+                        Path locModule = locFile.path().resolveSibling(UUID.randomUUID() + ".module");
+                        String locText = Files.readString(locFile.path());
+                        String locOldPrefix = locCoordinates.get("artifactId") + "-" + aRoot.version();
+                        String locNewPrefix = locCoordinates.get("artifactId") + "-" + locPublishedVersion;
+                        /* Gradle-generated artifact names and URLs are JSON strings; component and dependency versions remain logical. */
+                        java.util.regex.Pattern locPattern = java.util.regex.Pattern.compile(
+                                "(\\\"(?:name|url)\\\"\\s*:\\s*\\\")" + java.util.regex.Pattern.quote(locOldPrefix));
+                        locText = locPattern.matcher(locText).replaceAll(
+                                "$1" + java.util.regex.Matcher.quoteReplacement(locNewPrefix));
+                        if (aForm.containsKey("Classifier") || aForm.containsKey("Extension")) {
+                            String locOriginalClassifier = locCoordinates.getOrDefault("classifier", "");
+                            String locOriginalExtension = locCoordinates.getOrDefault("extension", "jar");
+                            String locOriginalName = locNewPrefix + (locOriginalClassifier.isEmpty() ? "" : "-" + locOriginalClassifier) + "." + locOriginalExtension;
+                            String locPublishedName = locNewPrefix + (locClassifier.isEmpty() ? "" : "-" + locClassifier) + "." + locExtension;
+                            locText = locText.replace("\"" + locOriginalName + "\"", "\"" + locPublishedName + "\"");
+                        }
+                        Files.writeString(locModule, locText);
+                        locContent = locModule.toUri();
+                    }
+                    locFiles.add(new AIcPublicationPayloadFile(locContent, locModuleName));
+                }
+                continue;
+            }
             if (locFile.logicalName().endsWith(".pom")) {
                 if (aIncludePom) locFiles.add(new AIcPublicationPayloadFile(locFile.contentUri(), locJava
                         ? locCoordinates.get("artifactId") + "-" + locPublishedVersion + ".pom" : locFile.logicalName()));

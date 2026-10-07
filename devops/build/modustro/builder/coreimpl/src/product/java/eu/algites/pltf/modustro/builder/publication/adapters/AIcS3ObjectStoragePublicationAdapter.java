@@ -97,12 +97,43 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
             int locStatus = locConnection.getResponseCode();
             if (locStatus < 200 || locStatus >= 300) {
                 String locMessage = locConnection.getResponseMessage();
+                String locDetails = AIcErrorDetails(locConnection, locAccessKey, locSecretKey);
                 locConnection.disconnect();
-                throw new IllegalStateException("S3-compatible PUT failed for '" + locTarget + "' with HTTP " + locStatus + " " + locMessage + ".");
+                throw new IllegalStateException("S3-compatible PUT failed for '" + locTarget + "' with HTTP " + locStatus + " " + locMessage + "." + locDetails);
             }
             locConnection.disconnect();
         }
         aContext.progressReporter().completed("Object-storage publication completed.");
+    }
+
+    /** Reports only bounded S3 error fields, never the signed request or credential fields. */
+    private static String AIcErrorDetails(HttpURLConnection aConnection, String aAccessKey, String aSecretKey) {
+        try (var locInput = aConnection.getErrorStream()) {
+            if (locInput == null) return "";
+            byte[] locBody = locInput.readNBytes(16384);
+            var locFactory = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            locFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            locFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            locFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            locFactory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            locFactory.setAttribute(javax.xml.XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+            var locBuilder = locFactory.newDocumentBuilder();
+            locBuilder.setErrorHandler(new org.xml.sax.helpers.DefaultHandler());
+            var locDocument = locBuilder.parse(new java.io.ByteArrayInputStream(locBody));
+            StringBuilder locDetails = new StringBuilder();
+            for (String locField : new String[]{"Code", "Message", "RequestId", "Region"}) {
+                var locNodes = locDocument.getElementsByTagName(locField);
+                if (locNodes.getLength() == 0) continue;
+                String locValue = locNodes.item(0).getTextContent().replace(aAccessKey, "[redacted]").replace(aSecretKey, "[redacted]")
+                        .replaceAll("[\\p{Cntrl}\\s]+", " ").trim();
+                if (locValue.length() > 512) locValue = locValue.substring(0, 512);
+                if (!locValue.isBlank()) locDetails.append(" ").append(locField).append("=").append(locValue).append(";");
+            }
+            return locDetails.toString();
+        } catch (Exception locIgnored) {
+            /* A missing or non-XML response body must not hide the original HTTP failure. */
+            return "";
+        }
     }
 
     private static URI AIcRoot(URI aUri) {

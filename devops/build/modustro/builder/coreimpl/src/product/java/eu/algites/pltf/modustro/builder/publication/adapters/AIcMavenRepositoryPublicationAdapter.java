@@ -130,7 +130,10 @@ public final class AIcMavenRepositoryPublicationAdapter implements AIiPublicatio
             if(last.getTextContent().compareTo(updated)<=0){last.setTextContent(updated);var snapshot=child(document,versioning,"snapshot");set(document,snapshot,"timestamp",coords.get("snapshotTimestamp"));set(document,snapshot,"buildNumber",coords.get("snapshotBuildNumber"));}
             var versions=child(document,versioning,"snapshotVersions");
             for(var file:context.payload().files()){
-                boolean pom=file.logicalName().endsWith(".pom");String extension=pom?"pom":coords.get("extension");String classifier=pom?"":coords.getOrDefault("classifier","");
+                boolean pom=file.logicalName().endsWith(".pom");
+                boolean module=file.logicalName().endsWith(".module");
+                String extension=pom?"pom":module?"module":coords.get("extension");
+                String classifier=(pom||module)?"":coords.getOrDefault("classifier","");
                 if(extension==null||extension.isBlank())throw new IllegalArgumentException("Snapshot payload requires extension coordinate.");
                 org.w3c.dom.Element entry=null;
                 for(var node=versions.getFirstChild();node!=null;node=node.getNextSibling())if(node instanceof org.w3c.dom.Element element&&element.getTagName().equals("snapshotVersion")&&text(element,"extension").equals(extension)&&text(element,"classifier").equals(classifier)){entry=element;break;}

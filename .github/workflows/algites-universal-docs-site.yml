@@ -444,6 +444,18 @@ jobs:
           rm -rf "${locGradleUserHome}/caches"
           echo "ALGITES_GRADLE_REFRESH_ARGUMENT=--refresh-dependencies" >> "${GITHUB_ENV}"
 
+      - name: Install governed Gradle defaults
+        shell: bash
+        run: |
+          set -euo pipefail
+          locCommand="${RUNNER_TEMP}/modustro-gradle.sh"
+          curl -fsSL \
+            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${MODUSTRO_PUBLIC_GOVERNANCE_REVISION:-main}/gradle/tool/repository/modustro-gradle.sh" \
+            > "${locCommand}"
+          chmod +x "${locCommand}"
+          echo "ALGITES_GRADLE_COMMAND=${locCommand}" >> "${GITHUB_ENV}"
+          echo "MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME=gradle-diagnostic-reports-${GITHUB_JOB}-${GITHUB_RUN_ATTEMPT}-$(cat /proc/sys/kernel/random/uuid)" >> "${GITHUB_ENV}"
+
       - name: Resolve Algites artifact metadata
         id: algites-artifact-metadata
         working-directory: source
@@ -513,7 +525,7 @@ jobs:
           }
           KTS
 
-          _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" ./gradlew --no-daemon "${locPublishingArgs[@]}" ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} --quiet --project-dir "${locResolverProjectDir}" writeAlgitesResolvedArtifactMetadataProperties
+          _TMP_ALGITES_METADATA_REPOSITORY_DIR="${PWD}" _TMP_ALGITES_RESOLVED_PROPERTIES_FILE="${locResolvedPropertiesFile}" "${ALGITES_GRADLE_COMMAND}" --no-daemon "${locPublishingArgs[@]}" ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} --quiet --project-dir "${locResolverProjectDir}" writeAlgitesResolvedArtifactMetadataProperties
 
           locResolvedVersion="$(grep -m 1 '^artifactDirectories\.0\.version\.resolvedValue=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
           locResolvedLane="$(grep -m 1 '^artifactDirectories\.0\.version\.lane=' "${locResolvedPropertiesFile}" | cut -d= -f2- || true)"
@@ -611,7 +623,7 @@ jobs:
           set -euo pipefail
           mapfile -t locPublishingArgs < "${MODUSTRO_PUBLICATION_ARGUMENTS_FILE}"
 
-          ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
+          "${ALGITES_GRADLE_COMMAND}" --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
             ${{ steps.request.outputs.gradle-task }} \
             -Pmodustro.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
             -Pmodustro.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
@@ -648,7 +660,7 @@ jobs:
           set -euo pipefail
           mapfile -t locPublishingArgs < "${MODUSTRO_PUBLICATION_ARGUMENTS_FILE}"
 
-          ./gradlew --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
+          "${ALGITES_GRADLE_COMMAND}" --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
             publishModustroDocsSite \
             -Pmodustro.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
             -Pmodustro.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
@@ -683,3 +695,16 @@ jobs:
         if: ${{ steps.publication.outputs.publish-github-pages == 'true' && steps.docs_publishing_policy.outputs.publishing_enabled == 'true' }}
         id: deploy-pages
         uses: actions/deploy-pages@v4
+      - name: Upload Gradle diagnostic reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME || format('gradle-diagnostic-reports-{0}-{1}-{2}', github.job, github.run_attempt, strategy.job-index) }}
+          path: |
+            **/reports/configuration-cache/**
+            **/reports/problems/**
+            **/reports/tests/**
+            **/test-results/**
+          if-no-files-found: warn
+          retention-days: 7
+
