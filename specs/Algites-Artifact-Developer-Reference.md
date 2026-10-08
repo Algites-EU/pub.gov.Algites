@@ -199,6 +199,12 @@ Version:
   QualifierKind: snapshot
 ```
 
+The schema-site publication endpoint may be active even for a repository with no canonical
+definitions. Staging in that case succeeds with an empty manifest, while
+`publishModustroSchemaSite` is skipped without contacting the remote repository.
+This is a no-op only for genuinely empty schema content; missing sidecars, invalid
+paths, missing manifests, and failures affecting non-empty publications remain errors.
+
 ### 4.1 `SourceRepository`
 
 | Attribute | Required | Meaning |

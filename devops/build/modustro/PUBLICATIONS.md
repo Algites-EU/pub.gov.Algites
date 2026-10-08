@@ -739,6 +739,14 @@ Alternatively, opt in to the generator as a prerequisite of schema-site staging:
 This also applies transitively to `publishModustroSchemaSite`. Without the property,
 missing sidecars remain a hard validation error. Limit representations if desired with
 `-Pmodustro.schemas.sourceKinds=yamldefs,jsondefs,xmldefs` (or a subset).
+If `schema_site` publishing is enabled but no canonical definitions are found in the
+selected source roots, `generateModustroSchemaSite` still writes its empty manifest and
+`publishModustroSchemaSite` is **SKIPPED** (no upload, no publication error).
+This also permits repositories that only publish Java/Python artifacts to inherit the
+common schema-site publishing configuration. If at least one definition is staged,
+normal validation and required publishing remain strict; a missing staging manifest
+is always an error.
+
 This affects **source** user sidecars only: the existing
 `-Pmodustro.schemas.adoptUntrackedDrafts=true` is a different one-off operation for
 remote **deploy** metadata on existing S3 draft objects.

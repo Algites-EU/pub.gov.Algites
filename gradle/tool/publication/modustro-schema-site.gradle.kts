@@ -485,6 +485,22 @@ if (tasks.findByName("publishModustroSchemaSite") == null) {
         if (locSchemaHasPublicationEndpoints) {
             dependsOn("prepareModustroSchemaPublishing")
             payloadFiles.from(locFiles)
+            /* An enabled schema endpoint does not imply that this repository owns schemas.
+             * The staging task always writes a manifest, even when it has zero definition rows.
+             * Skip only the empty schema-site publication; other empty payloads remain errors. */
+            onlyIf("Canonical definitions are staged for schema-site publication") {
+                val locManifest = File(payloadRoot.get().asFile, ".modustro-publishing/schema-site.tsv")
+                if (!locManifest.isFile) {
+                    throw GradleException("Schema-site staging did not produce its required manifest: '$locManifest'.")
+                }
+                val locHasDefinitions = locManifest.useLines(Charsets.UTF_8) { locLines ->
+                    locLines.drop(1).any(String::isNotBlank)
+                }
+                if (!locHasDefinitions) {
+                    logger.lifecycle("Skipping schema-site publication for '${artifactIdentity.get()}': no canonical definitions staged.")
+                }
+                locHasDefinitions
+            }
         }
         publicationPlanJson.set(JsonOutput.toJson(locArtifactPlans.firstOrNull()?.first ?: mapOf("publicationEnabled" to false)))
         credentialProfilesJson.set(JsonOutput.toJson(locCredentialProfiles))

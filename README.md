@@ -28,6 +28,10 @@ modified, and this does not create remote S3 deployment metadata. See
 `specs/Algites-Artifact-Developer-Reference.md` §3.2 and
 `devops/build/modustro/PUBLICATIONS.md`.
 
+When schema-site publication is enabled but a repository has no canonical definitions,
+`publishModustroSchemaSite` skips the upload after successful empty staging. Non-empty
+schema publications retain normal validation and fail-on-publishing-error behavior.
+
 ### Python bytecode cache in Gradle builds
 
 Managed Python subprocesses run with `PYTHONDONTWRITEBYTECODE=1`; existing
