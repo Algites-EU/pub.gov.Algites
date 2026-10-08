@@ -256,23 +256,16 @@ public final class AIcPublicationPlanner {
                 if (aIncludePom) {
                     String locModuleName = locCoordinates.get("artifactId") + "-" + locPublishedVersion + ".module";
                     URI locContent = locFile.contentUri();
-                    if (!Objects.equals(locPublishedVersion, aRoot.version())) {
+                    if (aForm.containsKey("Classifier") || aForm.containsKey("Extension")) {
                         Path locModule = locFile.path().resolveSibling(UUID.randomUUID() + ".module");
                         String locText = Files.readString(locFile.path());
-                        String locOldPrefix = locCoordinates.get("artifactId") + "-" + aRoot.version();
-                        String locNewPrefix = locCoordinates.get("artifactId") + "-" + locPublishedVersion;
-                        /* Gradle-generated artifact names and URLs are JSON strings; component and dependency versions remain logical. */
-                        java.util.regex.Pattern locPattern = java.util.regex.Pattern.compile(
-                                "(\\\"(?:name|url)\\\"\\s*:\\s*\\\")" + java.util.regex.Pattern.quote(locOldPrefix));
-                        locText = locPattern.matcher(locText).replaceAll(
-                                "$1" + java.util.regex.Matcher.quoteReplacement(locNewPrefix));
-                        if (aForm.containsKey("Classifier") || aForm.containsKey("Extension")) {
-                            String locOriginalClassifier = locCoordinates.getOrDefault("classifier", "");
-                            String locOriginalExtension = locCoordinates.getOrDefault("extension", "jar");
-                            String locOriginalName = locNewPrefix + (locOriginalClassifier.isEmpty() ? "" : "-" + locOriginalClassifier) + "." + locOriginalExtension;
-                            String locPublishedName = locNewPrefix + (locClassifier.isEmpty() ? "" : "-" + locClassifier) + "." + locExtension;
-                            locText = locText.replace("\"" + locOriginalName + "\"", "\"" + locPublishedName + "\"");
-                        }
+                        /* Keep logical SNAPSHOT references: Gradle resolves them through repository metadata. */
+                        String locPrefix = locCoordinates.get("artifactId") + "-" + aRoot.version();
+                        String locOriginalClassifier = locCoordinates.getOrDefault("classifier", "");
+                        String locOriginalExtension = locCoordinates.getOrDefault("extension", "jar");
+                        String locOriginalName = locPrefix + (locOriginalClassifier.isEmpty() ? "" : "-" + locOriginalClassifier) + "." + locOriginalExtension;
+                        String locPublishedName = locPrefix + (locClassifier.isEmpty() ? "" : "-" + locClassifier) + "." + locExtension;
+                        locText = locText.replace("\"" + locOriginalName + "\"", "\"" + locPublishedName + "\"");
                         Files.writeString(locModule, locText);
                         locContent = locModule.toUri();
                     }

@@ -61,8 +61,8 @@ public final class AIcPublicationMetadataChecks {
             new AIcMavenRepositoryPublicationAdapter().publish(AIcContext(locJob, Map.of()));
             String locBase = "/test/library/1.0-SNAPSHOT/";
             String locPublished = new String(locStored.get(locBase + "library-" + locVersion + ".module"), StandardCharsets.UTF_8);
-            AIcPublicationCheckAssertions.assertTrue(locPublished.contains("\"url\":\"library-" + locVersion + ".jar\""));
-            AIcPublicationCheckAssertions.assertTrue(locPublished.contains("library-" + locVersion + "-sources.jar"));
+            AIcPublicationCheckAssertions.assertTrue(locPublished.contains("\"url\":\"library-1.0-SNAPSHOT.jar\""));
+            AIcPublicationCheckAssertions.assertTrue(locPublished.contains("library-1.0-SNAPSHOT-sources.jar"));
             AIcPublicationCheckAssertions.assertTrue(locPublished.contains("\"requires\":\"1.0-SNAPSHOT\""));
             AIcPublicationCheckAssertions.assertTrue(locPublished.contains("\"version\":\"1.0-SNAPSHOT\""));
             AIcPublicationCheckAssertions.assertTrue(locPublished.contains("original-hash"));
