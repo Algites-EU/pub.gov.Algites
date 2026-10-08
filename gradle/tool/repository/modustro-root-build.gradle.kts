@@ -60,6 +60,7 @@ import org.gradle.api.publish.maven.MavenPublication
 import org.gradle.api.credentials.HttpHeaderCredentials
 import org.gradle.authentication.http.HttpHeaderAuthentication
 import org.gradle.api.tasks.Exec
+import org.gradle.api.tasks.JavaExec
 import org.gradle.api.tasks.Input
 import org.gradle.api.tasks.InputDirectory
 import org.gradle.api.tasks.Classpath
@@ -420,6 +421,7 @@ abstract class AIcGeneratePythonProjectMetadataTask : DefaultTask() {
         """.trimIndent()
         val locProcess = ProcessBuilder(pythonExecutable.get(), "-c", locScript, aTemplateFile.absolutePath)
             .redirectErrorStream(true)
+            .apply { environment()["PYTHONDONTWRITEBYTECODE"] = "1" }
             .start()
         val locOutput = locProcess.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (locProcess.waitFor() != 0) {
@@ -632,6 +634,7 @@ abstract class AIcResolvePythonDependenciesTask : DefaultTask() {
         """.trimIndent()
         val locProcess = ProcessBuilder(pythonExecutable.get(), "-c", locScript, locTemplateFile.absolutePath)
             .redirectErrorStream(true)
+            .apply { environment()["PYTHONDONTWRITEBYTECODE"] = "1" }
             .start()
         val locOutput = locProcess.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
         if (locProcess.waitFor() != 0) {
@@ -693,6 +696,7 @@ abstract class AIcResolvePythonDependenciesTask : DefaultTask() {
             val locProcess = ProcessBuilder(locCommand)
                 .directory(projectDirectory.get().asFile)
                 .redirectErrorStream(true)
+                .apply { environment()["PYTHONDONTWRITEBYTECODE"] = "1" }
                 .start()
             val locOutputText = locProcess.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
             val locExitCode = locProcess.waitFor()
@@ -1735,8 +1739,28 @@ allprojects {
         }
     }
 
+    /*
+     * Python test helpers may import modules from staged dependency directories.
+     * Do not generate transient bytecode while running TestNG-based JVM tests.
+     * Classpath normalization prevents existing .pyc files from changing Test
+     * up-to-date and build-cache fingerprints without changing the runtime classpath.
+     */
+    normalization {
+        runtimeClasspath {
+            ignore("**/__pycache__/**")
+            ignore("**/*.pyc")
+            ignore("**/*.pyo")
+        }
+    }
     tasks.withType<Test>().configureEach {
         useTestNG()
+        environment("PYTHONDONTWRITEBYTECODE", "1")
+    }
+    tasks.withType<Exec>().configureEach {
+        environment("PYTHONDONTWRITEBYTECODE", "1")
+    }
+    tasks.withType<JavaExec>().configureEach {
+        environment("PYTHONDONTWRITEBYTECODE", "1")
     }
 }
 
@@ -2951,7 +2975,9 @@ subprojects {
                 locModustroManifestOutputFile.get().asFile.absolutePath,
                 locPythonBuildModes.joinToString(",")
             )
-            inputs.dir(locPythonBuildProjectDirectory)
+            inputs.files(project.fileTree(locPythonBuildProjectDirectory) {
+                exclude("**/__pycache__/**", "**/*.pyc", "**/*.pyo")
+            })
             inputs.file(locModustroManifestOutputFile)
             outputs.dir(locPythonDistDirectory)
         }
@@ -3017,7 +3043,7 @@ subprojects {
                     dependsOn(locGenerateDevelopMetadata)
                     into(locDevelopRoot)
                     from(project.layout.projectDirectory) {
-                        exclude("run/**", "build/**", ".gradle/**", ".kotlin/**", "**/__pycache__/**", "**/*.pyc", "pyproject.toml", "src/product/**")
+                        exclude("run/**", "build/**", ".gradle/**", ".kotlin/**", "**/__pycache__/**", "**/*.pyc", "**/*.pyo", "pyproject.toml", "src/product/**")
                     }
                     from(locDevelopMetadata) { rename { "pyproject.toml" } }
                     locAlgitesProductLicenses.forEach { license ->
@@ -3032,7 +3058,11 @@ subprojects {
                     commandLine(modustroGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3", "-c", locPythonBuildAndManifestScript,
                         locDevelopRoot.asFile.absolutePath, locDevelopDist.asFile.absolutePath,
                         locModustroManifestOutputFile.get().asFile.absolutePath, "wheel,sdist")
-                    inputs.dir(locDevelopRoot); inputs.file(locModustroManifestOutputFile); outputs.dir(locDevelopDist)
+                    inputs.files(project.fileTree(locDevelopRoot) {
+                        exclude("**/__pycache__/**", "**/*.pyc", "**/*.pyo")
+                    })
+                    inputs.file(locModustroManifestOutputFile)
+                    outputs.dir(locDevelopDist)
                 }
                 locDevelopKinds.forEach { kind ->
                     val plan = locDevelopPlans.getValue(kind)

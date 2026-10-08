@@ -21,6 +21,7 @@ public final class AIcMavenBuildRecordChecks {
         AIcMavenBuildRecordChecks locChecks = new AIcMavenBuildRecordChecks();
         locChecks.AIcPublishesPairedSnapshotAndBuildRecord();
         locChecks.AIcRecordsTransformedParent();
+        locChecks.AIcRejectsRemoteSourceWithoutDownloadingIt();
     }
 
     public void AIcPublishesPairedSnapshotAndBuildRecord() throws Exception {
@@ -157,6 +158,40 @@ public final class AIcMavenBuildRecordChecks {
         AIcPublicationCheckAssertions.assertTrue(locRecord[0].contains(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locParentFile)));
         AIcPublicationCheckAssertions.assertTrue(!locRecord[0].contains(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locRootFile)));
         AIcPublicationCheckAssertions.assertTrue(locRecord[0].contains("transformed.jar"));
+    }
+
+    /** A publication without a local input must not anonymously download from a private Maven endpoint. */
+    public void AIcRejectsRemoteSourceWithoutDownloadingIt() throws Exception {
+        java.net.URI locRemoteUri = java.net.URI.create("https://maven.cloudsmith.io/example/private/library.jar");
+        Path locDirectory = Files.createTempDirectory("modustro-record-remote-");
+        AIcPublicationPayload locPayload = new AIcPublicationPayload(
+                AInPublicationOutputKind.NATIVE_PRODUCT_BINARIES, AInPublicationStability.SNAPSHOT,
+                "test:library", "1.0-SNAPSHOT",
+                List.of(new AIcPublicationPayloadFile(locRemoteUri, "library.jar")),
+                Map.of("groupId", "test", "artifactId", "library", "version", "1.0-SNAPSHOT"));
+        AIcPublicationExecutionLineage locLineage = new AIcPublicationExecutionLineage(List.of(
+                new AIcPublicationExecutionStep("publication", "publication", locRemoteUri, locRemoteUri, Map.of(), Map.of())));
+        AIcPublicationFinalizationAction locAction = new AIcPublicationFinalizationAction(
+                "build-record", true, "modustro-build-record", null, 0,
+                AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, false, Map.of(), List.of());
+        AIcPublicationEndpoint locEndpoint = AIcPublicationPlanner.endpoint(Map.of(
+                "Id", "target", "PublicationAdapter", "local-copy", "PublicationUri", locDirectory.toUri().toString()), "target");
+        AIcPublicationFinalizationActionAttemptContext locContext = new AIcPublicationFinalizationActionAttemptContext(
+                locAction, locLineage, locPayload, locRemoteUri, locEndpoint, 1, 1, null, null, Map.of(),
+                () -> false, new AIiPublicationProgressReporter() {
+                    @Override public void started(String aMessage) { }
+                    @Override public void progress(long aCompleted, long aTotal, String aUnit, String aMessage) { }
+                    @Override public void indeterminate(String aMessage) { }
+                    @Override public void completed(String aMessage) { }
+                }, (aPayload, aEndpoint) -> {
+                    throw new AssertionError("Remote source must be rejected before attempting sidecar publishing.");
+                });
+        try {
+            new AIcBuildRecordPublicationFinalizationActionAdapter().execute(locContext);
+            throw new AssertionError("Expected remote build-record source to be rejected.");
+        } catch (IllegalStateException locExpected) {
+            AIcPublicationCheckAssertions.assertTrue(locExpected.getMessage().contains("refusing an unauthenticated download"));
+        }
     }
 
 }

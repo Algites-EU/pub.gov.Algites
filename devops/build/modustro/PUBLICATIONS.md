@@ -711,3 +711,74 @@ and executed validation evidence are recorded in the checkpoint's `VALIDATION.md
 Provider cleanup tests use mock HTTP. A passing graph/test suite does not claim that production Cloudsmith/Repsy
 credentials, remote uploads, or remote cleanup have been exercised. Those are integration checks in the target environment.
 
+
+
+### Generating missing canonical-definition user sidecars
+
+The globally published `yamldefs`, `jsondefs` and `xmldefs` definitions require a sibling
+`<definition-filename>.meta.yml` in the source repository. The **local** source-sidecar bootstrap
+is separate from S3 deploy-sidecar creation and does not access publishing credentials.
+
+```bash
+./gradlew generateMissingModustroSchemaSidecars --no-configuration-cache
+```
+
+The task uses the discovered artifact directories and the canonical source roots
+`src/product/{yamldefs,jsondefs,xmldefs}`. New files contain the governed
+`global-publication-user-metadata_1` `$schema` URI and a `GlobalPublicationPathId` derived
+from the definition's source-root-relative path (never from the `src/product` prefix).
+Existing `.meta.yml` files are **never overwritten**. Review the generated source files with
+`git status --short` / `git diff` and commit them as authored inputs.
+
+Alternatively, opt in to the generator as a prerequisite of schema-site staging:
+
+```bash
+./gradlew generateModustroSchemaSite -Pmodustro.schemas.generateMissingUserSidecars=true
+```
+
+This also applies transitively to `publishModustroSchemaSite`. Without the property,
+missing sidecars remain a hard validation error. Limit representations if desired with
+`-Pmodustro.schemas.sourceKinds=yamldefs,jsondefs,xmldefs` (or a subset).
+This affects **source** user sidecars only: the existing
+`-Pmodustro.schemas.adoptUntrackedDrafts=true` is a different one-off operation for
+remote **deploy** metadata on existing S3 draft objects.
+
+## Python bytecode cache during Modustro builds
+
+The shared Gradle wrapper exports `PYTHONDONTWRITEBYTECODE=1` for the whole build,
+and the Gradle root build conventions independently prevent Python processes invoked by
+`Test`, `Exec`, `JavaExec`, Python dependency preflight, and Sphinx documentation
+from producing `.pyc` and `__pycache__` files (`PYTHONDONTWRITEBYTECODE=1`).
+The Python repository publication adapter applies the same environment variable
+to Twine. For third-party code executed outside these managed processes, the
+calling workflow must likewise set `PYTHONDONTWRITEBYTECODE=1`.
+
+Gradle runtime classpath normalization excludes `**/__pycache__/**`, `**/*.pyc`,
+and `**/*.pyo` when computing up-to-date/build-cache fingerprints. Native and
+development Python packaging tasks also exclude existing Python bytecode from
+tracked inputs. Existing bytecode files are not deleted; they are ignored.
+This deliberately does not disable Python's in-memory compilation.
+
+To verify locally, run a test task twice with `--info` (without `--rerun-tasks`
+or `--refresh-dependencies`), and check that the second run is `UP-TO-DATE` or
+`FROM-CACHE` when its actual inputs have not changed. New Python executions
+should not create any `__pycache__` files.
+
+## Build-record finalization of Maven repository publications
+
+The `modustro-build-record` publication-finalization action hashes the **local
+source bytes of the immediately preceding publication or local transform**.
+It records SHA-256 and byte size in the build-record sidecar without issuing a
+GET request against the published Maven URL. A repository can require credentials
+for downloads independently of allowing an authenticated upload; anonymous
+reads must not be assumed.
+
+If the source of the action is no longer locally materialized, the action fails
+explicitly instead of downloading it anonymously. A remote-only publication
+needs a separate verified content-metadata mechanism; it must not silently fall
+back to the original root artifact when a nested action transformed the bytes.
+
+When updating the Maven publisher/finalization code, rebuild and republish
+`pub.gov.Algites_devops.build.modustro.builder.coreimpl` (JAR, POM, `.module`)
+and refresh the consuming Gradle dependency. Merely changing governance sources
+does not replace an already cached Maven bootstrap binary.

@@ -156,6 +156,26 @@ Every canonical definition that participates in global publication carries a sib
 
 The publication service validates the user sidecar and generates a separate `global-publication-deploy-metadata_1` sidecar for deployed content. Deploy metadata carries the validated `GlobalPublicationPathId` plus server-controlled `PublicationState` (`draft` or `release`), `PublicationRevision`, `FirstPublishedAt`, `PublishedAt`, optional `ReleasedAt`, and optional trusted `PublishedBy`. `PublicationRevision` is controlled by the publisher and monotonically increases when deployed draft content is replaced. Transitioning a definition to `release` freezes that content revision; a released `GlobalPublicationPathId` is immutable and must never transition back to `draft`. If `PublishedBy` is present, the deployment adapter must derive it from authenticated/trusted execution context and must never copy it from repository metadata or another author-controlled input.
 
+**Generate missing author-controlled sidecars locally:** from the target repository root run
+`./gradlew generateMissingModustroSchemaSidecars --no-configuration-cache`. This explicit task scans
+all discovered artifacts' `src/product/yamldefs`, `src/product/jsondefs`, and `src/product/xmldefs`
+source roots; for each canonical definition without a sibling `.meta.yml`, it creates one using the
+versioned `global-publication-user-metadata_1` schema URI and `GlobalPublicationPathId` equal to
+the source-root-relative filename (with its relative directories). It includes the three conventional
+YAML `$schema` hints. Existing metadata is left byte-for-byte unchanged, even if its contents need
+manual correction; subsequent schema-site validation remains strict. No deployed sidecars, S3 objects,
+or publication state are changed by this task. This operation edits **authored source files**; review
+`git status --short` before committing the generated metadata.
+
+To automatically run the same explicit task before schema-site staging, use
+`./gradlew generateModustroSchemaSite -Pmodustro.schemas.generateMissingUserSidecars=true`.
+The same option works when running `publishModustroSchemaSite`, because publishing depends on staging.
+Without the option, normal staging/publishing still fails on missing user sidecars and never generates
+them silently. You can limit the representations with
+`-Pmodustro.schemas.sourceKinds=yamldefs,jsondefs,xmldefs` (or any comma-delimited subset).
+The property accepts only `true` or `false`; it is **not** the separate S3 migration option
+`modustro.schemas.adoptUntrackedDrafts`, which controls missing **remote deploy** metadata.
+
 The planned automatic definition `SystemId` follows the same logical-path rule: it is derived from the effective `GroupId`, the artifact-local logical path, the definition-relative directory path inside its canonical definition source root, and the logical filename. Source-root implementation segments are not part of that identity. Ordinary builds validate source metadata; automatic user-sidecar creation is reserved for an explicit generation task rather than silently mutating authored sources. Deploy sidecars are never generated in the source repository; they are created only at the publication trust boundary.
 
 Root YAML/JSON documents may expose `$schema` as technical document metadata. For generated YAML roots the comment form used by YAML language servers, the commented `$schema` hint, and the actual `$schema` property should identify the same schema URI. Embedded contracts keep `$schema` at the document root rather than forcing it into embedded business objects.

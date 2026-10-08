@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Prevent all Python subprocesses spawned by Gradle or its build logic from
+# creating transient bytecode beside staged source and dependency files.
+export PYTHONDONTWRITEBYTECODE=1
+
 # Default build caching and diagnostic stacktraces without overriding explicit choices.
 locWrapper="${MODUSTRO_GRADLE_WRAPPER:-}"
 locWrapperRoot="$PWD"

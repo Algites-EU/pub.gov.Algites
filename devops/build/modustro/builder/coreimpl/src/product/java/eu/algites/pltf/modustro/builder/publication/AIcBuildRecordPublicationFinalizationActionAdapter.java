@@ -34,9 +34,9 @@ public final class AIcBuildRecordPublicationFinalizationActionAdapter implements
             throw new IllegalArgumentException("Build record requires effective GroupId.");
         }
         String locFilename = AIcFilename(locInputUri);
-        URI locContentUri = AIcContentUri(aContext);
-        long locSize = AIcSize(locContentUri);
-        String locSha256 = AIcHash(locContentUri);
+        Path locContentPath = AIcLocalContentPath(aContext);
+        long locSize = Files.size(locContentPath);
+        String locSha256 = AIcHash(locContentPath);
         Map<String, Object> locRecord = new LinkedHashMap<>();
         locRecord.put("BuildRecordVersion", 1);
         locRecord.put("Artifact", Map.of(
@@ -77,15 +77,24 @@ public final class AIcBuildRecordPublicationFinalizationActionAdapter implements
                 locPublicationResult.outputUri(), Map.of("PublicationId", locPublicationResult.publicationId()), null);
     }
 
-    /** A transport preserves the submitted bytes; nested actions may produce new content. */
-    private static URI AIcContentUri(AIcPublicationFinalizationActionAttemptContext aContext) {
+    /** Hash the exact local bytes submitted to the parent publication, never its remote download URL. */
+    private static Path AIcLocalContentPath(AIcPublicationFinalizationActionAttemptContext aContext) {
+        URI locContentUri = aContext.inputUri();
         if (!aContext.lineage().steps().isEmpty()) {
             AIcPublicationExecutionStep locParent = aContext.lineage().parent();
             if ("publication".equals(locParent.kind()) && locParent.inputUri() != null) {
-                return locParent.inputUri();
+                locContentUri = locParent.inputUri();
             }
         }
-        return aContext.inputUri();
+        if (!"file".equalsIgnoreCase(locContentUri.getScheme())) {
+            throw new IllegalStateException("Build-record finalization requires the original local content or verified source metadata; "
+                    + "refusing an unauthenticated download of published content (URI scheme: " + locContentUri.getScheme() + ").");
+        }
+        Path locContentPath = Path.of(locContentUri);
+        if (!Files.isRegularFile(locContentPath)) {
+            throw new IllegalStateException("Build-record finalization source file does not exist: " + locContentPath);
+        }
+        return locContentPath;
     }
 
     private static String AIcFilename(URI aUri) {
@@ -107,20 +116,9 @@ public final class AIcBuildRecordPublicationFinalizationActionAdapter implements
         return aFilename + ".modustro-build-record.yml";
     }
 
-    private static long AIcSize(URI aUri) throws Exception {
-        if ("file".equalsIgnoreCase(aUri.getScheme())) return Files.size(Path.of(aUri));
-        try (InputStream locInput = aUri.toURL().openStream()) {
-            long locSize = 0L;
-            byte[] locBuffer = new byte[65536];
-            int locRead;
-            while ((locRead = locInput.read(locBuffer)) >= 0) locSize = Math.addExact(locSize, locRead);
-            return locSize;
-        }
-    }
-
-    private static String AIcHash(URI aUri) throws Exception {
+    private static String AIcHash(Path aPath) throws Exception {
         MessageDigest locDigest = MessageDigest.getInstance("SHA-256");
-        try (InputStream locInput = "file".equalsIgnoreCase(aUri.getScheme()) ? Files.newInputStream(Path.of(aUri)) : aUri.toURL().openStream()) {
+        try (InputStream locInput = Files.newInputStream(aPath)) {
             byte[] locBuffer = new byte[65536];
             int locRead;
             while ((locRead = locInput.read(locBuffer)) >= 0) locDigest.update(locBuffer, 0, locRead);
@@ -162,7 +160,7 @@ public final class AIcBuildRecordPublicationFinalizationActionAdapter implements
 
     /** Returns the SHA-256 hash of one local file. */
     public static String hash(Path aPath) throws Exception {
-        return AIcHash(aPath.toAbsolutePath().normalize().toUri());
+        return AIcHash(aPath.toAbsolutePath().normalize());
     }
 
     /** Serializes simple build-record structures deterministically. */

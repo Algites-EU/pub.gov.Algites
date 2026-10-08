@@ -60,6 +60,8 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
 
     permissions:
       contents: read
@@ -412,7 +414,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check \
+          python -m pip install --no-compile --disable-pip-version-check \
             "build==1.6.1" \
             "twine==7.0.0" \
             "Sphinx==9.1.0" \

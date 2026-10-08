@@ -81,6 +81,7 @@ permissions:
 
 env:
   _TMP_ALGITES_DOCS_DEFAULT_REF: ${{ github.head_ref || github.ref_name }}
+  PYTHONDONTWRITEBYTECODE: "1"
 
 concurrency:
   group: algites-docs-pages-${{ github.repository }}
@@ -609,7 +610,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python -m pip install --disable-pip-version-check \
+          python -m pip install --no-compile --disable-pip-version-check \
             "build==1.6.1" \
             "Sphinx==9.1.0" \
             "sphinx-autoapi==3.8.0"

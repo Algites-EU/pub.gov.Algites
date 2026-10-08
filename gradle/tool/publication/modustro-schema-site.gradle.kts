@@ -34,7 +34,93 @@ import eu.algites.pltf.modustro.builder.model.publication.AIcPublicationStabilit
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind
 import eu.algites.pltf.modustro.builder.model.publication.AInPublicationStability
 import java.io.File
+import java.nio.file.FileAlreadyExistsException
+import java.nio.file.Files
+import java.nio.file.LinkOption
+import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
+
+/** Governed source-sidecar contract used by both generation and schema-site validation. */
+object AIcModustroSchemaUserMetadata {
+    const val SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID = "GlobalPublicationPathId"
+    const val SCHEMA_FIELD_NAME__JSON_SCHEMA = "\$schema"
+    const val SCHEMA_URI = "https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.yamldef.schema.json"
+}
+
+/**
+ * Creates missing author-controlled source sidecars. Existing sidecars are never modified.
+ * This task intentionally declares no Gradle outputs: source files are owned by the author,
+ * not by the build cache, and every explicit invocation must inspect the current source tree.
+ */
+abstract class AIcGenerateMissingModustroSchemaSidecarsTask : DefaultTask() {
+    @get:Input abstract val sourceKinds: ListProperty<String>
+    @get:Input abstract val artifactPathsJson: Property<String>
+    @get:Internal abstract val repositoryDirectory: DirectoryProperty
+
+    @TaskAction
+    fun AIcGenerate() {
+        @Suppress("UNCHECKED_CAST")
+        val locArtifactPaths = JsonSlurper().parseText(artifactPathsJson.get()) as List<String>
+        val locRepositoryRoot = repositoryDirectory.get().asFile
+        val locRepositoryCanonicalPath = locRepositoryRoot.toPath().toRealPath()
+        val locPathValidator = AIcGlobalPublicationPathValidator()
+        var locCreated = 0
+        var locExisting = 0
+        var locDefinitions = 0
+
+        locArtifactPaths.distinct().sorted().forEach { locArtifactPath ->
+            val locArtifactRoot = if (locArtifactPath.isBlank() || locArtifactPath == ".") {
+                locRepositoryRoot
+            } else {
+                File(locRepositoryRoot, locArtifactPath)
+            }
+            sourceKinds.get().sorted().forEach locSourceKindLoop@{ locKind ->
+                val locSourceRoot = File(locArtifactRoot, "src/product/$locKind")
+                if (!locSourceRoot.isDirectory) return@locSourceKindLoop
+                locSourceRoot.walkTopDown()
+                    .filter { locFile -> locFile.isFile && !locFile.name.endsWith(".meta.yml") }
+                    .sortedBy { locFile -> locFile.relativeTo(locSourceRoot).invariantSeparatorsPath }
+                    .forEach { locDefinition ->
+                        if (Files.isSymbolicLink(locDefinition.toPath())) {
+                            throw GradleException("Refusing to generate a sidecar for symlinked definition '$locDefinition'.")
+                        }
+                        if (!locDefinition.parentFile.toPath().toRealPath().startsWith(locRepositoryCanonicalPath)) {
+                            throw GradleException("Refusing to create a sidecar outside the repository: '$locDefinition'.")
+                        }
+                        val locPathId = locPathValidator.validate(
+                            locDefinition.relativeTo(locSourceRoot).invariantSeparatorsPath
+                        )
+                        val locSidecar = File(locDefinition.path + ".meta.yml")
+                        locDefinitions++
+                        if (Files.exists(locSidecar.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                            if (!locSidecar.isFile || Files.isSymbolicLink(locSidecar.toPath())) {
+                                throw GradleException("Schema sidecar path is not a regular file: '$locSidecar'.")
+                            }
+                            locExisting++
+                        } else {
+                            val locSchema = AIcModustroSchemaUserMetadata.SCHEMA_URI
+                            val locContent = buildString {
+                                appendLine("# yaml-language-server: \$schema=$locSchema")
+                                appendLine("# \$schema: $locSchema")
+                                appendLine("${AIcModustroSchemaUserMetadata.SCHEMA_FIELD_NAME__JSON_SCHEMA}: $locSchema")
+                                appendLine()
+                                appendLine("${AIcModustroSchemaUserMetadata.SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID}: $locPathId")
+                            }
+                            try {
+                                Files.writeString(locSidecar.toPath(), locContent, Charsets.UTF_8,
+                                    StandardOpenOption.CREATE_NEW, StandardOpenOption.WRITE)
+                                locCreated++
+                                logger.lifecycle("Created global schema user sidecar: ${locSidecar.relativeTo(locRepositoryRoot)}")
+                            } catch (locConcurrent: FileAlreadyExistsException) {
+                                throw GradleException("Schema sidecar appeared during generation; refusing to overwrite: '$locSidecar'.", locConcurrent)
+                            }
+                        }
+                    }
+            }
+        }
+        logger.lifecycle("Global schema user sidecars: $locDefinitions definitions, $locCreated created, $locExisting already present.")
+    }
+}
 
 /** Stages schemas using declared inputs and a data-only publication plan. */
 abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
@@ -69,7 +155,7 @@ abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
     fun AIcSchemaReadGlobalPublicationPathId(aSidecar: File): String {
         val locValues = aSidecar.readLines(Charsets.UTF_8).mapNotNull { locLine ->
             val locTrimmed = locLine.trim()
-            if (locTrimmed.isBlank() || locTrimmed.startsWith("#") || !locTrimmed.startsWith("GlobalPublicationPathId:")) {
+            if (locTrimmed.isBlank() || locTrimmed.startsWith("#") || !locTrimmed.startsWith("${AIcModustroSchemaUserMetadata.SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID}:")) {
                 null
             } else {
                 locTrimmed.substringAfter(':').trim().removeSurrounding("\"").removeSurrounding("'").takeIf(String::isNotBlank)
@@ -77,7 +163,7 @@ abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
         }
         if (locValues.size != 1) {
             throw GradleException(
-                "Global-publication user sidecar '$aSidecar' must define exactly one non-empty GlobalPublicationPathId."
+                "Global-publication user sidecar '$aSidecar' must define exactly one non-empty ${AIcModustroSchemaUserMetadata.SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID}."
             )
         }
         return locValues.single()
@@ -150,7 +236,7 @@ abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
                             val locPathId = locPathValidator.validate(AIcSchemaReadGlobalPublicationPathId(locSidecar))
                             if (locPathId != locExpectedPathId) {
                                 throw GradleException(
-                                    "Canonical definition '$locDefinitionFile' declares GlobalPublicationPathId '$locPathId', " +
+                                    "Canonical definition '$locDefinitionFile' declares ${AIcModustroSchemaUserMetadata.SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID} '$locPathId', " +
                                         "but the canonical source-root-relative path is '$locExpectedPathId'."
                                 )
                             }
@@ -183,7 +269,7 @@ abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
         val locManifest = File(locOutputRoot, ".modustro-publishing/schema-site.tsv")
         locManifest.parentFile.mkdirs()
         locManifest.writeText(
-            "SourceKind\tGlobalPublicationPathId\tStagedPath\tSha256\tPublicationState\tArtifactPath\tPublicationDestinations\n" +
+            "SourceKind\t${AIcModustroSchemaUserMetadata.SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID}\tStagedPath\tSha256\tPublicationState\tArtifactPath\tPublicationDestinations\n" +
                 locManifestRows.joinToString(System.lineSeparator()) +
                 if (locManifestRows.isEmpty()) "" else System.lineSeparator(),
             Charsets.UTF_8
@@ -327,9 +413,29 @@ val locSchemaCanonicalSources = files(locSchemaArtifactPlans.flatMap { locArtifa
     val locDirectory = if (locPath.isBlank() || locPath == ".") rootProject.projectDir else File(rootProject.projectDir, locPath)
     locSchemaSourceKinds.sorted().map { locKind -> File(locDirectory, "src/product/$locKind") }
 })
+val locGenerateMissingUserSidecars = providers.gradleProperty("modustro.schemas.generateMissingUserSidecars")
+    .orElse("false").get().also { locValue ->
+        require(locValue == "true" || locValue == "false") {
+            "modustro.schemas.generateMissingUserSidecars must be true or false."
+        }
+    } == "true"
+
+val locGenerateMissingModustroSchemaSidecars = tasks.register<AIcGenerateMissingModustroSchemaSidecarsTask>(
+    "generateMissingModustroSchemaSidecars"
+) {
+    group = "modustro"
+    description = "Creates only missing canonical yamldefs/jsondefs/xmldefs source user sidecars; never overwrites existing metadata."
+    sourceKinds.set(locSchemaSourceKinds.sorted())
+    artifactPathsJson.set(JsonOutput.toJson(locSchemaArtifactPlans.map { it["path"]?.toString().orEmpty() }))
+    repositoryDirectory.set(rootProject.layout.projectDirectory)
+}
+
 val locGenerateModustroSchemaSite = tasks.register<AIcGenerateModustroSchemaSiteTask>("generateModustroSchemaSite") {
     group = "modustro"
     description = "Validates and stages canonical definitions for global schema-site publication."
+    if (locGenerateMissingUserSidecars) {
+        dependsOn(locGenerateMissingModustroSchemaSidecars)
+    }
     publicationState.set(locSchemaPublicationState)
     sourceKinds.set(locSchemaSourceKinds.sorted())
     artifactPlansJson.set(JsonOutput.toJson(locSchemaArtifactPlans))

@@ -163,6 +163,7 @@ class AIcGeneratePythonDocsSiteAction(
             )
                 .directory(locEntry.locArtifactDirectory)
                 .redirectErrorStream(true)
+                .apply { environment()["PYTHONDONTWRITEBYTECODE"] = "1" }
                 .start()
 
             val locOutput = locProcess.inputStream.bufferedReader(Charsets.UTF_8).readText()

@@ -48,10 +48,11 @@ public final class AIcPythonRepositoryPublicationAdapter implements AIiPublicati
         }
 
         aContext.progressReporter().started("Uploading Python distribution with Twine.");
-        Process locProcess = new ProcessBuilder(locCommand)
+        ProcessBuilder locProcessBuilder = new ProcessBuilder(locCommand)
                 .directory(AIcWorkingDirectory(aContext.payload()))
-                .inheritIO()
-                .start();
+                .inheritIO();
+        locProcessBuilder.environment().put("PYTHONDONTWRITEBYTECODE", "1");
+        Process locProcess = locProcessBuilder.start();
         try {
             while (locProcess.isAlive()) {
                 if (aContext.cancellationToken().isCancellationRequested()) {
