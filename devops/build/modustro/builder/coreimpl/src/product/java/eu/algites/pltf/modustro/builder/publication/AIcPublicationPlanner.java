@@ -41,6 +41,13 @@ public final class AIcPublicationPlanner {
                 String locId = locEndpoint.id() + "/" + locLocalId;
                 if (!locIds.add(locId)) throw new IllegalArgumentException("Duplicate publication path " + locId);
                 AIcPublicationPayload locPayload = AIcForm(locFrozen, locForm, locEndpoint, locIndex++ == 0, aContext);
+                if (locPayload.outputKind() == AInPublicationOutputKind.SCHEMA_SITE
+                        && locPayload.files().stream().anyMatch(aFile -> aFile.logicalName().startsWith("api/")
+                            && !aFile.logicalName().endsWith(".modustro-build-record.yml"))
+                        && !"s3-object-storage".equals(locEndpoint.publicationAdapter())) {
+                    throw new IllegalArgumentException("Global schema publication requires a transport implementing the mandatory deploy-sidecar lifecycle; " +
+                            "currently supported: s3-object-storage.");
+                }
                 for (AIcPublicationPayloadFile locFile : locPayload.files()) {
                     String locTarget = locEndpoint.publicationUri() + "|" + locFile.logicalName();
                     if (!locTargets.add(locTarget)) throw new IllegalArgumentException("Duplicate publication target " + locFile.logicalName());

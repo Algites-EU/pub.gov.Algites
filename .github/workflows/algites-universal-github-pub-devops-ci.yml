@@ -414,7 +414,9 @@ jobs:
           set -euo pipefail
           python -m pip install --disable-pip-version-check \
             "build==1.6.1" \
-            "twine==7.0.0"
+            "twine==7.0.0" \
+            "Sphinx==9.1.0" \
+            "sphinx-autoapi==3.8.0"
           locPythonExecutable="$(python -c 'import sys; print(sys.executable)')"
           echo "ALGITES_PYTHON_EXECUTABLE=${locPythonExecutable}" >> "${GITHUB_ENV}"
 

@@ -165,6 +165,7 @@ abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
                             val locTarget = File(locOutputRoot, "api/$locSourceKind/$locPathId")
                             locTarget.parentFile.mkdirs()
                             locDefinitionFile.copyTo(locTarget, overwrite = true)
+                            locSidecar.copyTo(File(locTarget.path + ".meta.yml"), overwrite = true)
                             val locSha256 = AIcSchemaSha256(locDefinitionFile)
                             locManifestRows += listOf(
                                 locSourceKind,
@@ -295,6 +296,22 @@ val locSchemaHasPublicationEndpoints = locSchemaArtifactDirectories
         locEnabled && locEndpoints.isNotEmpty()
     }
 
+if (locSchemaHasPublicationEndpoints) {
+    try {
+        Class.forName(
+            "eu.algites.pltf.modustro.builder.publication.adapters.AIcS3SchemaPublication",
+            false,
+            AIcGlobalPublicationPathValidator::class.java.classLoader
+        )
+    } catch (locMissing: ClassNotFoundException) {
+        throw GradleException(
+            "Schema publication requires the deploy-sidecar-aware Builder coreimpl. " +
+                "Install the updated builder bootstrap first, or publish the new builder with schema publication disabled.",
+            locMissing
+        )
+    }
+}
+
 val locSchemaArtifactPlans = locSchemaArtifactDirectories
     .filter { it["structureKind"]?.toString() == "artifact" }
     .map { locArtifact ->
@@ -374,7 +391,10 @@ if (tasks.findByName("publishModustroSchemaSite") == null) {
                 ?: error("Algites effective repository GroupId is unavailable for schema publication.")),
             "artifactId" to rootProject.name,
             "technologyKind" to "modustro",
-            "logicalVersion" to rootProject.version.toString()
+            "logicalVersion" to rootProject.version.toString(),
+            "schemaAdoptUntrackedDrafts" to providers.gradleProperty("modustro.schemas.adoptUntrackedDrafts").orElse("false").get().also {
+                require(it == "true" || it == "false") { "modustro.schemas.adoptUntrackedDrafts must be true or false." }
+            }
         ) else emptyMap())
         payloadRoot.set(locSchemaSiteRoot)
         publicationService.set(locPublicationService)

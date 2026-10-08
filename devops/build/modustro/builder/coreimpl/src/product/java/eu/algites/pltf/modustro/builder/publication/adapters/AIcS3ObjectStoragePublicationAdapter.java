@@ -31,10 +31,16 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
     public String adapterId() { return ADAPTER_ID; }
 
     @Override
-    public boolean isRetrySafe(AIcPublicationPayload aPayload, AIcPublicationEndpoint aEndpoint) { return true; }
+    public boolean isRetrySafe(AIcPublicationPayload aPayload, AIcPublicationEndpoint aEndpoint) { return aPayload.outputKind() != eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind.SCHEMA_SITE; }
 
     @Override
     public void publish(AIcPublicationAttemptContext aContext) throws Exception {
+        if (aContext.payload().outputKind() == eu.algites.pltf.modustro.builder.model.publication.AInPublicationOutputKind.SCHEMA_SITE
+                && aContext.payload().files().stream().anyMatch(aFile -> aFile.logicalName().startsWith("api/")
+                        && !aFile.logicalName().endsWith(".modustro-build-record.yml"))) {
+            new AIcS3SchemaPublication().publish(aContext);
+            return;
+        }
         AIcPublicationEndpoint locEndpoint = aContext.endpoint();
         URI locRoot = AIcRoot(locEndpoint.publicationUri());
         String locRegion = Objects.toString(
@@ -108,7 +114,7 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
     }
 
     /** Identifies the configured username with at most its first half, without exposing the secret. */
-    private static String AIcUsernamePrefix(String aUsername, String aSecret) {
+    static String AIcUsernamePrefix(String aUsername, String aSecret) {
         String locPrefix = aUsername.substring(0, aUsername.length() / 2);
         if (!aSecret.isEmpty()) locPrefix = locPrefix.replace(aSecret, "[redacted]");
         locPrefix = locPrefix.replaceAll("[\\p{Cntrl}\\s]+", " ");
@@ -116,7 +122,7 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
     }
 
     /** Reports only bounded S3 error fields, never the signed request or credential fields. */
-    private static String AIcErrorDetails(HttpURLConnection aConnection, String aAccessKey, String aSecretKey) {
+    static String AIcErrorDetails(HttpURLConnection aConnection, String aAccessKey, String aSecretKey) {
         try (var locInput = aConnection.getErrorStream()) {
             if (locInput == null) return "";
             byte[] locBody = locInput.readNBytes(16384);
@@ -145,7 +151,7 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
         }
     }
 
-    private static URI AIcRoot(URI aUri) {
+    static URI AIcRoot(URI aUri) {
         if (aUri == null || aUri.getScheme() == null || !("https".equalsIgnoreCase(aUri.getScheme()) || "http".equalsIgnoreCase(aUri.getScheme()))) {
             throw new IllegalArgumentException("s3-object-storage requires an absolute HTTP(S) PublicationUri.");
         }
@@ -153,7 +159,7 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
         return URI.create(locText.endsWith("/") ? locText : locText + "/");
     }
 
-    private static URI AIcTarget(URI aRoot, String aLogicalName) {
+    static URI AIcTarget(URI aRoot, String aLogicalName) {
         String locValue = aLogicalName == null ? "" : aLogicalName.replace('\\', '/');
         while (locValue.startsWith("/")) locValue = locValue.substring(1);
         if (locValue.isBlank() || locValue.equals("..") || locValue.contains("../")) throw new IllegalArgumentException("Invalid logical publication path '" + aLogicalName + "'.");
@@ -175,24 +181,24 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
         return HexFormat.of().formatHex(locDigest.digest());
     }
 
-    private static String AIcSha256(byte[] aValue) throws Exception {
+    static String AIcSha256(byte[] aValue) throws Exception {
         return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(aValue));
     }
 
-    private static byte[] AIcHmac(byte[] aKey, String aValue) throws Exception {
+    static byte[] AIcHmac(byte[] aKey, String aValue) throws Exception {
         Mac locMac = Mac.getInstance("HmacSHA256");
         locMac.init(new SecretKeySpec(aKey, "HmacSHA256"));
         return locMac.doFinal(aValue.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static byte[] AIcSigningKey(String aSecret, String aDate, String aRegion, String aService) throws Exception {
+    static byte[] AIcSigningKey(String aSecret, String aDate, String aRegion, String aService) throws Exception {
         byte[] locDate = AIcHmac(("AWS4" + aSecret).getBytes(StandardCharsets.UTF_8), aDate);
         byte[] locRegion = AIcHmac(locDate, aRegion);
         byte[] locService = AIcHmac(locRegion, aService);
         return AIcHmac(locService, "aws4_request");
     }
 
-    private static void AIcApplyTimeouts(HttpURLConnection aConnection, Instant aDeadline) {
+    static void AIcApplyTimeouts(HttpURLConnection aConnection, Instant aDeadline) {
         if (aDeadline == null) return;
         long locMillis = Math.max(1L, Duration.between(Instant.now(), aDeadline).toMillis());
         int locTimeout = (int) Math.min(Integer.MAX_VALUE, locMillis);
@@ -200,7 +206,7 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
         aConnection.setReadTimeout(locTimeout);
     }
 
-    private static void AIcCheckCancellation(AIcPublicationAttemptContext aContext) throws InterruptedException {
+    static void AIcCheckCancellation(AIcPublicationAttemptContext aContext) throws InterruptedException {
         if (aContext.cancellationToken().isCancellationRequested()) throw new InterruptedException("Publication attempt cancelled.");
     }
 }

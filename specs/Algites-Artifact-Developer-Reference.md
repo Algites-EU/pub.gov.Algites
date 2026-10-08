@@ -1567,3 +1567,11 @@ Use this guide for day-to-day authoring, then consult the source of truth when n
 - reusable public workflows: `.github/workflows/`
 
 The private DevOps operator guide is maintained separately in `priv.gov.Algites` because it documents private publication governance, centralized publication workers, repository service lists, and operational credentials.
+
+### Required deployed schema sidecars
+
+S3 schema publication uploads each definition immediately followed by its generated `<definition>.meta.yml` deploy sidecar. The source `.meta.yml` remains a strict author input containing only `GlobalPublicationPathId` and optional `$schema`; source metadata is never copied unchanged into the deployed state. Deployed metadata additionally carries `ContentSha256`, the SHA-256 of the exact canonical bytes. All source pairs and all previous remote pairs are validated before the first write. A missing or unreadable sidecar, a checksum mismatch, or a prohibited release transition fails publication. New paths require both remote objects to be absent; existing objects without deployment state are never overwritten automatically. Conditional S3 writes guard individual objects with `If-None-Match` or `If-Match`. A required sidecar failure stops this payload before another definition is uploaded.
+
+For an explicit one-time migration only, `-Pmodustro.schemas.adoptUntrackedDrafts=true` permits creating missing deployment metadata for byte-identical existing draft content. It never overwrites that canonical object, accepts changed content, or adopts a release. Initial timestamps represent this adoption, since earlier publishing history is unavailable. Return to the default `false` afterwards. Publishers need object read and write permissions in IAM and bucket policy. Other schema transports are rejected until they implement this lifecycle.
+
+Two independent S3 objects are not an atomic transaction. A process crash or a failed second PUT can leave the current pair incomplete; no subsequent definition is published. Readers should verify `ContentSha256`, and a later publication refuses inconsistent existing pairs. Conditional object writes are not a distributed lock spanning both objects: serialize publications of the same global path.

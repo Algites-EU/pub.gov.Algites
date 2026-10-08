@@ -47,6 +47,11 @@
           "type": "string",
           "minLength": 1,
           "description": "Optional trusted publisher identity derived by the deployment adapter from authenticated execution context; never copied from user metadata."
+        },
+        "ContentSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$",
+          "description": "SHA-256 of the exact deployed canonical content, used to reject incomplete or inconsistent definition/sidecar pairs."
         }
       },
       "required": [
@@ -54,7 +59,8 @@
         "PublicationState",
         "PublicationRevision",
         "FirstPublishedAt",
-        "PublishedAt"
+        "PublishedAt",
+        "ContentSha256"
       ]
     },
     "EmbeddedContent": {

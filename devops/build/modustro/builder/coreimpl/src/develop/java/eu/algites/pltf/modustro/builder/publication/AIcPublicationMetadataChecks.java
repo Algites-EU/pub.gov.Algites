@@ -143,7 +143,7 @@ public final class AIcPublicationMetadataChecks {
         try {
             Path locRoot = Files.createTempDirectory("modustro-s3-error-"); Path locFile = locRoot.resolve("one.json"); Files.writeString(locFile, "{}");
             var locEndpoint = AIcPublicationPlanner.endpoint(Map.of("Id", "s3", "PublicationAdapter", "s3-object-storage", "PublicationUri", "http://127.0.0.1:" + locServer.getAddress().getPort() + "/bucket/", "Configuration", Map.of("Region", "fr-par")), "s3");
-            var locPayload = new AIcPublicationPayload(AInPublicationOutputKind.SCHEMA_SITE, AInPublicationStability.SNAPSHOT, "repo", "1.0-SNAPSHOT", List.of(new AIcPublicationPayloadFile(locFile, "api/one.json")), Map.of());
+            var locPayload = new AIcPublicationPayload(AInPublicationOutputKind.MODUSTRO_DOCS_SITE, AInPublicationStability.SNAPSHOT, "repo", "1.0-SNAPSHOT", List.of(new AIcPublicationPayloadFile(locFile, "api/one.json")), Map.of());
             try {
                 new AIcS3ObjectStoragePublicationAdapter().publish(new AIcPublicationAttemptContext(locEndpoint, locPayload, 1, 1, null, null,
                         Map.of("username", locUsername, "password", locSecret), () -> false, locReporter));
