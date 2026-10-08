@@ -48,10 +48,11 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
         if (locAccessKey == null || locSecretKey == null) {
             throw new IllegalArgumentException("s3-object-storage requires a basic credential profile whose Username is the access key and Password is the secret key.");
         }
+        String locIdentityDetails = " UsernamePrefix=" + AIcUsernamePrefix(locAccessKey, locSecretKey) + "; Region=" + locRegion + ";";
         long locTotal = 0L;
         for (AIcPublicationPayloadFile locFile : aContext.payload().files()) locTotal = Math.addExact(locTotal, Files.size(locFile.path()));
         long locCompleted = 0L;
-        aContext.progressReporter().started("Publishing object-storage payload to " + locRoot);
+        aContext.progressReporter().started("Publishing object-storage payload to " + locRoot + "." + locIdentityDetails);
         for (AIcPublicationPayloadFile locFile : aContext.payload().files()) {
             AIcCheckCancellation(aContext);
             URI locTarget = AIcTarget(locRoot, locFile.logicalName());
@@ -99,11 +100,19 @@ public final class AIcS3ObjectStoragePublicationAdapter implements AIiPublicatio
                 String locMessage = locConnection.getResponseMessage();
                 String locDetails = AIcErrorDetails(locConnection, locAccessKey, locSecretKey);
                 locConnection.disconnect();
-                throw new IllegalStateException("S3-compatible PUT failed for '" + locTarget + "' with HTTP " + locStatus + " " + locMessage + "." + locDetails);
+                throw new IllegalStateException("S3-compatible PUT failed for '" + locTarget + "' with HTTP " + locStatus + " " + locMessage + "." + locDetails + locIdentityDetails);
             }
             locConnection.disconnect();
         }
         aContext.progressReporter().completed("Object-storage publication completed.");
+    }
+
+    /** Identifies the configured username with at most its first half, without exposing the secret. */
+    private static String AIcUsernamePrefix(String aUsername, String aSecret) {
+        String locPrefix = aUsername.substring(0, aUsername.length() / 2);
+        if (!aSecret.isEmpty()) locPrefix = locPrefix.replace(aSecret, "[redacted]");
+        locPrefix = locPrefix.replaceAll("[\\p{Cntrl}\\s]+", " ");
+        return locPrefix + "...";
     }
 
     /** Reports only bounded S3 error fields, never the signed request or credential fields. */
