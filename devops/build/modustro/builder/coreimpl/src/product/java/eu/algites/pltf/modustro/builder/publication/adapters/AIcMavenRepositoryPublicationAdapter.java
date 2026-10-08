@@ -130,11 +130,26 @@ public final class AIcMavenRepositoryPublicationAdapter implements AIiPublicatio
             if(last.getTextContent().compareTo(updated)<=0){last.setTextContent(updated);var snapshot=child(document,versioning,"snapshot");set(document,snapshot,"timestamp",coords.get("snapshotTimestamp"));set(document,snapshot,"buildNumber",coords.get("snapshotBuildNumber"));}
             var versions=child(document,versioning,"snapshotVersions");
             for(var file:context.payload().files()){
-                boolean pom=file.logicalName().endsWith(".pom");
-                boolean module=file.logicalName().endsWith(".module");
-                String extension=pom?"pom":module?"module":coords.get("extension");
-                String classifier=(pom||module)?"":coords.getOrDefault("classifier","");
-                if(extension==null||extension.isBlank())throw new IllegalArgumentException("Snapshot payload requires extension coordinate.");
+                String locName = Path.of(file.logicalName()).getFileName().toString();
+                String locPrefix = coords.get("artifactId") + "-" + context.payload().version();
+                if (!locName.startsWith(locPrefix + ".") && !locName.startsWith(locPrefix + "-")) {
+                    throw new IllegalArgumentException("Snapshot filename does not match its published Maven coordinates: " + locName);
+                }
+                String extension;
+                String classifier;
+                if (locName.startsWith(locPrefix + ".")) {
+                    extension = locName.substring(locPrefix.length() + 1);
+                    classifier = "";
+                } else {
+                    String locRemainder = locName.substring(locPrefix.length() + 1);
+                    int locDot = locRemainder.indexOf('.');
+                    if (locDot <= 0 || locDot == locRemainder.length() - 1) {
+                        throw new IllegalArgumentException("Invalid Maven classified snapshot filename: " + locName);
+                    }
+                    classifier = locRemainder.substring(0, locDot);
+                    extension = locRemainder.substring(locDot + 1);
+                }
+                /* A sidecar's compound extension must not overwrite the main JAR metadata entry. */
                 org.w3c.dom.Element entry=null;
                 for(var node=versions.getFirstChild();node!=null;node=node.getNextSibling())if(node instanceof org.w3c.dom.Element element&&element.getTagName().equals("snapshotVersion")&&text(element,"extension").equals(extension)&&text(element,"classifier").equals(classifier)){entry=element;break;}
                 if(entry==null){entry=document.createElement("snapshotVersion");versions.appendChild(entry);}else if(text(entry,"updated").compareTo(updated)>0)continue;

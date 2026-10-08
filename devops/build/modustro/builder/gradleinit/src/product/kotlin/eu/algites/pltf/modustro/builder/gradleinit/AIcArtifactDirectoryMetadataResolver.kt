@@ -16,6 +16,8 @@ import java.security.MessageDigest
 
 /** Canonical schema field name used by the bootstrap resolver before generated descriptor models are available. */
 private const val SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY = "ExecutionFailurePolicy"
+private const val SCHEMA_FIELD_NAME__VERSION_SCOPE_PUBLICATION_FINALIZATION_ACTIONS = "VersionScopePublicationFinalizationActions"
+private const val SCHEMA_FIELD_NAME__ARTIFACT_PUBLICATION_FINALIZATION_ACTIONS = "ArtifactPublicationFinalizationActions"
 
 
 data class AIcdAlgitesVersion(
@@ -541,7 +543,26 @@ fun AIcAlgitesExternalDefaultsState(): AIcdModustroResolvedState {
         } else {
             return@forEach
         }
-        locState = locState.AIcMerge(AIcResolvedStateFromRawValues(AIcReadSimpleYamlScalars(locFile), "", locFile))
+        val locValues = AIcReadSimpleYamlScalars(locFile)
+        /* Reject invalid metadata at its source, before values are merged with other layers. */
+        for (locPropertyPrefix in listOf(
+            SCHEMA_FIELD_NAME__VERSION_SCOPE_PUBLICATION_FINALIZATION_ACTIONS,
+            SCHEMA_FIELD_NAME__ARTIFACT_PUBLICATION_FINALIZATION_ACTIONS
+        )) {
+            for (locStability in listOf("Snapshot", "Release")) {
+                val locPrefix = "$locPropertyPrefix.$locStability"
+                try {
+                    eu.algites.pltf.modustro.builder.publication.AIcPublicationConfiguration.list(locValues, locPrefix)
+                } catch (locException: IllegalArgumentException) {
+                    throw IllegalArgumentException(
+                        "Invalid publication defaults from '$locVariableName' at '${locFile.canonicalPath}': ${locException.message}. " +
+                            "If this is the bundled public defaults file, rebuild and republish the gradleinit bootstrap artifact.",
+                        locException
+                    )
+                }
+            }
+        }
+        locState = locState.AIcMerge(AIcResolvedStateFromRawValues(locValues, "", locFile))
     }
     return locState
 }

@@ -9,7 +9,15 @@ import org.testng.annotations.Test;
 /** Tests the canonical descriptor representation of build execution failure policies. */
 public class AItcPublicationPlannerPolicyTest {
 
-    /** Verifies lower-snake-case endpoint policy conversion to the generated Java enum. */
+    /** Rejects obsolete failure policy property names rather than silently translating them. */
+    @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = "Unknown publication property .*\\.FailurePolicy")
+    public void testLegacyFailurePolicyIsRejected() {
+        var locValues = Map.of(
+                "VersionScopePublicationFinalizationActions.Release.0.Id", "cleanup",
+                "VersionScopePublicationFinalizationActions.Release.0.FailurePolicy", "ignore_failure");
+        AIcPublicationConfiguration.list(locValues, "VersionScopePublicationFinalizationActions.Release");
+    }
+
     @Test
     public void testExecutionFailurePolicyWireValue() {
         var locEndpoint = AIcPublicationPlanner.endpoint(Map.of(

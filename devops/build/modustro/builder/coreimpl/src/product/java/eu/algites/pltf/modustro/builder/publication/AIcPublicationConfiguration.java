@@ -15,6 +15,7 @@ import java.util.TreeSet;
 
 /** Core-owned sparse descriptor projection. Expand each hierarchy layer before merging layers. */
 public final class AIcPublicationConfiguration {
+    private static final String SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY = "ExecutionFailurePolicy";
     private static final Set<String> BOOLEAN_PROPERTIES = Set.of(
             "ExecutionEnabled", "PublicationEnabled", "ShowPublicationProgressIfPossible", "ShowProgressIfPossible");
     private static final Set<String> INTEGER_PROPERTIES = Set.of(
@@ -24,7 +25,7 @@ public final class AIcPublicationConfiguration {
             "Id", "OutputSelector", "TechnologyKind", "ExecutionEnabled", "PublicationEnabled", "Classifier", "Extension",
             "PublicationFinalizationActionAdapter", "FinalizationActionAdapter",
             "OutputPublicationFinalizationActionAdapter", "ArtifactPublicationFinalizationActionAdapter",
-            "VersionScopePublicationFinalizationActionAdapter", "TargetPublicationEndpointId", "ExecutionOrder", "ExecutionFailurePolicy",
+            "VersionScopePublicationFinalizationActionAdapter", "TargetPublicationEndpointId", "ExecutionOrder", SCHEMA_FIELD_NAME__EXECUTION_FAILURE_POLICY,
             "RetryCount", "WaitForNextAttemptMillis", "AttemptTimeoutMillis", "ShowProgressIfPossible",
             "PublicationUri", "PublicationAdapter", "PublicationCredentialProfile",
             "PublicationRetryCount", "PublicationWaitForNextAttemptMillis",

@@ -1,0 +1,1 @@
+The former compatibility alias FailurePolicy -> ExecutionFailurePolicy was reverted. FailurePolicy is rejected. Use ExecutionFailurePolicy in source metadata. This does not fix stale producer metadata by itself. No bootstrap binary included.
