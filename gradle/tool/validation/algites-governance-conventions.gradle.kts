@@ -32,6 +32,7 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
         val locRepositoryDirectory = repositoryDirectory.get().asFile
         val locIgnoredDirectoryNames = ignoredDirectoryNames.get()
         val locProblems = mutableListOf<String>()
+        val locDocumentationWarnings = mutableListOf<String>()
 
         val locDataClassPattern = Regex(
             "(?m)^\\s*(?:(?:private|internal|public|protected)\\s+)?data\\s+class\\s+([A-Za-z_][A-Za-z0-9_]*)\\b"
@@ -197,15 +198,18 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
         /*
          * Credential profile identifiers use the current external-I/O vocabulary.
          * The obsolete action-family suffixes are rejected in active governance
-         * sources so that subscription/publication terminology cannot silently
-         * regress through examples, defaults, or workflow configuration.
+         * sources. Documentation can legitimately describe obsolete identifiers
+         * during migrations, so findings in Markdown and plain-text documentation
+         * or documentation directories are warnings only and must never fail the build.
          */
         val locObsoleteCredentialProfileIdPattern = Regex(
             "\\balgites-[a-z0-9._-]+-(?:upload|download|manage)\\b"
         )
+        val locCredentialConventionDocumentationExtensions = setOf("md", "txt")
+        val locCredentialConventionDocumentationDirectoryNames = setOf("doc", "docs", "documentation")
         val locCredentialConventionExtensions = setOf(
-            "json", "json5", "kts", "kt", "md", "properties", "py", "txt", "yaml", "yml"
-        )
+            "json", "json5", "kts", "kt", "properties", "py", "yaml", "yml"
+        ) + locCredentialConventionDocumentationExtensions
         val locObsoletePlaceholderIoUriPattern = Regex(
             """https://dummy\.invalid/[^\s"']*/(?:upload|download|manage)/"""
         )
@@ -218,13 +222,19 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
             }
             .forEach { locFile ->
                 val locText = locFile.readText(Charsets.UTF_8)
+                val locIsDocumentation =
+                    locFile.extension.lowercase() in locCredentialConventionDocumentationExtensions ||
+                        locRepositoryDirectory.toPath().relativize(locFile.toPath()).any { locPathSegment ->
+                            locPathSegment.toString().lowercase() in locCredentialConventionDocumentationDirectoryNames
+                        }
+                val locFindings = if (locIsDocumentation) locDocumentationWarnings else locProblems
                 locObsoleteCredentialProfileIdPattern.findAll(locText).forEach { locMatch ->
                     val locLine = locText.substring(0, locMatch.range.first).count { it == '\n' } + 1
                     val locPath = locRepositoryDirectory.toPath()
                         .relativize(locFile.toPath())
                         .toString()
                         .replace(File.separatorChar, '/')
-                    locProblems.add(
+                    locFindings.add(
                         "$locPath:$locLine obsolete credential profile id '${locMatch.value}' must use " +
                             "the subscription/publication terminology."
                     )
@@ -235,7 +245,7 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
                         .relativize(locFile.toPath())
                         .toString()
                         .replace(File.separatorChar, '/')
-                    locProblems.add(
+                    locFindings.add(
                         "$locPath:$locLine obsolete dummy endpoint URI '${locMatch.value}' must use " +
                             "the subscription/publication terminology."
                     )
@@ -276,6 +286,10 @@ abstract class AIcCheckAlgitesGovernanceConventionsTask : DefaultTask() {
                 }
         }
 
+        locDocumentationWarnings.sorted().forEach { locWarning ->
+            logger.warn("Algites governance documentation warning (non-fatal): $locWarning")
+        }
+
         if (locProblems.isNotEmpty()) {
             throw GradleException(
                 buildString {
@@ -293,7 +307,7 @@ val checkAlgitesGovernanceConventions = tasks.register<AIcCheckAlgitesGovernance
     "checkAlgitesGovernanceConventions"
 ) {
     group = "verification"
-    description = "Checks Algites governance source conventions, structured-data wire names, and internal _TMP_ALGITES_* transport references."
+    description = "Checks active Algites governance sources and reports documentation migration references as non-fatal warnings."
     repositoryDirectory.set(rootProject.layout.projectDirectory)
     ignoredDirectoryNames.set(AIcGovernanceConventionIgnoredDirectoryNames)
 }
