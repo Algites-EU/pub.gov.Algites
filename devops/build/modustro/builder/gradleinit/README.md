@@ -5,6 +5,30 @@
 compiled here instead of being evaluated as Settings/Project script plugins;
 Input-subscription and output-publication normalization still delegates portable semantics to Core.
 
+## Version Scope dependency defaults
+
+An omitted `VersionRequirement` on a `DependencyKind: modustro` dependency
+inherits the **effective version of its declaring artifact**, but only if the
+referenced artifact is found in the **same Version Scope** of the same source
+repository. The metadata resolver matches the canonical local `ArtifactId`,
+`VariantId` and (when supplied) `GroupId`; it does not infer versions from a
+matching name in another repository. The resolved metadata contains an
+explicit `VersionRequirement.Exact`, so native dependency handlers and the
+published dependency metadata receive an ordinary exact version requirement.
+
+An explicitly declared `VersionRequirement` always takes precedence, including
+an explicitly null `Exact`. A missing version for a known local dependency in
+another Version Scope is an error: that dependency must state its own version
+requirement. Missing versions for external dependencies are **not** populated
+from the consumer's Version Scope. `DependencyConstraints` continue to require
+their own explicit `VersionRequirement`.
+
+The rule applies after descriptor inheritance and also when metadata resolution
+is restricted to a single artifact or subtree: the resolver can inspect the
+repository's artifact identities to identify local targets outside the selected
+subtree. Version-scope membership is determined by the nearest effective
+version declaration, not by the directory's common parent alone.
+
 ## Consumer bootstrap
 
 Copy the repository root `settings.gradle.kts` (also available as

@@ -613,7 +613,63 @@ fun AIcResolveModustroArtifactDirectoryMetadata(
     }
     AIcValidateArtifactVariantCoordinateCollisions(locRepository.id, locScanResult.artifactDirectories)
 
-    return AIcdModustroResolutionResult(locRepository, locScanResult.artifactDirectories, locScanResult.isolatedBuildDirectories)
+    /* A subtree/current-only request may refer to an artifact outside the requested directories. */
+    val locNeedsRepositoryLookup = locNormalizedPath != null || locResolutionKind == "current-only"
+    val locHasUnversionedModustroDependencies = locScanResult.artifactDirectories.any { locArtifact ->
+        locArtifact.structureKind == "artifact" && locArtifact.dependencies.any { locDependency ->
+            locDependency.dependencyKind == "modustro" && locDependency.versionRequirement == null &&
+                locDependency.artifactId.startsWith("${locRepository.id}_")
+        }
+    }
+    val locAvailableArtifacts = if (locNeedsRepositoryLookup && locHasUnversionedModustroDependencies) {
+        AIcResolveArtifactDirectoryAndSubdirectories(aRepositoryRoot, ".", locInitialState).artifactDirectories
+    } else locScanResult.artifactDirectories
+    val locResolvedArtifacts = AIcResolveSameVersionScopeDependencyVersions(
+        locRepository.id, locScanResult.artifactDirectories, locAvailableArtifacts)
+
+    return AIcdModustroResolutionResult(locRepository, locResolvedArtifacts, locScanResult.isolatedBuildDirectories)
+}
+
+/** Applies a scope-local version only to an omitted Modustro dependency requirement. */
+fun AIcResolveSameVersionScopeDependencyVersions(
+    aRepositoryId: String,
+    aArtifacts: List<AIcdModustroArtifactDirectoryMetadata>,
+    aAvailableArtifacts: List<AIcdModustroArtifactDirectoryMetadata>
+): List<AIcdModustroArtifactDirectoryMetadata> {
+    val locTargets = aAvailableArtifacts.asSequence()
+        .filter { it.structureKind == "artifact" }
+        .groupBy { AIcCanonicalArtifactId(aRepositoryId, it.path) }
+    return aArtifacts.map artifact@ { locOwner ->
+        if (locOwner.structureKind != "artifact") return@artifact locOwner
+        val locDependencies = locOwner.dependencies.map dependency@ { locDependency ->
+            if (locDependency.dependencyKind != "modustro" || locDependency.versionRequirement != null) {
+                return@dependency locDependency
+            }
+            val locCandidates = locTargets[locDependency.artifactId].orEmpty().filter { locTarget ->
+                locTarget.variantId == locDependency.variantId &&
+                    (locDependency.groupId == null || locTarget.groupId == locDependency.groupId)
+            }
+            if (locCandidates.size > 1) {
+                error("Artifact '${locOwner.path}' has ambiguous local Modustro dependency '${locDependency.artifactId}' " +
+                    "(GroupId='${locDependency.groupId}', VariantId='${locDependency.variantId}').")
+            }
+            val locTarget = locCandidates.singleOrNull() ?: return@dependency locDependency
+            if (locOwner.versionScopePath != locTarget.versionScopePath) {
+                error("Artifact '${locOwner.path}' depends on local artifact '${locTarget.path}' in another Version Scope " +
+                    "('${locOwner.versionScopePath}' vs '${locTarget.versionScopePath}'); an explicit VersionRequirement is required.")
+            }
+            val locVersion = locOwner.version.AIcResolvedValue()
+                ?: error("Artifact '${locOwner.path}' has no resolved version for scope-local dependency '${locTarget.path}'.")
+            val locTargetVersion = locTarget.version.AIcResolvedValue()
+            require(locTargetVersion == locVersion) {
+                "Same Version Scope '${locOwner.versionScopePath}' has conflicting effective versions for " +
+                    "'${locOwner.path}' ($locVersion) and '${locTarget.path}' ($locTargetVersion)."
+            }
+            locDependency.copy(versionRequirement = AIcdAlgitesVersionRequirement(
+                exact = locVersion, specifiedProperties = setOf("Exact")))
+        }
+        locOwner.copy(dependencies = locDependencies)
+    }
 }
 
 fun AIcCanonicalArtifactId(aRepositoryId: String, aArtifactPath: String): String {
