@@ -177,7 +177,7 @@ public final class AItcModustroGradleInitTest {
                 """);
         BuildResult locResult = AIcBuildWithDiagnostics(GradleRunner.create()
                 .withEnvironment(AIcTestEnvironment()).withProjectDir(locFixture.toFile())
-                .withArguments("help", ":pub.test.gradleinit_child:help", "--offline", "--stacktrace"));
+                .withArguments("help", ":child:help", "--offline", "--stacktrace"));
         Assert.assertTrue(locResult.getOutput().contains("ISOLATED_DOMAIN_OK"));
     }
 
@@ -380,8 +380,8 @@ public final class AItcModustroGradleInitTest {
         Assert.assertTrue(locWithoutIdentity.contains("MODUSTRO_BUILD_INVOCATION_ID"), locWithoutIdentity);
         Assert.assertFalse(Files.exists(locFixture.resolve("published/publishFixture/payload.txt")));
         Assert.assertFalse(Files.exists(locFixture.resolve("child/published/publishFixture/payload.txt")));
-        var locCompositeEnvironment = AIcCompositeEnvironment();
-        String locFirst = AIcBuildWithDiagnostics(locRunner.withEnvironment(locCompositeEnvironment)).getOutput();
+        /* Each publication attempt requires its own invocation identity, even with a cached Gradle configuration. */
+        String locFirst = AIcBuildWithDiagnostics(locRunner.withEnvironment(AIcCompositeEnvironment())).getOutput();
         Assert.assertTrue(locFirst.contains("Configuration cache entry stored") || locFirst.contains("Configuration cache entry reused"), locFirst);
         String locRecord = AIcLatestPublicationRecord(locFixture);
         Assert.assertTrue(locRecord.contains("\"State\":\"COMPLETE\""), locRecord);
@@ -391,7 +391,8 @@ public final class AItcModustroGradleInitTest {
         Assert.assertTrue(locRecord.contains("\"TechnologyKind\":\"python\""), locRecord);
         Assert.assertTrue(locRecord.contains("eu.algites.test:local:develop"), locRecord);
         Assert.assertEquals(Files.readString(locFixture.resolve("published/refreshModustroDocsSite/payload.txt")), "root payload");
-        String locSecond = AIcBuildWithDiagnostics(locRunner.withEnvironment(locCompositeEnvironment)).getOutput();
+        /* Reuse the cached task configuration, not the identity of a finalized publication attempt. */
+        String locSecond = AIcBuildWithDiagnostics(locRunner.withEnvironment(AIcCompositeEnvironment())).getOutput();
         Assert.assertTrue(locSecond.contains("Configuration cache entry reused"), locSecond);
         String locPropertyId = "test:" + java.util.UUID.randomUUID();
         locRunner.withEnvironment(AIcTestEnvironment()).withArguments("modustroPublish",
