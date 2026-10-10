@@ -1901,7 +1901,7 @@ modustroBuild.configure {
 val modustroPublicationBuildGate = tasks.register("modustroPublicationBuildGate") {
     group = "publishing"
     description = "Requires all effective or explicitly selected Algites TechnologyKinds to build successfully before any publication task may start."
-    dependsOn(modustroBuild)
+    dependsOn(modustroBuild, "validateModustroPublicationProfiles")
 }
 
 val modustroPublish = tasks.register("modustroPublish") {
@@ -2209,6 +2209,75 @@ tasks.findByName("refreshModustroDocsSite")?.let { locRefresh ->
 }
 
 
+/** Reject missing credential profiles before any artifact in the Version Scope is published. */
+abstract class AIcValidateModustroPublicationProfilesTask : DefaultTask() {
+    @get:Input
+    abstract val validationProblems: ListProperty<String>
+
+    @TaskAction
+    fun AIcValidate() {
+        val locProblems = validationProblems.get()
+        if (locProblems.isNotEmpty()) {
+            throw GradleException("Modustro publication credential preflight failed before publishing any outputs:\n" +
+                locProblems.joinToString("\n") { " - $it" })
+        }
+        logger.lifecycle("Modustro publication credential preflight: active endpoint profiles are consistent.")
+    }
+}
+
+val locPublicationCredentialPreflightProblems = mutableListOf<String>()
+@Suppress("UNCHECKED_CAST")
+val locPublicationCredentialPreflightPlanResolver = rootProject.extra["modustroEffectivePublicationPlan"]
+    as (Map<String, Any?>, String, String) -> Map<String, Any?>
+val locPublicationCredentialPreflightRepositoryProfiles =
+    (modustroResolvedRepositoryMetadata["credentialProfiles"] as? Map<String, Any?>).orEmpty()
+val locPublicationCredentialPreflightKinds = listOf("java", "python", "mps")
+val locPublicationCredentialPreflightSelectors = listOf(
+    "native_product_binaries", "native_product_sources", "native_product_documentation",
+    "native_develop_binaries", "native_develop_sources", "native_develop_documentation")
+
+modustroResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (locProjectPath, locMetadata) ->
+    val locArtifactProfiles = (locMetadata["credentialProfiles"] as? Map<String, Any?>).orEmpty()
+    val locEffectiveProfiles = locPublicationCredentialPreflightRepositoryProfiles + locArtifactProfiles
+    val locDeclaredKinds = AIcModustroStringList(locMetadata["technologyKinds"]).toSet()
+    val locEffectiveKinds = if (modustroRequestedTechnologyKinds.isEmpty()) locDeclaredKinds
+        else locDeclaredKinds.intersect(modustroRequestedTechnologyKinds)
+    val locArtifactVersion = modustroResolvedVersionValue(locMetadata) ?: rootProject.version.toString()
+    val locArtifactStability = if (locArtifactVersion.endsWith("SNAPSHOT", ignoreCase = true)) "snapshot" else "release"
+    locEffectiveKinds.filter { it in locPublicationCredentialPreflightKinds }.forEach { locKind ->
+        locPublicationCredentialPreflightSelectors.forEach { locSelector ->
+            for (locStability in listOf(locArtifactStability)) {
+                val locPlan = locPublicationCredentialPreflightPlanResolver(
+                    locMetadata + ("publicationTechnologyKind" to locKind), locSelector, locStability)
+                if (locPlan["publicationEnabled"] != true) continue
+                val locEndpoints = (locPlan["publicationEndpoints"] as? List<*>).orEmpty()
+                locEndpoints.forEach { locRaw ->
+                    val locEndpoint = locRaw as? Map<*, *> ?: return@forEach
+                    if (locEndpoint["executionEnabled"] == false) return@forEach
+                    val locId = locEndpoint["publicationCredentialProfile"]?.toString()
+                        ?.takeIf { it.isNotBlank() && it != "null" } ?: return@forEach
+                    val locProfile = locEffectiveProfiles[locId] as? Map<*, *>
+                    if (locProfile == null || locProfile["type"]?.toString().isNullOrBlank()) {
+                        val locEndpointId = locEndpoint["id"]?.toString() ?: "<unnamed>"
+                        locPublicationCredentialPreflightProblems.add(
+                            "$locProjectPath [$locKind/$locSelector/$locStability] endpoint '$locEndpointId' " +
+                                "references undefined/incomplete credential profile '$locId' " +
+                                "(available profiles: ${locEffectiveProfiles.keys.sorted().joinToString(", ")}).")
+                    }
+                }
+            }
+        }
+    }
+}
+
+val modustroValidatePublicationProfiles = tasks.register<AIcValidateModustroPublicationProfilesTask>(
+    "validateModustroPublicationProfiles") {
+    group = "verification"
+    description = "Validates credentials for active artifact publication endpoints before any output is published."
+    validationProblems.set(locPublicationCredentialPreflightProblems.distinct().sorted())
+}
+
+
 subprojects {
     val locAlgitesRunDirectoryRelativePath = AIcModustroRunDirectoryRelativePath(project.projectDir)
     val locAlgitesArtifactDirectory = modustroResolvedArtifactDirectoryForProject(project.path)
@@ -2412,7 +2481,11 @@ subprojects {
             as (Map<String, Any?>, String, String) -> Map<String, Any?>
         return JsonOutput.toJson(locResolver((locAlgitesArtifactDirectory ?: emptyMap()) + ("publicationTechnologyKind" to aTechnologyKind), aOutputKind, locModustroPublicationStability))
     }
-    val locPublicationCredentialProfilesJson = JsonOutput.toJson(locAlgitesArtifactDirectory?.get("credentialProfiles") ?: emptyMap<String, Any>())
+    /* Use the scope's inherited profiles, retaining repository defaults as a safety net
+     * for bootstrap metadata that provides only the artifact-local overrides. */
+    val locPublicationCredentialProfilesJson = JsonOutput.toJson(
+        locPublicationCredentialPreflightRepositoryProfiles +
+            ((locAlgitesArtifactDirectory?.get("credentialProfiles") as? Map<String, Any?>).orEmpty()))
 
     val locAlgitesArtifactDirectoryPath = locAlgitesArtifactDirectory?.get("path")?.toString()?.takeIf { it.isNotBlank() } ?: "."
     val locAlgitesProductLicenses = locAlgitesLicensesForPathAndContentKind(locAlgitesArtifactDirectoryPath, "product")

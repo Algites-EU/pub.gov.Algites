@@ -91,12 +91,62 @@ public final class AIcGitBranchPublicationAdapter implements AIiPublicationAdapt
         } else if (locDiffExit != 0) {
             throw new IllegalStateException("git diff --cached --quiet failed with exit code " + locDiffExit + ".");
         }
+        /* The workflow configures origin with its scoped GitHub token. Never bypass that
+         * authenticated remote by passing the public PublicationUri to git push. */
+        String locOrigin = AIcReadOriginUrl(aContext, locWorkingTree);
+        if (!AIcRemoteMatchesPublication(locOrigin, locRemoteUri)) {
+            throw new IllegalStateException(
+                    "Configured Git remote 'origin' does not refer to the declared publication repository. "
+                    + "Check the documentation-branch workspace setup and PublicationUri."
+            );
+        }
         AIcRun(
                 aContext,
                 locWorkingTree,
-                List.of("git", "push", locRemoteUri.toString(), "HEAD:refs/heads/" + locBranch),
+                List.of("git", "push", "origin", "HEAD:refs/heads/" + locBranch),
                 true);
         aContext.progressReporter().completed("Git branch publication completed.");
+    }
+
+    private static String AIcReadOriginUrl(AIcPublicationAttemptContext aContext, Path aWorkingTree)
+            throws Exception {
+        AIcCheckCancellation(aContext);
+        Process locProcess = new ProcessBuilder("git", "remote", "get-url", "origin")
+                .directory(aWorkingTree.toFile())
+                .redirectErrorStream(true)
+                .start();
+        String locOutput = new String(locProcess.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
+        int locExitCode = locProcess.waitFor();
+        if (locExitCode != 0 || locOutput.isBlank()) {
+            throw new IllegalStateException("Git publication requires a configured remote 'origin'.");
+        }
+        /* Do not log locOutput: it may contain the workflow's authentication token. */
+        return locOutput;
+    }
+
+    static boolean AIcRemoteMatchesPublication(String aOrigin, URI aPublicationUri) {
+        try {
+            URI locRemote = new URI(aOrigin);
+            if (!"https".equalsIgnoreCase(locRemote.getScheme()) ||
+                    !"https".equalsIgnoreCase(aPublicationUri.getScheme()) ||
+                    locRemote.getHost() == null || aPublicationUri.getHost() == null ||
+                    !locRemote.getHost().equalsIgnoreCase(aPublicationUri.getHost()) ||
+                    locRemote.getPort() != aPublicationUri.getPort()) {
+                return false;
+            }
+            return AIcCanonicalRepositoryPath(locRemote.getPath())
+                    .equals(AIcCanonicalRepositoryPath(aPublicationUri.getPath()));
+        } catch (java.net.URISyntaxException locException) {
+            return false;
+        }
+    }
+
+    private static String AIcCanonicalRepositoryPath(String aPath) {
+        String locPath = aPath == null ? "" : aPath.replaceAll("/+$", "");
+        if (locPath.endsWith(".git")) {
+            locPath = locPath.substring(0, locPath.length() - 4);
+        }
+        return locPath;
     }
 
     private static int AIcRun(
@@ -108,8 +158,18 @@ public final class AIcGitBranchPublicationAdapter implements AIiPublicationAdapt
         List<String> locCommand = new ArrayList<>(aCommand);
         ProcessBuilder locBuilder = new ProcessBuilder(locCommand);
         locBuilder.directory(aWorkingTree.toFile());
-        locBuilder.inheritIO();
+        locBuilder.redirectErrorStream(true);
         Process locProcess = locBuilder.start();
+        java.io.ByteArrayOutputStream locCapturedOutput = new java.io.ByteArrayOutputStream();
+        Thread locOutputReader = new Thread(() -> {
+            try {
+                locProcess.getInputStream().transferTo(locCapturedOutput);
+            } catch (java.io.IOException locException) {
+                /* The process can close its stream when cancelled. */
+            }
+        }, "modustro-git-publication-output");
+        locOutputReader.setDaemon(true);
+        locOutputReader.start();
         while (true) {
             AIcCheckCancellation(aContext);
             Instant locDeadline = aContext.deadline();
@@ -122,12 +182,23 @@ public final class AIcGitBranchPublicationAdapter implements AIiPublicationAdapt
             }
             if (locProcess.waitFor(200L, TimeUnit.MILLISECONDS)) {
                 int locExit = locProcess.exitValue();
+                locOutputReader.join(1000L);
                 if (aRequireSuccess && locExit != 0) {
-                    throw new IllegalStateException("Git publishing command failed with exit code " + locExit + ": " + String.join(" ", locCommand));
+                    String locSafeOutput = AIcRedactGitOutput(
+                            locCapturedOutput.toString(java.nio.charset.StandardCharsets.UTF_8));
+                    throw new IllegalStateException("Git publishing command failed with exit code " + locExit
+                            + ": " + String.join(" ", locCommand)
+                            + (locSafeOutput.isBlank() ? "" : "\nGit output: " + locSafeOutput));
                 }
                 return locExit;
             }
         }
+    }
+
+    static String AIcRedactGitOutput(String aOutput) {
+        /* Never include embedded HTTPS authentication material in CI error messages. */
+        String locRedacted = aOutput.replaceAll("(?i)(https?://)[^/@\\s]+@", "$1[REDACTED]@").trim();
+        return locRedacted.substring(0, Math.min(locRedacted.length(), 16000));
     }
 
     private static String AIcRequiredCoordinate(Map<String, String> aCoordinates, String aKey) {

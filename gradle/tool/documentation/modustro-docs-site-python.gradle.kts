@@ -75,10 +75,12 @@ data class AIcdPythonDocsSiteEntry(
 class AIcGeneratePythonDocsSiteAction(
     private val locPythonExecutable: String,
     private val locArtifactDocsRootFile: File,
+    private val locToolchainDirectory: File,
     private val locEntries: List<AIcdPythonDocsSiteEntry>
 ) : Action<Task>, java.io.Serializable {
 
     override fun execute(aTask: Task) {
+        val locSphinxPython = if (locEntries.isEmpty()) locPythonExecutable else AIcEnsureSphinxToolchain(aTask)
         var locGeneratedCount = 0
 
         locEntries.forEach { locEntry ->
@@ -153,7 +155,7 @@ class AIcGeneratePythonDocsSiteAction(
             )
 
             val locProcess = ProcessBuilder(
-                locPythonExecutable,
+                locSphinxPython,
                 "-m",
                 "sphinx",
                 "-b",
@@ -173,7 +175,7 @@ class AIcGeneratePythonDocsSiteAction(
             }
             check(locExitCode == 0) {
                 "Python documentation generation failed for '${locEntry.locLocalArtifactId}' with exit code $locExitCode. " +
-                    "Ensure Sphinx and sphinx-autoapi are installed for '$locPythonExecutable'."
+                    "Sphinx invocation failed for '$locSphinxPython'."
             }
 
             if (locPythonSourceDirectories.isNotEmpty()) {
@@ -202,6 +204,52 @@ class AIcGeneratePythonDocsSiteAction(
 
         aTask.logger.lifecycle("Python documentation generated at: ${locArtifactDocsRootFile.absolutePath}")
         aTask.logger.lifecycle("Documented Python artifact(s): $locGeneratedCount")
+    }
+
+    /**
+     * Build workflows may use another interpreter than the documentation workflow. Reuse an
+     * already provisioned Sphinx installation, or provision a private, reproducible environment
+     * rather than installing into the runner's system interpreter.
+     */
+    private fun AIcEnsureSphinxToolchain(aTask: Task): String {
+        val locCheck = listOf("-c", "import sphinx, autoapi")
+        if (AIcRunPython(locPythonExecutable, locCheck).first == 0) {
+            aTask.logger.info("Modustro Python documentation: using existing Sphinx from $locPythonExecutable")
+            return locPythonExecutable
+        }
+        val locVirtualEnvironment = File(locToolchainDirectory, "venv")
+        val locVenvPython = File(locVirtualEnvironment,
+            if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) "Scripts/python.exe" else "bin/python")
+        if (locVenvPython.isFile && AIcRunPython(locVenvPython.absolutePath, locCheck).first == 0) {
+            return locVenvPython.absolutePath
+        }
+        if (!locVenvPython.isFile) {
+            locVirtualEnvironment.parentFile.mkdirs()
+            val (locExit, locOutput) = AIcRunPython(locPythonExecutable,
+                listOf("-m", "venv", locVirtualEnvironment.absolutePath))
+            check(locExit == 0) {
+                "Cannot create isolated Modustro Python docs toolchain using '$locPythonExecutable': $locOutput"
+            }
+        }
+        aTask.logger.lifecycle("Modustro Python docs: installing Sphinx and sphinx-autoapi into an isolated toolchain.")
+        val (locInstallExit, locInstallOutput) = AIcRunPython(locVenvPython.absolutePath,
+            listOf("-m", "pip", "install", "--no-compile", "--disable-pip-version-check",
+                "Sphinx==9.1.0", "sphinx-autoapi==3.8.0"))
+        check(locInstallExit == 0) {
+            "Cannot provision Modustro Python documentation toolchain: $locInstallOutput"
+        }
+        check(AIcRunPython(locVenvPython.absolutePath, locCheck).first == 0) {
+            "The isolated Modustro Python documentation toolchain is missing sphinx or autoapi after installation."
+        }
+        return locVenvPython.absolutePath
+    }
+
+    private fun AIcRunPython(aExecutable: String, aArguments: List<String>): Pair<Int, String> {
+        val locProcess = ProcessBuilder(listOf(aExecutable) + aArguments)
+            .redirectErrorStream(true)
+            .start()
+        val locOutput = locProcess.inputStream.bufferedReader(Charsets.UTF_8).readText()
+        return locProcess.waitFor() to locOutput.trim().takeLast(8000)
     }
 
     private fun AIcPythonString(aValue: String): String {
@@ -371,12 +419,17 @@ val locGeneratePythonDocsSite = tasks.register("generatePythonDocsSite") {
     }
     inputs.property("pythonExecutable", locPythonExecutable)
     inputs.property("snapshotInstanceId", locPythonDocsSnapshotInstanceId ?: "")
+    /* Artifact documentation and index tasks share this site tree. Gradle must not cache
+     * a partial site as though it were the complete output of this task. */
     outputs.dir(locArtifactDocsRoot)
+    inputs.property("modustroPythonDocsSphinxVersion", "9.1.0")
+    inputs.property("modustroPythonDocsAutoApiVersion", "3.8.0")
 
     doLast(
         AIcGeneratePythonDocsSiteAction(
             locPythonExecutable,
             locArtifactDocsRoot.asFile,
+            File(rootProject.layout.buildDirectory.get().asFile, "modustro/python-docs-toolchain"),
             locPythonDocsEntries
         )
     )
