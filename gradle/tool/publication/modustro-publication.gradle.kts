@@ -27,6 +27,8 @@ if (!rootProject.extra.has("modustroEffectivePublicationPlan")) {
     }
 }
 
+/* Applied scripts may be included through multiple output publication entry points. */
+if (!rootProject.extra.has("modustroResolvePublicationPlan")) {
 fun AIcPublicationDestinationIds(aValue: String?): List<String> = aValue
     ?.split(',')
     ?.map(String::trim)
@@ -79,3 +81,4 @@ val locResolvePublicationPlan = fun(
 
 rootProject.extra["modustroResolvePublicationPlan"] = locResolvePublicationPlan
 rootProject.extra["modustroPublicationDestinationIds"] = { aValue: String? -> AIcPublicationDestinationIds(aValue) }
+}

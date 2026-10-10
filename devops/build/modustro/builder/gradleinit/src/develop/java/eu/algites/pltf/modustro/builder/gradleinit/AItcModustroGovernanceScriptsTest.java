@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.gradle.testkit.runner.GradleRunner;
+import org.gradle.testkit.runner.UnexpectedBuildFailure;
 import org.testng.Assert;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -89,9 +90,16 @@ public final class AItcModustroGovernanceScriptsTest {
                 }
                 """;
             Files.writeString(locBuild.resolve("build.gradle.kts"), locBuildScript);
-            var locResult = GradleRunner.create().withProjectDir(locBuild.toFile())
-                .withArguments("printModustroPublicationOverrides", "-Pmodustro.publication.nativeProductBinaries=FORCE_OFF",
-                    "--stacktrace").build();
+            org.gradle.testkit.runner.BuildResult locResult;
+            try {
+                locResult = GradleRunner.create().withProjectDir(locBuild.toFile())
+                    .withArguments("printModustroPublicationOverrides", "-Pmodustro.publication.nativeProductBinaries=FORCE_OFF",
+                        "--stacktrace").build();
+            } catch (UnexpectedBuildFailure locFailure) {
+                throw new AssertionError("Publication bridge fixture (root=" + aRootBuild +
+                    ", local=" + aLocalCopy + ") failed:\n" +
+                    locFailure.getBuildResult().getOutput(), locFailure);
+            }
             Assert.assertTrue(locResult.getOutput().contains("PUBLICATION_FALLBACK_OK"));
             Assert.assertEquals(locDownloads.get(), aLocalCopy ? 0 : 1);
         } finally {

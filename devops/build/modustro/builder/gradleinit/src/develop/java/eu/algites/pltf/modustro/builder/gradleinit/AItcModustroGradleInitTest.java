@@ -5,12 +5,23 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
 import org.gradle.testkit.runner.GradleRunner;
+import org.gradle.testkit.runner.UnexpectedBuildFailure;
 import org.gradle.testkit.runner.BuildResult;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
 /** Integration checks for the Settings classloader boundary and compiled discovery. */
 public final class AItcModustroGradleInitTest {
+    /** Includes the nested TestKit build output in CI failures. */
+    private static BuildResult AIcBuildWithDiagnostics(GradleRunner aRunner) {
+        try {
+            return aRunner.build();
+        } catch (UnexpectedBuildFailure locFailure) {
+            throw new AssertionError("Nested Gradle build failed:\n" +
+                    locFailure.getBuildResult().getOutput(), locFailure);
+        }
+    }
+
     /** Test invocations must not inherit a production CI publication identity. */
     private static java.util.Map<String, String> AIcTestEnvironment() {
         var locEnvironment = new java.util.HashMap<>(System.getenv());
@@ -164,8 +175,9 @@ public final class AItcModustroGradleInitTest {
                 check(locByProject[":"]!!["groupId"] == "eu.algites.test")
                 println("ISOLATED_DOMAIN_OK")
                 """);
-        BuildResult locResult = GradleRunner.create().withEnvironment(AIcTestEnvironment()).withProjectDir(locFixture.toFile())
-                .withArguments("help", ":child:help", "--offline", "--stacktrace").build();
+        BuildResult locResult = AIcBuildWithDiagnostics(GradleRunner.create()
+                .withEnvironment(AIcTestEnvironment()).withProjectDir(locFixture.toFile())
+                .withArguments("help", ":pub.test.gradleinit_child:help", "--offline", "--stacktrace"));
         Assert.assertTrue(locResult.getOutput().contains("ISOLATED_DOMAIN_OK"));
     }
 
@@ -368,7 +380,8 @@ public final class AItcModustroGradleInitTest {
         Assert.assertTrue(locWithoutIdentity.contains("MODUSTRO_BUILD_INVOCATION_ID"), locWithoutIdentity);
         Assert.assertFalse(Files.exists(locFixture.resolve("published/publishFixture/payload.txt")));
         Assert.assertFalse(Files.exists(locFixture.resolve("child/published/publishFixture/payload.txt")));
-        String locFirst = locRunner.withEnvironment(AIcCompositeEnvironment()).build().getOutput();
+        var locCompositeEnvironment = AIcCompositeEnvironment();
+        String locFirst = AIcBuildWithDiagnostics(locRunner.withEnvironment(locCompositeEnvironment)).getOutput();
         Assert.assertTrue(locFirst.contains("Configuration cache entry stored") || locFirst.contains("Configuration cache entry reused"), locFirst);
         String locRecord = AIcLatestPublicationRecord(locFixture);
         Assert.assertTrue(locRecord.contains("\"State\":\"COMPLETE\""), locRecord);
@@ -378,7 +391,7 @@ public final class AItcModustroGradleInitTest {
         Assert.assertTrue(locRecord.contains("\"TechnologyKind\":\"python\""), locRecord);
         Assert.assertTrue(locRecord.contains("eu.algites.test:local:develop"), locRecord);
         Assert.assertEquals(Files.readString(locFixture.resolve("published/refreshModustroDocsSite/payload.txt")), "root payload");
-        String locSecond = locRunner.withEnvironment(AIcCompositeEnvironment()).build().getOutput();
+        String locSecond = AIcBuildWithDiagnostics(locRunner.withEnvironment(locCompositeEnvironment)).getOutput();
         Assert.assertTrue(locSecond.contains("Configuration cache entry reused"), locSecond);
         String locPropertyId = "test:" + java.util.UUID.randomUUID();
         locRunner.withEnvironment(AIcTestEnvironment()).withArguments("modustroPublish",
