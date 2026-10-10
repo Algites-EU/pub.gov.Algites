@@ -1469,6 +1469,43 @@ fun AIcValidateLocalAlgitesDependencyVersion(
     }
 }
 
+/** Validates an in-repository Python dependency without asking a remote package index for its wheel. */
+fun AIcValidateLocalAlgitesPythonDependencyVersion(
+    aDefinition: Map<String, Any?>,
+    aTargetMetadata: Map<String, Any?>,
+    aTargetProjectPath: String,
+    aContext: String
+) {
+    val locRequirement = AIcAlgitesPortableVersionRequirement(aDefinition, aContext) ?: return
+    val locTargetVersion = modustroResolvedVersionValue(aTargetMetadata)
+        ?: modustroResolvedVersionValue(modustroResolvedArtifactDirectoryForProject(":"))
+        ?: throw GradleException("$aContext targets local Python artifact '$aTargetProjectPath' without a resolvable version.")
+    if (locRequirement.exact != null && locRequirement.exact != locTargetVersion) {
+        throw GradleException(
+            "$aContext requires '${locRequirement.exact}', but local Python artifact '$aTargetProjectPath' has version '$locTargetVersion'."
+        )
+    }
+    val locNativeRequirement = AIcAlgitesNativePortableVersionRequirement(
+        locRequirement, "modustro", "java", aContext
+    )
+    val locCandidateRequirement = AIcVersionRequirement(
+        locTargetVersion,
+        locNativeRequirement.minimum(),
+        locNativeRequirement.maximum(),
+        locNativeRequirement.maximumStrict(),
+        locNativeRequirement.excludedVersionTexts(),
+        locNativeRequirement.preferredVersionText()
+    )
+    try {
+        AIsVersionRequirementNormalizer.normalize(locCandidateRequirement, AIcGradleVersionScheme.INSTANCE)
+    } catch (locException: IllegalArgumentException) {
+        throw GradleException(
+            "$aContext does not accept local Python artifact '$aTargetProjectPath' version '$locTargetVersion': ${locException.message}",
+            locException
+        )
+    }
+}
+
 @Suppress("UNCHECKED_CAST")
 fun AIcModustroEnvironmentRequirement(aArtifactDirectory: Map<String, Any?>?, aEnvironment: String): Map<String, Any?>? =
     (aArtifactDirectory?.get("environmentRequirements") as? Map<String, Map<String, Any?>>)?.get(aEnvironment.lowercase())
@@ -2662,16 +2699,78 @@ subprojects {
         locPythonConstraintDefinitions.forEachIndexed { locIndex, locDefinition ->
             AIcModustroPythonEffectiveUsages(locDefinition, "Project '${project.path}' DependencyConstraints[$locIndex]")
         }
-        val locPythonResolutionDependencies = locPythonDependencyDefinitions
+        /*
+         * A Modustro dependency on another artifact of this source repository is
+         * a local build-graph edge, not a requirement to download an already
+         * published snapshot. External Python/Modustro dependencies must still
+         * be resolved through the configured indexes. Keep all dependencies in
+         * the generated wheel/sdist metadata regardless of the preflight route.
+         */
+        fun locPythonExternalPreflightEntries(
+            aDefinitions: List<Map<String, Any?>>,
+            aPropertyName: String
+        ): List<String> = aDefinitions
             .filter { locDefinition -> AIcModustroDependencyUsages(locDefinition).any(::AIcModustroPythonParticipatesInResolution) }
-            .mapIndexed { locIndex, locDefinition ->
-                AIcAlgitesPythonResolutionEntry(locDefinition, project.path, "Project '${project.path}' Dependencies[$locIndex]")
+            .mapIndexedNotNull { locIndex, locDefinition ->
+                val locContext = "Project '${project.path}' $aPropertyName[$locIndex]"
+                val locLocalTarget = AIcAlgitesLocalDependencyTarget(locDefinition, project.path)
+                if (locLocalTarget != null) {
+                    val (locTargetProject, locTargetMetadata) = locLocalTarget
+                    /* The package-name resolver checks that the local target actually supports Python. */
+                    val locPackageName = AIcAlgitesPythonDependencyPackageName(locDefinition, project.path)
+                    AIcValidateLocalAlgitesPythonDependencyVersion(
+                        locDefinition, locTargetMetadata, locTargetProject.path, locContext
+                    )
+                    logger.lifecycle(
+                        "Modustro Python preflight: LOCAL ${project.path} -> ${locTargetProject.path} " +
+                            "($locPackageName); remote package-index lookup skipped."
+                    )
+                    null
+                } else {
+                    /*
+                     * Detect a same-repository artifact whose declared GroupId does not match
+                     * its inherited effective GroupId, instead of accidentally treating it
+                     * as a remote Python package. Other repositories still use normal pip
+                     * resolution, including artifacts not present in this build domain.
+                     */
+                    if (locDefinition["dependencyKind"]?.toString() == "modustro") {
+                        val locArtifactId = locDefinition["artifactId"]?.toString().orEmpty()
+                        val locVariantId = locDefinition["variantId"]?.toString()?.takeUnless {
+                            it.isBlank() || it == "null"
+                        }
+                        val locCandidates = modustroResolvedArtifactDirectoriesByGradleProjectPath
+                            .filterKeys { it != ":" }
+                            .filter { (locPath, locMetadata) ->
+                                AIcAlgitesCanonicalArtifactId(locPath) == locArtifactId &&
+                                    locMetadata["variantId"]?.toString()?.takeUnless {
+                                        it.isBlank() || it == "null"
+                                    } == locVariantId
+                            }
+                        if (locCandidates.isNotEmpty()) {
+                            val locDeclaredGroup = locDefinition["groupId"]?.toString()
+                            val locActualGroups = locCandidates.map { (locPath, locMetadata) ->
+                                "$locPath=${locMetadata["groupId"]}"
+                            }.sorted().joinToString(", ")
+                            throw GradleException(
+                                "$locContext references an artifact present in this build, but the local " +
+                                    "Modustro dependency matcher did not accept it. " +
+                                    "Declared GroupId='$locDeclaredGroup', local targets: $locActualGroups. " +
+                                    "Check inherited GroupId and VariantId instead of publishing a " +
+                                    "local artifact merely to satisfy Python preflight."
+                            )
+                        }
+                    }
+                    val locRemoteEntry = AIcAlgitesPythonResolutionEntry(locDefinition, project.path, locContext)
+                    logger.info("Modustro Python preflight: REMOTE ${project.path}: $locRemoteEntry")
+                    locRemoteEntry
+                }
             }
-        val locPythonResolutionConstraints = locPythonConstraintDefinitions
-            .filter { locDefinition -> AIcModustroDependencyUsages(locDefinition).any(::AIcModustroPythonParticipatesInResolution) }
-            .mapIndexed { locIndex, locDefinition ->
-                AIcAlgitesPythonResolutionEntry(locDefinition, project.path, "Project '${project.path}' DependencyConstraints[$locIndex]")
-            }
+        val locPythonResolutionDependencies = locPythonExternalPreflightEntries(
+            locPythonDependencyDefinitions, "Dependencies"
+        )
+        val locPythonResolutionConstraints = locPythonExternalPreflightEntries(
+            locPythonConstraintDefinitions, "DependencyConstraints"
+        )
         val locPythonPublishedDependencies = locPythonDependencyDefinitions
             .filter { locDefinition ->
                 AIcModustroDependencyUsages(locDefinition).any { locUsage ->
