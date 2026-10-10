@@ -4,6 +4,10 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.List;
+import java.util.Map;
+import eu.algites.pltf.modustro.builder.publication.AIcPublicationDomainStore;
+import groovy.json.JsonSlurper;
 import org.gradle.testkit.runner.GradleRunner;
 import org.gradle.testkit.runner.UnexpectedBuildFailure;
 import org.gradle.testkit.runner.BuildResult;
@@ -45,6 +49,76 @@ public final class AItcModustroGradleInitTest {
             return Files.readString(locNewest);
         }
     }
+    /** Selects the immutable record belonging to an exact invocation, independent of filesystem timestamps. */
+    private static String AIcPublicationRecordForInvocation(Path aFixture, String aInvocationId) throws IOException {
+        String locSafeInvocationId = aInvocationId.replaceAll("[^A-Za-z0-9._-]+", "_");
+        if (locSafeInvocationId.length() > 100) locSafeInvocationId = locSafeInvocationId.substring(0, 100);
+        String locDirectoryName = locSafeInvocationId + "-" +
+                AIcPublicationDomainStore.fingerprint(aInvocationId).substring(0, 16);
+        Path locRoot = aFixture.resolve("build/run/publication-records")
+                .resolve(locDirectoryName).resolve("version-scopes");
+        Assert.assertTrue(Files.isDirectory(locRoot),
+                "Missing Version Scope records for invocation '" + aInvocationId + "' at " + locRoot);
+        try (var locPaths = Files.list(locRoot)) {
+            List<Path> locRecords = locPaths.filter(Files::isRegularFile)
+                    .filter(aPath -> aPath.getFileName().toString().endsWith(".json"))
+                    .sorted().toList();
+            Assert.assertEquals(locRecords.size(), 1,
+                    "Expected one Version Scope record for invocation '" + aInvocationId + "': " + locRecords);
+            return Files.readString(locRecords.get(0));
+        }
+    }
+
+    private static Map<?, ?> AIcJsonObject(Object aValue, String aContext) {
+        Assert.assertTrue(aValue instanceof Map<?, ?>, "Expected JSON object at " + aContext + ": " + aValue);
+        return (Map<?, ?>) aValue;
+    }
+
+    private static List<?> AIcJsonArray(Map<?, ?> aObject, String aKey) {
+        Object locValue = aObject.get(aKey);
+        Assert.assertTrue(locValue instanceof List<?>, "Expected JSON array for '" + aKey + "': " + aObject);
+        return (List<?>) locValue;
+    }
+
+    /** A cross-domain publication must finalize exactly once, with both artifacts and all outputs complete. */
+    private static void AIcAssertCompleteCompositeRecord(String aJson) {
+        Map<?, ?> locRecord = AIcJsonObject(new JsonSlurper().parseText(aJson), "Version Scope record");
+        Assert.assertEquals(locRecord.get("State"), "COMPLETE", aJson);
+        Assert.assertEquals(locRecord.get("VersionScopeId"), ".", aJson);
+        Assert.assertEquals(locRecord.get("Version"), "1.0-SNAPSHOT", aJson);
+        Assert.assertTrue(AIcJsonArray(locRecord, "MissingDomainResults").isEmpty(), aJson);
+
+        List<?> locArtifacts = AIcJsonArray(locRecord, "Artifacts");
+        Assert.assertEquals(locArtifacts.size(), 2, aJson);
+        for (String locArtifactPath : List.of("local", "child")) {
+            var locMatchingArtifacts = locArtifacts.stream()
+                    .map(aValue -> AIcJsonObject(aValue, "Artifacts"))
+                    .filter(aArtifact -> locArtifactPath.equals(aArtifact.get("ArtifactPath")))
+                    .toList();
+            Assert.assertEquals(locMatchingArtifacts.size(), 1, aJson);
+            Map<?, ?> locArtifact = locMatchingArtifacts.get(0);
+            Assert.assertEquals(locArtifact.get("Success"), Boolean.TRUE, aJson);
+            List<?> locOutputs = AIcJsonArray(locArtifact, "Outputs");
+            Assert.assertFalse(locOutputs.isEmpty(), aJson);
+            for (Object locOutputValue : locOutputs) {
+                Map<?, ?> locOutput = AIcJsonObject(locOutputValue, "Artifacts.Outputs");
+                Assert.assertEquals(locOutput.get("Completed"), Boolean.TRUE, aJson);
+                Assert.assertEquals(locOutput.get("Success"), Boolean.TRUE, aJson);
+            }
+        }
+        Assert.assertTrue(aJson.contains("\"TechnologyKind\":\"python\""), aJson);
+        Assert.assertTrue(aJson.contains("eu.algites.test:local:develop"), aJson);
+
+        List<?> locActions = AIcJsonArray(locRecord, "VersionScopePublicationFinalizationActions");
+        Assert.assertEquals(locActions.size(), 1, "Exactly one scope finalization action is expected: " + aJson);
+        Map<?, ?> locAction = AIcJsonObject(locActions.get(0), "VersionScopePublicationFinalizationActions[0]");
+        Assert.assertEquals(locAction.get("Id"), "refresh", aJson);
+        Assert.assertEquals(locAction.get("Success"), Boolean.TRUE, aJson);
+        Object locAttempts = locAction.get("Attempts");
+        Assert.assertTrue(locAttempts instanceof Number, aJson);
+        Assert.assertEquals(((Number) locAttempts).intValue(), 1, aJson);
+    }
+
     private static String AIcBootstrap() throws IOException {
         Properties locMetadata = new Properties();
         try (var locInput = AItcModustroGradleInitTest.class.getClassLoader()
@@ -380,29 +454,45 @@ public final class AItcModustroGradleInitTest {
         Assert.assertTrue(locWithoutIdentity.contains("MODUSTRO_BUILD_INVOCATION_ID"), locWithoutIdentity);
         Assert.assertFalse(Files.exists(locFixture.resolve("published/publishFixture/payload.txt")));
         Assert.assertFalse(Files.exists(locFixture.resolve("child/published/publishFixture/payload.txt")));
-        /* Each publication attempt requires its own invocation identity, even with a cached Gradle configuration. */
-        String locFirst = AIcBuildWithDiagnostics(locRunner.withEnvironment(AIcCompositeEnvironment())).getOutput();
+        /* Every publication invocation has a distinct identity, independent of configuration cache reuse. */
+        Map<String, String> locFirstEnvironment = AIcCompositeEnvironment();
+        String locFirstId = locFirstEnvironment.get("MODUSTRO_BUILD_INVOCATION_ID");
+        String locFirst = AIcBuildWithDiagnostics(locRunner.withEnvironment(locFirstEnvironment)).getOutput();
         Assert.assertTrue(locFirst.contains("Configuration cache entry stored") || locFirst.contains("Configuration cache entry reused"), locFirst);
-        String locRecord = AIcLatestPublicationRecord(locFixture);
-        Assert.assertTrue(locRecord.contains("\"State\":\"COMPLETE\""), locRecord);
-        Assert.assertTrue(locRecord.contains("\"ArtifactPath\":\"local\""), locRecord);
-        Assert.assertTrue(locRecord.contains("\"ArtifactPath\":\"child\""), locRecord);
-        Assert.assertEquals(locRecord.split("\"ArtifactPath\":\"local\"", -1).length - 1, 1, locRecord);
-        Assert.assertTrue(locRecord.contains("\"TechnologyKind\":\"python\""), locRecord);
-        Assert.assertTrue(locRecord.contains("eu.algites.test:local:develop"), locRecord);
+        String locFirstRecord = AIcPublicationRecordForInvocation(locFixture, locFirstId);
+        AIcAssertCompleteCompositeRecord(locFirstRecord);
         Assert.assertEquals(Files.readString(locFixture.resolve("published/refreshModustroDocsSite/payload.txt")), "root payload");
-        /* Reuse the cached task configuration, not the identity of a finalized publication attempt. */
-        String locSecond = AIcBuildWithDiagnostics(locRunner.withEnvironment(AIcCompositeEnvironment())).getOutput();
+
+        /* A second invocation must publish new payloads and finalize once while reusing configuration cache. */
+        Files.writeString(locFixture.resolve("payload.txt"), "second root payload");
+        Files.writeString(locFixture.resolve("child/payload.txt"), "second child payload");
+        Map<String, String> locSecondEnvironment = AIcCompositeEnvironment();
+        String locSecondId = locSecondEnvironment.get("MODUSTRO_BUILD_INVOCATION_ID");
+        Assert.assertNotEquals(locSecondId, locFirstId);
+        String locSecond = AIcBuildWithDiagnostics(locRunner.withEnvironment(locSecondEnvironment)).getOutput();
         Assert.assertTrue(locSecond.contains("Configuration cache entry reused"), locSecond);
+        String locSecondRecord = AIcPublicationRecordForInvocation(locFixture, locSecondId);
+        AIcAssertCompleteCompositeRecord(locSecondRecord);
+        Assert.assertEquals(AIcPublicationRecordForInvocation(locFixture, locFirstId), locFirstRecord,
+                "A subsequent invocation must not modify a finalized record from the first invocation.");
+        Assert.assertEquals(Files.readString(locFixture.resolve("published/publishFixture/payload.txt")), "second root payload");
+        Assert.assertEquals(Files.readString(locFixture.resolve("child/published/publishFixture/payload.txt")), "second child payload");
+        Assert.assertEquals(Files.readString(locFixture.resolve("published/refreshModustroDocsSite/payload.txt")), "second root payload");
+
+        /* A third invocation verifies that an already finalized identity rejects a changed payload. */
+        Files.writeString(locFixture.resolve("payload.txt"), "root payload");
+        Files.writeString(locFixture.resolve("child/payload.txt"), "child payload");
         String locPropertyId = "test:" + java.util.UUID.randomUUID();
         locRunner.withEnvironment(AIcTestEnvironment()).withArguments("modustroPublish",
                 "-Pmodustro.build.invocationId=" + locPropertyId, "--configuration-cache", "--offline", "--stacktrace").build();
-        String locCommitted = AIcLatestPublicationRecord(locFixture);
-        Assert.assertTrue(locCommitted.contains("\"State\":\"COMPLETE\""), locCommitted);
+        String locCommitted = AIcPublicationRecordForInvocation(locFixture, locPropertyId);
+        AIcAssertCompleteCompositeRecord(locCommitted);
         Files.writeString(locFixture.resolve("payload.txt"), "must not overwrite committed native output");
         String locRepeated = locRunner.buildAndFail().getOutput();
         Assert.assertTrue(locRepeated.contains("finalized") || locRepeated.contains("committed"), locRepeated);
-        Assert.assertEquals(AIcLatestPublicationRecord(locFixture), locCommitted);
+        Assert.assertEquals(AIcPublicationRecordForInvocation(locFixture, locPropertyId), locCommitted);
+        Assert.assertEquals(AIcPublicationRecordForInvocation(locFixture, locFirstId), locFirstRecord);
+        Assert.assertEquals(AIcPublicationRecordForInvocation(locFixture, locSecondId), locSecondRecord);
         Assert.assertEquals(Files.readString(locFixture.resolve("published/publishFixture/payload.txt")), "root payload");
         Files.writeString(locFixture.resolve("payload.txt"), "root payload");
         locRunner.withArguments("modustroPublish", "--configuration-cache", "--offline", "--stacktrace");
@@ -410,9 +500,13 @@ public final class AItcModustroGradleInitTest {
         Path locChildBuild = locFixture.resolve("child/build.gradle.kts");
         Files.writeString(locChildBuild, Files.readString(locChildBuild)
                 .replace("tasks.register(\"modustroPublish\") { dependsOn(locNative) }", "tasks.register(\"modustroPublish\")"));
-        String locMissing = locRunner.withEnvironment(AIcCompositeEnvironment()).buildAndFail().getOutput();
+        Map<String, String> locMissingEnvironment = AIcCompositeEnvironment();
+        String locMissing = locRunner.withEnvironment(locMissingEnvironment).buildAndFail().getOutput();
         Assert.assertTrue(locMissing.contains("incomplete"), locMissing);
-        Assert.assertTrue(AIcLatestPublicationRecord(locFixture).contains("\"State\":\"FAILED\""));
+        String locMissingRecord = AIcPublicationRecordForInvocation(locFixture,
+                locMissingEnvironment.get("MODUSTRO_BUILD_INVOCATION_ID"));
+        Assert.assertEquals(AIcJsonObject(new JsonSlurper().parseText(locMissingRecord), "failed Version Scope record")
+                .get("State"), "FAILED", locMissingRecord);
         Assert.assertFalse(Files.exists(locFixture.resolve("published/refreshModustroDocsSite/payload.txt")));
     }
 }

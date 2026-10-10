@@ -72,7 +72,10 @@ public final class AItcModustroGovernanceScriptsTest {
                 val locMetadata = mapOf<String, Any?>("publicationTechnologyKind" to "java", "outputPublications" to mapOf(
                     "java.native_product_binaries" to mapOf("snapshot" to mapOf("publicationEnabled" to true))
                 ))
-                check(locResolve(locMetadata, "native_product_binaries", "snapshot")["publicationEnabled"] == false)
+                val locForcedOff = locResolve(locMetadata, "native_product_binaries", "snapshot")
+                check(locForcedOff["publicationEnabled"] == false) {
+                    "FORCE_OFF must disable native_product_binaries/snapshot: $locForcedOff"
+                }
                 println("PUBLICATION_FALLBACK_OK")
                 """;
             if (!aRootBuild) locBuildScript += """
@@ -84,9 +87,15 @@ public final class AItcModustroGovernanceScriptsTest {
                 })
                 listOf("modustro_docs_site", "schema_site").forEach {
                     val locPlan = locRepositoryResolver(locRepositoryMetadata, it, "snapshot", emptyList())
-                    check(locPlan["publicationEnabled"] == true)
-                    check((locPlan["outputPublicationFinalizationActions"] as List<*>).size == 1)
-                    check(locPlan.containsKey("snapshotPublicationEndpoints"))
+                    check(locPlan["publicationEnabled"] == true) {
+                        "Publication bridge unexpectedly disabled $it/snapshot: $locPlan"
+                    }
+                    check((locPlan["outputPublicationFinalizationActions"] as List<*>).size == 1) {
+                        "Publication bridge lost output finalization actions for $it/snapshot: $locPlan"
+                    }
+                    check(locPlan.containsKey("snapshotPublicationEndpoints")) {
+                        "Publication bridge omitted snapshot endpoint registry for $it: $locPlan"
+                    }
                 }
                 """;
             Files.writeString(locBuild.resolve("build.gradle.kts"), locBuildScript);
@@ -96,12 +105,16 @@ public final class AItcModustroGovernanceScriptsTest {
                     .withArguments("printModustroPublicationOverrides", "-Pmodustro.publication.nativeProductBinaries=FORCE_OFF",
                         "--stacktrace").build();
             } catch (UnexpectedBuildFailure locFailure) {
-                throw new AssertionError("Publication bridge fixture (root=" + aRootBuild +
-                    ", local=" + aLocalCopy + ") failed:\n" +
-                    locFailure.getBuildResult().getOutput(), locFailure);
+                /* Gradle's console summary hides TestKit's nested failure output; print it at the test boundary. */
+                String locDiagnostic = "Publication bridge fixture failed (root=" + aRootBuild +
+                    ", local=" + aLocalCopy + ", root=" + locRepository +
+                    ", entry=" + (aRootBuild ? "modustro-root-build.gradle.kts" : "modustro-publication.gradle.kts") +
+                    ", fixture=" + locFixture + "):\n" + locFailure.getBuildResult().getOutput();
+                System.err.println(locDiagnostic);
+                throw new AssertionError(locDiagnostic, locFailure);
             }
-            Assert.assertTrue(locResult.getOutput().contains("PUBLICATION_FALLBACK_OK"));
-            Assert.assertEquals(locDownloads.get(), aLocalCopy ? 0 : 1);
+            Assert.assertTrue(locResult.getOutput().contains("PUBLICATION_FALLBACK_OK"), locResult.getOutput());
+            Assert.assertEquals(locDownloads.get(), aLocalCopy ? 0 : 1, locResult.getOutput());
         } finally {
             locServer.stop(0);
         }
