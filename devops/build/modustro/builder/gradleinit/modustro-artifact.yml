@@ -5,6 +5,11 @@ Artifact:
 Dependencies:
   - DependencyKind: modustro
     Items:
+      - GroupId: eu.algites.pltf.modustro.builder
+        ArtifactId: pub.gov.Algites_devops.build.modustro.builder.coreintf
+        Usages: [product_api]
+        VersionRequirement:
+          Exact: "1.0-SNAPSHOT"
       - GroupId: eu.algites.tool.build
         ArtifactId: pub.gov.Algites_devops.build.modustrobuild
         Usages: [product_api]
