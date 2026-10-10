@@ -157,7 +157,7 @@ public final class AItcModustroGradleInitTest {
         Path locFixture = AIcFixture();
         Files.writeString(locFixture.resolve("modustro-source-repository.yml"),
                 Files.readString(locFixture.resolve("modustro-source-repository.yml"))
-                + "\nNestedGradleSettingsBuildPolicy: USE_ISOLATED_BUILD_ON_NESTED_SETTINGS\n");
+                + "\nNestedGradleSettingsBuildPolicy: use_isolated_build_on_nested_settings\n");
         Files.writeString(locFixture.resolve("settings.gradle.kts"), AIcBootstrap());
         Files.writeString(locFixture.resolve("build.gradle.kts"), "");
         Files.writeString(locFixture.resolve("child/settings.gradle.kts"), AIcBootstrap());
@@ -359,7 +359,7 @@ public final class AItcModustroGradleInitTest {
         Path locFixture = AIcFixture();
         Path locDescriptor = locFixture.resolve("modustro-source-repository.yml");
         Files.writeString(locDescriptor, Files.readString(locDescriptor) + """
-                NestedGradleSettingsBuildPolicy: USE_ISOLATED_BUILD_ON_NESTED_SETTINGS
+                NestedGradleSettingsBuildPolicy: use_isolated_build_on_nested_settings
                 OutputPublications:
                   - OutputSelector: native_outputs
                     TechnologyKind: java
