@@ -46,14 +46,8 @@ public final class AIcBuildRecordPublicationFinalizationActionAdapter implements
         locRecord.put("Output", Map.of(
                 "TechnologyKind", locCoordinates.getOrDefault("technologyKind", "unknown"),
                 "OutputType", locRoot.outputKind().descriptorName(),
-                "PublishedVersion", Objects.toString(locRoot.version(), "unknown"),
                 "Files", List.of(Map.of("Filename", locFilename, "Sha256", locSha256, "Size", locSize))));
-        locRecord.put("ExecutionLineage", aContext.lineage().steps().stream().map(locStep -> Map.of(
-                "Id", locStep.id(),
-                "Kind", locStep.kind(),
-                "InputUri", Objects.toString(locStep.inputUri(), ""),
-                "OutputUri", Objects.toString(locStep.outputUri(), ""),
-                "Result", locStep.resultMetadata())).toList());
+
 
         Path locDirectory = Files.createTempDirectory("modustro-build-record-");
         Path locSidecar = locDirectory.resolve(locFilename + ".modustro-build-record.yml");

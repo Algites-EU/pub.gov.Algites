@@ -2572,13 +2572,35 @@ subprojects {
             if (AInBuildOutputProductionKind.JAVA_JAVADOC_JAR in locJavaProductionKinds) {
                 locJavaExtension.withJavadocJar()
             }
+            /* Some conventions register their source archive only after the Java plugin callback.
+             * A Java-only project must always have a source archive producer, even if it has no .java files.
+             * Kotlin JVM projects keep the archive supplied by their Kotlin plugin. */
+            afterEvaluate {
+                if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds &&
+                    tasks.findByName("sourcesJar") == null && tasks.findByName("kotlinSourcesJar") == null) {
+                    tasks.register<Jar>("sourcesJar") {
+                        archiveClassifier.set("sources")
+                        from(locMainSourceSet.allSource)
+                    }
+                }
+                if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds &&
+                    tasks.findByName("sourcesJar") != null && tasks.findByName("kotlinSourcesJar") != null) {
+                    throw GradleException("Ambiguous source archive producers in ${project.path}: " +
+                        "sourcesJar and kotlinSourcesJar would both publish the same -sources.jar. " +
+                        "Configure only one source archive producer.")
+                }
+            }
             if ("java" in locEffectiveTechnologyKinds) {
                 modustroBuild.configure { dependsOn(tasks.named("check")) }
                 if (AInBuildOutputProductionKind.JAVA_CLASSES_JAR in locJavaProductionKinds) {
                     modustroBuild.configure { dependsOn(tasks.named("jar")) }
                 }
                 if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
-                    modustroBuild.configure { dependsOn(locJavaSourcesArchiveTaskName()) }
+                    /* Task registration can change while Kotlin and Java plugins are applied.
+                     * Do not turn a missing sourcesJar into a configuration-time failure. */
+                    modustroBuild.configure {
+                        dependsOn(tasks.matching { locTask -> locTask.name in setOf("sourcesJar", "kotlinSourcesJar") })
+                    }
                 }
                 if (AInBuildOutputProductionKind.JAVA_JAVADOC_JAR in locJavaProductionKinds) {
                     modustroBuild.configure { dependsOn(tasks.named("javadocJar")) }
@@ -2642,7 +2664,7 @@ subprojects {
 
         if ("java" in locEffectiveTechnologyKinds && locAnyNativePublicationEnabled) {
             plugins.withId("maven-publish") {
-                val locSourcesTaskName = locJavaSourcesArchiveTaskName()
+                val locSourcesTaskName = "sourcesJar"
                 listOf(
                     Triple(AInBuildOutputProductionKind.JAVA_CLASSES_JAR, "publishModustroJavaNativeBinary", "jar"),
                     Triple(AInBuildOutputProductionKind.JAVA_SOURCES_JAR, "publishModustroJavaNativeSources", locSourcesTaskName),
@@ -2653,14 +2675,23 @@ subprojects {
                         "sourcesJar", "kotlinSourcesJar" -> "native_product_sources"
                         else -> "native_product_documentation"
                     }
-                    val locArchive = tasks.named<Jar>(locArchiveTaskName).flatMap { it.archiveFile }
+                    val locArchive = if (locOutputKind == "native_product_sources") {
+                        layout.buildDirectory.file("libs/$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion-sources.jar")
+                    } else {
+                        tasks.named<Jar>(locArchiveTaskName).flatMap { it.archiveFile }
+                    }
                     val locPom = layout.buildDirectory.file("publications/mavenJava/pom-default.xml")
                     val locModule = layout.buildDirectory.file("publications/mavenJava/module.json")
                     val locPlanJson = locModustroPublicationPlanJson(locOutputKind, "java")
                     val locPublish = tasks.register<AIcModustroPublishFilesTask>(locTaskName) {
                         group = "publishing"
                         description = "Publishes the Java native output through the Modustro publication scheduler."
-                        dependsOn(modustroPublicationBuildGate, tasks.named(locArchiveTaskName))
+                        dependsOn(modustroPublicationBuildGate)
+                        if (locOutputKind == "native_product_sources") {
+                            dependsOn(tasks.matching { locTask -> locTask.name in setOf("sourcesJar", "kotlinSourcesJar") })
+                        } else {
+                            dependsOn(tasks.named(locArchiveTaskName))
+                        }
                         payloadFiles.from(locArchive)
                         if (locArchiveTaskName == "jar") {
                             dependsOn("generatePomFileForMavenJavaPublication", "generateMetadataFileForMavenJavaPublication")

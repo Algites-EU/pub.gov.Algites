@@ -37,7 +37,6 @@
             }
           },
           "required": [
-            "RepositoryId",
             "GroupId",
             "ArtifactCoordinateId",
             "Version"
@@ -62,10 +61,6 @@
                 "modustro_docs_site",
                 "schema_site"
               ]
-            },
-            "PublishedVersion": {
-              "type": "string",
-              "minLength": 1
             },
             "Classifier": {
               "type": "string"
@@ -100,14 +95,29 @@
                   "Size"
                 ]
               }
+            },
+            "OutputTypes": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "enum": [
+                  "native_product_sources",
+                  "native_product_binaries",
+                  "native_product_documentation",
+                  "native_develop_sources",
+                  "native_develop_binaries",
+                  "native_develop_documentation",
+                  "modustro_docs_site",
+                  "schema_site"
+                ]
+              },
+              "description": "Logical outputs contributing files to a shared physical publication bundle."
             }
           },
           "required": [
             "TechnologyKind",
             "OutputType",
-            "PublishedVersion",
-            "Classifier",
-            "Extension",
             "Files"
           ]
         },
@@ -203,36 +213,14 @@
           "required": [
             "Kind"
           ]
-        },
-        "ParentPublication": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "Id": {
-              "type": "string",
-              "minLength": 1
-            },
-            "Attempts": {
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          "required": [
-            "Id",
-            "Attempts"
-          ]
         }
       },
       "required": [
         "BuildRecordVersion",
         "Artifact",
-        "Output",
-        "Invocation",
-        "Sources",
-        "Tools",
-        "OutputOrigin",
-        "ParentPublication"
-      ]
+        "Output"
+      ],
+      "description": "Pre-publication provenance and prepared file hashes only. Upload results are written to Version Scope execution records, not to this deployable sidecar."
     },
     "EmbeddedContent": {
       "$anchor": "EmbeddedContent",

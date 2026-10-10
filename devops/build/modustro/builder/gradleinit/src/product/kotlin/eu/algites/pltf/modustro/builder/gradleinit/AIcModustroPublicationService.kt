@@ -36,6 +36,13 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         val profiles: Map<String, Any?>
     )
 
+    private data class AIcdDeferredJavaOutput(
+        val payload: AIcPublicationPayload,
+        val plan: Map<String, Any?>,
+        val profiles: Map<String, Any?>,
+        val outputId: String
+    )
+
     private data class AIcdCompletedOutput(
         val scheduled: AIcdScheduledOutput,
         val result: AIcOutputPublicationExecutionResult
@@ -44,6 +51,10 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     @get:Inject abstract val providers: ProviderFactory
     private val locLogger = Logging.getLogger(AIcModustroPublicationService::class.java)
     private val locScheduledOutputs = Collections.synchronizedList(mutableListOf<AIcdScheduledOutput>())
+    private val locDeferredJavaOutputs = mutableListOf<AIcdDeferredJavaOutput>()
+    private val locDeferredJavaResults = linkedMapOf<String, AIcOutputPublicationExecutionResult>()
+    private val locDeferredJavaFailures = mutableListOf<Throwable>()
+
     private val locExpectedOutputs = linkedMapOf<String, AIcdScheduledOutput>()
     private val locFinalizedScopes = mutableSetOf<String>()
     private val locRepositoryRefreshRequests = mutableSetOf<String>()
@@ -83,6 +94,23 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     /** Uses Core publication scheduling for one output and retains its complete execution tree for higher barriers. */
     fun AIcPublish(aPayload: AIcPublicationPayload, aPlan: Map<String, Any?>, aProfiles: Map<String, Any?>, aOutputId: String) {
         AIcBeginOutput(aPlan, aPayload.outputKind().name, AIcStability(aPayload.stability()), aPayload.version(), aPayload.coordinates())
+        if (aPayload.coordinates()["technologyKind"] == "java" &&
+            aPayload.outputKind().name in setOf("NATIVE_PRODUCT_BINARIES", "NATIVE_PRODUCT_SOURCES", "NATIVE_PRODUCT_DOCUMENTATION")) {
+            val locPending = AIcOutputPublicationExecutionResult(
+                aPayload.artifactIdentity(), "java", aPayload.outputKind(), aPayload.stability(),
+                aPayload.coordinates()["logicalVersion"] ?: aPayload.coordinates()["version"] ?: aPayload.version(),
+                AIcPublicationPlanner.publicationEndpointRegistry(aPlan as Map<String, Object>),
+                AIcPublicationPlanner.snapshotPublicationEndpoints(aPlan as Map<String, Object>),
+                emptyList(), emptyList(), false)
+            synchronized(this) {
+                check(locDeferredJavaOutputs.none { it.outputId == aOutputId }) { "Duplicate output $aOutputId" }
+                locDeferredJavaOutputs.add(AIcdDeferredJavaOutput(aPayload, aPlan.toMap(), aProfiles.toMap(), aOutputId))
+                val locScheduled = AIcdScheduledOutput(aOutputId, null, locPending, aPlan.toMap(), aProfiles.toMap())
+                locExpectedOutputs[aOutputId] = locScheduled
+                locScheduledOutputs.add(locScheduled)
+            }
+            return
+        }
         val locContext = AIcContext()
         val locDirectory = parameters.credentialBaseDirectory.get().asFile.toPath().resolve("build/run/publication-records")
         val locPlanner = AIcPublicationPlanner()
@@ -403,8 +431,108 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         locLogger.lifecycle("Modustro Version Scope publication record: {}", locFile)
     }
 
+    /** All Java product outputs are staged by their Gradle tasks; this barrier publishes complete bundles. */
+    @Suppress("UNCHECKED_CAST")
+    private fun AIcPublishDeferredJavaBundles() {
+        if (locDeferredJavaOutputs.isEmpty()) return
+        val locContext = AIcContext()
+        val locDirectory = parameters.credentialBaseDirectory.get().asFile.toPath().resolve("build/run/publication-records")
+        /* A partial build must never publish a JAR before an enabled sibling output has staged its files. */
+        val locStagedIds = locDeferredJavaOutputs.map { it.outputId }.toSet()
+        for (locStaged in locDeferredJavaOutputs) {
+            val locMissing = locExpectedOutputs.values.filter { locExpected ->
+                locExpected.outputId !in locStagedIds &&
+                    locExpected.pendingResult.technologyKind() == "java" &&
+                    locExpected.pendingResult.outputKind().name in setOf(
+                        "NATIVE_PRODUCT_BINARIES", "NATIVE_PRODUCT_SOURCES", "NATIVE_PRODUCT_DOCUMENTATION") &&
+                    locExpected.pendingResult.artifactIdentity() == locStaged.payload.artifactIdentity() &&
+                    (locExpected.plan["artifactPath"] ?: ".") == (locStaged.plan["artifactPath"] ?: ".") &&
+                    locExpected.plan["publicationEnabled"] == true &&
+                    (locExpected.plan["publicationEndpoints"] as? List<*>)
+                        .orEmpty().any { (it as? Map<*, *>)?.let { locEndpoint ->
+                            locEndpoint["executionEnabled"] != false && locEndpoint["enabled"] != false } == true }
+            }
+            if (locMissing.isNotEmpty()) throw GradleException(
+                "Refusing partial Java Maven publication of '${locStaged.payload.artifactIdentity()}': " +
+                    "enabled sibling output tasks have not prepared their files: " +
+                    locMissing.joinToString { it.outputId })
+        }
+        val locGroups = locDeferredJavaOutputs.groupBy { locOutput ->
+            listOf(locOutput.plan["versionScopePath"]?.toString() ?: ".",
+                locOutput.plan["artifactPath"]?.toString() ?: ".",
+                locOutput.payload.artifactIdentity(), locOutput.payload.version(), locOutput.payload.stability().name).joinToString("|")
+        }
+        val locFailures = mutableListOf<Throwable>()
+        for (locGroup in locGroups.values) {
+            val locLogicalJobs = linkedMapOf<String, AIcPublicationJob>()
+            val locJobOwner = linkedMapOf<String, AIcdDeferredJavaOutput>()
+            for (locOutput in locGroup) {
+                val locJobs = AIcPublicationPlanner().plan(locOutput.payload,
+                    locOutput.plan as Map<String, Object>, locContext as Map<String, Object>, locDirectory)
+                for (locJob in locJobs) {
+                    /* Separate logical outputs may legitimately use identical endpoint IDs. */
+                    val locUniqueId = locOutput.outputId + "::" + locJob.id()
+                    val locUniqueJob = AIcPublicationJob(locUniqueId, locJob.endpoint(), locJob.payload(),
+                        locJob.configuration(), locJob.publicationFinalizationActions(), locJob.publicationEndpointRegistry())
+                    check(locLogicalJobs.putIfAbsent(locUniqueId, locUniqueJob) == null) {
+                        "Duplicate logical publication job $locUniqueId within the same artifact."
+                    }
+                    locJobOwner[locUniqueId] = locOutput
+                }
+            }
+            val locBatch = AIcMavenPublicationBatchPlanner().plan(locLogicalJobs.values.toList())
+            val locMemberJobs = locLogicalJobs.values.groupBy { locBatch.physicalIdByLogicalId().getValue(it.id()) }
+            val locPhysicalProfiles = linkedMapOf<String, Map<String, Any?>>()
+            for (locPhysical in locBatch.physicalJobs()) {
+                val locOwners = locMemberJobs.getValue(locPhysical.id()).map { locJobOwner.getValue(it.id()) }
+                check(locOwners.all { it.profiles == locOwners.first().profiles }) {
+                    "Conflicting credential profile dictionaries for Maven bundle ${locPhysical.id()}."
+                }
+                locPhysicalProfiles[locPhysical.endpoint().id()] = locOwners.first().profiles
+            }
+            val locFirst = locGroup.first()
+            val locHandle = AIcScheduler().schedule(locFirst.payload, locBatch.physicalJobs(), emptyList(),
+                AIcPublicationPlanner.snapshotPublicationEndpoints(locFirst.plan as Map<String, Object>),
+                { locEndpoint -> AIcCredentials(locEndpoint, locPhysicalProfiles.getValue(locEndpoint.id())) },
+                AIcProgressReporterFactory())
+            try { locHandle.requiredCompletion().toCompletableFuture().get() }
+            catch (locFailure: Exception) { locFailures.add(locFailure) }
+            val locAggregate = locHandle.outputExecutionResult().toCompletableFuture().get()
+            val locPhysicalResults = locAggregate.publications().associateBy { it.publicationId() }
+            for (locOutput in locGroup) {
+                val locMembers = locLogicalJobs.values.filter { locJobOwner[it.id()] === locOutput }
+                val locExecutions = locMembers.map { locMember ->
+                    val locPhysicalId = locBatch.physicalIdByLogicalId().getValue(locMember.id())
+                    val locExecution = locPhysicalResults.getValue(locPhysicalId)
+                    val locLogicalId = locMember.id().substringAfter("::")
+                    val locPhysicalResult = locExecution.result()
+                    val locLogicalResult = AIcPublicationResult(locLogicalId, locPhysicalResult.started(),
+                        locPhysicalResult.success(), locPhysicalResult.ignoredFailure(), locPhysicalResult.attempts(),
+                        locPhysicalResult.duration(), locPhysicalResult.outputUri(),
+                        locPhysicalResult.metadata() + ("PhysicalPublicationId" to locPhysicalId), locPhysicalResult.failure())
+                    AIcPublicationExecutionResult(locLogicalId, locMember.endpoint(), locMember.payload(),
+                        locMember.configuration(), locLogicalResult, locExecution.publicationFinalizationActions(),
+                        locExecution.failureHandled())
+                }
+                val locBase = AIcOutputPublicationExecutionResult(locOutput.payload.artifactIdentity(), "java",
+                    locOutput.payload.outputKind(), locOutput.payload.stability(),
+                    locOutput.payload.coordinates()["logicalVersion"] ?: locOutput.payload.coordinates()["version"] ?: locOutput.payload.version(),
+                    AIcPublicationPlanner.publicationEndpointRegistry(locOutput.plan as Map<String, Object>),
+                    AIcPublicationPlanner.snapshotPublicationEndpoints(locOutput.plan as Map<String, Object>),
+                    locExecutions, emptyList())
+                val locFinal = AIcScheduler().finalizeOutput(locBase,
+                    AIcPublicationPlanner.outputPublicationFinalizationActions(locOutput.plan as Map<String, Object>),
+                    AIcProgressReporterFactory())
+                locDeferredJavaResults[locOutput.outputId] = locFinal
+            }
+        }
+        locDeferredJavaOutputs.clear()
+        locDeferredJavaFailures.addAll(locFailures)
+    }
+
     /** Drains all output graphs, then executes artifact and Version-Scope publication finalization barriers. */
     @Synchronized fun AIcAwait() {
+        AIcPublishDeferredJavaBundles()
         val locRepositoryOutputs = locScheduledOutputs.filter { it.pendingResult.outputKind() == AInPublicationOutputKind.MODUSTRO_DOCS_SITE ||
             it.pendingResult.outputKind() == AInPublicationOutputKind.SCHEMA_SITE }
         locRepositoryOutputs.forEach { it.handle?.outputExecutionResult()?.toCompletableFuture()?.get() }
@@ -417,7 +545,8 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         val locCopy = locExpectedOutputs.values.filter { AIcScopeKey(it) in locActiveScopes && AIcScopeKey(it) !in locFinalizedScopes }
         if (locCopy.isEmpty()) return
         val locCompleted = locCopy.map { locScheduled ->
-            val locResult = try { locScheduled.handle?.outputExecutionResult()?.toCompletableFuture()?.get() ?: locScheduled.pendingResult }
+            val locResult = try { locScheduled.handle?.outputExecutionResult()?.toCompletableFuture()?.get()
+                        ?: locDeferredJavaResults[locScheduled.outputId] ?: locScheduled.pendingResult }
                 catch (locFailure: Exception) {
                     locLogger.warn("Output publication graph did not complete cleanly: ${locScheduled.outputId}", locFailure)
                     locScheduled.pendingResult
@@ -511,6 +640,8 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
             }
         }
         locScheduledOutputs.removeAll(locCopy.toSet())
+        locDeferredJavaFailures.forEach { locRequiredFailures.add("Maven bundle" to it) }
+        locDeferredJavaFailures.clear()
         if (locRequiredFailures.isNotEmpty()) {
             val locFailure = GradleException("Required publication finalization failed for Version Scope(s): " +
                 locRequiredFailures.joinToString { it.first }, locRequiredFailures.first().second)
@@ -753,11 +884,33 @@ abstract class AIcModustroPublishFilesTask : DefaultTask() {
                 "Set -Palgites.snapshot.instanceId=<UTC timestamp> or ALGITES_SNAPSHOT_INSTANCE_ID.")
         }
         val locRoot = payloadRoot.orNull?.asFile
-        val locFiles = payloadFiles.files.filter { it.isFile }.map { locFile ->
+        val locMissingFiles = payloadFiles.files.filterNot { it.isFile }
+        if (locMissingFiles.isNotEmpty()) throw GradleException(
+            "Publication of '${artifactIdentity.get()}' ${outputKind.get()} requires files that do not exist: " +
+                locMissingFiles.joinToString { it.absolutePath })
+        val locFiles = payloadFiles.files.map { locFile ->
             val locName = locRoot?.let { locFile.relativeTo(it).invariantSeparatorsPath } ?: locFile.name
             AIcPublicationPayloadFile(locFile.toPath(), publishedFileNames.get()[locName] ?: locName)
         }.sortedBy { it.logicalName() }
         if (locFiles.isEmpty()) throw GradleException("No publication payload files for '${artifactIdentity.get()}' ${outputKind.get()}.")
+        if (outputKind.get() in setOf("NATIVE_PRODUCT_BINARIES", "NATIVE_PRODUCT_SOURCES", "NATIVE_PRODUCT_DOCUMENTATION") &&
+            coordinates.get()["technologyKind"] == "java") {
+            val locKind = outputKind.get()
+            val locClassifier = when (locKind) {
+                "NATIVE_PRODUCT_SOURCES" -> "-sources.jar"
+                "NATIVE_PRODUCT_DOCUMENTATION" -> "-javadoc.jar"
+                else -> ".jar"
+            }
+            val locArchive = locFiles.filter { it.logicalName().endsWith(locClassifier) &&
+                (locKind != "NATIVE_PRODUCT_BINARIES" || !it.logicalName().endsWith("-sources.jar")) }
+            if (locArchive.size != 1) throw GradleException(
+                "Java native publication '$locKind' must contain exactly one required archive '$locClassifier', found ${locArchive.size}.")
+            if (locKind == "NATIVE_PRODUCT_BINARIES" &&
+                (locFiles.none { it.logicalName().endsWith(".pom") } ||
+                    locFiles.none { it.logicalName().endsWith(".module") })) {
+                throw GradleException("Java binary publication requires its POM and Gradle .module metadata alongside the JAR.")
+            }
+        }
         @Suppress("UNCHECKED_CAST")
         val locProfiles = JsonSlurper().parseText(credentialProfilesJson.get()) as Map<String, Any?>
         publicationService.get().AIcPublish(AIcPublicationPayload(AInPublicationOutputKind.valueOf(outputKind.get()),

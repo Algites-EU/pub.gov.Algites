@@ -17,31 +17,26 @@ public final class AItcModustroNativeSourcesTaskWiringTest {
         return locRepository;
     }
 
-    /** Kotlin's source archive must replace, not accompany, Java's identically named output. */
+    /** Resolves source archive producers lazily and rejects duplicate output writers. */
     @Test
     public void AIcUsesSingleProducerForNativeSources() throws IOException {
         Path locRepository = AIcRepository();
         String locSource = Files.readString(locRepository.resolve("gradle/tool/repository/modustro-root-build.gradle.kts"));
         String locGradleInit = Files.readString(locRepository.resolve("devops/build/modustro/builder/gradleinit/build.gradle.kts"));
-        Assert.assertTrue(locGradleInit.contains("`kotlin-dsl`"), "The Kotlin fixture must exercise Kotlin JVM conventions.");
+        Assert.assertTrue(locGradleInit.contains("`kotlin-dsl`"), "Kotlin DSL must remain enabled.");
         Assert.assertTrue(locSource.contains("plugins.hasPlugin(\"org.jetbrains.kotlin.jvm\")"),
-            "The source archive must recognize the Kotlin JVM plugin.");
-        Assert.assertTrue(locSource.contains("file(\"src/product/kotlin\").isDirectory"),
-            "Kotlin source roots must be detected even during early Java plugin application.");
-        Assert.assertTrue(locSource.contains("\"kotlinSourcesJar\" else \"sourcesJar\""),
-            "The build must select the Kotlin or Java source archive, not both.");
-        Assert.assertTrue(locSource.contains("locJavaSourcesArchiveTaskName() == \"sourcesJar\") {"),
-            "Java withSourcesJar() must not be called for Kotlin modules.");
-        Assert.assertTrue(locSource.contains("Triple(AInBuildOutputProductionKind.JAVA_SOURCES_JAR, " +
-            "\"publishModustroJavaNativeSources\", locSourcesTaskName)"),
-            "Native source publishing must use the selected archive task.");
-        Assert.assertTrue(locSource.contains("dependsOn(modustroPublicationBuildGate, tasks.named(locArchiveTaskName))"),
-            "Publishing tasks must depend explicitly on their archive producer.");
-        Assert.assertTrue(locSource.contains("val locArchive = tasks.named<Jar>(locArchiveTaskName).flatMap { it.archiveFile }"),
-            "The archive file must be obtained through the producing task provider.");
-        Assert.assertTrue(locSource.contains("modustroBuild.configure { dependsOn(locJavaSourcesArchiveTaskName()) }"),
-            "The aggregate build must use the same archive producer as publishing.");
-        Assert.assertTrue(locSource.contains("\"sourcesJar\", \"kotlinSourcesJar\" -> \"native_product_sources\""),
-            "Both supported task names must map to the native source output kind.");
+                "The Kotlin source convention must detect the Kotlin JVM plugin.");
+        Assert.assertTrue(locSource.contains("locJavaSourcesArchiveTaskName() == \"sourcesJar\")"),
+                "The Java sources plugin must not create a duplicate producer in Kotlin projects.");
+        Assert.assertTrue(locSource.contains("tasks.matching { locTask -> locTask.name in setOf(\"sourcesJar\", \"kotlinSourcesJar\") }"),
+                "The build must depend on actual producers rather than naming an absent sourcesJar task.");
+        Assert.assertTrue(locSource.contains("tasks.findByName(\"sourcesJar\") == null && tasks.findByName(\"kotlinSourcesJar\") == null"),
+                "Java fallback source archive is only registered when neither producer exists.");
+        Assert.assertTrue(locSource.contains("Ambiguous source archive producers"),
+                "Duplicate archive writers must be rejected before building.");
+        Assert.assertTrue(locSource.contains("layout.buildDirectory.file(\"libs/$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion-sources.jar\")"),
+                "The source payload must reference its canonical output file.");
+        Assert.assertTrue(locSource.contains("dependsOn(tasks.matching { locTask -> locTask.name in setOf(\"sourcesJar\", \"kotlinSourcesJar\") })"),
+                "Publishing must wait for the actual Java or Kotlin archive producer.");
     }
 }

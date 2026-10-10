@@ -54,7 +54,12 @@ public final class AIcPublicationPlanner {
                 }
                 List<AIcPublicationFinalizationAction> locActions = publicationFinalizationActions(
                         AIcValue(locForm, "PublicationFinalizationActions", "publicationFinalizationActions"), 0);
-                if (locActions.stream().noneMatch(locAction -> "build-record".equals(locAction.id()))) {
+                if ("maven-repository".equals(locEndpoint.publicationAdapter()) &&
+                        locActions.stream().anyMatch(locAction -> "modustro-build-record".equals(locAction.finalizationActionAdapter()))) {
+                    throw new IllegalArgumentException("Maven build-record must be prepared before the bundle upload, not published by a finalization action.");
+                }
+                if (!"maven-repository".equals(locEndpoint.publicationAdapter()) &&
+                        locActions.stream().noneMatch(locAction -> "build-record".equals(locAction.id()))) {
                     ArrayList<AIcPublicationFinalizationAction> locWithDefault = new ArrayList<>(locActions);
                     locWithDefault.add(new AIcPublicationFinalizationAction("build-record", true, "modustro-build-record", null, 0,
                             AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, true, Map.of(), List.of()));

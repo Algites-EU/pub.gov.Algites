@@ -109,6 +109,19 @@ public final class AIcPublicationScheduler implements AutoCloseable {
         return new AIcPublicationScheduleHandle(locRequired, locOutput, locPublicationResults, locActionResults);
     }
 
+    /** Applies per-output finalization after shared physical Maven publication has completed. */
+    public AIcOutputPublicationExecutionResult finalizeOutput(
+            AIcOutputPublicationExecutionResult aBase,
+            List<AIcOutputPublicationFinalizationAction> aActions,
+            AIiPublicationProgressReporterFactory aProgressReporterFactory) {
+        if (!aBase.success()) return aBase;
+        List<AIcFinalizationActionExecutionResult> locActions = AIcRunOutputFinalizationActions(
+                aBase, aActions, aProgressReporterFactory);
+        return new AIcOutputPublicationExecutionResult(aBase.artifactIdentity(), aBase.technologyKind(),
+                aBase.outputKind(), aBase.stability(), aBase.version(), aBase.publicationEndpointRegistry(),
+                aBase.snapshotPublicationEndpoints(), aBase.publications(), locActions);
+    }
+
     /** Executes the flat artifact finalization barrier after every output execution is terminal. */
     public AIcArtifactPublicationExecutionResult finalizeArtifact(
             AIcArtifactPublicationExecutionResult aBase,

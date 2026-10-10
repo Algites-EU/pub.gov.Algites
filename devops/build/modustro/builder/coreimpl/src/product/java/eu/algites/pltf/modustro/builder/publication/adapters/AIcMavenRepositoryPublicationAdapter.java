@@ -29,7 +29,16 @@ public final class AIcMavenRepositoryPublicationAdapter implements AIiPublicatio
 
     @Override
     public boolean isRetrySafe(AIcPublicationPayload aPayload, AIcPublicationEndpoint aEndpoint) {
-        return true;
+        /* A Cloudsmith native upload may already be synchronizing its multipart Maven package.
+         * Replaying an interrupted PUT series can create a second, conflicting package. */
+        URI locUri = aEndpoint.publicationUri();
+        return locUri != null && !AIcIsCloudsmithNative(locUri);
+    }
+
+    private static boolean AIcIsCloudsmithNative(URI aUri) {
+        String locHost = aUri.getHost();
+        return locHost != null && (locHost.equalsIgnoreCase("maven.cloudsmith.io") ||
+                locHost.toLowerCase(java.util.Locale.ROOT).endsWith(".maven.cloudsmith.io"));
     }
 
     @Override
@@ -102,7 +111,11 @@ public final class AIcMavenRepositoryPublicationAdapter implements AIiPublicatio
             }
             locConnection.disconnect();
         }
-        if(locCoordinates.containsKey("snapshotTimestamp"))AIcSnapshotMetadata(locRoot.resolve(locBasePath+"maven-metadata.xml"),aContext);
+        /* Cloudsmith owns native snapshot metadata after its asynchronous package assembly.
+         * Do not race it by sending an independent metadata PUT for a staged package. */
+        if (locCoordinates.containsKey("snapshotTimestamp") && !AIcIsCloudsmithNative(locRoot)) {
+            AIcSnapshotMetadata(locRoot.resolve(locBasePath + "maven-metadata.xml"), aContext);
+        }
         aContext.progressReporter().completed("Maven repository publication completed.");
     }
 
