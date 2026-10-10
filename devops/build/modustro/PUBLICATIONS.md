@@ -725,9 +725,10 @@ is separate from S3 deploy-sidecar creation and does not access publishing crede
 
 The task uses the discovered artifact directories and the canonical source roots
 `src/product/{yamldefs,jsondefs,xmldefs}`. New files contain the governed
-`global-publication-user-metadata_1` `$schema` URI and a `GlobalPublicationPathId` derived
-from the definition's source-root-relative path (never from the `src/product` prefix).
-Existing `.meta.yml` files are **never overwritten**. Review the generated source files with
+`global-publication-user-metadata_1` `$schema` URI and a `GlobalPublicationPathId`
+**initially derived** from the definition's source-root-relative path (never from the `src/product`
+prefix). This is only a generator default: authors can select a stable logical publication path
+that differs from the physical source layout. Existing `.meta.yml` files are **never overwritten**. Review the generated source files with
 `git status --short` / `git diff` and commit them as authored inputs.
 
 Alternatively, opt in to the generator as a prerequisite of schema-site staging:

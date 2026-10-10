@@ -226,7 +226,6 @@ abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
                         .filter { locFile -> locFile.isFile && !locFile.name.endsWith(".meta.yml") }
                         .sortedBy { locFile -> locFile.relativeTo(locSourceRoot).invariantSeparatorsPath }
                         .forEach { locDefinitionFile ->
-                            val locExpectedPathId = locDefinitionFile.relativeTo(locSourceRoot).invariantSeparatorsPath
                             val locSidecar = File(locDefinitionFile.path + ".meta.yml")
                             if (!locSidecar.isFile) {
                                 throw GradleException(
@@ -234,12 +233,10 @@ abstract class AIcGenerateModustroSchemaSiteTask : DefaultTask() {
                                 )
                             }
                             val locPathId = locPathValidator.validate(AIcSchemaReadGlobalPublicationPathId(locSidecar))
-                            if (locPathId != locExpectedPathId) {
-                                throw GradleException(
-                                    "Canonical definition '$locDefinitionFile' declares ${AIcModustroSchemaUserMetadata.SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID} '$locPathId', " +
-                                        "but the canonical source-root-relative path is '$locExpectedPathId'."
-                                )
-                            }
+                            /* The author-declared publication path is independent of the file's
+                             * physical path below src/product/<source kind>. Keep it stable even
+                             * when source files are reorganized, and reject only invalid or
+                             * duplicate publication targets. */
                             val locTargetKey = "$locSourceKind/$locPathId"
                             val locPreviousSource = locSeenTargets.putIfAbsent(locTargetKey, locDefinitionFile.absolutePath)
                             if (locPreviousSource != null) {

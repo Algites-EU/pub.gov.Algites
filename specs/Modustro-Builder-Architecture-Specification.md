@@ -415,7 +415,7 @@ $schema: <URI>
 
 Strict validation that these three values are identical and equal to the publication base URL plus the definition sidecar `GlobalPublicationPathId` is intentionally deferred until global definition deployment is operational.
 
-`GlobalPublicationPathId` is always the logical/package-relative definition path below its canonical definition source root. Technical source-root segments and synthetic representation directories are not inserted. The publication endpoint provides `/api/yamldefs/`, `/api/jsondefs/`, or `/api/xmldefs/` separately.
+`GlobalPublicationPathId` is the author-declared, stable logical publication path for the definition. It is **not required to equal the definition's filesystem path** relative to its canonical source root; repository layout changes must not silently change public schema URLs. Technical source-root segments (`src/product/...`) and synthetic representation directories are not inserted. The publication endpoint provides `/api/yamldefs/`, `/api/jsondefs/`, or `/api/xmldefs/` separately. Publication validates the path for safety and checks that no two source definitions claim the same publication target.
 
 ## Compiled Gradle initialization boundary
 

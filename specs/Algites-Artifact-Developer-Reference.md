@@ -152,7 +152,7 @@ Canonical machine-readable definitions belong under representation-specific sour
 
 Every canonical definition that participates in global publication carries a sibling `<definition-file>.meta.yml` **user sidecar**. Its contract is `global-publication-user-metadata_1` and its only business field is `GlobalPublicationPathId`. The sidecar is author-controlled input to publication; deployment state, timestamps, revisions, publisher identity, and other server-controlled fields are forbidden by the user-metadata schema rather than ignored.
 
-`GlobalPublicationPathId` is the logical path below the canonical definition source root. It therefore excludes technical segments such as `src/product/yamldefs` itself and must not insert an artificial representation directory; the publication endpoint already distinguishes `/api/yamldefs/`, `/api/jsondefs/`, and `/api/xmldefs/`.
+`GlobalPublicationPathId` is the stable **logical publication path** selected by the author, independent of where the definition is stored under its canonical source root. It does not need to match the source-root-relative filesystem path. It excludes technical segments such as `src/product/yamldefs` itself and must not insert an artificial representation directory; the publication endpoint already distinguishes `/api/yamldefs/`, `/api/jsondefs/`, and `/api/xmldefs/`. Publication validates the identifier for safety and refuses duplicate publication destinations. Moving a source file should not change its published identifier or URL.
 
 The publication service validates the user sidecar and generates a separate `global-publication-deploy-metadata_1` sidecar for deployed content. Deploy metadata carries the validated `GlobalPublicationPathId` plus server-controlled `PublicationState` (`draft` or `release`), `PublicationRevision`, `FirstPublishedAt`, `PublishedAt`, optional `ReleasedAt`, and optional trusted `PublishedBy`. `PublicationRevision` is controlled by the publisher and monotonically increases when deployed draft content is replaced. Transitioning a definition to `release` freezes that content revision; a released `GlobalPublicationPathId` is immutable and must never transition back to `draft`. If `PublishedBy` is present, the deployment adapter must derive it from authenticated/trusted execution context and must never copy it from repository metadata or another author-controlled input.
 
@@ -161,9 +161,11 @@ The publication service validates the user sidecar and generates a separate `glo
 all discovered artifacts' `src/product/yamldefs`, `src/product/jsondefs`, and `src/product/xmldefs`
 source roots; for each canonical definition without a sibling `.meta.yml`, it creates one using the
 versioned `global-publication-user-metadata_1` schema URI and `GlobalPublicationPathId` equal to
-the source-root-relative filename (with its relative directories). It includes the three conventional
+the source-root-relative filename (with its relative directories) **as a default only**. Authors
+may then choose another stable logical publication path. It includes the three conventional
 YAML `$schema` hints. Existing metadata is left byte-for-byte unchanged, even if its contents need
-manual correction; subsequent schema-site validation remains strict. No deployed sidecars, S3 objects,
+manual correction; subsequent schema-site validation enforces safe and unique publication paths,
+not equality with physical source paths. No deployed sidecars, S3 objects,
 or publication state are changed by this task. This operation edits **authored source files**; review
 `git status --short` before committing the generated metadata.
 

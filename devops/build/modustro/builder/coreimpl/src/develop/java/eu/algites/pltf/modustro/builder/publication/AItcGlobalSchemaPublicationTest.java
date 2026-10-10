@@ -132,6 +132,21 @@ public final class AItcGlobalSchemaPublicationTest {
         AIcPublicationCheckAssertions.assertEquals(AIcPuts, List.of(AIcA, AIcA + ".meta.yml", AIcB, AIcB + ".meta.yml"));
         AIcPublicationCheckAssertions.assertEquals(AIcMetadata().root().get("PublicationRevision").longValue(), 1L);
         AIcPublicationCheckAssertions.assertTrue(AIcMetadata().root().has("$schema"));
+        /* A canonical definition may live at a flat physical source path while its
+         * author-declared publication identity contains a stable package namespace. */
+        AIcReset();
+        String locLogicalId = "eu/algites/tool/build/yamldefs/algites-credential-profiles_1.yamldef.schema.json";
+        String locLogicalTarget = "api/yamldefs/" + locLogicalId;
+        Path locPhysicalDefinition = AIcRoot.resolve("physical-yamldefs/algites-credential-profiles_1.yamldef.schema.json");
+        Files.createDirectories(locPhysicalDefinition.getParent());
+        Files.writeString(locPhysicalDefinition, "{\"title\":\"credential profiles\"}");
+        Path locPhysicalSidecar = Path.of(locPhysicalDefinition + ".meta.yml");
+        Files.writeString(locPhysicalSidecar, "GlobalPublicationPathId: " + locLogicalId + "\n");
+        AIcPublish(List.of(new AIcPublicationPayloadFile(locPhysicalDefinition, locLogicalTarget),
+                new AIcPublicationPayloadFile(locPhysicalSidecar, locLogicalTarget + ".meta.yml")), "draft", false);
+        AIcPublicationCheckAssertions.assertEquals(AIcPuts, List.of(locLogicalTarget, locLogicalTarget + ".meta.yml"));
+        AIcPublicationCheckAssertions.assertEquals(
+                AIcMapper.readTree(AIcStored.get(locLogicalTarget + ".meta.yml")).get("GlobalPublicationPathId").asText(), locLogicalId);
         AIcReset(); locFiles = AIcLocal(AIcA); AIcFailure(List.of(locFiles.get(0)), "draft", false);
         AIcPublicationCheckAssertions.assertTrue(AIcReads.isEmpty() && AIcPuts.isEmpty());
         AIcReset(); locFiles = AIcLocal(AIcA); Files.writeString(locFiles.get(1).path(), "GlobalPublicationPathId: test/a.json\nPublicationState: release\n");

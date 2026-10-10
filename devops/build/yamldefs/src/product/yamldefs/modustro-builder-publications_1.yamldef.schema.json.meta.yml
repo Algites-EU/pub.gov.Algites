@@ -1,2 +1,5 @@
-CanonicalVersion: 1
-SystemId: eu.algites.gov.build.modustro-builder-publications_1.yamldef.schema.json
+# yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.yamldef.schema.json
+# $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.yamldef.schema.json
+$schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.yamldef.schema.json
+
+GlobalPublicationPathId: eu/algites/tool/build/yamldefs/modustro-builder-publications_1.yamldef.schema.json
