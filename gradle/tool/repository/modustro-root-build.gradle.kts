@@ -2531,6 +2531,15 @@ subprojects {
         }
     }
 
+    /* The Kotlin JVM plugin may apply the Java plugin before its own plugin ID becomes visible.
+     * Recognize established Kotlin source roots as well, so Java withSourcesJar() never
+     * registers a second task with the same *-sources.jar output during plugin application. */
+    val locJavaSourcesArchiveTaskName = {
+        if (plugins.hasPlugin("org.jetbrains.kotlin.jvm") ||
+            file("src/product/kotlin").isDirectory || file("src/main/kotlin").isDirectory)
+            "kotlinSourcesJar" else "sourcesJar"
+    }
+
     if ("java" in locAlgitesTechnologyKinds) {
         plugins.withId("java") {
             val locJavaExtension = extensions.getByType(JavaPluginExtension::class.java)
@@ -2549,12 +2558,15 @@ subprojects {
             locTestSourceSet.resources.setSrcDirs(locDevelopResourceRoots)
             if (locHasCapabilityDemand("java", "source_native_processing")) {
                 tasks.matching { locTask ->
-                    locTask.name in setOf("compileJava", "processResources", "sourcesJar", "javadoc", "javadocJar")
+                    locTask.name in setOf("compileJava", "processResources", "sourcesJar", "kotlinSourcesJar", "javadoc", "javadocJar")
                 }.configureEach {
                     locJavaSourceProcessingTask?.let { locSourceProcessingTask -> dependsOn(locSourceProcessingTask) }
                 }
             }
-            if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
+            if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds &&
+                locJavaSourcesArchiveTaskName() == "sourcesJar") {
+                /* Kotlin JVM already owns kotlinSourcesJar. Registering Java sourcesJar as well would
+                 * create two tasks writing the same *-sources.jar archive. */
                 locJavaExtension.withSourcesJar()
             }
             if (AInBuildOutputProductionKind.JAVA_JAVADOC_JAR in locJavaProductionKinds) {
@@ -2566,7 +2578,7 @@ subprojects {
                     modustroBuild.configure { dependsOn(tasks.named("jar")) }
                 }
                 if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds) {
-                    modustroBuild.configure { dependsOn(tasks.named("sourcesJar")) }
+                    modustroBuild.configure { dependsOn(locJavaSourcesArchiveTaskName()) }
                 }
                 if (AInBuildOutputProductionKind.JAVA_JAVADOC_JAR in locJavaProductionKinds) {
                     modustroBuild.configure { dependsOn(tasks.named("javadocJar")) }
@@ -2630,14 +2642,15 @@ subprojects {
 
         if ("java" in locEffectiveTechnologyKinds && locAnyNativePublicationEnabled) {
             plugins.withId("maven-publish") {
+                val locSourcesTaskName = locJavaSourcesArchiveTaskName()
                 listOf(
                     Triple(AInBuildOutputProductionKind.JAVA_CLASSES_JAR, "publishModustroJavaNativeBinary", "jar"),
-                    Triple(AInBuildOutputProductionKind.JAVA_SOURCES_JAR, "publishModustroJavaNativeSources", "sourcesJar"),
+                    Triple(AInBuildOutputProductionKind.JAVA_SOURCES_JAR, "publishModustroJavaNativeSources", locSourcesTaskName),
                     Triple(AInBuildOutputProductionKind.JAVA_JAVADOC_JAR, "publishModustroJavaNativeDocumentation", "javadocJar")
                 ).filter { it.first in locJavaProductionKinds }.forEach { (_, locTaskName, locArchiveTaskName) ->
                     val locOutputKind = when (locArchiveTaskName) {
                         "jar" -> "native_product_binaries"
-                        "sourcesJar" -> "native_product_sources"
+                        "sourcesJar", "kotlinSourcesJar" -> "native_product_sources"
                         else -> "native_product_documentation"
                     }
                     val locArchive = tasks.named<Jar>(locArchiveTaskName).flatMap { it.archiveFile }
@@ -2647,7 +2660,7 @@ subprojects {
                     val locPublish = tasks.register<AIcModustroPublishFilesTask>(locTaskName) {
                         group = "publishing"
                         description = "Publishes the Java native output through the Modustro publication scheduler."
-                        dependsOn(modustroPublicationBuildGate)
+                        dependsOn(modustroPublicationBuildGate, tasks.named(locArchiveTaskName))
                         payloadFiles.from(locArchive)
                         if (locArchiveTaskName == "jar") {
                             dependsOn("generatePomFileForMavenJavaPublication", "generateMetadataFileForMavenJavaPublication")
@@ -2662,7 +2675,7 @@ subprojects {
                         stability.set(locModustroPublicationStability)
                         artifactIdentity.set(listOfNotNull(locAlgitesResolvedProjectGroup, locAlgitesEffectiveArtifactId).joinToString(":"))
                         publicationVersion.set(locAlgitesProjectVersion)
-                        coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId, "version" to locAlgitesProjectVersion, "technologyKind" to "java", "classifier" to (if (locArchiveTaskName == "sourcesJar") "sources" else if (locArchiveTaskName == "javadocJar") "javadoc" else ""), "extension" to "jar"))
+                        coordinates.set(mapOf("groupId" to (locAlgitesResolvedProjectGroup ?: ""), "artifactId" to locAlgitesEffectiveArtifactId, "version" to locAlgitesProjectVersion, "technologyKind" to "java", "classifier" to (if (locArchiveTaskName == "sourcesJar" || locArchiveTaskName == "kotlinSourcesJar") "sources" else if (locArchiveTaskName == "javadocJar") "javadoc" else ""), "extension" to "jar"))
                         publicationService.set(modustroPublicationService)
                         usesService(modustroPublicationService)
                     }
