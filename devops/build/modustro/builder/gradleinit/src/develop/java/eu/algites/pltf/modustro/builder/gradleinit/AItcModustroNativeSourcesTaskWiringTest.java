@@ -32,8 +32,12 @@ public final class AItcModustroNativeSourcesTaskWiringTest {
                 "The build must depend on actual producers rather than naming an absent sourcesJar task.");
         Assert.assertTrue(locSource.contains("tasks.findByName(\"sourcesJar\") == null && tasks.findByName(\"kotlinSourcesJar\") == null"),
                 "Java fallback source archive is only registered when neither producer exists.");
-        Assert.assertTrue(locSource.contains("Ambiguous source archive producers"),
-                "Duplicate archive writers must be rejected before building.");
+        Assert.assertTrue(locSource.contains("tasks.named<Jar>(\"sourcesJar\").configure { enabled = false }"),
+                "When Kotlin owns the archive, the Java sourcesJar task must be disabled.");
+        Assert.assertTrue(locSource.contains("tasks.named<Jar>(\"kotlinSourcesJar\").configure { enabled = false }"),
+                "When Java owns the archive, the Kotlin sourcesJar task must be disabled.");
+        Assert.assertFalse(locSource.contains("Ambiguous source archive producers"),
+                "The build should resolve duplicate source producers, not fail configuration.");
         Assert.assertTrue(locSource.contains("layout.buildDirectory.file(\"libs/$locAlgitesEffectiveArtifactId-$locAlgitesProjectVersion-sources.jar\")"),
                 "The source payload must reference its canonical output file.");
         Assert.assertTrue(locSource.contains("dependsOn(tasks.matching { locTask -> locTask.name in setOf(\"sourcesJar\", \"kotlinSourcesJar\") })"),

@@ -309,7 +309,15 @@ public final class AItcModustroGradleInitTest {
                 .withArguments("publishFixture", "--configuration-cache", "--offline", "--stacktrace");
         Assert.assertTrue(locRunner.build().getOutput().contains("Configuration cache entry stored"));
         Assert.assertEquals(Files.readString(locFixture.resolve("published/nested/payload.txt")), "first payload");
-        Assert.assertTrue(Files.isRegularFile(locFixture.resolve("published/nested/payload.txt.modustro-build-record.yml")));
+        /* A Java binary publication has a primary archive. The build record must
+         * describe its JAR, not an unrelated auxiliary text payload. */
+        Path locBuildRecord = locFixture.resolve("published/fixture.jar.modustro-build-record.yml");
+        Assert.assertTrue(Files.isRegularFile(locBuildRecord),
+                "The build record must be attached to the Java binary archive.");
+        String locRecord = Files.readString(locBuildRecord);
+        Assert.assertTrue(locRecord.contains("fixture.jar"), locRecord);
+        Assert.assertFalse(Files.exists(locFixture.resolve("published/nested/payload.txt.modustro-build-record.yml")),
+                "The auxiliary file is not the primary archive for the Java publication.");
         Files.writeString(locFixture.resolve("payload.txt"), "second payload");
         String locSecondOutput = locRunner.build().getOutput();
         Assert.assertTrue(locSecondOutput.contains("Configuration cache entry reused"), locSecondOutput);
