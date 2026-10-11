@@ -22,7 +22,10 @@ public final class AItcModustroPublicationPreflightWiringTest {
     public void AIcValidatesFinalPublishingTaskPlans() throws IOException {
         String locSource = Files.readString(AIcRepository().resolve(
             "gradle/tool/repository/modustro-root-build.gradle.kts"));
-        Assert.assertTrue(locSource.contains("locProject.tasks.withType(AIcModustroPublishFilesTask::class.java)"));
+        Assert.assertTrue(locSource.contains("allTasks.filterIsInstance<AIcModustroPublishFilesTask>()"),
+                "Publication preflight must only inspect publishers selected in the effective Gradle task graph.");
+        Assert.assertFalse(locSource.contains("locProject.tasks.withType(AIcModustroPublishFilesTask::class.java)"),
+                "Publication preflight must not scan every configured publication task.");
         Assert.assertTrue(locSource.contains("locTask.publicationPlanJson.get()"));
         Assert.assertTrue(locSource.contains("locTask.credentialProfilesJson.get()"));
         Assert.assertTrue(locSource.contains("locPlan[\"publicationEnabled\"] != true"));

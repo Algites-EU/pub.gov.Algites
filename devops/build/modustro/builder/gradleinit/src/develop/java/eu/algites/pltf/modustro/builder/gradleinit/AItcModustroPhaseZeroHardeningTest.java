@@ -43,7 +43,8 @@ public final class AItcModustroPhaseZeroHardeningTest {
         String locController = Files.readString(locRoot.resolve("gradle/tool/repository/modustro-phase-controller.sh"));
         String locMain = Files.readString(locRoot.resolve("gradle/tool/repository/modustro-root-build.gradle.kts"));
         Assert.assertTrue(locPhases.contains("gradle.includedBuilds.sortedBy { it.name }"));
-        Assert.assertTrue(locPhases.contains("MODUSTRO_OPERATION_INTENT"));
+        Assert.assertTrue(locPhases.contains("setOf(\"modustroDependencyPreflight\")"),
+                "Resolve must run dependency preflight without globally validating unrelated publications.");
         Assert.assertTrue(locController.contains("export MODUSTRO_OPERATION_INTENT=\"$through\""));
         Assert.assertTrue(locMain.contains("requiredProfilesJson"));
         Assert.assertTrue(locMain.contains("locSecrets = AIcObject"));
