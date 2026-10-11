@@ -88,6 +88,12 @@ if [[ -z "${ALGITES_SNAPSHOT_INSTANCE_ID:-}" ]]; then
   export ALGITES_SNAPSHOT_INSTANCE_ID="$(date -u +%Y%m%d%H%M%S%3N)"
 fi
 
+# Validate every enabled publication plan before build phases when publishing.
+# Non-publishing compile/verify invocations must not require publication credentials.
+if [[ "$through" == "publish" ]]; then
+  export MODUSTRO_PUBLISHING_INTENT=true
+fi
+
 phases=(resolve prepare compile verify package publish)
 tasks=(modustroResolvePhase modustroPreparePhase modustroCompilePhase modustroVerifyPhase modustroPackagePhase modustroPublishPhase)
 gradle_command="${ALGITES_GRADLE_COMMAND:-$(dirname "${BASH_SOURCE[0]}")/modustro-gradle.sh}"

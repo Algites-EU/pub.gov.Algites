@@ -42,7 +42,9 @@ fun AIcRegisterModustroPhase(
 AIcRegisterModustroPhase(
     "modustroResolvePhase",
     "Resolves all mandatory dependency graphs in this build domain and isolated child build domains.",
-    setOf("modustroDependencyPreflight")
+    if (System.getenv("MODUSTRO_PUBLISHING_INTENT") == "true")
+        setOf("modustroDependencyPreflight", "validateModustroPublicationProfiles")
+    else setOf("modustroDependencyPreflight")
 )
 
 AIcRegisterModustroPhase(
@@ -82,6 +84,11 @@ AIcRegisterModustroPhase(
 
 /* Direct publishing must preserve the same global package-before-publish invariant as the outer phase controller. */
 val locModustroPackagePhase = tasks.named("modustroPackagePhase")
+/* Direct publish invocations also require publication validation, even when
+ * they do not use the external phase controller. */
+locModustroPackagePhase.configure {
+    dependsOn(rootProject.tasks.named("validateModustroPublicationProfiles"))
+}
 allprojects.forEach { locProject ->
     locProject.tasks.matching { locTask ->
         locTask.name == "modustroPublish" || locTask.name.startsWith("publishModustro")

@@ -2277,6 +2277,73 @@ val modustroValidatePublicationProfiles = tasks.register<AIcValidateModustroPubl
     validationProblems.set(locPublicationCredentialPreflightProblems.distinct().sorted())
 }
 
+/* Publication plans are validated from the same immutable JSON inputs that the
+ * publishing tasks pass to AIcModustroPublicationService. Checking only the
+ * hierarchical metadata is insufficient when plans are expanded or merged. */
+gradle.projectsEvaluated {
+    val locActualPublicationProblems = mutableListOf<String>()
+    for (locProject in allprojects) {
+        for (locTask in locProject.tasks.withType(AIcModustroPublishFilesTask::class.java)) {
+            val locTaskPath = locTask.path
+            val locRawPlan = JsonSlurper().parseText(locTask.publicationPlanJson.get())
+            val locPlan = locRawPlan as? Map<*, *>
+            if (locPlan == null) {
+                locActualPublicationProblems += "$locTaskPath: publicationPlanJson must contain an object."
+                continue
+            }
+            if (locPlan["publicationEnabled"] != true) continue
+            val locRawProfiles = JsonSlurper().parseText(locTask.credentialProfilesJson.get())
+            val locProfiles = locRawProfiles as? Map<*, *>
+            if (locProfiles == null) {
+                locActualPublicationProblems += "$locTaskPath: credentialProfilesJson must contain an object."
+                continue
+            }
+            val locRawEndpoints = locPlan["publicationEndpoints"] as? List<*>
+            if (locRawEndpoints == null || locRawEndpoints.isEmpty()) {
+                locActualPublicationProblems += "$locTaskPath: enabled publication has no PublicationEndpoints."
+                continue
+            }
+            for (locRawEndpoint in locRawEndpoints) {
+                val locEndpoint = locRawEndpoint as? Map<*, *>
+                if (locEndpoint == null) {
+                    locActualPublicationProblems += "$locTaskPath: PublicationEndpoint must be an object."
+                    continue
+                }
+                if (locEndpoint["executionEnabled"] == false || locEndpoint["enabled"] == false) continue
+                val locEndpointId = locEndpoint["id"]?.toString()?.takeIf(String::isNotBlank) ?: "<unnamed>"
+                val locAdapter = locEndpoint["publicationAdapter"]?.toString()?.takeIf(String::isNotBlank)
+                val locUri = locEndpoint["publicationUri"]?.toString()?.takeIf(String::isNotBlank)
+                if (locAdapter == null) locActualPublicationProblems +=
+                    "$locTaskPath: endpoint '$locEndpointId' has no PublicationAdapter."
+                if (locUri == null) {
+                    locActualPublicationProblems += "$locTaskPath: endpoint '$locEndpointId' has no PublicationUri."
+                } else {
+                    val locParsedUri = runCatching { java.net.URI.create(locUri) }.getOrNull()
+                    if (locParsedUri == null || !locParsedUri.isAbsolute) locActualPublicationProblems +=
+                        "$locTaskPath: endpoint '$locEndpointId' has an invalid absolute PublicationUri."
+                }
+                val locProfileId = locEndpoint["publicationCredentialProfile"]?.toString()
+                    ?.takeIf { it.isNotBlank() && it != "null" } ?: continue
+                val locProfile = locProfiles[locProfileId] as? Map<*, *>
+                val locType = locProfile?.get("type")?.toString()?.trim()?.lowercase()
+                if (locType !in setOf("basic", "bearer", "api_key")) {
+                    locActualPublicationProblems +=
+                        "$locTaskPath: endpoint '$locEndpointId' references undefined or invalid credential profile '$locProfileId' " +
+                        "(available: ${locProfiles.keys.map { it.toString() }.sorted().joinToString(", ")})."
+                } else if (locType == "api_key") {
+                    val locConfiguration = locProfile?.get("configuration") as? Map<*, *>
+                    if (locConfiguration?.get("headerName")?.toString().isNullOrBlank()) {
+                        locActualPublicationProblems +=
+                            "$locTaskPath: API-key credential profile '$locProfileId' requires configuration.headerName."
+                    }
+                }
+            }
+        }
+    }
+    modustroValidatePublicationProfiles.configure {
+        validationProblems.set((locPublicationCredentialPreflightProblems + locActualPublicationProblems).distinct().sorted())
+    }
+}
 
 subprojects {
     val locAlgitesRunDirectoryRelativePath = AIcModustroRunDirectoryRelativePath(project.projectDir)
