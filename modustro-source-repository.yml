@@ -8,6 +8,12 @@ SourceRepository:
 
 GroupId: eu.algites.gov.pub
 
+# Keep this repository bootstrappable even through an older published gradleinit.
+EnvironmentRequirements:
+  Java:
+    Minimum: ">=17"
+    Prefer: "17"
+
 Version:
   ReleaseLineVersion: '1'
   Revision: 0

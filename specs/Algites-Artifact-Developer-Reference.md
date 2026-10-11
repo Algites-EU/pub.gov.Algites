@@ -371,6 +371,9 @@ EnvironmentRequirements:
 
 The Java adapter uses the preferred version, exact version, or minimum bound (in that order) to select the Java toolchain used for compilation and tests. Python publishes the hard `STRICT_MAXIMUMS` form as `Requires-Python`.
 
+Algites public repository defaults declare `EnvironmentRequirements.Java.Minimum: ">=17"` and `Prefer: "17"`. These defaults are inherited by all artifacts unless their directory descriptors explicitly provide another Java requirement; therefore the active Java compiler/toolchain and published JVM variant metadata do not depend on the JDK used to launch Gradle. The Gradle settings plugin (`gradleinit`) additionally declares the same Java 17 target explicitly. Java libraries on the settings plugin runtime classpath must remain compatible with that target, including transitive dependencies. A project requiring Java 21 can override its requirement, but it must not become a runtime dependency of Java 17 consumers.
+
+
 ## 7. Source layout
 
 The canonical source layout is:

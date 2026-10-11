@@ -1,3 +1,9 @@
+# Shared Algites Java baseline. Artifact descriptors may override EnvironmentRequirements.Java.
+EnvironmentRequirements:
+  Java:
+    Minimum: ">=17"
+    Prefer: "17"
+
 OutputPublications:
 - OutputSelector: modustro_docs_site
   Snapshot:

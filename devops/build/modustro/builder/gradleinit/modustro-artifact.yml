@@ -2,6 +2,13 @@ Artifact:
   TechnologyKinds: [java]
   Name: Modustro Builder Gradle initialization
   Description: Compiled Settings and Project adapters with a single Builder classpath per build domain.
+# The settings plugin must load on every supported Gradle 9.x runtime.
+# Keep its JVM bytecode baseline explicit even when repository defaults change.
+EnvironmentRequirements:
+  Java:
+    Minimum: ">=17"
+    Prefer: "17"
+
 Dependencies:
   - DependencyKind: modustro
     Items:
