@@ -30,6 +30,21 @@ public final class AItcModustroPublicationPreflightWiringTest {
         Assert.assertTrue(locSource.contains("validationProblems.set(locActualPublicationProblems.distinct().sorted())"));
     }
 
+    /** A package-only operation must not require configured publishing endpoints or secrets. */
+    @Test
+    public void AIcPackagingDoesNotRequirePublicationPreflight() throws IOException {
+        String locPhases = Files.readString(AIcRepository().resolve(
+            "gradle/tool/repository/modustro-build-phase-tasks.gradle.kts"));
+        Assert.assertTrue(locPhases.contains("setOf(\"assemble\", \"buildPython\")"),
+                "Packaging must remain a separate phase from publishing.");
+        Assert.assertFalse(locPhases.contains("locModustroPackagePhase.configure"),
+                "Publication preflight must never be an unconditional package dependency.");
+        Assert.assertTrue(locPhases.contains("locTask.name.startsWith(\"publishModustro\")"),
+                "The publication-only preflight must cover individual publishing tasks.");
+        Assert.assertTrue(locPhases.contains("dependsOn(locModustroPackagePhase, locModustroPublicationPreflight)"),
+                "Publishing must retain package and publication-preflight dependencies.");
+    }
+
     /** Publishing validates in resolve, before prepare/compile/package; direct publishing uses a gate. */
     @Test
     public void AIcValidatesBeforePublishingWork() throws IOException {
@@ -42,8 +57,11 @@ public final class AItcModustroPublicationPreflightWiringTest {
             "gradle/tool/repository/modustro-root-build.gradle.kts"));
         Assert.assertTrue(locController.contains("export MODUSTRO_PUBLISHING_INTENT=true"));
         Assert.assertTrue(locPhases.contains("setOf(\"modustroDependencyPreflight\", \"validateModustroPublicationProfiles\")"));
-        Assert.assertTrue(locPhases.contains("locModustroPackagePhase.configure"));
-        Assert.assertTrue(locPhases.contains("dependsOn(rootProject.tasks.named(\"validateModustroPublicationProfiles\"))"));
+        Assert.assertTrue(locPhases.contains("val locModustroPublicationPreflight = rootProject.tasks.named(\"validateModustroPublicationProfiles\")"));
+        Assert.assertTrue(locPhases.contains("dependsOn(locModustroPackagePhase, locModustroPublicationPreflight)"),
+                "Only publishing tasks must require the publication preflight on direct invocation.");
+        Assert.assertFalse(locPhases.contains("locModustroPackagePhase.configure"),
+                "Packaging must not depend on publication configuration or secrets.");
         Assert.assertTrue(locRoot.contains("dependsOn(modustroBuild, \"validateModustroPublicationProfiles\")"));
     }
 }

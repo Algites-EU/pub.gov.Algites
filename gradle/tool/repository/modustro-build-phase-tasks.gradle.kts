@@ -85,17 +85,16 @@ AIcRegisterModustroPhase(
     setOf("modustroPublish")
 )
 
-/* Direct publishing must preserve the same global package-before-publish invariant as the outer phase controller. */
+/* Package production must not require publication endpoint configuration or secrets.
+ * For direct publishing, gate the individual publishing tasks after package
+ * production and publication validation; phase-controller publishing still
+ * validates every included build domain during the initial resolve phase. */
 val locModustroPackagePhase = tasks.named("modustroPackagePhase")
-/* Direct publish invocations also require publication validation, even when
- * they do not use the external phase controller. */
-locModustroPackagePhase.configure {
-    dependsOn(rootProject.tasks.named("validateModustroPublicationProfiles"))
-}
+val locModustroPublicationPreflight = rootProject.tasks.named("validateModustroPublicationProfiles")
 allprojects.forEach { locProject ->
     locProject.tasks.matching { locTask ->
         locTask.name == "modustroPublish" || locTask.name.startsWith("publishModustro")
     }.configureEach {
-        dependsOn(locModustroPackagePhase)
+        dependsOn(locModustroPackagePhase, locModustroPublicationPreflight)
     }
 }
