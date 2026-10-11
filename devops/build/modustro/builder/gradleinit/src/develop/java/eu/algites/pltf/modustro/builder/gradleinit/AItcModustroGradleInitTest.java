@@ -156,7 +156,16 @@ public final class AItcModustroGradleInitTest {
                         Stability: release
                         Enabled: false
                 """);
+        /* Java publication fixtures must satisfy the native bundle contract.
+         * A text file alone is not a Java binary, even for local-copy transport. */
+        Files.writeString(locDirectory.resolve("fixture.jar"), "fixture binary archive");
+        Files.writeString(locDirectory.resolve("fixture-sources.jar"), "fixture sources archive");
+        Files.writeString(locDirectory.resolve("fixture.pom"), "<project/>");
+        Files.writeString(locDirectory.resolve("fixture.module"), "{}");
         Path locChild = Files.createDirectories(locDirectory.resolve("child"));
+        Files.writeString(locChild.resolve("fixture.jar"), "fixture binary archive");
+        Files.writeString(locChild.resolve("fixture.pom"), "<project/>");
+        Files.writeString(locChild.resolve("fixture.module"), "{}");
         Files.writeString(locChild.resolve("modustro-artifact.yml"), """
                 Artifact:
                   Name: Gradle init child
@@ -287,6 +296,9 @@ public final class AItcModustroGradleInitTest {
                     artifactIdentity.set("fixture")
                     publicationVersion.set("1.0-SNAPSHOT")
                     payloadFiles.from(layout.projectDirectory.file("payload.txt"))
+                    payloadFiles.from(layout.projectDirectory.file("fixture.jar"))
+                    payloadFiles.from(layout.projectDirectory.file("fixture.pom"))
+                    payloadFiles.from(layout.projectDirectory.file("fixture.module"))
                     publishedFileNames.put("payload.txt", "nested/payload.txt")
                     publicationService.set(locService)
                     usesService(locService)
@@ -363,6 +375,14 @@ public final class AItcModustroGradleInitTest {
                     coordinates.set(mapOf("groupId" to "eu.algites.test", "artifactId" to "fixture",
                         "technologyKind" to if (aKind == "MODUSTRO_DOCS_SITE") "modustro" else "java"))
                     payloadFiles.from(layout.projectDirectory.file("payload.txt"))
+                    if (aKind == "NATIVE_PRODUCT_BINARIES") {
+                        payloadFiles.from(layout.projectDirectory.file("fixture.jar"))
+                        payloadFiles.from(layout.projectDirectory.file("fixture.pom"))
+                        payloadFiles.from(layout.projectDirectory.file("fixture.module"))
+                    }
+                    if (aKind == "NATIVE_PRODUCT_SOURCES") {
+                        payloadFiles.from(layout.projectDirectory.file("fixture-sources.jar"))
+                    }
                     publishedFileNames.put("payload.txt", "payload.txt")
                     publicationService.set(locService)
                     usesService(locService)
@@ -410,6 +430,11 @@ public final class AItcModustroGradleInitTest {
                     coordinates.set(mapOf("groupId" to "eu.algites.test", "artifactId" to aArtifactPath,
                         "technologyKind" to if (aKind == "MODUSTRO_DOCS_SITE") "modustro" else aTechnology))
                     payloadFiles.from(layout.projectDirectory.file("payload.txt"))
+                    if (aKind == "NATIVE_PRODUCT_BINARIES") {
+                        payloadFiles.from(layout.projectDirectory.file("fixture.jar"))
+                        payloadFiles.from(layout.projectDirectory.file("fixture.pom"))
+                        payloadFiles.from(layout.projectDirectory.file("fixture.module"))
+                    }
                     publishedFileNames.put("payload.txt", "payload.txt")
                     publicationService.set(locService)
                     usesService(locService)

@@ -92,6 +92,7 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     }
 
     /** Uses Core publication scheduling for one output and retains its complete execution tree for higher barriers. */
+    @Suppress("UNCHECKED_CAST")
     fun AIcPublish(aPayload: AIcPublicationPayload, aPlan: Map<String, Any?>, aProfiles: Map<String, Any?>, aOutputId: String) {
         AIcBeginOutput(aPlan, aPayload.outputKind().name, AIcStability(aPayload.stability()), aPayload.version(), aPayload.coordinates())
         /* Only Maven targets require a complete physical package before transport.

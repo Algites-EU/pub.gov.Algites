@@ -94,6 +94,13 @@ if [[ "$through" == "publish" ]]; then
   export MODUSTRO_PUBLISHING_INTENT=true
 fi
 
+# Every nested settings.gradle.kts build receives exactly the same operation intent.
+# A separate resolve invocation must complete for all included build domains before build tasks.
+export MODUSTRO_OPERATION_INTENT="$through"
+if [[ "$through" == "publish" ]]; then
+  export MODUSTRO_PUBLISHING_INTENT=true
+fi
+
 phases=(resolve prepare compile verify package publish)
 tasks=(modustroResolvePhase modustroPreparePhase modustroCompilePhase modustroVerifyPhase modustroPackagePhase modustroPublishPhase)
 gradle_command="${ALGITES_GRADLE_COMMAND:-$(dirname "${BASH_SOURCE[0]}")/modustro-gradle.sh}"

@@ -27,7 +27,7 @@ public final class AItcModustroPublicationPreflightWiringTest {
         Assert.assertTrue(locSource.contains("locTask.credentialProfilesJson.get()"));
         Assert.assertTrue(locSource.contains("locPlan[\"publicationEnabled\"] != true"));
         Assert.assertTrue(locSource.contains("references undefined or invalid credential profile"));
-        Assert.assertTrue(locSource.contains("locPublicationCredentialPreflightProblems + locActualPublicationProblems"));
+        Assert.assertTrue(locSource.contains("validationProblems.set(locActualPublicationProblems.distinct().sorted())"));
     }
 
     /** Publishing validates in resolve, before prepare/compile/package; direct publishing uses a gate. */

@@ -2211,17 +2211,106 @@ tasks.findByName("refreshModustroDocsSite")?.let { locRefresh ->
 
 /** Reject missing credential profiles before any artifact in the Version Scope is published. */
 abstract class AIcValidateModustroPublicationProfilesTask : DefaultTask() {
-    @get:Input
-    abstract val validationProblems: ListProperty<String>
+    @get:Input abstract val validationProblems: ListProperty<String>
+    @get:Input abstract val requiredProfilesJson: Property<String>
+    @get:Internal abstract val credentialBaseDirectory: DirectoryProperty
 
+    /** The runtime and this early preflight accept the same canonical credential sources.
+     * No credential bytes are emitted in diagnostics or stored in Gradle task inputs. */
     @TaskAction
     fun AIcValidate() {
-        val locProblems = validationProblems.get()
-        if (locProblems.isNotEmpty()) {
-            throw GradleException("Modustro publication credential preflight failed before publishing any outputs:\n" +
-                locProblems.joinToString("\n") { " - $it" })
+        val locErrors = validationProblems.get().toMutableList()
+        if (locErrors.isNotEmpty()) {
+            throw GradleException("Modustro publication configuration preflight failed:\n" +
+                locErrors.joinToString("\n") { " - $it" })
         }
-        logger.lifecycle("Modustro publication credential preflight: active endpoint profiles are consistent.")
+        val locRequests = JsonSlurper().parseText(requiredProfilesJson.get()) as? List<*>
+            ?: throw GradleException("Modustro publication preflight credential request list is malformed.")
+        if (locRequests.isEmpty()) {
+            logger.lifecycle("Modustro publication preflight: no publication credentials required.")
+            return
+        }
+        fun AIcCredentialCli(aArguments: List<String>): String? {
+            val locExecutable = System.getenv("ALGITES_CREDENTIAL_CLI")?.takeIf { it.isNotBlank() }
+                ?: "algites-credentials"
+            return try {
+                val locProcess = ProcessBuilder(listOf(locExecutable) + aArguments)
+                    .redirectErrorStream(false).start()
+                if (!locProcess.waitFor(20, java.util.concurrent.TimeUnit.SECONDS)) {
+                    locProcess.destroyForcibly()
+                    null
+                } else if (locProcess.exitValue() != 0) null
+                else locProcess.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+            } catch (_: Exception) { null }
+        }
+        fun AIcObject(aValue: String?, aName: String): Map<*, *> {
+            if (aValue.isNullOrBlank()) return emptyMap<String, Any?>()
+            return (runCatching { JsonSlurper().parseText(aValue) }.getOrNull() as? Map<*, *>)
+                ?: throw GradleException("$aName must contain a valid JSON object.")
+        }
+        val locDocument = AIcObject(
+            System.getenv("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS")?.takeIf { it.isNotBlank() }
+                ?: if (System.getenv("CI") == "true") null else AIcCredentialCli(listOf("bootstrap-document")),
+            "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS")
+        val locSecrets = AIcObject(System.getenv("_TMP_ALGITES_CREDENTIAL_SECRETS_JSON"),
+            "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON")
+        val locBase = credentialBaseDirectory.get().asFile
+        val locResolved = mutableSetOf<String>()
+        for (locRaw in locRequests) {
+            val locRequest = locRaw as? Map<*, *> ?: continue
+            val locProfileId = locRequest["profileId"]?.toString().orEmpty()
+            val locType = locRequest["type"]?.toString().orEmpty()
+            val locContext = locRequest["context"]?.toString().orEmpty()
+            if (!locResolved.add("$locProfileId|$locType")) continue
+            val locProfile = locDocument[locProfileId] as? Map<*, *>
+            val locTypeKey = when (locType) {
+                "basic" -> "Basic"
+                "bearer" -> "Bearer"
+                "api_key" -> "ApiKey"
+                else -> null
+            }
+            val locTyped = locTypeKey?.let { locProfile?.get(it) } as? Map<*, *>
+            if (locTyped == null) {
+                locErrors += "$locContext: credential '$locProfileId/$locType' is not available in the effective credential document."
+                continue
+            }
+            val locFields = when (locType) {
+                "basic" -> listOf("Username", "Password")
+                "bearer" -> listOf("Token")
+                "api_key" -> listOf("ApiKey")
+                else -> emptyList()
+            }
+            for (locField in locFields) {
+                val locValue = locTyped[locField] as? Map<*, *>
+                val locSource = locValue?.get("Source")?.toString()
+                val locRef = locValue?.get("Value")?.toString()
+                if (locSource.isNullOrBlank() || locRef.isNullOrBlank()) {
+                    locErrors += "$locContext: credential '$locProfileId/$locType/$locField' is missing Source/Value."
+                    continue
+                }
+                val locIsResolved = when (locSource) {
+                    "direct_value" -> locRef.isNotBlank()
+                    "environment_variable_content" -> !System.getenv(locRef).isNullOrBlank()
+                    "file_content" -> {
+                        val locCandidate = java.io.File(locRef).let { if (it.isAbsolute) it else java.io.File(locBase, locRef) }
+                        locCandidate.isFile && locCandidate.canRead() && locCandidate.length() > 0L
+                    }
+                    "secret_content" -> {
+                        val locMaterialized = locSecrets[locRef]?.toString()
+                            ?: if (System.getenv("CI") == "true") null else AIcCredentialCli(listOf("bootstrap-secret", locRef))
+                        !locMaterialized.isNullOrBlank()
+                    }
+                    else -> false
+                }
+                if (!locIsResolved) locErrors +=
+                    "$locContext: credential '$locProfileId/$locType/$locField' source '$locSource' cannot resolve its required value."
+            }
+        }
+        if (locErrors.isNotEmpty()) {
+            throw GradleException("Modustro publication secrets preflight failed before build/publishing:\n" +
+                locErrors.distinct().sorted().joinToString("\n") { " - $it" })
+        }
+        logger.lifecycle("Modustro publication preflight: resolved ${locResolved.size} required credential profile/type pair(s).")
     }
 }
 
@@ -2273,8 +2362,10 @@ modustroResolvedArtifactDirectoriesByGradleProjectPath.toSortedMap().forEach { (
 val modustroValidatePublicationProfiles = tasks.register<AIcValidateModustroPublicationProfilesTask>(
     "validateModustroPublicationProfiles") {
     group = "verification"
-    description = "Validates credentials for active artifact publication endpoints before any output is published."
+    description = "Validates active publication plans and resolves only the credentials actually required."
     validationProblems.set(locPublicationCredentialPreflightProblems.distinct().sorted())
+    requiredProfilesJson.convention("[]")
+    credentialBaseDirectory.set(rootProject.layout.projectDirectory)
 }
 
 /* Publication plans are validated from the same immutable JSON inputs that the
@@ -2282,6 +2373,7 @@ val modustroValidatePublicationProfiles = tasks.register<AIcValidateModustroPubl
  * hierarchical metadata is insufficient when plans are expanded or merged. */
 gradle.projectsEvaluated {
     val locActualPublicationProblems = mutableListOf<String>()
+    val locRequiredPublicationCredentials = mutableListOf<Map<String, String>>()
     for (locProject in allprojects) {
         for (locTask in locProject.tasks.withType(AIcModustroPublishFilesTask::class.java)) {
             val locTaskPath = locTask.path
@@ -2330,18 +2422,25 @@ gradle.projectsEvaluated {
                     locActualPublicationProblems +=
                         "$locTaskPath: endpoint '$locEndpointId' references undefined or invalid credential profile '$locProfileId' " +
                         "(available: ${locProfiles.keys.map { it.toString() }.sorted().joinToString(", ")})."
-                } else if (locType == "api_key") {
-                    val locConfiguration = locProfile?.get("configuration") as? Map<*, *>
-                    if (locConfiguration?.get("headerName")?.toString().isNullOrBlank()) {
-                        locActualPublicationProblems +=
-                            "$locTaskPath: API-key credential profile '$locProfileId' requires configuration.headerName."
+                } else {
+                    if (locType == "api_key") {
+                        val locConfiguration = locProfile?.get("configuration") as? Map<*, *>
+                        if (locConfiguration?.get("headerName")?.toString().isNullOrBlank()) {
+                            locActualPublicationProblems +=
+                                "$locTaskPath: API-key credential profile '$locProfileId' requires configuration.headerName."
+                        }
                     }
+                    locRequiredPublicationCredentials += mapOf(
+                        "profileId" to locProfileId,
+                        "type" to locType.orEmpty(),
+                        "context" to "$locTaskPath endpoint '$locEndpointId'")
                 }
             }
         }
     }
     modustroValidatePublicationProfiles.configure {
-        validationProblems.set((locPublicationCredentialPreflightProblems + locActualPublicationProblems).distinct().sorted())
+        validationProblems.set(locActualPublicationProblems.distinct().sorted())
+        requiredProfilesJson.set(JsonOutput.toJson(locRequiredPublicationCredentials.distinct()))
     }
 }
 
@@ -2652,9 +2751,17 @@ subprojects {
                 }
                 if (AInBuildOutputProductionKind.JAVA_SOURCES_JAR in locJavaProductionKinds &&
                     tasks.findByName("sourcesJar") != null && tasks.findByName("kotlinSourcesJar") != null) {
-                    throw GradleException("Ambiguous source archive producers in ${project.path}: " +
-                        "sourcesJar and kotlinSourcesJar would both publish the same -sources.jar. " +
-                        "Configure only one source archive producer.")
+                    /* Both plugins may contribute an archive with the identical path.
+                     * Kotlin DSL owns the Kotlin source archive; disable the duplicate
+                     * Java archive, never silently publish two competing producers. */
+                    if (plugins.hasPlugin("org.jetbrains.kotlin.jvm") ||
+                        file("src/product/kotlin").isDirectory || file("src/main/kotlin").isDirectory) {
+                        tasks.named<Jar>("sourcesJar").configure { enabled = false }
+                        logger.lifecycle("Modustro sources archive in ${project.path}: kotlinSourcesJar selected; duplicate sourcesJar disabled.")
+                    } else {
+                        tasks.named<Jar>("kotlinSourcesJar").configure { enabled = false }
+                        logger.lifecycle("Modustro sources archive in ${project.path}: sourcesJar selected; duplicate kotlinSourcesJar disabled.")
+                    }
                 }
             }
             if ("java" in locEffectiveTechnologyKinds) {
