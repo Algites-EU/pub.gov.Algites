@@ -170,6 +170,15 @@ public final class AItcModustroGovernanceScriptsTest {
             Files.writeString(locBuild.resolve("bridge.gradle.kts"), locBridge.replace("${System.getenv(\"MODUSTRO_PUBLIC_GOVERNANCE_REVISION\") ?: \"main\"}", "main").replace(locRemotePrefix, locTestPrefix));
             Files.writeString(locBuild.resolve("build.gradle.kts"), """
                 tasks.register("modustroDependencyPreflight")
+                tasks.register("validateModustroPublicationProfiles") {
+                    doLast { println("FIXTURE_PUBLICATION_PREFLIGHT_OK") }
+                }
+                tasks.register("assemble") {
+                    doLast { println("FIXTURE_PACKAGED_OK") }
+                }
+                tasks.register("modustroPublish") {
+                    doLast { println("FIXTURE_PUBLISHED_OK") }
+                }
                 tasks.register("processModustroJavaNativeSources") {
                     doLast { println("REMOTE_PHASE_PREPARED") }
                 }
@@ -180,12 +189,30 @@ public final class AItcModustroGovernanceScriptsTest {
                 """);
             var locRunner = GradleRunner.create().withProjectDir(locBuild.toFile())
                 .withArguments("modustroPreparePhase", "--configuration-cache", "--stacktrace");
-            Assert.assertTrue(locRunner.build().getOutput().contains("REMOTE_PHASE_PREPARED"));
+            String locPrepareOutput = locRunner.build().getOutput();
+            Assert.assertTrue(locPrepareOutput.contains("REMOTE_PHASE_PREPARED"), locPrepareOutput);
+            Assert.assertFalse(locPrepareOutput.contains("FIXTURE_PUBLICATION_PREFLIGHT_OK"), locPrepareOutput);
             int locDownloadsAfterFirst = locDownloads.get();
             Assert.assertEquals(locDownloadsAfterFirst, aLocalCopy ? 0 : 1);
             String locSecondOutput = locRunner.build().getOutput();
             Assert.assertTrue(locSecondOutput.contains("Reusing configuration cache"), locSecondOutput);
+            Assert.assertFalse(locSecondOutput.contains("FIXTURE_PUBLICATION_PREFLIGHT_OK"), locSecondOutput);
             Assert.assertEquals(locDownloads.get(), locDownloadsAfterFirst);
+
+            String locPackageOutput = GradleRunner.create().withProjectDir(locBuild.toFile())
+                .withArguments("modustroPackagePhase", "--configuration-cache", "--stacktrace")
+                .build().getOutput();
+            Assert.assertTrue(locPackageOutput.contains("FIXTURE_PACKAGED_OK"), locPackageOutput);
+            Assert.assertFalse(locPackageOutput.contains("FIXTURE_PUBLICATION_PREFLIGHT_OK"), locPackageOutput);
+
+            String locPublishOutput = GradleRunner.create().withProjectDir(locBuild.toFile())
+                .withArguments("modustroPublish", "--configuration-cache", "--stacktrace")
+                .build().getOutput();
+            int locPreflight = locPublishOutput.indexOf("FIXTURE_PUBLICATION_PREFLIGHT_OK");
+            int locPackaged = locPublishOutput.indexOf("FIXTURE_PACKAGED_OK");
+            int locPublished = locPublishOutput.indexOf("FIXTURE_PUBLISHED_OK");
+            Assert.assertTrue(locPreflight >= 0 && locPackaged >= 0 && locPublished > locPreflight &&
+                locPublished > locPackaged, locPublishOutput);
         } finally {
             locServer.stop(0);
         }
