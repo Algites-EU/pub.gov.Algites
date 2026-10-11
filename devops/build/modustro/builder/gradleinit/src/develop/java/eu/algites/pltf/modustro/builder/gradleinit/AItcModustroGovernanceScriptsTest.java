@@ -6,6 +6,8 @@ import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.gradle.testkit.runner.GradleRunner;
 import org.gradle.testkit.runner.UnexpectedBuildFailure;
@@ -17,6 +19,36 @@ import org.testng.annotations.Test;
 public final class AItcModustroGovernanceScriptsTest {
     private static final String OVERRIDES_PATH = "gradle/tool/repository/modustro-publication-overrides.gradle.kts";
     private static final String OVERRIDES_URL = "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/" + OVERRIDES_PATH;
+
+    /** Makes TestKit fixtures independent of publication flags set by the calling CI workflow. */
+    private static Map<String, String> AIcFixtureEnvironment(Map<String, String> aEnvironment) {
+        Map<String, String> locEnvironment = new HashMap<>(aEnvironment);
+        locEnvironment.keySet().removeIf(aName ->
+            aName.startsWith("MODUSTRO_PUBLICATION_") ||
+            aName.equals("MODUSTRO_PUBLISHING_INTENT") ||
+            aName.equals("MODUSTRO_OPERATION_INTENT"));
+        return locEnvironment;
+    }
+
+    /** Creates a real GradleRunner without inheriting publication invocation overrides. */
+    private static GradleRunner AIcFixtureRunner(Path aProjectDirectory) {
+        return GradleRunner.create()
+            .withProjectDir(aProjectDirectory.toFile())
+            .withEnvironment(AIcFixtureEnvironment(System.getenv()));
+    }
+
+    /** A snapshot publishing workflow must not change the expected behavior of isolated fixtures. */
+    @Test
+    public void AIcDoesNotInheritPublishingWorkflowOverrides() {
+        Map<String, String> locEnvironment = Map.of(
+            "MODUSTRO_PUBLICATION_SCHEMA_SITE", "FORCE_OFF",
+            "MODUSTRO_PUBLICATION_MODUSTRO_DOCS_SITE", "FORCE_OFF",
+            "MODUSTRO_PUBLICATION_NATIVE_PRODUCT_BINARIES", "FORCE_ON",
+            "MODUSTRO_PUBLISHING_INTENT", "true",
+            "MODUSTRO_OPERATION_INTENT", "publish",
+            "JAVA_HOME", "/fixture/java");
+        Assert.assertEquals(AIcFixtureEnvironment(locEnvironment), Map.of("JAVA_HOME", "/fixture/java"));
+    }
 
     /** Supplies both publication entry points and both local and downloaded initialization paths. */
     @DataProvider(name = "entryPoints")
@@ -101,7 +133,7 @@ public final class AItcModustroGovernanceScriptsTest {
             Files.writeString(locBuild.resolve("build.gradle.kts"), locBuildScript);
             org.gradle.testkit.runner.BuildResult locResult;
             try {
-                locResult = GradleRunner.create().withProjectDir(locBuild.toFile())
+                locResult = AIcFixtureRunner(locBuild)
                     .withArguments("printModustroPublicationOverrides", "-Pmodustro.publication.nativeProductBinaries=FORCE_OFF",
                         "--stacktrace").build();
             } catch (UnexpectedBuildFailure locFailure) {
@@ -187,7 +219,7 @@ public final class AItcModustroGovernanceScriptsTest {
                 val locPhases = listOf("Resolve", "Prepare", "Compile", "Verify", "Package", "Publish")
                 check(locPhases.all { "modustro${it}Phase" in tasks.names })
                 """);
-            var locRunner = GradleRunner.create().withProjectDir(locBuild.toFile())
+            var locRunner = AIcFixtureRunner(locBuild)
                 .withArguments("modustroPreparePhase", "--configuration-cache", "--stacktrace");
             String locPrepareOutput = locRunner.build().getOutput();
             Assert.assertTrue(locPrepareOutput.contains("REMOTE_PHASE_PREPARED"), locPrepareOutput);
@@ -199,13 +231,13 @@ public final class AItcModustroGovernanceScriptsTest {
             Assert.assertFalse(locSecondOutput.contains("FIXTURE_PUBLICATION_PREFLIGHT_OK"), locSecondOutput);
             Assert.assertEquals(locDownloads.get(), locDownloadsAfterFirst);
 
-            String locPackageOutput = GradleRunner.create().withProjectDir(locBuild.toFile())
+            String locPackageOutput = AIcFixtureRunner(locBuild)
                 .withArguments("modustroPackagePhase", "--configuration-cache", "--stacktrace")
                 .build().getOutput();
             Assert.assertTrue(locPackageOutput.contains("FIXTURE_PACKAGED_OK"), locPackageOutput);
             Assert.assertFalse(locPackageOutput.contains("FIXTURE_PUBLICATION_PREFLIGHT_OK"), locPackageOutput);
 
-            String locPublishOutput = GradleRunner.create().withProjectDir(locBuild.toFile())
+            String locPublishOutput = AIcFixtureRunner(locBuild)
                 .withArguments("modustroPublish", "--configuration-cache", "--stacktrace")
                 .build().getOutput();
             int locPreflight = locPublishOutput.indexOf("FIXTURE_PUBLICATION_PREFLIGHT_OK");
