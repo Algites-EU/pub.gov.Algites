@@ -24,6 +24,7 @@ public final class AIcMavenBuildRecordChecks {
         locChecks.AIcRejectsRemoteSourceWithoutDownloadingIt();
     }
 
+    /** A complete Maven package is uploaded once with its build record already attached. */
     public void AIcPublishesPairedSnapshotAndBuildRecord() throws Exception {
         Map<String, byte[]> locBytes = new ConcurrentHashMap<>();
         Map<String, AtomicInteger> locPuts = new ConcurrentHashMap<>();
@@ -57,42 +58,54 @@ public final class AIcMavenBuildRecordChecks {
         locServer.start();
         try {
             Path locDirectory = Files.createTempDirectory("modustro-maven-record-");
-            Path locJar = locDirectory.resolve("library-1.0-SNAPSHOT-javadoc.jar");
-            Files.writeString(locJar, "unchanged documentation");
-            AIcPublicationPayload locPayload = new AIcPublicationPayload(
-                    AInPublicationOutputKind.NATIVE_PRODUCT_DOCUMENTATION,
-                    AInPublicationStability.SNAPSHOT,
-                    "test:library",
-                    "1.0-SNAPSHOT",
-                    List.of(new AIcPublicationPayloadFile(locJar, locJar.getFileName().toString())),
-                    Map.of(
-                            "groupId", "test",
-                            "artifactId", "library",
-                            "version", "1.0-SNAPSHOT",
-                            "logicalVersion", "1.0-SNAPSHOT",
-                            "technologyKind", "java",
-                            "classifier", "javadoc",
-                            "extension", "jar"));
+            String locLogicalPrefix = "library-1.0-SNAPSHOT";
+            String locMainName = locLogicalPrefix + ".jar";
+            String locPomName = locLogicalPrefix + ".pom";
+            String locModuleName = locLogicalPrefix + ".module";
+            String locSourcesName = locLogicalPrefix + "-sources.jar";
+            Path locMain = locDirectory.resolve(locMainName);
+            Path locPom = locDirectory.resolve(locPomName);
+            Path locModule = locDirectory.resolve(locModuleName);
+            Path locSources = locDirectory.resolve(locSourcesName);
+            Files.writeString(locMain, "binary contents");
+            Files.writeString(locPom, "<project></project>");
+            Files.writeString(locModule, "{}");
+            Files.writeString(locSources, "source contents");
+
+            Map<String, String> locBinaryCoordinates = Map.of(
+                    "groupId", "test", "artifactId", "library", "version", "1.0-SNAPSHOT", "technologyKind", "java");
+            Map<String, String> locSourceCoordinates = Map.of(
+                    "groupId", "test", "artifactId", "library", "version", "1.0-SNAPSHOT",
+                    "technologyKind", "java", "classifier", "sources", "extension", "jar");
+            AIcPublicationPayload locBinary = new AIcPublicationPayload(
+                    AInPublicationOutputKind.NATIVE_PRODUCT_BINARIES, AInPublicationStability.SNAPSHOT,
+                    "test:library", "1.0-SNAPSHOT", List.of(
+                        new AIcPublicationPayloadFile(locMain, locMainName),
+                        new AIcPublicationPayloadFile(locPom, locPomName),
+                        new AIcPublicationPayloadFile(locModule, locModuleName)), locBinaryCoordinates);
+            AIcPublicationPayload locSource = new AIcPublicationPayload(
+                    AInPublicationOutputKind.NATIVE_PRODUCT_SOURCES, AInPublicationStability.SNAPSHOT,
+                    "test:library", "1.0-SNAPSHOT",
+                    List.of(new AIcPublicationPayloadFile(locSources, locSourcesName)), locSourceCoordinates);
             Map<String, Object> locEndpoint = Map.of(
-                    "Id", "remote",
-                    "PublicationUri", "http://127.0.0.1:" + locServer.getAddress().getPort() + "/maven/",
+                    "Id", "remote", "PublicationUri", "http://127.0.0.1:" + locServer.getAddress().getPort() + "/maven/",
                     "PublicationAdapter", "maven-repository");
-            List<AIcPublicationJob> locJobs = new AIcPublicationPlanner().plan(
-                    locPayload,
-                    Map.of("PublicationEnabled", true, "PublicationEndpoints", List.of(locEndpoint)),
-                    Map.of("RepositoryId", "pub.test", "Invocation", Map.of(
-                            "Id", "mock-http",
-                            "StartedAt", "2026-10-04T20:00:00.123456789Z")),
-                    locDirectory);
-            AIcPublicationCheckAssertions.assertEquals(locJobs.size(), 1);
-            AIcPublicationCheckAssertions.assertEquals(locJobs.get(0).publicationFinalizationActions().size(), 1);
-            AIcPublicationCheckAssertions.assertEquals(locJobs.get(0).publicationFinalizationActions().get(0).id(), "build-record");
+            Map<String, Object> locConfig = Map.of("PublicationEnabled", true, "PublicationEndpoints", List.of(locEndpoint));
+            Map<String, Object> locContext = Map.of("RepositoryId", "pub.test", "Invocation", Map.of(
+                    "Id", "mock-http", "StartedAt", "2026-10-04T20:00:00.123456789Z"));
+            AIcPublicationPlanner locPlanner = new AIcPublicationPlanner();
+            List<AIcPublicationJob> locBinaryJobs = locPlanner.plan(locBinary, locConfig, locContext, locDirectory);
+            List<AIcPublicationJob> locSourceJobs = locPlanner.plan(locSource, locConfig, locContext, locDirectory);
+            AIcMavenPublicationBatchPlanner.AIcdBatch locBatch = new AIcMavenPublicationBatchPlanner()
+                    .plan(List.of(locBinaryJobs.get(0), locSourceJobs.get(0)));
+            AIcPublicationCheckAssertions.assertEquals(locBatch.physicalJobs().size(), 1);
+            AIcPublicationCheckAssertions.assertTrue(locBatch.physicalJobs().get(0).publicationFinalizationActions().isEmpty());
 
             try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(new eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog(
                     List.of(), List.of(new AIcMavenRepositoryPublicationAdapter()),
                     List.of(new AIcBuildRecordPublicationFinalizationActionAdapter()), List.of(), List.of(), List.of()))) {
                 var locHandle = locScheduler.schedule(
-                        locPayload, locJobs, List.of(), Map.of(),
+                        locBinary, locBatch.physicalJobs(), List.of(), Map.of(),
                         aEndpoint -> Map.of(),
                         aEndpoint -> new AIiPublicationProgressReporter() {
                             @Override public void started(String aMessage) { }
@@ -101,23 +114,28 @@ public final class AIcMavenBuildRecordChecks {
                             @Override public void completed(String aMessage) { }
                         });
                 locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
-                AIcPublicationCheckAssertions.assertTrue(locHandle.publicationResults().get("remote/standard").toCompletableFuture().join().success());
-                AIcPublicationCheckAssertions.assertTrue(locHandle.publicationFinalizationActionResults().get("remote/standard/build-record").toCompletableFuture().join().result().success());
+                AIcPublicationCheckAssertions.assertTrue(locHandle.publicationResults().get(
+                        locBatch.physicalJobs().get(0).id()).toCompletableFuture().join().success());
             }
 
             String locBase = "/maven/test/library/1.0-SNAPSHOT/";
-            String locMainName = locJobs.get(0).payload().files().get(0).logicalName();
-            String locRecordName = locMainName + ".modustro-build-record.yml";
-            AIcPublicationCheckAssertions.assertTrue(locBytes.containsKey(locBase + locMainName));
-            AIcPublicationCheckAssertions.assertTrue(locBytes.containsKey(locBase + locRecordName));
-            AIcPublicationCheckAssertions.assertEquals(locPuts.get(locBase + locMainName).get(), 1);
-            AIcPublicationCheckAssertions.assertEquals(locPuts.get(locBase + locRecordName).get(), 1);
+            for (AIcPublicationPayloadFile locFile : locBatch.physicalJobs().get(0).payload().files()) {
+                String locPath = locBase + locFile.logicalName();
+                AIcPublicationCheckAssertions.assertTrue(locBytes.containsKey(locPath));
+                AIcPublicationCheckAssertions.assertEquals(locPuts.get(locPath).get(), 1);
+            }
             AIcPublicationCheckAssertions.assertTrue(locBytes.containsKey(locBase + "maven-metadata.xml"));
             AIcPublicationCheckAssertions.assertEquals(locArtifactGets.get(), 0);
-            String locRecord = new String(locBytes.get(locBase + locRecordName), java.nio.charset.StandardCharsets.UTF_8);
-            AIcPublicationCheckAssertions.assertTrue(locRecord.contains("\"Filename\":\"" + locMainName + "\""));
-            AIcPublicationCheckAssertions.assertTrue(locRecord.contains(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locJar)));
-            AIcPublicationCheckAssertions.assertTrue(locRecord.contains("\"Size\":" + Files.size(locJar)));
+            AIcPublicationPayloadFile locRecordFile = locBatch.physicalJobs().get(0).payload().files().stream()
+                    .filter(aFile -> aFile.logicalName().endsWith(".modustro-build-record.yml"))
+                    .findFirst().orElseThrow();
+            String locRecord = new String(locBytes.get(locBase + locRecordFile.logicalName()),
+                    java.nio.charset.StandardCharsets.UTF_8);
+            AIcPublicationCheckAssertions.assertTrue(locRecord.contains("\"Filename\":\"" +
+                    locBatch.physicalJobs().get(0).payload().files().get(0).logicalName() + "\""));
+            AIcPublicationCheckAssertions.assertTrue(locRecord.contains(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locMain)));
+            AIcPublicationCheckAssertions.assertTrue(locRecord.contains(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locSources)));
+            AIcPublicationCheckAssertions.assertTrue(!locRecord.contains("ExecutionLineage"));
         } finally {
             locServer.stop(0);
         }

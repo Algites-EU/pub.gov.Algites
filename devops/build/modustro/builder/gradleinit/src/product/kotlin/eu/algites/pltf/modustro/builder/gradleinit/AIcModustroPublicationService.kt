@@ -94,7 +94,16 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     /** Uses Core publication scheduling for one output and retains its complete execution tree for higher barriers. */
     fun AIcPublish(aPayload: AIcPublicationPayload, aPlan: Map<String, Any?>, aProfiles: Map<String, Any?>, aOutputId: String) {
         AIcBeginOutput(aPlan, aPayload.outputKind().name, AIcStability(aPayload.stability()), aPayload.version(), aPayload.coordinates())
-        if (aPayload.coordinates()["technologyKind"] == "java" &&
+        /* Only Maven targets require a complete physical package before transport.
+         * Local-copy and other independent adapters must retain their normal publication
+         * and Version Scope finalization lifecycle (including configuration-cache reuse). */
+        val locRequiresMavenBundle = (aPlan["publicationEndpoints"] as? List<*>).orEmpty()
+            .filterIsInstance<Map<*, *>>()
+            .any { locEndpoint ->
+                locEndpoint["executionEnabled"] != false && locEndpoint["enabled"] != false &&
+                    (locEndpoint["publicationAdapter"] ?: locEndpoint["PublicationAdapter"]) == "maven-repository"
+            }
+        if (locRequiresMavenBundle && aPayload.coordinates()["technologyKind"] == "java" &&
             aPayload.outputKind().name in setOf("NATIVE_PRODUCT_BINARIES", "NATIVE_PRODUCT_SOURCES", "NATIVE_PRODUCT_DOCUMENTATION")) {
             val locPending = AIcOutputPublicationExecutionResult(
                 aPayload.artifactIdentity(), "java", aPayload.outputKind(), aPayload.stability(),
