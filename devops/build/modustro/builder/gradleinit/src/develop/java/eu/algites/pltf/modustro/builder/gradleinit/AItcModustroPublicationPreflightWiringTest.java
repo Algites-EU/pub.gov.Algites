@@ -41,8 +41,8 @@ public final class AItcModustroPublicationPreflightWiringTest {
                 "Publication preflight must never be an unconditional package dependency.");
         Assert.assertTrue(locPhases.contains("locTask.name.startsWith(\"publishModustro\")"),
                 "The publication-only preflight must cover individual publishing tasks.");
-        Assert.assertTrue(locPhases.contains("dependsOn(locModustroPackagePhase, locModustroPublicationPreflight)"),
-                "Publishing must retain package and publication-preflight dependencies.");
+        Assert.assertTrue(locPhases.contains("dependsOn(locModustroPublicationPreflight)"),
+                "Publishing must retain publication-preflight dependencies.");
     }
 
     /** Publishing validates in resolve, before prepare/compile/package; direct publishing uses a gate. */
@@ -56,12 +56,14 @@ public final class AItcModustroPublicationPreflightWiringTest {
         String locRoot = Files.readString(locRepository.resolve(
             "gradle/tool/repository/modustro-root-build.gradle.kts"));
         Assert.assertTrue(locController.contains("export MODUSTRO_PUBLISHING_INTENT=true"));
-        Assert.assertTrue(locPhases.contains("setOf(\"modustroDependencyPreflight\", \"validateModustroPublicationProfiles\")"));
+        Assert.assertTrue(locPhases.contains("setOf(\"modustroDependencyPreflight\")"));
         Assert.assertTrue(locPhases.contains("val locModustroPublicationPreflight = rootProject.tasks.named(\"validateModustroPublicationProfiles\")"));
-        Assert.assertTrue(locPhases.contains("dependsOn(locModustroPackagePhase, locModustroPublicationPreflight)"),
+        Assert.assertTrue(locPhases.contains("dependsOn(locModustroPublicationPreflight)"),
                 "Only publishing tasks must require the publication preflight on direct invocation.");
         Assert.assertFalse(locPhases.contains("locModustroPackagePhase.configure"),
                 "Packaging must not depend on publication configuration or secrets.");
         Assert.assertTrue(locRoot.contains("dependsOn(modustroBuild, \"validateModustroPublicationProfiles\")"));
+        Assert.assertTrue(locRoot.contains("gradle.taskGraph.whenReady"));
+        Assert.assertTrue(locRoot.contains("allTasks.filterIsInstance<AIcModustroPublishFilesTask>()"));
     }
 }

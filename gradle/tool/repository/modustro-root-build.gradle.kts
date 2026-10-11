@@ -2371,11 +2371,14 @@ val modustroValidatePublicationProfiles = tasks.register<AIcValidateModustroPubl
 /* Publication plans are validated from the same immutable JSON inputs that the
  * publishing tasks pass to AIcModustroPublicationService. Checking only the
  * hierarchical metadata is insufficient when plans are expanded or merged. */
-gradle.projectsEvaluated {
+/* The preflight scope is the effective task graph, not all configured output
+ * publications. PublicationEnabled is a capability gate, not an execution request.
+ * Resolve credentials for selected tasks only, before any selected publisher runs. */
+gradle.taskGraph.whenReady {
+    val locSelectedPublicationTasks = allTasks.filterIsInstance<AIcModustroPublishFilesTask>()
     val locActualPublicationProblems = mutableListOf<String>()
     val locRequiredPublicationCredentials = mutableListOf<Map<String, String>>()
-    for (locProject in allprojects) {
-        for (locTask in locProject.tasks.withType(AIcModustroPublishFilesTask::class.java)) {
+    for (locTask in locSelectedPublicationTasks) {
             val locTaskPath = locTask.path
             val locRawPlan = JsonSlurper().parseText(locTask.publicationPlanJson.get())
             val locPlan = locRawPlan as? Map<*, *>
@@ -2436,7 +2439,6 @@ gradle.projectsEvaluated {
                         "context" to "$locTaskPath endpoint '$locEndpointId'")
                 }
             }
-        }
     }
     modustroValidatePublicationProfiles.configure {
         validationProblems.set(locActualPublicationProblems.distinct().sorted())

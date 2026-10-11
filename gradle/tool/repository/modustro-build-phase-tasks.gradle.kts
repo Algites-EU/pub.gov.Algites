@@ -44,10 +44,7 @@ AIcRegisterModustroPhase(
     "Resolves all mandatory dependency graphs in this build domain and isolated child build domains.",
     /* Included isolated builds also execute modustroResolvePhase through Gradle
      * composite build task references; no domain may build before all preflights pass. */
-    if (System.getenv("MODUSTRO_OPERATION_INTENT") == "publish" ||
-        System.getenv("MODUSTRO_PUBLISHING_INTENT") == "true")
-        setOf("modustroDependencyPreflight", "validateModustroPublicationProfiles")
-    else setOf("modustroDependencyPreflight")
+setOf("modustroDependencyPreflight")
 )
 
 AIcRegisterModustroPhase(
@@ -95,6 +92,9 @@ allprojects.forEach { locProject ->
     locProject.tasks.matching { locTask ->
         locTask.name == "modustroPublish" || locTask.name.startsWith("publishModustro")
     }.configureEach {
-        dependsOn(locModustroPackagePhase, locModustroPublicationPreflight)
+        dependsOn(locModustroPublicationPreflight)
+        if (name != "publishModustroDocsSite") {
+            dependsOn(locModustroPackagePhase)
+        }
     }
 }

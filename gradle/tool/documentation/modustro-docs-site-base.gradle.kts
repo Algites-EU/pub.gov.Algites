@@ -1669,8 +1669,8 @@ if (tasks.findByName("publishModustroDocsSite") == null) {
     val locConfigureDocsSitePublication: AIcModustroPublishFilesTask.() -> Unit = {
         group = "publishing"
         description = "Publishes the generated Modustro documentation site through the common publication scheduler."
+        dependsOn("generateModustroDocsSite")
         if (locDocsHasPublicationEndpoints) {
-            dependsOn("generateModustroDocsSite")
             payloadFiles.from(locFiles)
         }
         val locBoundPlan = locDocsPublicationPlan + ("publicationEndpoints" to (locDocsPublicationPlan["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty().map { endpoint ->

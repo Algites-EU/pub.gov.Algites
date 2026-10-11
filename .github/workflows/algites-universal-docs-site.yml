@@ -617,7 +617,7 @@ jobs:
           locPythonExecutable="$(python -c 'import sys; print(sys.executable)')"
           echo "ALGITES_PYTHON_EXECUTABLE=${locPythonExecutable}" >> "${GITHUB_ENV}"
 
-      - name: Generate documentation site into persistent documentation branch workspace
+      - name: Generate and publish documentation through Modustro Builder
         working-directory: source
         shell: bash
         run: |
@@ -626,9 +626,11 @@ jobs:
 
           "${ALGITES_GRADLE_COMMAND}" --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
             ${{ steps.request.outputs.gradle-task }} \
+            publishModustroDocsSite \
             -Pmodustro.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
             -Pmodustro.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
             -Pmodustro.docs.publicationId="${{ steps.effective-publication.outputs.publication-id }}" \
+            -Pmodustro.docs.publishingBranch="${{ steps.publication.outputs.documentation-branch }}" \
             -Pmodustro.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
             -Pmodustro.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
             -Pmodustro.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
@@ -653,27 +655,6 @@ jobs:
             *) echo "::error::Invalid effective documentation PublicationEnabled: ${locEnabled}"; exit 1 ;;
           esac
           echo "publishing_enabled=${locEnabled}" >> "${GITHUB_OUTPUT}"
-
-      - name: Publish documentation through Modustro Builder
-        working-directory: source
-        shell: bash
-        run: |
-          set -euo pipefail
-          mapfile -t locPublishingArgs < "${MODUSTRO_PUBLICATION_ARGUMENTS_FILE}"
-
-          "${ALGITES_GRADLE_COMMAND}" --no-daemon ${ALGITES_GRADLE_REFRESH_ARGUMENT:-} \
-            publishModustroDocsSite \
-            -Pmodustro.docs.siteRoot="${GITHUB_WORKSPACE}/documentation-branch" \
-            -Pmodustro.docs.publicationKind="${{ steps.publication.outputs.publication-kind }}" \
-            -Pmodustro.docs.publicationId="${{ steps.effective-publication.outputs.publication-id }}" \
-            -Pmodustro.docs.publishingBranch="${{ steps.publication.outputs.documentation-branch }}" \
-            -Pmodustro.docs.sourceRef="${{ steps.source-parameters.outputs.source-ref }}" \
-            -Pmodustro.docs.sourceCommit="${{ steps.source-revision.outputs.source-commit }}" \
-            -Pmodustro.docs.generatedAt="${{ steps.source-revision.outputs.generated-at }}" \
-            -Palgites.snapshot.instanceId="${{ steps.request.outputs.snapshot-instance-id }}" \
-            -Palgites.technologyKinds="${{ steps.request.outputs.technology-kinds }}" \
-            ${{ steps.request.outputs.gradle-arguments }} \
-            "${locPublishingArgs[@]}"
 
       - name: Upload documentation site as workflow artifact
         uses: actions/upload-artifact@v4
