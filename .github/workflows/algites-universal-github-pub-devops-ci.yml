@@ -745,16 +745,36 @@ jobs:
         if: ${{ steps.mode.outputs.mode == 'skip' }}
         run: |
           echo "Mode=skip → no construction/verification/approval for this branch."
-      - name: Upload Gradle diagnostic reports
-        if: always()
+      - name: Collect Gradle failure reports
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          locRoot="${{ runner.temp }}/algites-gradle-diagnostics"
+          mkdir -p "$locRoot"
+          locCount=0
+          while IFS= read -r -d '' locFile; do
+            locDest="$locRoot/$locFile"
+            mkdir -p "$(dirname "$locDest")"
+            cp -- "$locFile" "$locDest"
+            locCount=$((locCount + 1))
+          done < <(find . -type f \
+            \( -path '*/test-results/*' -o -path '*/reports/tests/*' \
+               -o -path '*/reports/problems/*' -o -path '*/configuration-cache/*/configuration-cache-report.html' \) \
+            -print0 2>/dev/null)
+          echo "Collected $locCount Gradle diagnostic files"
+          echo "### Gradle failure diagnostics" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Collected files: $locCount" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$locCount" -eq 0 ]]; then
+            echo "::warning::No Gradle test reports found; build may have failed before test execution."
+          fi
+
+      - name: Upload Gradle failure reports
+        if: ${{ failure() }}
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME || format('gradle-diagnostic-reports-{0}-{1}-{2}', github.job, github.run_attempt, strategy.job-index) }}
-          path: |
-            **/reports/configuration-cache/**
-            **/reports/problems/**
-            **/reports/tests/**
-            **/test-results/**
+          name: ${{ format('gradle-failure-reports-{0}-{1}-{2}', github.job, github.run_attempt, strategy.job-index) }}
+          path: ${{ runner.temp }}/algites-gradle-diagnostics/
           if-no-files-found: warn
-          retention-days: 7
-
+          retention-days: 14
