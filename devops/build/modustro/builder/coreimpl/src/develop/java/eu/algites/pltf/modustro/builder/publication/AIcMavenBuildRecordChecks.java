@@ -126,16 +126,9 @@ public final class AIcMavenBuildRecordChecks {
             }
             AIcPublicationCheckAssertions.assertTrue(locBytes.containsKey(locBase + "maven-metadata.xml"));
             AIcPublicationCheckAssertions.assertEquals(locArtifactGets.get(), 0);
-            AIcPublicationPayloadFile locRecordFile = locBatch.physicalJobs().get(0).payload().files().stream()
-                    .filter(aFile -> aFile.logicalName().endsWith(".modustro-build-record.yml"))
-                    .findFirst().orElseThrow();
-            String locRecord = new String(locBytes.get(locBase + locRecordFile.logicalName()),
-                    java.nio.charset.StandardCharsets.UTF_8);
-            AIcPublicationCheckAssertions.assertTrue(locRecord.contains("\"Filename\":\"" +
-                    locBatch.physicalJobs().get(0).payload().files().get(0).logicalName() + "\""));
-            AIcPublicationCheckAssertions.assertTrue(locRecord.contains(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locMain)));
-            AIcPublicationCheckAssertions.assertTrue(locRecord.contains(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locSources)));
-            AIcPublicationCheckAssertions.assertTrue(!locRecord.contains("ExecutionLineage"));
+            AIcPublicationCheckAssertions.assertTrue(locBatch.physicalJobs().get(0).payload().files().stream()
+                    .noneMatch(aFile -> aFile.logicalName().contains("build-record")));
+
         } finally {
             locServer.stop(0);
         }
@@ -155,7 +148,7 @@ public final class AIcMavenBuildRecordChecks {
                 new AIcPublicationExecutionStep("publication", "publication", locRootFile.toUri(), locRootFile.toUri(), Map.of(), Map.of()),
                 new AIcPublicationExecutionStep("transform", "publication-finalization-action", locRootFile.toUri(), locParentFile.toUri(), Map.of(), Map.of())));
         AIcPublicationFinalizationAction locAction = new AIcPublicationFinalizationAction(
-                "build-record", true, "modustro-build-record", null, 0,
+                "build-record", true, "modustro-artifact-build-record", null, 0,
                 AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, false, Map.of(), List.of());
         AIcPublicationEndpoint locEndpoint = AIcPublicationPlanner.endpoint(Map.of(
                 "Id", "target", "PublicationAdapter", "local-copy", "PublicationUri", locDirectory.toUri().toString()), "target");
@@ -190,7 +183,7 @@ public final class AIcMavenBuildRecordChecks {
         AIcPublicationExecutionLineage locLineage = new AIcPublicationExecutionLineage(List.of(
                 new AIcPublicationExecutionStep("publication", "publication", locRemoteUri, locRemoteUri, Map.of(), Map.of())));
         AIcPublicationFinalizationAction locAction = new AIcPublicationFinalizationAction(
-                "build-record", true, "modustro-build-record", null, 0,
+                "build-record", true, "modustro-artifact-build-record", null, 0,
                 AIngBuildExecutionFailurePolicy_1.FAIL_BUILD_ON_FAILURE, 0, 1000L, null, false, Map.of(), List.of());
         AIcPublicationEndpoint locEndpoint = AIcPublicationPlanner.endpoint(Map.of(
                 "Id", "target", "PublicationAdapter", "local-copy", "PublicationUri", locDirectory.toUri().toString()), "target");

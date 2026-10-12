@@ -52,6 +52,8 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     private val locLogger = Logging.getLogger(AIcModustroPublicationService::class.java)
     private val locScheduledOutputs = Collections.synchronizedList(mutableListOf<AIcdScheduledOutput>())
     private val locDeferredJavaOutputs = mutableListOf<AIcdDeferredJavaOutput>()
+    private val locBuildRecordInputs = linkedMapOf<String, MutableList<AIcPublicationPayload>>()
+    private val locBuildRecordPaths = linkedMapOf<String, String>()
     private val locDeferredJavaResults = linkedMapOf<String, AIcOutputPublicationExecutionResult>()
     private val locDeferredJavaFailures = mutableListOf<Throwable>()
 
@@ -95,6 +97,15 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     @Suppress("UNCHECKED_CAST")
     fun AIcPublish(aPayload: AIcPublicationPayload, aPlan: Map<String, Any?>, aProfiles: Map<String, Any?>, aOutputId: String) {
         AIcBeginOutput(aPlan, aPayload.outputKind().name, AIcStability(aPayload.stability()), aPayload.version(), aPayload.coordinates())
+        synchronized(this) {
+            val locArtifactPath = aPlan["artifactPath"]?.toString() ?: "."
+            val locKey = listOf(aPlan["versionScopePath"]?.toString() ?: ".", locArtifactPath,
+                aPayload.artifactIdentity(), aPayload.version(), aPayload.stability().name).joinToString("|")
+            if (aPayload.outputKind() != AInPublicationOutputKind.MODUSTRO_ARTIFACT_BUILD_RECORD) {
+                locBuildRecordInputs.getOrPut(locKey) { mutableListOf() }.add(aPayload)
+                locBuildRecordPaths[locKey] = locArtifactPath
+            }
+        }
         /* Only Maven targets require a complete physical package before transport.
          * Local-copy and other independent adapters must retain their normal publication
          * and Version Scope finalization lifecycle (including configuration-cache reuse). */
@@ -439,6 +450,40 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
             catch (locFailure: java.nio.file.AtomicMoveNotSupportedException) { Files.move(locTemporary, locFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
         } finally { Files.deleteIfExists(locTemporary) }
         locLogger.lifecycle("Modustro Version Scope publication record: {}", locFile)
+        /* The publication policy belongs to the Version Scope. Never pick the first
+         * eligible artifact: conflicting effective policies must fail deterministically. */
+        val locArtifacts = aResult.artifacts().sortedBy { it.artifactPath() }
+        if (locArtifacts.isEmpty()) return
+        val locPolicyKey = "modustro.${AInPublicationOutputKind.MODUSTRO_VERSION_SCOPE_PUBLICATION_RECORD.descriptorName()}"
+        val locLane = AIcStability(aResult.stability())
+        fun AIcEffectiveScopeRecordPolicy(aPath: String): Map<String, Any?>? {
+            val locMetadata = locArtifactMetadata.firstOrNull { it["path"]?.toString() == aPath }
+                ?: throw GradleException("Missing artifact metadata for Version Scope publication record: $aPath")
+            @Suppress("UNCHECKED_CAST")
+            val locPolicies = locMetadata["outputPublications"] as? Map<String, Map<String, Any?>>
+            @Suppress("UNCHECKED_CAST")
+            return locPolicies?.get(locPolicyKey)?.get(locLane) as? Map<String, Any?>
+        }
+        val locReference = AIcEffectiveScopeRecordPolicy(locArtifacts.first().artifactPath())
+        for (locCandidate in locArtifacts.drop(1)) {
+            val locCandidatePolicy = AIcEffectiveScopeRecordPolicy(locCandidate.artifactPath())
+            if (locCandidatePolicy != locReference) {
+                throw GradleException("Conflicting effective Version Scope publication policy for " +
+                    "'${AInPublicationOutputKind.MODUSTRO_VERSION_SCOPE_PUBLICATION_RECORD.descriptorName()}' " +
+                    "in scope '${aResult.versionScopeId()}', version '${aResult.version()}': " +
+                    "'${locArtifacts.first().artifactPath()}' and '${locCandidate.artifactPath()}' differ. " +
+                    "Define a uniform policy at the Version Scope/governance level.")
+            }
+        }
+        if (locReference?.get("publicationEnabled") != true) return
+        val locArtifact = locArtifacts.first()
+        val locArtifactPath = locArtifact.artifactPath()
+        val locCoordinates = mapOf("groupId" to locArtifact.artifactIdentity().substringBefore(":", "modustro"),
+            "artifactId" to locArtifact.artifactIdentity().substringAfter(":", "version-scope"),
+            "technologyKind" to "modustro")
+        AIcPublishSystemRecord(locFile, AInPublicationOutputKind.MODUSTRO_VERSION_SCOPE_PUBLICATION_RECORD,
+            locArtifactPath, locArtifact.artifactIdentity(), aResult.version(), aResult.stability(),
+            locCoordinates, false)
     }
 
     /** All Java product outputs are staged by their Gradle tasks; this barrier publishes complete bundles. */
@@ -540,9 +585,89 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         locDeferredJavaFailures.addAll(locFailures)
     }
 
+    /** Resolves system-output destinations from the effective artifact policy, never from a native repository. */
+    @Suppress("UNCHECKED_CAST")
+    private fun AIcSystemRecordPlan(aArtifactPath: String, aOutputKind: AInPublicationOutputKind,
+                                    aStability: AInPublicationStability): Pair<Map<String, Any?>, Map<String, Any?>>? {
+        val locMetadata = locArtifactMetadata.firstOrNull { it["path"]?.toString() == aArtifactPath } ?: return null
+        val locPolicies = locMetadata["outputPublications"] as? Map<String, Map<String, Any?>> ?: return null
+        val locPolicy = locPolicies["modustro.${aOutputKind.descriptorName()}"] ?: return null
+        val locLane = AIcStability(aStability)
+        val locBranch = locPolicy[locLane] as? Map<String, Any?> ?: return null
+        if (locBranch["publicationEnabled"] != true) return null
+        val locEndpoints = (locBranch["publicationEndpoints"] as? List<Map<String, Any?>>).orEmpty()
+        val locRoot = parameters.credentialBaseDirectory.get().asFile.toPath().toAbsolutePath().normalize()
+        val locAdjusted = locEndpoints.map { locEndpoint ->
+            if (locEndpoint["publicationAdapter"] != "local-copy") {
+                throw GradleException("System record output '${aOutputKind.descriptorName()}' requires local-copy during phase 0.")
+            }
+            val locUri = locEndpoint["publicationUri"]?.toString() ?: throw GradleException("System record endpoint has no PublicationUri.")
+            val locRelative = when {
+                locUri.startsWith("file:./") -> locUri.removePrefix("file:./")
+                locUri.startsWith("file:") -> locUri.removePrefix("file:")
+                else -> throw GradleException("System record endpoint must use a relative file: PublicationUri.")
+            }
+            val locTarget = locRoot.resolve(locRelative).normalize()
+            if (!locTarget.startsWith(locRoot.resolve("build/run").normalize())) {
+                throw GradleException("System record endpoint must reside inside build/run: $locUri")
+            }
+            locEndpoint + ("publicationUri" to locTarget.toUri().toString())
+        }
+        val locArtifactActions = locMetadata["artifactPublicationFinalizationActions"] as? Map<String, Any?> ?: emptyMap()
+        val locScopeActions = locMetadata["versionScopePublicationFinalizationActions"] as? Map<String, Any?> ?: emptyMap()
+        val locPlan = mapOf<String, Any?>(
+            "artifactPath" to aArtifactPath,
+            "versionScopePath" to (locMetadata["versionScopePath"]?.toString() ?: "."),
+            "publicationEnabled" to true,
+            "publicationEndpoints" to locAdjusted,
+            "publicationEndpointRegistry" to locAdjusted,
+            "snapshotPublicationEndpoints" to if (locLane == "snapshot") locAdjusted else emptyList<Map<String, Any?>>(),
+            "artifactPublicationFinalizationActions" to (locArtifactActions[locLane] ?: emptyList<Any>()),
+            "versionScopePublicationFinalizationActions" to (locScopeActions[locLane] ?: emptyList<Any>()))
+        val locProfiles = locMetadata["credentialProfiles"] as? Map<String, Any?> ?: emptyMap()
+        return locPlan to locProfiles
+    }
+
+    /** Publishes a system record through the standard publication scheduler. */
+    @Suppress("UNCHECKED_CAST")
+    private fun AIcPublishSystemRecord(aFile: Path, aKind: AInPublicationOutputKind,
+                                      aArtifactPath: String, aArtifactIdentity: String,
+                                      aVersion: String, aStability: AInPublicationStability,
+                                      aCoordinates: Map<String, String>, aTrackInScope: Boolean) {
+        val (locPlan, locProfiles) = AIcSystemRecordPlan(aArtifactPath, aKind, aStability) ?: return
+        val locPayload = AIcPublicationPayload(aKind, aStability, aArtifactIdentity, aVersion,
+            listOf(AIcPublicationPayloadFile(aFile, aFile.fileName.toString())),
+            aCoordinates + ("technologyKind" to "modustro") + ("groupId" to aCoordinates.getOrDefault("groupId", "modustro")))
+        if (aTrackInScope) {
+            AIcPublish(locPayload, locPlan, locProfiles,
+                "record:${aKind.descriptorName()}:$aArtifactPath:$aVersion")
+        } else {
+            val locJobs = AIcPublicationPlanner().plan(locPayload, locPlan as Map<String, Object>,
+                AIcContext() as Map<String, Object>, parameters.credentialBaseDirectory.get().asFile.toPath().resolve("build/run/publication-records"))
+            val locHandle = AIcScheduler().schedule(locPayload, locJobs, emptyList(),
+                AIcPublicationPlanner.snapshotPublicationEndpoints(locPlan as Map<String, Object>),
+                { locEndpoint -> AIcCredentials(locEndpoint, locProfiles) }, AIcProgressReporterFactory())
+            val locResult = locHandle.outputExecutionResult().toCompletableFuture().get()
+            locHandle.requiredCompletion().toCompletableFuture().get()
+            if (!locResult.success()) throw GradleException("System publication record could not be published: $aFile")
+        }
+    }
+
     /** Drains all output graphs, then executes artifact and Version-Scope publication finalization barriers. */
     @Synchronized fun AIcAwait() {
         AIcPublishDeferredJavaBundles()
+        val locRecordRoot = parameters.credentialBaseDirectory.get().asFile.toPath()
+            .resolve("build/run/publication-records")
+        for ((locKey, locOutputs) in locBuildRecordInputs.toMap()) {
+            val locArtifactPath = locBuildRecordPaths.getValue(locKey)
+            val locFile = AIcArtifactLocalBuildRecord.write(locRecordRoot, locArtifactPath, locOutputs)
+            val locFirst = locOutputs.first()
+            AIcPublishSystemRecord(locFile, AInPublicationOutputKind.MODUSTRO_ARTIFACT_BUILD_RECORD,
+                locArtifactPath, locFirst.artifactIdentity(), locFirst.version(), locFirst.stability(),
+                locFirst.coordinates(), true)
+        }
+        locBuildRecordInputs.clear()
+        locBuildRecordPaths.clear()
         val locRepositoryOutputs = locScheduledOutputs.filter { it.pendingResult.outputKind() == AInPublicationOutputKind.MODUSTRO_DOCS_SITE ||
             it.pendingResult.outputKind() == AInPublicationOutputKind.SCHEMA_SITE }
         locRepositoryOutputs.forEach { it.handle?.outputExecutionResult()?.toCompletableFuture()?.get() }

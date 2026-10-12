@@ -18,16 +18,16 @@ OutputPublications:
         Extension: jar
         PublicationFinalizationActions:
         - Id: build-record
-          PublicationFinalizationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-artifact-build-record
           FinalizationActions:
           - Id: record-of-record
-            FinalizationActionAdapter: modustro-build-record
+            FinalizationActionAdapter: modustro-artifact-build-record
       - Id: custom
         Classifier: tests.custom
         Extension: jar
         PublicationFinalizationActions:
         - Id: build-record
-          PublicationFinalizationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-artifact-build-record
   TechnologyKind: java
 - OutputSelector: native_outputs
   Snapshot:
@@ -47,16 +47,16 @@ OutputPublications:
         Extension: jar
         PublicationFinalizationActions:
         - Id: build-record
-          PublicationFinalizationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-artifact-build-record
           FinalizationActions:
           - Id: record-of-record
-            FinalizationActionAdapter: modustro-build-record
+            FinalizationActionAdapter: modustro-artifact-build-record
       - Id: custom
         Classifier: tests.custom
         Extension: jar
         PublicationFinalizationActions:
         - Id: build-record
-          PublicationFinalizationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-artifact-build-record
   TechnologyKind: python
 - OutputSelector: native_outputs
   Snapshot:
@@ -76,16 +76,16 @@ OutputPublications:
         Extension: jar
         PublicationFinalizationActions:
         - Id: build-record
-          PublicationFinalizationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-artifact-build-record
           FinalizationActions:
           - Id: record-of-record
-            FinalizationActionAdapter: modustro-build-record
+            FinalizationActionAdapter: modustro-artifact-build-record
       - Id: custom
         Classifier: tests.custom
         Extension: jar
         PublicationFinalizationActions:
         - Id: build-record
-          PublicationFinalizationActionAdapter: modustro-build-record
+          PublicationFinalizationActionAdapter: modustro-artifact-build-record
   TechnologyKind: mps
 - OutputSelector: native_sources
   Snapshot:

@@ -167,8 +167,8 @@ public final class AIcPublicationGraphChecks {
                 Map.of("RepositoryId", "pub.test"),
                 locDirectory);
         AIcCheck(locPlan.size() == 1, "One root Publication must remain one scheduler root.");
-        AIcCheck(locPlan.get(0).publicationFinalizationActions().stream().anyMatch(aAction -> "build-record".equals(aAction.id())),
-                "A root Publication must receive one implicit build-record action.");
+        AIcCheck(locPlan.get(0).publicationFinalizationActions().isEmpty(),
+                "Build records must not be publication finalization actions.");
         try (AIcPublicationScheduler locScheduler = new AIcPublicationScheduler(new eu.algites.pltf.modustro.builder.catalog.AIcAdapterCatalog(
                 List.of(), List.of(new AIcLocalCopyPublicationAdapter()),
                 List.of(new AIcBuildRecordPublicationFinalizationActionAdapter()), List.of(), List.of(), List.of()))) {
@@ -177,9 +177,9 @@ public final class AIcPublicationGraphChecks {
             locHandle.requiredCompletion().toCompletableFuture().get(10, TimeUnit.SECONDS);
         }
         Path locPublishedJar = locPublishedDirectory.resolve("library-1.0.jar");
-        Path locRecord = locPublishedDirectory.resolve("library-1.0.jar.modustro-build-record.yml");
         AIcCheck(Files.isRegularFile(locPublishedJar), "Root publication must write its payload.");
-        AIcCheck(Files.isRegularFile(locRecord), "Implicit build-record must use the exact published filename suffix.");
+        AIcCheck(!Files.exists(locPublishedDirectory.resolve("library-1.0.jar.modustro-build-record.yml")),
+                "Publication must not upload an implicit build record.");
         AIcCheck(locBefore.equals(AIcBuildRecordPublicationFinalizationActionAdapter.hash(locJar)),
                 "Build-record generation must not modify the root artifact.");
 
@@ -193,7 +193,7 @@ public final class AIcPublicationGraphChecks {
                 Map.of(), locDirectory);
         AIcCheck(locNoRecordPlan.get(0).publicationFinalizationActions().size() == 1
                         && !locNoRecordPlan.get(0).publicationFinalizationActions().get(0).executionEnabled(),
-                "An explicit disabled build-record action must suppress the implicit action.");
+                "An explicit disabled build-record action must remain disabled.");
     }
 
     private static void AIcCheckActionLineageAndOrdering() throws Exception {

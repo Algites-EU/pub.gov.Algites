@@ -471,6 +471,8 @@
             "native_develop_binaries",
             "native_develop_documentation",
             "modustro_docs_site",
+            "modustro_artifact_build_record",
+            "modustro_version_scope_publication_record",
             "schema_site",
             "native_outputs",
             "native_product_outputs",

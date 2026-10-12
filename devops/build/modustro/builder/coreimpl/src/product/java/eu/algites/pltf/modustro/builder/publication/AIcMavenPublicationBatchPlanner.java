@@ -4,7 +4,6 @@ import eu.algites.pltf.modustro.builder.model.publication.*;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.security.MessageDigest;
 import java.util.*;
 
 /** Combines logical Maven outputs into one physical publication per repository and Maven GAV. */
@@ -43,6 +42,14 @@ public final class AIcMavenPublicationBatchPlanner {
                     }
                 }
             }
+            /* Reject legacy and new artifact BuildRecord filenames before any Maven upload. */
+            if (locFiles.keySet().stream().anyMatch(aName ->
+                    aName.endsWith("-build-record.yml") ||
+                    aName.endsWith(".modustro-build-record.yml") ||
+                    aName.endsWith("modustro-build-record.yml") ||
+                    aName.endsWith("modustro-artifact-build-record.yml"))) {
+                throw new IllegalArgumentException("Artifact BuildRecord must not be published as a Maven package.");
+            }
             String locArtifactId = locFirst.payload().coordinates().get("artifactId");
             String locVersion = locFirst.payload().version();
             String locPrefix = locArtifactId + "-" + locVersion;
@@ -51,26 +58,6 @@ public final class AIcMavenPublicationBatchPlanner {
                 throw new IllegalArgumentException("Maven bundle " + locArtifactId + ":" + locVersion +
                         " must include the main JAR, POM and Gradle module metadata before uploading any file; found " + locFiles.keySet());
             }
-            String locBuildRecordName = locPrefix + "-build-record.modustro-build-record.yml";
-            if (locFiles.containsKey(locBuildRecordName)) throw new IllegalArgumentException("Build record filename collision.");
-            LinkedHashMap<String, Object> locRecord = new LinkedHashMap<>();
-            locRecord.put("BuildRecordVersion", 1);
-            locRecord.put("Artifact", Map.of("GroupId", locFirst.payload().coordinates().get("groupId"),
-                    "ArtifactCoordinateId", locArtifactId,
-                    "Version", locFirst.payload().coordinates().getOrDefault("version", locVersion)));
-            List<Map<String, Object>> locDescriptions = new ArrayList<>();
-            for (AIcPublicationPayloadFile locFile : locFiles.values()) {
-                byte[] locBytes = Files.readAllBytes(locFile.path());
-                locDescriptions.add(Map.of("Filename", locFile.logicalName(), "Size", locBytes.length,
-                        "Sha256", HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(locBytes))));
-            }
-            locRecord.put("Output", Map.of("TechnologyKind", "java", "OutputType",
-                    locFirst.payload().outputKind().descriptorName(), "OutputTypes",
-                    locGroup.stream().map(aJob -> aJob.payload().outputKind().descriptorName()).distinct().toList(),
-                    "Files", locDescriptions));
-            Path locRecordFile = Files.createTempFile("modustro-maven-bundle-record-", ".yml");
-            Files.writeString(locRecordFile, AIcBuildRecordPublicationFinalizationActionAdapter.json(locRecord) + "\n");
-            locFiles.put(locBuildRecordName, new AIcPublicationPayloadFile(locRecordFile, locBuildRecordName));
             String locPhysicalId = "maven-bundle:" + locFirst.id();
             AIcPublicationPayload locPhysicalPayload = new AIcPublicationPayload(locFirst.payload().outputKind(),
                     locFirst.payload().stability(), locFirst.payload().artifactIdentity(), locVersion,

@@ -47,13 +47,33 @@ public class AItcMavenPublicationBatchPlannerTest {
         Assert.assertEquals(locBatch.physicalJobs().size(), 1);
         Assert.assertEquals(locBatch.physicalIdByLogicalId().get("bin"), locBatch.physicalIdByLogicalId().get("sources"));
         List<AIcPublicationPayloadFile> locFiles = locBatch.physicalJobs().get(0).payload().files();
-        Assert.assertEquals(locFiles.size(), 5);
-        AIcPublicationPayloadFile locBuildRecord = locFiles.stream()
-                .filter(aFile -> aFile.logicalName().endsWith(".modustro-build-record.yml"))
-                .findFirst().orElseThrow();
-        String locText = Files.readString(locBuildRecord.path());
+        Assert.assertEquals(locFiles.size(), 4);
+        Assert.assertTrue(locFiles.stream().noneMatch(aFile -> aFile.logicalName().contains("build-record")));
+
+    }
+
+    @Test
+    public void testLocalBuildRecordContainsAllOutputsWithoutEnteringMavenPayload() throws Exception {
+        Path locRoot = Files.createTempDirectory("artifact-local-record-");
+        String locVersion = "artifact-1.0-20261010.123456-1";
+        AIcPublicationJob locBinary = AIcJob("binary", AIcEndpoint("binary", "https://example.org/maven", 0),
+                AInPublicationOutputKind.NATIVE_PRODUCT_BINARIES, locRoot,
+                locVersion + ".jar", locVersion + ".pom", locVersion + ".module");
+        AIcPublicationJob locSources = AIcJob("sources", AIcEndpoint("sources", "https://example.org/maven", 0),
+                AInPublicationOutputKind.NATIVE_PRODUCT_SOURCES, locRoot, locVersion + "-sources.jar");
+        Path locRecord = AIcArtifactLocalBuildRecord.write(locRoot, "devops/build/example",
+                List.of(locBinary.payload(), locSources.payload()));
+        String locText = Files.readString(locRecord);
+        Assert.assertTrue(locText.contains("native_product_binaries"));
+        Assert.assertTrue(locText.contains("native_product_sources"));
+        Assert.assertTrue(locText.contains(locVersion + ".jar"));
+        Assert.assertTrue(locText.contains(locVersion + "-sources.jar"));
         Assert.assertFalse(locText.contains("ExecutionLineage"));
-        Assert.assertTrue(locText.contains("Sha256"));
+        Assert.assertTrue(locRecord.toString().contains("build-records"));
+        Assert.assertEquals(locRecord.getFileName().toString(), "modustro-artifact-build-record.yml");
+        AIcMavenPublicationBatchPlanner.AIcdBatch locBatch = new AIcMavenPublicationBatchPlanner().plan(List.of(locBinary, locSources));
+        Assert.assertTrue(locBatch.physicalJobs().get(0).payload().files().stream()
+                .noneMatch(aFile -> aFile.logicalName().endsWith(".yml")));
     }
 
     @Test(expectedExceptions = IllegalArgumentException.class, expectedExceptionsMessageRegExp = ".*ExecutionOrder.*")

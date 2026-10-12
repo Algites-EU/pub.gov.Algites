@@ -16,7 +16,7 @@ import java.util.Set;
 
 /** Creates and publishes the standard Modustro build-record sidecar for its immediate parent content. */
 public final class AIcBuildRecordPublicationFinalizationActionAdapter implements AIiPublicationFinalizationActionAdapter {
-    public static final String ADAPTER_ID = "modustro-build-record";
+    public static final String ADAPTER_ID = "modustro-artifact-build-record";
 
     @Override
     public String adapterId() { return ADAPTER_ID; }
