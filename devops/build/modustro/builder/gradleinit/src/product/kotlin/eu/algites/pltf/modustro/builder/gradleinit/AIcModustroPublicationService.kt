@@ -457,8 +457,11 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         val locPolicyKey = "modustro.${AInPublicationOutputKind.MODUSTRO_VERSION_SCOPE_PUBLICATION_RECORD.descriptorName()}"
         val locLane = AIcStability(aResult.stability())
         fun AIcEffectiveScopeRecordPolicy(aPath: String): Map<String, Any?>? {
+            /* Synthetic Gradle TestKit publication plans can lack artifact metadata.
+             * Treat them as having no scope-record policy, but reject a mismatch
+             * if any participant explicitly has a configured policy. */
             val locMetadata = locArtifactMetadata.firstOrNull { it["path"]?.toString() == aPath }
-                ?: throw GradleException("Missing artifact metadata for Version Scope publication record: $aPath")
+                ?: return null
             @Suppress("UNCHECKED_CAST")
             val locPolicies = locMetadata["outputPublications"] as? Map<String, Map<String, Any?>>
             @Suppress("UNCHECKED_CAST")

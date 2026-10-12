@@ -309,15 +309,18 @@ public final class AItcModustroGradleInitTest {
                 .withArguments("publishFixture", "--configuration-cache", "--offline", "--stacktrace");
         Assert.assertTrue(locRunner.build().getOutput().contains("Configuration cache entry stored"));
         Assert.assertEquals(Files.readString(locFixture.resolve("published/nested/payload.txt")), "first payload");
-        /* A Java binary publication has a primary archive. The build record must
-         * describe its JAR, not an unrelated auxiliary text payload. */
-        Path locBuildRecord = locFixture.resolve("published/fixture.jar.modustro-build-record.yml");
+        /* Artifact build records are stored independently of the Maven payload.
+         * They must never become a standalone repository package or sidecar. */
+        Path locBuildRecord = locFixture.resolve("build/run/publication-records/build-records/"
+                + "eu/algites/test/fixture/1.0-SNAPSHOT/modustro-artifact-build-record.yml");
         Assert.assertTrue(Files.isRegularFile(locBuildRecord),
-                "The build record must be attached to the Java binary archive.");
+                "The artifact build record must be generated in the local record store.");
         String locRecord = Files.readString(locBuildRecord);
         Assert.assertTrue(locRecord.contains("fixture.jar"), locRecord);
+        Assert.assertFalse(Files.exists(locFixture.resolve("published/fixture.jar.modustro-build-record.yml")),
+                "Build records must not be injected into the published Java package.");
         Assert.assertFalse(Files.exists(locFixture.resolve("published/nested/payload.txt.modustro-build-record.yml")),
-                "The auxiliary file is not the primary archive for the Java publication.");
+                "Auxiliary payloads must not produce per-file build records.");
         Files.writeString(locFixture.resolve("payload.txt"), "second payload");
         String locSecondOutput = locRunner.build().getOutput();
         Assert.assertTrue(locSecondOutput.contains("Configuration cache entry reused"), locSecondOutput);
