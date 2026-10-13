@@ -161,7 +161,51 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         try {
             locHandle.requiredCompletion().toCompletableFuture().get()
         } catch (locFailure: Exception) {
+            AIcReportPublicationFailure(aOutputId, aPayload, aPlan, aProfiles)
             throw GradleException("Required publishing failed for '${aPayload.artifactIdentity()}' ${aPayload.outputKind()}.", locFailure)
+        }
+    }
+
+    /** Logs the effective and preflight publication inputs without exposing credential values. */
+    private fun AIcReportPublicationFailure(
+        aOutputId: String,
+        aPayload: AIcPublicationPayload,
+        aPlan: Map<String, Any?>,
+        aProfiles: Map<String, Any?>
+    ) {
+        try {
+            val (locExpected, locSiblings) = synchronized(this) {
+                val locExpected = locExpectedOutputs[aOutputId]
+                val locSiblings = locExpectedOutputs.values
+                    .filter { locItem ->
+                        locItem.pendingResult.artifactIdentity() == aPayload.artifactIdentity() &&
+                            locItem.pendingResult.technologyKind() == aPayload.coordinates()["technologyKind"]
+                    }
+                    .map { locItem ->
+                        "${locItem.outputId}: outputKind=${locItem.pendingResult.outputKind()}, " +
+                            "endpoints=${AIcModustroPublicationCredentialDiagnostics.AIcEndpoints(locItem.plan)}, " +
+                            "availableProfileIds=${AIcModustroPublicationCredentialDiagnostics.AIcProfileIds(locItem.profiles)}"
+                    }
+                locExpected to locSiblings
+            }
+            val locDiagnostic = AIcModustroPublicationCredentialDiagnostics.AIcDescribe(
+                aOutputId, aPayload.artifactIdentity(), aPayload.coordinates()["technologyKind"] ?: "unknown",
+                aPayload.outputKind().name, aPlan, aProfiles,
+                locExpected?.plan, locExpected?.profiles, locSiblings
+            )
+            locLogger.error(locDiagnostic)
+            val locDirectory = parameters.credentialBaseDirectory.get().asFile.toPath()
+                .resolve("build/run/publication-records/diagnostics")
+            java.nio.file.Files.createDirectories(locDirectory)
+            val locHash = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(aOutputId.toByteArray(Charsets.UTF_8))
+            val locName = java.util.HexFormat.of().formatHex(locHash).take(24)
+            val locReport = locDirectory.resolve("publication-failure-$locName.txt")
+            java.nio.file.Files.writeString(locReport, locDiagnostic)
+            locLogger.error("Modustro publication failure diagnostic saved to: $locReport")
+        } catch (locDiagnosticFailure: Exception) {
+            /* Diagnostics must never replace the original publication failure. */
+            locLogger.warn("Could not collect safe publication diagnostic for '$aOutputId'.", locDiagnosticFailure)
         }
     }
 
@@ -360,7 +404,10 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         aBaseDirectory: java.io.File = parameters.credentialBaseDirectory.get().asFile): Map<String, String> {
         val locId = aEndpoint.publicationCredentialProfile() ?: return emptyMap()
         val locProfile = aProfiles[locId] as? Map<*, *>
-            ?: throw GradleException("Publication endpoint '${aEndpoint.id()}' references undefined credential profile '$locId'.")
+            ?: throw GradleException(
+                "Publication endpoint '${aEndpoint.id()}' references undefined credential profile '$locId'. " +
+                    "Available credential profile IDs: ${AIcModustroPublicationCredentialDiagnostics.AIcProfileIds(aProfiles)}."
+            )
         val locType = locProfile["type"]?.toString()?.trim()?.lowercase().orEmpty()
         fun AIcValue(aField: String): String = locCredentialValues.locAlgitesResolveCredentialValue(
             locId, locType, aField, aBaseDirectory
