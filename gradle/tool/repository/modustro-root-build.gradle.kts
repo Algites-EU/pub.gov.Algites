@@ -3374,6 +3374,182 @@ subprojects {
             outputs.dir(locPythonDistDirectory)
         }
 
+        /*
+         * Python native verification runs from an isolated interpreter populated with
+         * wheels from local Modustro dependency edges and published external dependencies.
+         * The Python interpreter receives explicit artifact-local inputs: it must never
+         * discover another artifact by traversing upwards through a source repository.
+         * Keep this runner inside the root-build contract: the script can be applied via
+         * a pinned remote Gradle build script without requiring an adjacent helper file.
+         */
+        val locPythonVerificationRunner = """
+            import json
+            import os
+            from pathlib import Path
+            import re
+            import shutil
+            import subprocess
+            import sys
+            import tempfile
+            import tomllib
+            import venv
+
+            def normalized_name(value):
+                return re.sub(r'[-_.]+', '-', value).lower()
+
+            def run(command, environment=None):
+                subprocess.run(command, check=True, env=environment)
+
+            mode, environment_directory, metadata_json, wheel_directories_json, endpoints_json, requirements_json, tests_directory, artifact_directory = sys.argv[1:9]
+            environment_directory = Path(environment_directory).resolve()
+            metadata_paths = [Path(item) for item in json.loads(metadata_json)]
+            wheel_directories = [Path(item) for item in json.loads(wheel_directories_json)]
+            endpoints = json.loads(endpoints_json)
+            extra_requirements = json.loads(requirements_json)
+            if mode == 'prepare':
+                metadata = [tomllib.loads(path.read_text(encoding='utf-8'))['project'] for path in metadata_paths]
+                local_names = {normalized_name(project['name']) for project in metadata}
+                requirements = []
+                for item in [*extra_requirements, *[dep for project in metadata for dep in project.get('dependencies', [])]]:
+                    match = re.match(r'[A-Za-z0-9_.-]+', item)
+                    if match is None:
+                        raise ValueError('Invalid Python test requirement: ' + item)
+                    if normalized_name(match.group()) not in local_names and item not in requirements:
+                        requirements.append(item)
+                wheels = []
+                for directory in wheel_directories:
+                    matches = sorted(directory.glob('*.whl'))
+                    if len(matches) != 1:
+                        raise RuntimeError('Exactly one current wheel is required in ' + str(directory) + '; found ' + str(len(matches)))
+                    wheels.extend(matches)
+                indexes = []
+                for endpoint in endpoints:
+                    identity, uri, credential, profile_type = endpoint.split('\t')
+                    if credential:
+                        raise RuntimeError('Python test index ' + identity + ' requires credentials; unsupported by this test-environment adapter')
+                    if uri and uri not in indexes:
+                        indexes.append(uri)
+                environment_directory.parent.mkdir(parents=True, exist_ok=True)
+                if environment_directory.exists():
+                    shutil.rmtree(environment_directory)
+                venv.create(environment_directory, with_pip=True)
+                executable = environment_directory / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+                pip = [str(executable), '-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--pre']
+                if indexes:
+                    pip += ['--index-url', indexes[0]]
+                    for index in indexes[1:]:
+                        pip += ['--extra-index-url', index]
+                if requirements:
+                    run(pip + requirements)
+                if wheels:
+                    run([str(executable), '-m', 'pip', 'install', '--disable-pip-version-check', '--no-input', '--no-deps', *map(str, wheels)])
+                (environment_directory / 'modustro-verified.txt').write_text('ready\\n', encoding='utf-8')
+            elif mode == 'test':
+                executable = environment_directory / ('Scripts/python.exe' if os.name == 'nt' else 'bin/python')
+                if not executable.is_file():
+                    raise RuntimeError('Missing Python test environment: ' + str(executable))
+                tests = Path(tests_directory)
+                environment = dict(os.environ)
+                environment.pop('PYTHONPATH', None)
+                environment['PYTHONDONTWRITEBYTECODE'] = '1'
+                environment['PYTHONPYCACHEPREFIX'] = str(environment_directory.parent / 'test-pycache')
+                report = environment_directory.parent / 'python-test-results.xml'
+                run([str(executable), '-m', 'pytest', '-q', '--junitxml', str(report), str(tests)], environment)
+            else:
+                raise ValueError('Invalid Modustro Python verification mode: ' + mode)
+        """.trimIndent()
+
+        val locVerificationProjects = linkedMapOf<String, Project>()
+        fun locCollectVerificationProjects(aCandidate: Project, aMetadata: Map<String, Any?>) {
+            if (locVerificationProjects.putIfAbsent(aCandidate.path, aCandidate) != null) return
+            AIcModustroDependencyDefinitions(aMetadata, "dependencies")
+                .filter { locDependency ->
+                    locDependency["dependencyKind"]?.toString() in setOf("modustro", "python") &&
+                        AIcModustroDependencyUsages(locDependency).any(::AIcModustroPythonParticipatesInResolution)
+                }
+                .forEach { locDependency ->
+                    val locLocal = AIcAlgitesLocalDependencyTarget(locDependency, aCandidate.path)
+                    if (locLocal != null) {
+                        val (locTargetProject, locTargetMetadata) = locLocal
+                        if ("python" !in AIcModustroStringList(locTargetMetadata["technologyKinds"])) {
+                            throw GradleException("Python test dependency '${locTargetProject.path}' has no Python TechnologyKind.")
+                        }
+                        locCollectVerificationProjects(locTargetProject, locTargetMetadata)
+                    }
+                }
+        }
+        val locEnableNativePythonTests = (modustroGradleOrEnvironmentValue("MODUSTRO_ENABLE_NATIVE_PYTHON_TESTS")
+            ?: "false").equals("true", ignoreCase = true)
+        if ("python" in locEffectiveTechnologyKinds && locEnableNativePythonTests) {
+            locCollectVerificationProjects(project, locAlgitesArtifactDirectory ?: emptyMap())
+        }
+        val locVerificationMetadataPaths = locVerificationProjects.values.map { locTarget ->
+            locTarget.layout.projectDirectory.file("pyproject.toml").asFile.absolutePath
+        }
+        val locVerificationDistPaths = locVerificationProjects.values.map { locTarget ->
+            rootProject.layout.projectDirectory.dir(
+                AIcModustroRunDirectoryRelativePath(locTarget.projectDir) + "/bld/python/dist"
+            ).asFile.absolutePath
+        }
+        val locVerificationExternalRequirements = locPythonDependencyDefinitions.mapIndexedNotNull { locIndex, locDefinition ->
+            if (!AIcModustroDependencyUsages(locDefinition).any(::AIcModustroPythonParticipatesInResolution) ||
+                AIcAlgitesLocalDependencyTarget(locDefinition, project.path) != null) null
+            else {
+                AIcAlgitesPythonDependencyPackageName(locDefinition, project.path) +
+                    AIcAlgitesPythonVersionRequirements(locDefinition,
+                        "Project '${project.path}' Python test Dependencies[$locIndex]")[AInPythonBuildPhase.STRICT_MAXIMUMS].orEmpty()
+            }
+        }.plus("pytest>=8,<10").distinct()
+        val locVerificationDirectory = locAlgitesProjectRunDirectory.dir("bld/python/verification")
+        val locVerificationEnvironment = locVerificationDirectory.dir("venv")
+        val locVerificationSource = layout.projectDirectory.dir("src/develop/python")
+        val locHasPythonTests = locVerificationSource.asFile.walkTopDown()
+            .any { locPath -> locPath.isFile && locPath.name.startsWith("test_") && locPath.extension == "py" }
+        if ("python" in locEffectiveTechnologyKinds && locHasPythonTests && locEnableNativePythonTests) {
+            val locPreparePythonTests = tasks.register<Exec>("prepareModustroPythonTestEnvironment") {
+                group = "verification"
+                description = "Provisions isolated Python test environment from native wheels and subscribed dependencies."
+                dependsOn(rootProject.tasks.named("modustroDependencyPreflight"))
+                locVerificationProjects.values.forEach { locTarget ->
+                    dependsOn("${locTarget.path}:generatePythonProjectMetadata", "${locTarget.path}:buildPython")
+                }
+                inputs.property("verificationRunner", locPythonVerificationRunner)
+                inputs.property("requirements", locVerificationExternalRequirements)
+                inputs.property("endpoints", locPythonDownloadEndpointDefinitions)
+                inputs.files(locVerificationMetadataPaths)
+                inputs.files(locVerificationDistPaths.map { fileTree(it) { include("*.whl") } })
+                outputs.dir(locVerificationEnvironment)
+                commandLine(modustroGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3", "-c",
+                    locPythonVerificationRunner, "prepare", locVerificationEnvironment.asFile.absolutePath,
+                    JsonOutput.toJson(locVerificationMetadataPaths), JsonOutput.toJson(locVerificationDistPaths),
+                    JsonOutput.toJson(locPythonDownloadEndpointDefinitions), JsonOutput.toJson(locVerificationExternalRequirements),
+                    locVerificationSource.asFile.absolutePath, project.projectDir.absolutePath)
+            }
+            tasks.withType<Test>().configureEach {
+                dependsOn(locPreparePythonTests)
+                environment("MODUSTRO_PYTHON_TEST_EXECUTABLE", locVerificationEnvironment.asFile.resolve(
+                    if (System.getProperty("os.name").lowercase().contains("win")) "Scripts/python.exe" else "bin/python"
+                ).absolutePath)
+                environment("MODUSTRO_PYTHON_TEST_ENVIRONMENT", locVerificationEnvironment.asFile.absolutePath)
+                environment("MODUSTRO_ARTIFACT_DIRECTORY", project.projectDir.absolutePath)
+            }
+            val locRunPythonTests = tasks.register<Exec>("testModustroPython") {
+                group = "verification"
+                description = "Runs native Python tests against installed artifact and dependency wheels."
+                dependsOn(locPreparePythonTests)
+                inputs.dir(locVerificationSource)
+                outputs.upToDateWhen { false }
+                workingDir(project.projectDir)
+                commandLine(modustroGradleOrEnvironmentValue("ALGITES_PYTHON_EXECUTABLE") ?: "python3", "-c",
+                    locPythonVerificationRunner, "test", locVerificationEnvironment.asFile.absolutePath,
+                    JsonOutput.toJson(locVerificationMetadataPaths), JsonOutput.toJson(locVerificationDistPaths),
+                    JsonOutput.toJson(locPythonDownloadEndpointDefinitions), JsonOutput.toJson(locVerificationExternalRequirements),
+                    locVerificationSource.asFile.absolutePath, project.projectDir.absolutePath)
+            }
+            pluginManager.apply("base")
+            tasks.named("check").configure { dependsOn(locRunPythonTests) }
+        }
+
         listOf(
             Triple(AInBuildOutputProductionKind.PYTHON_WHEEL, "publishModustroPythonNativeBinary", "*.whl"),
             Triple(AInBuildOutputProductionKind.PYTHON_SDIST, "publishModustroPythonNativeSources", "*.tar.gz")

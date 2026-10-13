@@ -44,3 +44,22 @@ normalization and Python package-build input tracking. See
 Maven build-record metadata is computed from the locally materialized published
 content, never by an anonymous download of the published JAR or sources JAR.
 See `devops/build/modustro/PUBLICATIONS.md` for the contract and bootstrap steps.
+
+### Native Python verification — Phase 0 preview
+
+The general repository Gradle convention can provision artifact-local Python
+verification through `prepareModustroPythonTestEnvironment` and
+`testModustroPython`. It installs the current artifact's built wheel and locally
+resolved Modustro dependency wheels into an isolated venv, then installs external
+Python requirements through the configured **public** Python repository subscriptions.
+It runs `src/develop/python/test_*.py` with pytest during `check`. Java TestNG
+integration tests can consume `MODUSTRO_PYTHON_TEST_EXECUTABLE` and
+`MODUSTRO_ARTIFACT_DIRECTORY` without inspecting sibling source directories.
+
+**Phase-0 rollout switch:** `-PMODUSTRO_ENABLE_NATIVE_PYTHON_TESTS=true`
+(default false until smoke/integration builds pass). A Python subscription with
+credential profiles is currently **not supported** by this preview runner and
+fails explicitly; extending the credential-safe index bridge is a separate
+remaining integration task. The ordinary Builder lifecycle is unchanged until
+opt-in is enabled. Do not remove existing parity scripts from consumer
+repositories until this verification path has passed a clean deployment.
