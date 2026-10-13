@@ -1,7 +1,6 @@
 package eu.algites.pltf.modustro.builder.gradleinit
 
 import java.io.File
-import groovy.json.JsonSlurper
 import org.gradle.api.initialization.Settings
 import org.gradle.api.plugins.ExtraPropertiesExtension
 
@@ -23,7 +22,7 @@ class AIcModustroGradleRuntime(aSettings: Settings) {
             parameters.repositoryVisibility.set(aVisibility ?: "")
         }.get()
         @Suppress("UNCHECKED_CAST")
-        return JsonSlurper().parseText(locJson) as Map<String, Any?>
+        return AIcMaterializedJson.AIcObject(locJson)
     }
     val resolveText = fun(aRoot: File, aPath: String?, aKind: String?, aName: String?, aVisibility: String?, aOutput: String?): String =
         AIcFormatOutput(AIcResolveModustroArtifactDirectoryMetadata(aRoot, aPath, aKind, aName, aVisibility), aOutput?.takeIf { it.isNotBlank() } ?: "yaml")

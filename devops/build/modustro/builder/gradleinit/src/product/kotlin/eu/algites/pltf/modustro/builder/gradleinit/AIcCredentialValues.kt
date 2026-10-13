@@ -1,6 +1,5 @@
 package eu.algites.pltf.modustro.builder.gradleinit
 
-import groovy.json.JsonSlurper
 import java.io.File
 import org.gradle.api.GradleException
 import org.gradle.api.provider.ProviderFactory
@@ -16,7 +15,7 @@ internal class AIcCredentialValues(private val providers: ProviderFactory) {
     fun AIcModustroParseCredentialJsonObject(aName: String, aRaw: String?): Map<String, Any?> {
         if (aRaw.isNullOrBlank()) return emptyMap()
         val locParsed = try {
-            JsonSlurper().parseText(aRaw)
+            AIcMaterializedJson.AIcParse(aRaw)
         } catch (aException: Exception) {
             throw GradleException("$aName does not contain valid JSON.", aException)
         }

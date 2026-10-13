@@ -3,7 +3,6 @@ package eu.algites.pltf.modustro.builder.gradleinit
 import eu.algites.pltf.modustro.builder.catalog.AIcBuiltinAdapterCatalog
 import eu.algites.pltf.modustro.builder.model.publication.*
 import eu.algites.pltf.modustro.builder.publication.*
-import groovy.json.JsonSlurper
 import groovy.json.JsonOutput
 import java.nio.file.Files
 import java.nio.file.Path
@@ -96,6 +95,16 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     /** Uses Core publication scheduling for one output and retains its complete execution tree for higher barriers. */
     @Suppress("UNCHECKED_CAST")
     fun AIcPublish(aPayload: AIcPublicationPayload, aPlan: Map<String, Any?>, aProfiles: Map<String, Any?>, aOutputId: String) {
+        /* Detach nested maps/lists before the scheduler can access them concurrently. */
+        @Suppress("UNCHECKED_CAST")
+        val locStablePlan = AIcMaterializedJson.AIcCopy(aPlan) as Map<String, Any?>
+        @Suppress("UNCHECKED_CAST")
+        val locStableProfiles = AIcMaterializedJson.AIcCopy(aProfiles) as Map<String, Any?>
+        AIcPublishStable(aPayload, locStablePlan, locStableProfiles, aOutputId)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun AIcPublishStable(aPayload: AIcPublicationPayload, aPlan: Map<String, Any?>, aProfiles: Map<String, Any?>, aOutputId: String) {
         AIcBeginOutput(aPlan, aPayload.outputKind().name, AIcStability(aPayload.stability()), aPayload.version(), aPayload.coordinates())
         synchronized(this) {
             val locArtifactPath = aPlan["artifactPath"]?.toString() ?: "."
@@ -229,19 +238,19 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
     @Synchronized fun AIcPrepare(aInputs: Map<String, String>, aCrossDomainScopes: Map<String, String>, aArtifactMetadata: Map<String, String>,
         aDomainMetadataJson: String, aDomainId: String, aRepositoryDirectory: String) {
         @Suppress("UNCHECKED_CAST")
-        val locParsedDomains = JsonSlurper().parseText(aDomainMetadataJson) as Map<String, Map<String, Any?>>
+        val locParsedDomains = AIcMaterializedJson.AIcParse(aDomainMetadataJson) as Map<String, Map<String, Any?>>
         locDomainMetadata = locParsedDomains
         locDomainId = aDomainId
         locRepositoryDirectory = Path.of(aRepositoryDirectory).toAbsolutePath().normalize()
         locPlanFingerprint = AIcPublicationDomainStore.fingerprint(JsonOutput.toJson(AIcCanonicalData(locDomainMetadata)))
         locCrossDomainVersionScopes.putAll(aCrossDomainScopes)
         @Suppress("UNCHECKED_CAST")
-        aArtifactMetadata.values.forEach { locArtifactMetadata.add(JsonSlurper().parseText(it) as Map<String, Any?>) }
+        aArtifactMetadata.values.forEach { locArtifactMetadata.add(AIcMaterializedJson.AIcParse(it) as Map<String, Any?>) }
         aInputs.forEach { (locId, locJson) ->
             @Suppress("UNCHECKED_CAST")
-            val locInput = JsonSlurper().parseText(locJson) as Map<String, Any?>
+            val locInput = AIcMaterializedJson.AIcParse(locJson) as Map<String, Any?>
             @Suppress("UNCHECKED_CAST")
-            val locPlan = JsonSlurper().parseText(locInput["plan"].toString()) as Map<String, Any?>
+            val locPlan = AIcMaterializedJson.AIcParse(locInput["plan"].toString()) as Map<String, Any?>
             @Suppress("UNCHECKED_CAST")
             val locInputCoordinates = locInput["coordinates"] as? Map<String, String> ?: emptyMap()
             val locInputKind = AInPublicationOutputKind.valueOf(locInput["outputKind"].toString())
@@ -260,7 +269,7 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
             @Suppress("UNCHECKED_CAST")
             val locCoordinates = locInput["coordinates"] as? Map<String, String> ?: emptyMap()
             @Suppress("UNCHECKED_CAST")
-            val locProfiles = JsonSlurper().parseText(locInput["profiles"].toString()) as Map<String, Any?>
+            val locProfiles = AIcMaterializedJson.AIcParse(locInput["profiles"].toString()) as Map<String, Any?>
             @Suppress("UNCHECKED_CAST")
             val locPending = AIcOutputPublicationExecutionResult(
                 locInput["artifactIdentity"].toString(), locCoordinates["technologyKind"] ?: "unknown", locKind,
@@ -568,7 +577,7 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
             .replace(Regex("[^A-Za-z0-9._-]+"), "_")
         val locFile = locRoot.resolve("$locSafe-${AIcPublicationDomainStore.fingerprint(AIcScopeKey(aResult)).take(16)}.json")
         if (Files.isRegularFile(locFile)) {
-            val locPrevious = JsonSlurper().parseText(Files.readString(locFile)) as? Map<*, *>
+            val locPrevious = AIcMaterializedJson.AIcParse(Files.readString(locFile)) as? Map<*, *>
             check(locPrevious?.get("State") != "COMPLETE") {
                 "Completed Version Scope record is immutable: $locFile. Start a new build invocation."
             }
@@ -985,7 +994,7 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         val locFile = AIcPublicationDomainStore.resultFile(locRepositoryDirectory!!, AIcInvocationId(), aDomainId, aStage)
         if (!Files.isRegularFile(locFile)) return null
         val locContribution = AIcPublicationDomainStore.read(locRepositoryDirectory!!, AIcInvocationId(), aDomainId, aStage) {
-            JsonSlurper().parseText(it) as Map<String, Object>
+            AIcMaterializedJson.AIcParse(it) as Map<String, Object>
         }
         check(locContribution.metadata()["PlanFingerprint"] == locPlanFingerprint) {
             "Publication domain '$aDomainId' resolved a different repository plan."
@@ -1143,7 +1152,7 @@ abstract class AIcModustroPublishFilesTask : DefaultTask() {
 
     @TaskAction fun AIcPublish() {
         @Suppress("UNCHECKED_CAST")
-        val locPlan = JsonSlurper().parseText(publicationPlanJson.get()) as Map<String, Any?>
+        val locPlan = AIcMaterializedJson.AIcObject(publicationPlanJson.get())
         if (locPlan["publicationEnabled"] != true) return
         val locEndpoints = (locPlan["publicationEndpoints"] as? List<*>).orEmpty()
         if (locEndpoints.none { (it as? Map<*, *>)?.get("enabled") != false }) return
@@ -1181,7 +1190,7 @@ abstract class AIcModustroPublishFilesTask : DefaultTask() {
             }
         }
         @Suppress("UNCHECKED_CAST")
-        val locProfiles = JsonSlurper().parseText(credentialProfilesJson.get()) as Map<String, Any?>
+        val locProfiles = AIcMaterializedJson.AIcObject(credentialProfilesJson.get())
         publicationService.get().AIcPublish(AIcPublicationPayload(AInPublicationOutputKind.valueOf(outputKind.get()),
             AInPublicationStability.valueOf(stability.get().uppercase()), artifactIdentity.get(), publicationVersion.get(),
             locFiles, coordinates.get()), locPlan, locProfiles, path)
