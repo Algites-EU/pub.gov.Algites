@@ -561,7 +561,10 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         val locInvocationId = locInvocation.replace(Regex("[^A-Za-z0-9._-]+"), "_").take(100) + "-" + AIcPublicationDomainStore.fingerprint(locInvocation).take(16)
         val locRoot = parameters.credentialBaseDirectory.get().asFile.toPath().resolve("build/run/publication-records/$locInvocationId/version-scopes")
         Files.createDirectories(locRoot)
-        val locSafe = (aResult.versionScopeId() + "-" + aResult.version() + "-" + AIcStability(aResult.stability()))
+        /* Root Version Scope id '.' must not turn the record into a hidden dotfile:
+         * actions/upload-artifact excludes hidden files by default. */
+        val locSafeScope = if (aResult.versionScopeId() == ".") "root" else aResult.versionScopeId()
+        val locSafe = (locSafeScope + "-" + aResult.version() + "-" + AIcStability(aResult.stability()))
             .replace(Regex("[^A-Za-z0-9._-]+"), "_")
         val locFile = locRoot.resolve("$locSafe-${AIcPublicationDomainStore.fingerprint(AIcScopeKey(aResult)).take(16)}.json")
         if (Files.isRegularFile(locFile)) {

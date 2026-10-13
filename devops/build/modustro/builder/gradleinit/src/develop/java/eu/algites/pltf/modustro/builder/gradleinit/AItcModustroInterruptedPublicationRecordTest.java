@@ -29,6 +29,14 @@ public final class AItcModustroInterruptedPublicationRecordTest {
     }
 
     @Test
+    public void AIcRootVersionScopeRecordIsNotHidden() throws IOException {
+        String locSource = Files.readString(AIcRepositoryRoot().resolve(
+            "devops/build/modustro/builder/gradleinit/src/product/kotlin/eu/algites/pltf/modustro/builder/gradleinit/AIcModustroPublicationService.kt"));
+        Assert.assertTrue(locSource.contains("val locSafeScope = if (aResult.versionScopeId() == \".\") \"root\" else aResult.versionScopeId()"));
+        Assert.assertTrue(locSource.contains("val locSafe = (locSafeScope +"));
+    }
+
+    @Test
     public void AIcFailureCheckpointCannotTriggerRemotePublication() throws IOException {
         String locSource = Files.readString(AIcRepositoryRoot().resolve(
             "devops/build/modustro/builder/gradleinit/src/product/kotlin/eu/algites/pltf/modustro/builder/gradleinit/AIcModustroPublicationService.kt"));
