@@ -1,6 +1,5 @@
 package eu.algites.pltf.modustro.builder.gradleinit;
 
-import groovy.json.internal.LazyMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -94,7 +93,8 @@ public final class AItcMaterializedJsonTest {
     }
 
     private static void AIcAssertEager(Object aValue) {
-        Assert.assertFalse(aValue instanceof LazyMap, "Groovy LazyMap leaked after JSON parsing");
+        Assert.assertFalse(aValue.getClass().getName().equals("groovy.json.internal.LazyMap"),
+            "Groovy LazyMap leaked after JSON parsing");
         if (aValue instanceof Map<?, ?> locMap) locMap.values().forEach(AItcMaterializedJsonTest::AIcAssertEager);
         if (aValue instanceof List<?> locList) locList.forEach(AItcMaterializedJsonTest::AIcAssertEager);
     }
