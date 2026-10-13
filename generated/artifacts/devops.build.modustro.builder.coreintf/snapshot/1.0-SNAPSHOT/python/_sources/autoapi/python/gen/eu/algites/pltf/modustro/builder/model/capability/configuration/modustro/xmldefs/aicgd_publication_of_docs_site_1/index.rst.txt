@@ -1,0 +1,83 @@
+python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_docs_site_1
+============================================================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_docs_site_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_docs_site_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_docs_site_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_docs_site_1.AIcgdPublicationOfDocsSite_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdPublicationOfDocsSite_1
+
+   Documentation-site publication capability configuration.
+
+   Generated from canonical definition publication-of-docs-site/1. Source: src/product/xmldefs/eu/algites/pltf/modustro/builder/model/capability/configuration/modustro/publication-of-docs-site_1.xsd. Do not edit manually.
+
+   .. attribute:: enabled
+
+      Whether documentation-site publication is enabled.
+
+   .. attribute:: publication_destinations
+
+      PublicationEndpoint identifiers selected as publication destinations for the documentation site.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__ENABLED
+      :value: 'Enabled'
+
+
+      ** ``Enabled``
+
+      **Field Description:** Whether documentation-site publication is enabled.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PUBLICATION_DESTINATIONS
+      :value: 'PublicationDestinations'
+
+
+      ** ``PublicationDestinations``
+
+      **Field Description:** PublicationEndpoint identifiers selected as publication destinations for the documentation site.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: enabled
+      :type:  bool
+
+
+   .. py:attribute:: publication_destinations
+      :type:  Any
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

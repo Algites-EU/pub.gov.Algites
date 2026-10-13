@@ -1,0 +1,145 @@
+python.gen.eu.algites.pltf.modustro.builder.model.technology.aicgd_technology_kind_definition_1
+===============================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.model.technology.aicgd_technology_kind_definition_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.technology.aicgd_technology_kind_definition_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.model.technology.aicgd_technology_kind_definition_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.technology.aicgd_technology_kind_definition_1.AIcgdTechnologyKindDefinition_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdTechnologyKindDefinition_1
+
+   Canonical representations: YAMLDEFS: urn:algites:modustro:builder:yamldef:model:technology-kind-definition:1 (src/product/yamldefs/eu/algites/pltf/modustro/builder/model/technology/technology-kind-definition_1.yamldef.schema.json); JSONDEFS: urn:algites:modustro:builder:jsondef:model:technology-kind-definition:1 (src/product/jsondefs/eu/algites/pltf/modustro/builder/model/technology/technology-kind-definition_1.jsondef.schema.json)
+
+   Generated from canonical definition urn:algites:modustro:builder:yamldef:model:technology-kind-definition:1/1. Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/model/technology/technology-kind-definition_1.yamldef.schema.json. Do not edit manually.
+
+   .. attribute:: technology_kind
+
+      Value of canonical property TechnologyKind.
+
+   .. attribute:: capabilities
+
+      Value of canonical property Capabilities.
+
+   .. attribute:: build_output_types
+
+      Value of canonical property BuildOutputTypes.
+
+   .. attribute:: default_build_output_types
+
+      Value of canonical property DefaultBuildOutputTypes.
+
+   .. attribute:: default_dependency_output_types
+
+      Value of canonical property DefaultDependencyOutputTypes.
+
+   .. attribute:: _schema
+
+      Optional absolute URI of the schema describing this root document.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__TECHNOLOGY_KIND
+      :value: 'TechnologyKind'
+
+
+      ** ``TechnologyKind``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__CAPABILITIES
+      :value: 'Capabilities'
+
+
+      ** ``Capabilities``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__BUILD_OUTPUT_TYPES
+      :value: 'BuildOutputTypes'
+
+
+      ** ``BuildOutputTypes``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__DEFAULT_BUILD_OUTPUT_TYPES
+      :value: 'DefaultBuildOutputTypes'
+
+
+      ** ``DefaultBuildOutputTypes``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__DEFAULT_DEPENDENCY_OUTPUT_TYPES
+      :value: 'DefaultDependencyOutputTypes'
+
+
+      ** ``DefaultDependencyOutputTypes``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SCHEMA
+      :value: '$schema'
+
+
+      ** ``$schema``
+
+      **Field Description:** Optional absolute URI of the schema describing this root document.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: technology_kind
+      :type:  str
+
+
+   .. py:attribute:: capabilities
+      :type:  tuple[Mapping[str, Any], Ellipsis]
+
+
+   .. py:attribute:: build_output_types
+      :type:  tuple[Mapping[str, Any], Ellipsis]
+
+
+   .. py:attribute:: default_build_output_types
+      :type:  tuple[str, Ellipsis]
+
+
+   .. py:attribute:: default_dependency_output_types
+      :type:  tuple[str, Ellipsis]
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

@@ -1,0 +1,47 @@
+python.gen.eu.algites.pltf.modustro.builder.model.execution.xmldefs.aing_build_execution_failure_policy_1
+=========================================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.model.execution.xmldefs.aing_build_execution_failure_policy_1
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.execution.xmldefs.aing_build_execution_failure_policy_1.AIngBuildExecutionFailurePolicy_1
+
+
+Module Contents
+---------------
+
+.. py:class:: AIngBuildExecutionFailurePolicy_1
+
+   Bases: :py:obj:`str`, :py:obj:`enum.Enum`
+
+
+   Defines how an execution failure affects its parent execution hierarchy and the enclosing build.
+
+   Generated from canonical definition eu.algites.pltf.modustro.builder.model.execution.build-execution-failure-policy/1. Source: src/product/xmldefs/eu/algites/pltf/modustro/builder/model/execution/build-execution-failure-policy_1.xsd. Do not edit manually.
+
+   Values:
+       FAIL_BUILD_ON_FAILURE: Requires the entire build to fail when this execution or any non-ignored descendant execution fails. This terminal failure cannot be absorbed by an ancestor execution policy.
+       PROPAGATE_FAILURE: Propagates a non-terminal failure to the immediate parent execution, whose own BuildExecutionFailurePolicy decides whether to fail the build, continue propagation, or ignore the failure.
+       IGNORE_FAILURE: Consumes a non-terminal failure at this execution boundary so that it is not propagated to an ancestor execution. An already terminal fail-build failure cannot be ignored.
+
+
+   .. py:attribute:: FAIL_BUILD_ON_FAILURE
+      :value: 'fail_build_on_failure'
+
+
+
+   .. py:attribute:: PROPAGATE_FAILURE
+      :value: 'propagate_failure'
+
+
+
+   .. py:attribute:: IGNORE_FAILURE
+      :value: 'ignore_failure'
+
+
+

@@ -1,0 +1,140 @@
+python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_global_schemas_1
+=================================================================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_global_schemas_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_global_schemas_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_global_schemas_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.xmldefs.aicgd_publication_of_global_schemas_1.AIcgdPublicationOfGlobalSchemas_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdPublicationOfGlobalSchemas_1
+
+   Global-definition publication capability configuration.
+
+   Generated from canonical definition publication-of-global-schemas/1. Source: src/product/xmldefs/eu/algites/pltf/modustro/builder/model/capability/configuration/modustro/publication-of-global-schemas_1.xsd. Do not edit manually.
+
+   .. attribute:: enabled
+
+      Whether global definition publication is enabled.
+
+   .. attribute:: source_kinds
+
+      Canonical definition source kinds included in publication.
+
+   .. attribute:: additional_source_roots
+
+      Additional canonical definition roots to include beyond standard source roots.
+
+   .. attribute:: publication_destinations
+
+      PublicationEndpoint identifiers selected as global-definition publication destinations.
+
+   .. attribute:: modustro_schema_version_validation
+
+      Controls validation of Modustro schema-definition versions before publication.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__ENABLED
+      :value: 'Enabled'
+
+
+      ** ``Enabled``
+
+      **Field Description:** Whether global definition publication is enabled.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SOURCE_KINDS
+      :value: 'SourceKinds'
+
+
+      ** ``SourceKinds``
+
+      **Field Description:** Canonical definition source kinds included in publication.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__ADDITIONAL_SOURCE_ROOTS
+      :value: 'AdditionalSourceRoots'
+
+
+      ** ``AdditionalSourceRoots``
+
+      **Field Description:** Additional canonical definition roots to include beyond standard source roots.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PUBLICATION_DESTINATIONS
+      :value: 'PublicationDestinations'
+
+
+      ** ``PublicationDestinations``
+
+      **Field Description:** PublicationEndpoint identifiers selected as global-definition publication destinations.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__MODUSTRO_SCHEMA_VERSION_VALIDATION
+      :value: 'ModustroSchemaVersionValidation'
+
+
+      ** ``ModustroSchemaVersionValidation``
+
+      **Field Description:** Controls validation of Modustro schema-definition versions before publication.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: enabled
+      :type:  bool
+
+
+   .. py:attribute:: source_kinds
+      :type:  Any
+
+
+   .. py:attribute:: additional_source_roots
+      :type:  Any
+
+
+   .. py:attribute:: publication_destinations
+      :type:  Any
+
+
+   .. py:attribute:: modustro_schema_version_validation
+      :type:  Any
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

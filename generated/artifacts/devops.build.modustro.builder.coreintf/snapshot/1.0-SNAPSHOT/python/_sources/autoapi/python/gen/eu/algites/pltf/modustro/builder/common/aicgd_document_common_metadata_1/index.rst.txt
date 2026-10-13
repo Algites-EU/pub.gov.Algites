@@ -1,0 +1,60 @@
+python.gen.eu.algites.pltf.modustro.builder.common.aicgd_document_common_metadata_1
+===================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.common.aicgd_document_common_metadata_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.common.aicgd_document_common_metadata_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.common.aicgd_document_common_metadata_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.common.aicgd_document_common_metadata_1.AIcgdDocumentCommonMetadata_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdDocumentCommonMetadata_1
+
+   Common technical metadata accepted by Algites/Modustro YAML and JSON root documents. Canonical representations: YAMLDEFS: https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json (src/product/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json); JSONDEFS: https://defs.dev.algites.eu/api/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json (src/product/jsondefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.jsondef.schema.json)
+
+   Generated from canonical definition https://defs.dev.algites.eu/api/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json/1. Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/common/document-common-metadata_1.yamldef.schema.json. Do not edit manually.
+
+   .. attribute:: _schema
+
+      Optional absolute URI of the schema describing this root document.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SCHEMA
+      :value: '$schema'
+
+
+      ** ``$schema``
+
+      **Field Description:** Optional absolute URI of the schema describing this root document.
+
+      :type: **Field Name
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

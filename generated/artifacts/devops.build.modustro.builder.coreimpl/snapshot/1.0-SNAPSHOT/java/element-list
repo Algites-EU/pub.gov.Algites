@@ -1,3 +1,4 @@
+eu.algites.pltf.modustro.builder.build
 eu.algites.pltf.modustro.builder.capability
 eu.algites.pltf.modustro.builder.catalog
 eu.algites.pltf.modustro.builder.dependency
@@ -8,5 +9,7 @@ eu.algites.pltf.modustro.builder.output
 eu.algites.pltf.modustro.builder.output.java
 eu.algites.pltf.modustro.builder.output.python
 eu.algites.pltf.modustro.builder.publication
-eu.algites.pltf.modustro.builder.resource
+eu.algites.pltf.modustro.builder.publication.adapters
+eu.algites.pltf.modustro.builder.subscription
+eu.algites.pltf.modustro.builder.subscription.adapters
 eu.algites.pltf.modustro.builder.validation

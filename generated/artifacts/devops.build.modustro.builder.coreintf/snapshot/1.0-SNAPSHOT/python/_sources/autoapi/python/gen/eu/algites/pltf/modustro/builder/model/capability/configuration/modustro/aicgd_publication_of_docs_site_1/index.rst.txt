@@ -1,0 +1,94 @@
+python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.aicgd_publication_of_docs_site_1
+====================================================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.aicgd_publication_of_docs_site_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.aicgd_publication_of_docs_site_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.aicgd_publication_of_docs_site_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.configuration.modustro.aicgd_publication_of_docs_site_1.AIcgdPublicationOfDocsSite_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdPublicationOfDocsSite_1
+
+   Canonical representations: YAMLDEFS: urn:algites:modustro:builder:yamldef:capability-configuration:modustro:publication-of-docs-site:1 (src/product/yamldefs/eu/algites/pltf/modustro/builder/model/capability/configuration/modustro/publication-of-docs-site_1.yamldef.schema.json); JSONDEFS: urn:algites:modustro:builder:jsondef:capability-configuration:modustro:publication-of-docs-site:1 (src/product/jsondefs/eu/algites/pltf/modustro/builder/model/capability/configuration/modustro/publication-of-docs-site_1.jsondef.schema.json)
+
+   Generated from canonical definition urn:algites:modustro:builder:yamldef:capability-configuration:modustro:publication-of-docs-site:1/1. Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/model/capability/configuration/modustro/publication-of-docs-site_1.yamldef.schema.json. Do not edit manually.
+
+   .. attribute:: _schema
+
+      Optional absolute URI of the schema describing this root document.
+
+   .. attribute:: enabled
+
+      Value of canonical property Enabled.
+
+   .. attribute:: publication_destinations
+
+      Value of canonical property PublicationDestinations.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SCHEMA
+      :value: '$schema'
+
+
+      ** ``$schema``
+
+      **Field Description:** Optional absolute URI of the schema describing this root document.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__ENABLED
+      :value: 'Enabled'
+
+
+      ** ``Enabled``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PUBLICATION_DESTINATIONS
+      :value: 'PublicationDestinations'
+
+
+      ** ``PublicationDestinations``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: enabled
+      :type:  bool
+
+
+   .. py:attribute:: publication_destinations
+      :type:  tuple[str, Ellipsis]
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

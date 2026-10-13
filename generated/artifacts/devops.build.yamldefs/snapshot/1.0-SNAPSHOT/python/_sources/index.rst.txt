@@ -1,4 +1,10 @@
 devops.build.yamldefs
 =====================
 
-No Python API source files were found in the canonical Python product source roots for this artifact.
+Python API reference generated from the artifact source tree.
+
+.. toctree::
+   :maxdepth: 2
+   :caption: API reference
+
+   autoapi/index

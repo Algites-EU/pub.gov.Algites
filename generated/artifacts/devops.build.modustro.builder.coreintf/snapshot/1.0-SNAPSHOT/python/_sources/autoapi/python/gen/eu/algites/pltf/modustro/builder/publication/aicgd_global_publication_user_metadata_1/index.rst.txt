@@ -1,0 +1,79 @@
+python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_user_metadata_1
+================================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_user_metadata_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_user_metadata_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_user_metadata_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_user_metadata_1.AIcgdGlobalPublicationUserMetadata_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdGlobalPublicationUserMetadata_1
+
+   Author-controlled source metadata used as input to global definition publication. Only the logical publication path is accepted; deployment-controlled fields are deliberately forbidden. Canonical representations: YAMLDEFS: urn:algites:modustro:builder:yamldef:publication:global-publication-user-metadata:1 (src/product/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.yamldef.schema.json); JSONDEFS: urn:algites:modustro:builder:jsondef:publication:global-publication-user-metadata:1 (src/product/jsondefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.jsondef.schema.json)
+
+   Generated from canonical definition urn:algites:modustro:builder:yamldef:publication:global-publication-user-metadata:1/1. Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-user-metadata_1.yamldef.schema.json. Do not edit manually.
+
+   .. attribute:: global_publication_path_id
+
+      Stable logical path selected by the definition author below the canonical definition source root.
+
+   .. attribute:: _schema
+
+      Optional absolute URI of the schema describing this root document.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID
+      :value: 'GlobalPublicationPathId'
+
+
+      ** ``GlobalPublicationPathId``
+
+      **Field Description:** Stable logical path selected by the definition author below the canonical definition source root.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SCHEMA
+      :value: '$schema'
+
+
+      ** ``$schema``
+
+      **Field Description:** Optional absolute URI of the schema describing this root document.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: global_publication_path_id
+      :type:  str
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

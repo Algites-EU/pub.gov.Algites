@@ -1,0 +1,96 @@
+python.gen.eu.algites.tool.build.aicgd_algites_environment_requirements_1
+=========================================================================
+
+.. py:module:: python.gen.eu.algites.tool.build.aicgd_algites_environment_requirements_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.tool.build.aicgd_algites_environment_requirements_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.tool.build.aicgd_algites_environment_requirements_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.tool.build.aicgd_algites_environment_requirements_1.AIcgdAlgitesEnvironmentRequirements_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdAlgitesEnvironmentRequirements_1
+
+   Generated representation of canonical definition algites-environment-requirements.
+
+   Generated from canonical definition https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/algites-environment-requirements_1.yamldef.schema.json/1. Source: src/product/yamldefs/algites-environment-requirements_1.yamldef.schema.json. Do not edit manually.
+
+   .. attribute:: java
+
+      Value of canonical property Java.
+
+   .. attribute:: python
+
+      Value of canonical property Python.
+
+   .. attribute:: mps
+
+      Value of canonical property Mps.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__JAVA
+      :value: 'Java'
+
+
+      ** ``Java``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PYTHON
+      :value: 'Python'
+
+
+      ** ``Python``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__MPS
+      :value: 'Mps'
+
+
+      ** ``Mps``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: java
+      :type:  python.gen.eu.algites.tool.build.aicgd_algites_version_requirement_1.AIcgdAlgitesVersionRequirement_1 | None
+
+
+   .. py:attribute:: python
+      :type:  python.gen.eu.algites.tool.build.aicgd_algites_version_requirement_1.AIcgdAlgitesVersionRequirement_1 | None
+
+
+   .. py:attribute:: mps
+      :type:  python.gen.eu.algites.tool.build.aicgd_algites_version_requirement_1.AIcgdAlgitesVersionRequirement_1 | None
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

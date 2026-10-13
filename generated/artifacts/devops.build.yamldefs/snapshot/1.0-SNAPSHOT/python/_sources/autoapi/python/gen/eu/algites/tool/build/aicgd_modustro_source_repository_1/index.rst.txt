@@ -1,0 +1,247 @@
+python.gen.eu.algites.tool.build.aicgd_modustro_source_repository_1
+===================================================================
+
+.. py:module:: python.gen.eu.algites.tool.build.aicgd_modustro_source_repository_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.tool.build.aicgd_modustro_source_repository_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.tool.build.aicgd_modustro_source_repository_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.tool.build.aicgd_modustro_source_repository_1.AIcgdModustroSourceRepository_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdModustroSourceRepository_1
+
+   Generated representation of canonical definition modustro-source-repository.
+
+   Generated from canonical definition https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/main/devops/build/yamldefs/src/product/yamldefs/modustro-source-repository_1.yamldef.schema.json/1. Source: src/product/yamldefs/modustro-source-repository_1.yamldef.schema.json. Do not edit manually.
+
+   .. attribute:: source_repository
+
+      Value of canonical property SourceRepository.
+
+   .. attribute:: _schema
+
+      Optional absolute URI of the schema describing this root document.
+
+   .. attribute:: group_id
+
+      Value of canonical property GroupId.
+
+   .. attribute:: version
+
+      Value of canonical property Version.
+
+   .. attribute:: credential_profiles
+
+      Value of canonical property CredentialProfiles.
+
+   .. attribute:: dependencies
+
+      Value of canonical property Dependencies.
+
+   .. attribute:: dependency_constraints
+
+      Value of canonical property DependencyConstraints.
+
+   .. attribute:: environment_requirements
+
+      Value of canonical property EnvironmentRequirements.
+
+   .. attribute:: nested_gradle_settings_build_policy
+
+      Value of canonical property NestedGradleSettingsBuildPolicy.
+
+   .. attribute:: output_publications
+
+      Value of canonical property OutputPublications.
+
+   .. attribute:: artifact_publication_finalization_actions
+
+      Value of canonical property ArtifactPublicationFinalizationActions.
+
+   .. attribute:: version_scope_publication_finalization_actions
+
+      Value of canonical property VersionScopePublicationFinalizationActions.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SOURCE_REPOSITORY
+      :value: 'SourceRepository'
+
+
+      ** ``SourceRepository``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SCHEMA
+      :value: '$schema'
+
+
+      ** ``$schema``
+
+      **Field Description:** Optional absolute URI of the schema describing this root document.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__GROUP_ID
+      :value: 'GroupId'
+
+
+      ** ``GroupId``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__VERSION
+      :value: 'Version'
+
+
+      ** ``Version``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__CREDENTIAL_PROFILES
+      :value: 'CredentialProfiles'
+
+
+      ** ``CredentialProfiles``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__DEPENDENCIES
+      :value: 'Dependencies'
+
+
+      ** ``Dependencies``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__DEPENDENCY_CONSTRAINTS
+      :value: 'DependencyConstraints'
+
+
+      ** ``DependencyConstraints``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__ENVIRONMENT_REQUIREMENTS
+      :value: 'EnvironmentRequirements'
+
+
+      ** ``EnvironmentRequirements``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__NESTED_GRADLE_SETTINGS_BUILD_POLICY
+      :value: 'NestedGradleSettingsBuildPolicy'
+
+
+      ** ``NestedGradleSettingsBuildPolicy``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__OUTPUT_PUBLICATIONS
+      :value: 'OutputPublications'
+
+
+      ** ``OutputPublications``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__ARTIFACT_PUBLICATION_FINALIZATION_ACTIONS
+      :value: 'ArtifactPublicationFinalizationActions'
+
+
+      ** ``ArtifactPublicationFinalizationActions``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__VERSION_SCOPE_PUBLICATION_FINALIZATION_ACTIONS
+      :value: 'VersionScopePublicationFinalizationActions'
+
+
+      ** ``VersionScopePublicationFinalizationActions``
+
+      :type: **Field Name
+
+
+   .. py:attribute:: source_repository
+      :type:  Mapping[str, Any]
+
+
+   .. py:attribute:: group_id
+      :type:  str
+
+
+   .. py:attribute:: version
+      :type:  python.gen.eu.algites.tool.build.aicgd_algites_version_1.AIcgdAlgitesVersion_1
+
+
+   .. py:attribute:: credential_profiles
+      :type:  Mapping[str, Any]
+
+
+   .. py:attribute:: dependencies
+      :type:  tuple[Mapping[str, Any], Ellipsis]
+
+
+   .. py:attribute:: dependency_constraints
+      :type:  tuple[Mapping[str, Any], Ellipsis]
+
+
+   .. py:attribute:: environment_requirements
+      :type:  python.gen.eu.algites.tool.build.aicgd_algites_environment_requirements_1.AIcgdAlgitesEnvironmentRequirements_1
+
+
+   .. py:attribute:: nested_gradle_settings_build_policy
+      :type:  str
+
+
+   .. py:attribute:: output_publications
+      :type:  tuple[Mapping[str, Any], Ellipsis]
+
+
+   .. py:attribute:: artifact_publication_finalization_actions
+      :type:  Mapping[str, Any]
+
+
+   .. py:attribute:: version_scope_publication_finalization_actions
+      :type:  Mapping[str, Any]
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

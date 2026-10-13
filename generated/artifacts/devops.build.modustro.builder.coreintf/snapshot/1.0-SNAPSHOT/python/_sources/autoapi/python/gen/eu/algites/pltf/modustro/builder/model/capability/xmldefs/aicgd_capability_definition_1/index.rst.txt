@@ -1,0 +1,102 @@
+python.gen.eu.algites.pltf.modustro.builder.model.capability.xmldefs.aicgd_capability_definition_1
+==================================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.model.capability.xmldefs.aicgd_capability_definition_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.xmldefs.aicgd_capability_definition_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.xmldefs.aicgd_capability_definition_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.model.capability.xmldefs.aicgd_capability_definition_1.AIcgdCapabilityDefinition_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdCapabilityDefinition_1
+
+   Defines a Modustro Builder capability, the model scopes where it may be configured, and the optional schema that describes capability-specific configuration.
+
+   Generated from canonical definition urn:algites:modustro:builder:model:capability-definition:1/1. Source: src/product/xmldefs/eu/algites/pltf/modustro/builder/model/capability/capability-definition_1.xsd. Do not edit manually.
+
+   .. attribute:: capability
+
+      Stable identifier of the capability being defined.
+
+   .. attribute:: allowed_scope
+
+      Descriptor scope at which this capability may be declared.
+
+   .. attribute:: configuration_schema_id
+
+      Optional canonical schema identifier for capability-specific configuration.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__CAPABILITY
+      :value: 'Capability'
+
+
+      ** ``Capability``
+
+      **Field Description:** Stable identifier of the capability being defined.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__ALLOWED_SCOPE
+      :value: 'AllowedScope'
+
+
+      ** ``AllowedScope``
+
+      **Field Description:** Descriptor scope at which this capability may be declared.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__CONFIGURATION_SCHEMA_ID
+      :value: 'ConfigurationSchemaId'
+
+
+      ** ``ConfigurationSchemaId``
+
+      **Field Description:** Optional canonical schema identifier for capability-specific configuration.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: capability
+      :type:  str
+
+
+   .. py:attribute:: allowed_scope
+      :type:  tuple[str, Ellipsis]
+
+
+   .. py:attribute:: configuration_schema_id
+      :type:  str | None
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+

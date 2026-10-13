@@ -1,0 +1,212 @@
+python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_deploy_metadata_1
+==================================================================================================
+
+.. py:module:: python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_deploy_metadata_1
+
+
+Attributes
+----------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_deploy_metadata_1.AIcSchemaTemporalValue
+   python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_deploy_metadata_1.AIcSchemaDuration
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   python.gen.eu.algites.pltf.modustro.builder.publication.aicgd_global_publication_deploy_metadata_1.AIcgdGlobalPublicationDeployMetadata_1
+
+
+Module Contents
+---------------
+
+.. py:data:: AIcSchemaTemporalValue
+
+.. py:data:: AIcSchemaDuration
+
+.. py:class:: AIcgdGlobalPublicationDeployMetadata_1
+
+   Deployment-controlled publication metadata generated from validated user metadata plus trusted publisher state. This document is not an author input contract. Canonical representations: YAMLDEFS: urn:algites:modustro:builder:yamldef:publication:global-publication-deploy-metadata:1 (src/product/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-deploy-metadata_1.yamldef.schema.json); JSONDEFS: urn:algites:modustro:builder:jsondef:publication:global-publication-deploy-metadata:1 (src/product/jsondefs/eu/algites/pltf/modustro/builder/publication/global-publication-deploy-metadata_1.jsondef.schema.json)
+
+   Generated from canonical definition urn:algites:modustro:builder:yamldef:publication:global-publication-deploy-metadata:1/1. Source: src/product/yamldefs/eu/algites/pltf/modustro/builder/publication/global-publication-deploy-metadata_1.yamldef.schema.json. Do not edit manually.
+
+   .. attribute:: global_publication_path_id
+
+      Stable logical publication path copied from validated user metadata.
+
+   .. attribute:: publication_state
+
+      Server-controlled publication lifecycle state. Released definitions are immutable and cannot transition back to draft.
+
+   .. attribute:: publication_revision
+
+      Server-controlled monotonically increasing revision of successfully deployed draft content. Release freezes the current content revision.
+
+   .. attribute:: first_published_at
+
+      Server-generated timestamp of the first successful deployment for this GlobalPublicationPathId.
+
+   .. attribute:: published_at
+
+      Server-generated timestamp of the most recent successful deployment or release transition represented by this metadata.
+
+   .. attribute:: content_sha256
+
+      SHA-256 of the exact deployed canonical content, used to reject incomplete or inconsistent definition/sidecar pairs.
+
+   .. attribute:: _schema
+
+      Optional absolute URI of the schema describing this root document.
+
+   .. attribute:: released_at
+
+      Server-generated timestamp at which this publication became an immutable release; absent while the publication is a draft.
+
+   .. attribute:: published_by
+
+      Optional trusted publisher identity derived by the deployment adapter from authenticated execution context; never copied from user metadata.
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__GLOBAL_PUBLICATION_PATH_ID
+      :value: 'GlobalPublicationPathId'
+
+
+      ** ``GlobalPublicationPathId``
+
+      **Field Description:** Stable logical publication path copied from validated user metadata.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PUBLICATION_STATE
+      :value: 'PublicationState'
+
+
+      ** ``PublicationState``
+
+      **Field Description:** Server-controlled publication lifecycle state. Released definitions are immutable and cannot transition back to draft.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PUBLICATION_REVISION
+      :value: 'PublicationRevision'
+
+
+      ** ``PublicationRevision``
+
+      **Field Description:** Server-controlled monotonically increasing revision of successfully deployed draft content. Release freezes the current content revision.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__FIRST_PUBLISHED_AT
+      :value: 'FirstPublishedAt'
+
+
+      ** ``FirstPublishedAt``
+
+      **Field Description:** Server-generated timestamp of the first successful deployment for this GlobalPublicationPathId.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PUBLISHED_AT
+      :value: 'PublishedAt'
+
+
+      ** ``PublishedAt``
+
+      **Field Description:** Server-generated timestamp of the most recent successful deployment or release transition represented by this metadata.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__CONTENT_SHA256
+      :value: 'ContentSha256'
+
+
+      ** ``ContentSha256``
+
+      **Field Description:** SHA-256 of the exact deployed canonical content, used to reject incomplete or inconsistent definition/sidecar pairs.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__SCHEMA
+      :value: '$schema'
+
+
+      ** ``$schema``
+
+      **Field Description:** Optional absolute URI of the schema describing this root document.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__RELEASED_AT
+      :value: 'ReleasedAt'
+
+
+      ** ``ReleasedAt``
+
+      **Field Description:** Server-generated timestamp at which this publication became an immutable release; absent while the publication is a draft.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: SCHEMA_FIELD_NAME__PUBLISHED_BY
+      :value: 'PublishedBy'
+
+
+      ** ``PublishedBy``
+
+      **Field Description:** Optional trusted publisher identity derived by the deployment adapter from authenticated execution context; never copied from user metadata.
+
+      :type: **Field Name
+
+
+   .. py:attribute:: global_publication_path_id
+      :type:  str
+
+
+   .. py:attribute:: publication_state
+      :type:  str
+
+
+   .. py:attribute:: publication_revision
+      :type:  int
+
+
+   .. py:attribute:: first_published_at
+      :type:  AIcSchemaTemporalValue
+
+
+   .. py:attribute:: published_at
+      :type:  AIcSchemaTemporalValue
+
+
+   .. py:attribute:: content_sha256
+      :type:  str
+
+
+   .. py:attribute:: released_at
+      :type:  AIcSchemaTemporalValue
+
+
+   .. py:attribute:: published_by
+      :type:  str
+
+
+   .. py:method:: from_mapping(value: Mapping[str, object])
+      :classmethod:
+
+
+
+   .. py:method:: to_mapping() -> Mapping[str, object]
+
+
