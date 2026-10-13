@@ -162,6 +162,17 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
             locHandle.requiredCompletion().toCompletableFuture().get()
         } catch (locFailure: Exception) {
             AIcReportPublicationFailure(aOutputId, aPayload, aPlan, aProfiles)
+            /*
+             * A failing required publication aborts the Gradle task graph before the
+             * normal Version Scope finalization barrier. Persist a local partial
+             * failure record now, without executing any finalization or publication.
+             */
+            try {
+                AIcWriteInterruptedVersionScopeRecord(aOutputId)
+            } catch (locRecordFailure: Exception) {
+                locLogger.warn("Unable to persist an interrupted Version Scope record for {}", aOutputId, locRecordFailure)
+                locFailure.addSuppressed(locRecordFailure)
+            }
             throw GradleException("Required publishing failed for '${aPayload.artifactIdentity()}' ${aPayload.outputKind()}.", locFailure)
         }
     }
@@ -476,7 +487,76 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
         "VersionScopePublicationFinalizationActions" to aResult.versionScopePublicationFinalizationActions().map(::AIcFinalizationTreeMap)
     )
 
-    private fun AIcWriteVersionScopeRecord(aResult: AIcVersionScopePublicationExecutionResult, aMissingResults: List<String> = emptyList()) {
+    /**
+     * Saves an incomplete, locally-only Version Scope record when one mandatory
+     * publication fails before the normal finalize/export tasks can execute.
+     *
+     * Prepared task inputs cover the whole scope, including tasks Gradle will skip
+     * after this failure. Only already completed output futures are represented as
+     * completed; the remainder stay pending and are listed explicitly.
+     *
+     * This is a diagnostic checkpoint, not a release ledger commit. In particular,
+     * no artifact/Version Scope finalizers or remote publication are invoked here.
+     */
+    @Synchronized
+    private fun AIcWriteInterruptedVersionScopeRecord(aFailedOutputId: String) {
+        val locFailed = locExpectedOutputs[aFailedOutputId] ?: return
+        val locScopeKey = AIcScopeKey(locFailed)
+        val locScopeOutputs = locExpectedOutputs.values.filter { AIcScopeKey(it) == locScopeKey }
+        if (locScopeOutputs.isEmpty()) return
+
+        val locPendingIds = mutableListOf<String>()
+        val locResults = locScopeOutputs.map { locOutput ->
+            val locFuture = locOutput.handle?.outputExecutionResult()?.toCompletableFuture()
+            val locTerminal = try {
+                if (locFuture?.isDone == true) locFuture.getNow(null) else null
+            } catch (locFailure: Exception) {
+                null
+            }
+            val locResult = locTerminal ?: locDeferredJavaResults[locOutput.outputId]
+            if (locResult == null) locPendingIds.add(locOutput.outputId)
+            locOutput to (locResult ?: locOutput.pendingResult)
+        }
+
+        val locArtifacts = locResults.groupBy { (locOutput, _) ->
+            locOutput.plan["artifactPath"]?.toString() ?: "."
+        }.toSortedMap().values.map { locGroup ->
+            val locFirst = locGroup.first()
+            val locOutput = locFirst.first
+            val locResult = locFirst.second
+            AIcArtifactPublicationExecutionResult(
+                locResult.artifactIdentity(),
+                locOutput.plan["artifactPath"]?.toString() ?: ".",
+                locOutput.plan["versionScopePath"]?.toString() ?: ".",
+                locResult.version(),
+                locResult.stability(),
+                locGroup.map { it.second },
+                emptyList()
+            )
+        }
+
+        val locFirst = locScopeOutputs.first().pendingResult
+        val locScope = AIcVersionScopePublicationExecutionResult(
+            locFailed.plan["versionScopePath"]?.toString() ?: ".",
+            locFirst.version(),
+            locFirst.stability(),
+            AInVersionScopePublicationAttemptState.FAILED,
+            locArtifacts,
+            emptyList()
+        )
+        AIcWriteVersionScopeRecord(
+            locScope,
+            listOf("InterruptedRequiredPublication:$aFailedOutputId") +
+                locPendingIds.sorted().map { "NotYetTerminal:$it" },
+            false
+        )
+    }
+
+    private fun AIcWriteVersionScopeRecord(
+        aResult: AIcVersionScopePublicationExecutionResult,
+        aMissingResults: List<String> = emptyList(),
+        aPublishSystemRecord: Boolean = true
+    ) {
         val locInvocation = AIcInvocationId()
         val locInvocationId = locInvocation.replace(Regex("[^A-Za-z0-9._-]+"), "_").take(100) + "-" + AIcPublicationDomainStore.fingerprint(locInvocation).take(16)
         val locRoot = parameters.credentialBaseDirectory.get().asFile.toPath().resolve("build/run/publication-records/$locInvocationId/version-scopes")
@@ -497,6 +577,7 @@ abstract class AIcModustroPublicationService : BuildService<AIcModustroPublicati
             catch (locFailure: java.nio.file.AtomicMoveNotSupportedException) { Files.move(locTemporary, locFile, java.nio.file.StandardCopyOption.REPLACE_EXISTING) }
         } finally { Files.deleteIfExists(locTemporary) }
         locLogger.lifecycle("Modustro Version Scope publication record: {}", locFile)
+        if (!aPublishSystemRecord) return
         /* The publication policy belongs to the Version Scope. Never pick the first
          * eligible artifact: conflicting effective policies must fail deterministically. */
         val locArtifacts = aResult.artifacts().sortedBy { it.artifactPath() }
