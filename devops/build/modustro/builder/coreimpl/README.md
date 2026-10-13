@@ -48,7 +48,7 @@ call the same check classes. The portable domain bridge additionally round-trips
 validates missing/stale/duplicate domain results, and checks immutable atomic handoff storage. Gradle orchestration
 has separate TestKit coverage in `gradleinit`.
 
-Run `bash devops/build/modustro/builder/coreimpl/verify-publication-core.sh` from the repository root with JDK 17 or newer.
+Run the publication regression suite with the standard Gradle `check` lifecycle (TestNG).
 This checks the publication/subscription/catalog packages and all core interfaces without external dependencies;
 it does not replace the full CoreImpl, Gradleinit, TestNG or generated-definition bootstrap checks.
 

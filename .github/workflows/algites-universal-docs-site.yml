@@ -449,12 +449,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          locCommand="${RUNNER_TEMP}/modustro-gradle.sh"
-          curl -fsSL \
-            "https://raw.githubusercontent.com/Algites-EU/pub.gov.Algites/${MODUSTRO_PUBLIC_GOVERNANCE_REVISION:-main}/gradle/tool/repository/modustro-gradle.sh" \
-            > "${locCommand}"
-          chmod +x "${locCommand}"
-          echo "ALGITES_GRADLE_COMMAND=${locCommand}" >> "${GITHUB_ENV}"
+          echo "ALGITES_GRADLE_COMMAND=${GITHUB_WORKSPACE}/source/gradlew" >> "${GITHUB_ENV}"
+          echo "PYTHONDONTWRITEBYTECODE=1" >> "${GITHUB_ENV}"
           echo "MODUSTRO_DIAGNOSTIC_ARTIFACT_NAME=gradle-diagnostic-reports-${GITHUB_JOB}-${GITHUB_RUN_ATTEMPT}-$(cat /proc/sys/kernel/random/uuid)" >> "${GITHUB_ENV}"
 
       - name: Resolve Algites artifact metadata

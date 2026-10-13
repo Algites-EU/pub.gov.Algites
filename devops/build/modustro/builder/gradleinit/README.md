@@ -72,7 +72,7 @@ the repository Settings and does not apply repository conventions to itself.
 Use JDK 17 and the repository's Gradle 9.2.1 wrapper:
 
 ```bash
-bash devops/build/modustro/builder/gradleinit/bootstrap.sh \
+bash devops/build/modustro/builder/builder-bootstrap.sh \
   :gradleinit:assemble :gradleinit:test :gradleinit:validatePlugins \
   :gradleinit:generatePomFileForMavenJavaPublication
 ```
@@ -86,7 +86,7 @@ For a Maven upload using this bootstrap build:
 ```bash
 export MODUSTRO_GRADLEINIT_BOOTSTRAP_USERNAME='<repository username>'
 export MODUSTRO_GRADLEINIT_BOOTSTRAP_PASSWORD='<repository password>'
-bash devops/build/modustro/builder/gradleinit/bootstrap.sh \
+bash devops/build/modustro/builder/builder-bootstrap.sh \
   :gradleinit:publishMavenJavaPublicationToBootstrapRepository \
   -Pmodustro.gradleinit.bootstrapRepositoryUrl='<Maven upload URL>'
 ```

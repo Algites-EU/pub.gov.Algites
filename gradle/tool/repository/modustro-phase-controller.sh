@@ -103,11 +103,12 @@ fi
 
 phases=(resolve prepare compile verify package publish)
 tasks=(modustroResolvePhase modustroPreparePhase modustroCompilePhase modustroVerifyPhase modustroPackagePhase modustroPublishPhase)
-gradle_command="${ALGITES_GRADLE_COMMAND:-$(dirname "${BASH_SOURCE[0]}")/modustro-gradle.sh}"
+gradle_command="${ALGITES_GRADLE_COMMAND:-$wrapper}"
+export PYTHONDONTWRITEBYTECODE=1
 export MODUSTRO_GRADLE_WRAPPER="$wrapper"
 for i in "${!phases[@]}"; do
   echo "=== Modustro phase: ${phases[$i]} ==="
-  bash "$gradle_command" --no-daemon --project-dir "$build_root" "${gradle_args[@]}" "${tasks[$i]}"
+  "$gradle_command" --no-daemon --stacktrace --build-cache --project-dir "$build_root" "${gradle_args[@]}" "${tasks[$i]}"
   if [[ "${phases[$i]}" == "$through" ]]; then
     break
   fi
