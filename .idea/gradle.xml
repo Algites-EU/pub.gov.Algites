@@ -8,10 +8,17 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/_obsolete" />
             <option value="$PROJECT_DIR$/devops" />
             <option value="$PROJECT_DIR$/devops/build" />
-            <option value="$PROJECT_DIR$/devops/build/policy" />
-            <option value="$PROJECT_DIR$/devops/build/policy/base" />
+            <option value="$PROJECT_DIR$/devops/build/credentials" />
+            <option value="$PROJECT_DIR$/devops/build/credentials/cli" />
+            <option value="$PROJECT_DIR$/devops/build/credentials/coreimpl" />
+            <option value="$PROJECT_DIR$/devops/build/credentials/coreintf" />
+            <option value="$PROJECT_DIR$/devops/build/credentials/macstore" />
+            <option value="$PROJECT_DIR$/devops/build/credentials/secretservicestore" />
+            <option value="$PROJECT_DIR$/devops/build/credentials/winstore" />
+            <option value="$PROJECT_DIR$/devops/build/yamldefs" />
           </set>
         </option>
       </GradleProjectSettings>

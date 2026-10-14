@@ -9,13 +9,12 @@
 .kotlin/
 **/.kotlin/
 
-# Documentation
-docs-site/
+# Legacy generated documentation/build outputs
+/docs-site/
+/run/
 
-# Build outputs (u vás do run/)
-run/*
-**/run/*
-build/*
+# Canonical repository-level build/runtime workspace
+/build/
 
 # Generated sources and derived development metadata
 **/src/product/*.gen/
@@ -24,3 +23,18 @@ build/*
 
 # Python packaging metadata
 **/*.egg-info/
+
+# IntelliJ IDEA - local configuration
+/.idea/*
+!/.idea/gradle.xml
+!/.idea/codeStyles/
+!/.idea/codeStyles/**
+!/.idea/inspectionProfiles/
+!/.idea/inspectionProfiles/**
+!/.idea/copyright/
+!/.idea/copyright/**
+!/.idea/encodings.xml
+!/.idea/vcs.xml
+
+# Local editor scratch files
+/.idea/#*#
